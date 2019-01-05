@@ -73,10 +73,18 @@ impl fmt::Display for Operand {
                 write!(f, "[{} + {} + 0x{:x}]", base, index, disp)
             },
             &Operand::RegIndexBaseScale(ref base, ref index, scale) => {
-                write!(f, "[{} + {} * {}]", base, index, scale)
+                if scale == 1 {
+                    write!(f, "[{} + {}]", base, index)
+                } else {
+                    write!(f, "[{} + {} * {}]", base, index, scale)
+                }
             }
             &Operand::RegIndexBaseScaleDisp(ref base, ref index, scale, disp) => {
-                write!(f, "[{} + {} * {} + 0x{:x}]", base, index, scale, disp)
+                if scale == 1 {
+                    write!(f, "[{} + {} + {:#x}]", base, index, disp)
+                } else {
+                    write!(f, "[{} + {} * {} + {:#x}]", base, index, scale, disp)
+                }
             },
             &Operand::Nothing => { Ok(()) },
             &Operand::Many(_) => { panic!("many not covered"); }
@@ -752,7 +760,7 @@ fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instructio
                                     instruction.opcode = Opcode::Invalid;
                                     return Ok(OperandCode::Nothing);
                                 },
-                                _ => { unsafe { unreachable_unchecked(); } }// panic!("unreachable?")
+                                _ => { unsafe { unreachable_unchecked(); } }
                             }
                             continue;
                         }
