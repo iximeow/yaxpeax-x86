@@ -1277,26 +1277,16 @@ fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instructio
 fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
-        if prefixes.rex().b() {
-            *result = Operand::Register(RegSpec {
-                num: m + 0b1000,
-                bank: width_to_gp_reg_bank(width)
-            });
-            return Ok(());
-        } else {
-            *result = Operand::Register(RegSpec {
-                num: m,
-                bank: width_to_gp_reg_bank(width)
-            });
-            return Ok(());
-        }
+        *result = Operand::Register(RegSpec {
+            num: m + if prefixes.rex().b() { 0b1000 } else { 0 },
+            bank: width_to_gp_reg_bank(width)
+        });
     } else if m == 5 && modbits == 0b00 {
         let disp = read_num(bytes_iter, 4);
         *result = Operand::RegDisp(RegSpec {
             num: 0,
             bank: if addr_width == 8 { RegisterBank::RIP } else { RegisterBank::EIP }
         }, disp as i32);
-        Ok(())
     } else if m == 4 {
         let sibbyte = *bytes_iter.next().unwrap();
         let (ss, index, base) = octets_of(sibbyte);
@@ -1315,99 +1305,60 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
             if index == 0b100 {
                 if modbits == 0b00 && !prefixes.rex().x() {
                     *result = Operand::DisplacementU32(disp as i32);
-                    Ok(())
                 } else {
-                    let indexnum = if prefixes.rex().x() {
-                        0b1000 + 0b100
-                    } else {
-                        0b100
+                    let reg = RegSpec {
+                        num: 0b100 + if prefixes.rex().x() { 0b1000 } else { 0 },
+                        bank: width_to_gp_reg_bank(addr_width)
                     };
 
                     if disp == 0 {
-                        *result = Operand::RegDeref(RegSpec {
-                            num: indexnum,
-                            bank: width_to_gp_reg_bank(addr_width)
-                        });
-                        Ok(())
+                        *result = Operand::RegDeref(reg);
                     } else {
-                        *result = Operand::RegDisp(RegSpec {
-                            num: indexnum,
-                            bank: width_to_gp_reg_bank(addr_width)
-                        }, disp as i32);
-                        Ok(())
+                        *result = Operand::RegDisp(reg, disp as i32);
                     }
                 }
             } else {
-                let base_reg = if prefixes.rex().b() {
-                    RegSpec {
-                        num: 5 + 0b1000,
-                        bank: width_to_gp_reg_bank(addr_width)
-                    }
-                } else {
-                    RegSpec {
-                        num: 5,
-                        bank: width_to_gp_reg_bank(addr_width)
-                    }
+                let base_reg = RegSpec {
+                    num: 5 + if prefixes.rex().b() { 0b1000 } else { 0 },
+                    bank: width_to_gp_reg_bank(addr_width)
                 };
 
-                let index_reg = if prefixes.rex().x() {
-                    RegSpec {
-                        num: index + 0b1000,
-                        bank: width_to_gp_reg_bank(addr_width)
-                    }
-                } else {
-                    RegSpec {
-                        num: index,
-                        bank: width_to_gp_reg_bank(addr_width)
-                    }
+                let index_reg = RegSpec {
+                    num: index + if prefixes.rex().x() { 0b1000 } else { 0 },
+                    bank: width_to_gp_reg_bank(addr_width)
                 };
 
-                match (ss, modbits, disp) {
+                *result = match (ss, modbits, disp) {
                     (0, 0b00, 0) => {
-                        *result = Operand::RegDeref(index_reg);
-                        Ok(())
+                        Operand::RegDeref(index_reg)
                     },
                     (0, 0b00, _) => {
-                        *result = Operand::RegDisp(index_reg, disp as i32);
-                        Ok(())
+                        Operand::RegDisp(index_reg, disp as i32)
                     },
                     (0, _, 0) => {
-                        *result = Operand::RegIndexBase(base_reg, index_reg);
-                        Ok(())
+                        Operand::RegIndexBase(base_reg, index_reg)
                     },
                     (0, _, _) => {
-                        *result = Operand::RegIndexBaseDisp(base_reg, index_reg, disp as i32);
-                        Ok(())
+                        Operand::RegIndexBaseDisp(base_reg, index_reg, disp as i32)
                     },
                     (_, 0b00, 0) => {
-                        *result = Operand::RegScale(index_reg, 1u8 << ss);
-                        Ok(())
+                        Operand::RegScale(index_reg, 1u8 << ss)
                     },
                     (_, 0b00, _) => {
-                        *result = Operand::RegScaleDisp(index_reg, 1u8 << ss, disp as i32);
-                        Ok(())
+                        Operand::RegScaleDisp(index_reg, 1u8 << ss, disp as i32)
                     },
                     (_, _, 0) => {
-                        *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
-                        Ok(())
+                        Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss)
                     },
                     (_, _, _) => {
-                        *result = Operand::RegIndexBaseScaleDisp(base_reg, index_reg, 1u8 << ss, disp as i32);
-                        Ok(())
+                        Operand::RegIndexBaseScaleDisp(base_reg, index_reg, 1u8 << ss, disp as i32)
                     }
-                }
+                };
             }
         } else {
-            let base_reg = if prefixes.rex().b() {
-                RegSpec {
-                    num: base + 0b1000,
-                    bank: width_to_gp_reg_bank(addr_width)
-                }
-            } else {
-                RegSpec {
-                    num: base,
-                    bank: width_to_gp_reg_bank(addr_width)
-                }
+            let base_reg = RegSpec {
+                num: base + if prefixes.rex().b() { 0b1000 } else { 0 },
+                bank: width_to_gp_reg_bank(addr_width)
             };
 
             let disp = if modbits == 0b00 {
@@ -1421,43 +1372,36 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
             if index == 0b100 {
                 if disp == 0 {
                     *result = Operand::RegDeref(base_reg);
-                    Ok(())
                 } else {
                     *result = Operand::RegDisp(base_reg, disp as i32);
-                    Ok(())
                 }
             } else {
                 let index_reg = RegSpec {
-                    num: index,
+                    num: index + if prefixes.rex().x() { 0b1000 } else { 0 },
                     bank: width_to_gp_reg_bank(addr_width)
                 };
                 if disp == 0 {
                     *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
-                    Ok(())
                 } else {
                     *result = Operand::RegIndexBaseScaleDisp(base_reg, index_reg, 1u8 << ss, disp as i32);
-                    Ok(())
                 }
             }
         }
     } else {
-        let regidx = m + if prefixes.rex().b() { 0b1000 } else { 0 };
+        let reg = RegSpec {
+            num: m + if prefixes.rex().b() { 0b1000 } else { 0 },
+            bank: width_to_gp_reg_bank(addr_width)
+        };
+
         if modbits == 0b00 {
-            *result = Operand::RegDeref(RegSpec {
-                num: regidx,
-                bank: width_to_gp_reg_bank(addr_width)
-            });
-            Ok(())
+            *result = Operand::RegDeref(reg);
         } else {
             let disp_width = if modbits == 0b01 { 1 } else { 4 };
             let disp = read_num(bytes_iter, disp_width) as i32;
-            *result = Operand::RegDisp(RegSpec {
-                num: regidx,
-                bank: width_to_gp_reg_bank(addr_width)
-            }, disp);
-            Ok(())
+            *result = Operand::RegDisp(reg, disp);
         }
     }
+    Ok(())
 }
 
 fn read_operands(
