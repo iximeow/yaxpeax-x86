@@ -1275,6 +1275,7 @@ fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instructio
 }
 
 fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
+    let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
         if prefixes.rex().b() {
             *result = Operand::Register(RegSpec {
@@ -1293,8 +1294,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
         let disp = read_num(bytes_iter, 4);
         *result = Operand::RegDisp(RegSpec {
             num: 0,
-            // this is determined by prefixes not ... operand width
-            bank: if width == 4 { RegisterBank::EIP } else { RegisterBank::RIP }
+            bank: if addr_width == 8 { RegisterBank::RIP } else { RegisterBank::EIP }
         }, disp as i32);
         Ok(())
     } else if m == 4 {
@@ -1326,13 +1326,13 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                     if disp == 0 {
                         *result = Operand::RegDeref(RegSpec {
                             num: indexnum,
-                            bank: width_to_gp_reg_bank(width)
+                            bank: width_to_gp_reg_bank(addr_width)
                         });
                         Ok(())
                     } else {
                         *result = Operand::RegDisp(RegSpec {
                             num: indexnum,
-                            bank: width_to_gp_reg_bank(width)
+                            bank: width_to_gp_reg_bank(addr_width)
                         }, disp as i32);
                         Ok(())
                     }
@@ -1341,24 +1341,24 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                 let base_reg = if prefixes.rex().b() {
                     RegSpec {
                         num: 5 + 0b1000,
-                        bank: width_to_gp_reg_bank(width)
+                        bank: width_to_gp_reg_bank(addr_width)
                     }
                 } else {
                     RegSpec {
                         num: 5,
-                        bank: width_to_gp_reg_bank(width)
+                        bank: width_to_gp_reg_bank(addr_width)
                     }
                 };
 
                 let index_reg = if prefixes.rex().x() {
                     RegSpec {
                         num: index + 0b1000,
-                        bank: width_to_gp_reg_bank(width)
+                        bank: width_to_gp_reg_bank(addr_width)
                     }
                 } else {
                     RegSpec {
                         num: index,
-                        bank: width_to_gp_reg_bank(width)
+                        bank: width_to_gp_reg_bank(addr_width)
                     }
                 };
 
@@ -1401,12 +1401,12 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
             let base_reg = if prefixes.rex().b() {
                 RegSpec {
                     num: base + 0b1000,
-                    bank: width_to_gp_reg_bank(width)
+                    bank: width_to_gp_reg_bank(addr_width)
                 }
             } else {
                 RegSpec {
                     num: base,
-                    bank: width_to_gp_reg_bank(width)
+                    bank: width_to_gp_reg_bank(addr_width)
                 }
             };
 
@@ -1429,7 +1429,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
             } else {
                 let index_reg = RegSpec {
                     num: index,
-                    bank: width_to_gp_reg_bank(width)
+                    bank: width_to_gp_reg_bank(addr_width)
                 };
                 if disp == 0 {
                     *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
@@ -1445,7 +1445,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
         if modbits == 0b00 {
             *result = Operand::RegDeref(RegSpec {
                 num: regidx,
-                bank: width_to_gp_reg_bank(width) // TODO: arch width
+                bank: width_to_gp_reg_bank(addr_width)
             });
             Ok(())
         } else {
@@ -1453,7 +1453,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
             let disp = read_num(bytes_iter, disp_width) as i32;
             *result = Operand::RegDisp(RegSpec {
                 num: regidx,
-                bank: width_to_gp_reg_bank(width) // TODO: arch width
+                bank: width_to_gp_reg_bank(addr_width)
             }, disp);
             Ok(())
         }
@@ -1886,7 +1886,7 @@ fn read_operands(
                 Ok(()) => {
                     instruction.operands[0] =
                         Operand::Register(RegSpec {
-                            num: r,
+                            num: r + if instruction.prefixes.rex().b() { 0b1000 } else { 0 },
                             bank: width_to_gp_reg_bank(opwidth)
                         });
                     Ok(())
@@ -1901,7 +1901,7 @@ fn read_operands(
                 Ok(imm) => {
                     instruction.operands = [
                        Operand::Register(RegSpec {
-                           num: reg_idx,
+                           num: reg_idx + if instruction.prefixes.rex().b() { 0b1000 } else { 0 },
                            bank: width_to_gp_reg_bank(opwidth)
                         }),
                         imm
