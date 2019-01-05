@@ -1,0 +1,21 @@
+[package]
+
+name = "x86-rs"
+version = "0.0.1"
+authors = [ "iximeow <me@iximeow.net>" ]
+repository = "x86-rs"
+description = """
+A rust x86-64 decoder
+"""
+
+[dependencies]
+"num-traits" = "0.2"
+"termios" = "0.2.2"
+"termion" = "1.4.0"
+"serde" = "*"
+"serde_json" = "*"
+"serde_derive" = "*"
+
+[[test]]
+name = "test"
+path = "test/test.rs"
