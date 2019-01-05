@@ -22,7 +22,7 @@ fn test_mov() {
         &[0x48, 0x89, 0x43, 0x18]
     ).unwrap()), "mov [rbx + 0x18], rax");
     assert_eq!(&format!("{}", decode(
-        &[0x48, 0xc7, 0x43, 0x10, 0x00, 0x00, 0x00]
+        &[0x48, 0xc7, 0x43, 0x10, 0x00, 0x00, 0x00, 0x00]
     ).unwrap()), "mov [rbx + 0x10], 0x0");
     assert_eq!(&format!("{}", decode(
         &[0x49, 0x89, 0x4e, 0x08]
@@ -35,10 +35,13 @@ fn test_mov() {
     ).unwrap()), "mov [r14 + 0x10], rax");
     assert_eq!(&format!("{}", decode(
         &[0x4d, 0x0f, 0x43, 0xec, 0x49]
-    ).unwrap()), "cmovae r13, r12");
+    ).unwrap()), "cmovnb r13, r12");
     assert_eq!(&format!("{}", decode(
         &[0x0f, 0xb6, 0x06]
     ).unwrap()), "movzx eax, byte [rsi]");
+    assert_eq!(&format!("{}", decode(
+        &[0x0f, 0xb7, 0x06]
+    ).unwrap()), "movzx eax, word [rsi]");
 }
 
 #[test]

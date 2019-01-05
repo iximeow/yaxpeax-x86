@@ -224,6 +224,9 @@ impl fmt::Display for Opcode {
             &Opcode::DIV => write!(f, "{}", "div"),
             &Opcode::IDIV => write!(f, "{}", "idiv"),
             &Opcode::CMPXCHG => write!(f, "{}", "cmpxchg"),
+            &Opcode::MOVZX_b => write!(f, "{}", "movzx"),
+            &Opcode::MOVZX_w => write!(f, "{}", "movzx"),
+            &Opcode::MOVSX => write!(f, "{}", "movsx"),
             &Opcode::Invalid => write!(f, "{}", "invalid")
         }
     }
@@ -231,6 +234,9 @@ impl fmt::Display for Opcode {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
+    MOVZX_b,
+    MOVZX_w,
+    MOVSX,
     SAR,
     SAL,
     SHR,
@@ -427,12 +433,42 @@ impl fmt::Display for Instruction {
                 write!(f, " {}", x)
             }
         };
-        match &self.operands[1] {
-            &Operand::Nothing => {
-                return Ok(());
+        match self.opcode {
+            Opcode::MOVZX_b => {
+                match &self.operands[1] {
+                    &Operand::Nothing => {
+                        return Ok(());
+                    },
+                    x @ &Operand::Register(_) => {
+                        write!(f, ", {}", x)
+                    }
+                    x @ _ => {
+                        write!(f, ", byte {}", x)
+                    }
+                }
             },
-            x @ &_ => {
-                write!(f, ", {}", x)
+            Opcode::MOVZX_w => {
+                match &self.operands[1] {
+                    &Operand::Nothing => {
+                        return Ok(());
+                    },
+                    x @ &Operand::Register(_) => {
+                        write!(f, ", {}", x)
+                    }
+                    x @ _ => {
+                        write!(f, ", word {}", x)
+                    }
+                }
+            },
+            _ => {
+                match &self.operands[1] {
+                    &Operand::Nothing => {
+                        return Ok(());
+                    },
+                    x @ &_ => {
+                        write!(f, ", {}", x)
+                    }
+                }
             }
         }
     }
@@ -440,6 +476,7 @@ impl fmt::Display for Instruction {
 
 #[derive(Copy, Clone, Debug)]
 pub enum OperandCode {
+    ModRM_0xf6,
     ModRM_0xf7,
     Gv_Ev_Iv,
     Gb_Eb_Ib,
@@ -478,6 +515,8 @@ pub enum OperandCode {
     Ew_Sw,
     Fw,
     Gb_Eb,
+    Gv_Eb,
+    Gv_Ew,
     Gv_Ev,
     Gv_M,
     I_3,
@@ -703,6 +742,16 @@ fn read_opcode_0f_map(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Ins
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMPXCHG;
                     Ok(OperandCode::Ev_Gv)
+                }
+                0xb6 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVZX_b;
+                    Ok(OperandCode::Gv_Eb)
+                },
+                0xb7 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVZX_w;
+                    Ok(OperandCode::Gv_Ew)
                 }
                 _ => {
                     Err(format!("Unknown opcode: 0f{:x}", b))
@@ -1192,7 +1241,11 @@ fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instructio
                         instruction.opcode = Opcode::HLT;
                         return Ok(OperandCode::Nothing);
                     },
-                    0xf6 => { },
+                    0xf6 => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::Invalid;
+                        return Ok(OperandCode::ModRM_0xf6);
+                    },
                     0xf7 => {
                         instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
@@ -1581,6 +1634,48 @@ fn read_operands(
                 Err(reason) => Err(reason)
             }
         },
+        OperandCode::ModRM_0xf6 => {
+            let opwidth = 1;
+            let modrm = bytes_iter.next().unwrap();
+            let (mod_bits, r, m) = octets_of(*modrm);
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+                Ok(()) => { },
+                Err(reason) => { return Err(reason); }
+            };
+            match r {
+                0 | 1 => {
+                    instruction.opcode = Opcode::TEST;
+                    match read_imm_signed(bytes_iter, 1, opwidth) {
+                        Ok(imm) => {
+                            instruction.operands[1] = imm;
+                        },
+                        Err(reason) => { return Err(reason); }
+                    }
+                },
+                2 => {
+                    instruction.opcode = Opcode::NOT;
+                },
+                3 => {
+                    instruction.opcode = Opcode::NEG;
+                },
+                4 => {
+                    instruction.opcode = Opcode::MUL;
+                },
+                5 => {
+                    instruction.opcode = Opcode::IMUL;
+                },
+                6 => {
+                    instruction.opcode = Opcode::DIV;
+                },
+                7 => {
+                    instruction.opcode = Opcode::IDIV;
+                },
+                _ => {
+                    unsafe { unreachable_unchecked(); }
+                }
+            }
+            Ok(())
+        },
         OperandCode::ModRM_0xf7 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let modrm = bytes_iter.next().unwrap();
@@ -1736,6 +1831,42 @@ fn read_operands(
                     instruction.operands[0] =
                         Operand::Register(RegSpec {
                             num: r,
+                            bank: width_to_gp_reg_bank(opwidth)
+                        });
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        },
+        OperandCode::Gv_Eb => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
+            // TODO: ...
+            let modrm = bytes_iter.next().unwrap();
+            let (mod_bits, r, m) = octets_of(*modrm);
+
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
+                Ok(()) => {
+                    instruction.operands[0] =
+                        Operand::Register(RegSpec {
+                            num: r,
+                            bank: width_to_gp_reg_bank(opwidth)
+                        });
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        },
+        OperandCode::Gv_Ew => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
+            // TODO: ...
+            let modrm = bytes_iter.next().unwrap();
+            let (mod_bits, r, m) = octets_of(*modrm);
+
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[1]) {
+                Ok(()) => {
+                    instruction.operands[0] =
+                        Operand::Register(RegSpec {
+                            num: r + if instruction.prefixes.rex().b() { 0b1000 } else { 0 },
                             bank: width_to_gp_reg_bank(opwidth)
                         });
                     Ok(())
