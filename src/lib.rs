@@ -1379,10 +1379,10 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                     bank: width_to_gp_reg_bank(width)
                 };
                 if disp == 0 {
-                    *result = Operand::RegIndexBaseScale(base_reg, index_reg, ss);
+                    *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
                     Ok(())
                 } else {
-                    *result = Operand::RegIndexBaseScaleDisp(base_reg, index_reg, ss, disp as i32);
+                    *result = Operand::RegIndexBaseScaleDisp(base_reg, index_reg, 1u8 << ss, disp as i32);
                     Ok(())
                 }
             }
