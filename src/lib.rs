@@ -12,6 +12,37 @@ pub struct RegSpec {
     bank: RegisterBank
 }
 
+impl RegSpec {
+    fn from_parts(num: u8, extended: bool, bank: RegisterBank) -> RegSpec {
+        RegSpec {
+            num: num + if extended { 0b1000 } else { 0 },
+            bank: bank
+        }
+    }
+
+    fn gp_from_parts(num: u8, extended: bool, width: u8, rex: bool) -> RegSpec {
+        println!("from_parts width: {}, num: {}, extended: {}", width, num, extended);
+        RegSpec {
+            num: num + if extended { 0b1000 } else { 0 },
+            bank: width_to_gp_reg_bank(width, rex)
+        }
+    }
+
+    fn RIP() -> RegSpec {
+        RegSpec {
+            num: 0,
+            bank: RegisterBank::RIP
+        }
+    }
+
+    fn EIP() -> RegSpec {
+        RegSpec {
+            num: 0,
+            bank: RegisterBank::EIP
+        }
+    }
+}
+
 impl fmt::Display for RegSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let name = match self.bank {
@@ -28,7 +59,7 @@ impl fmt::Display for RegSpec {
                 ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"][self.num as usize]
             },
             RegisterBank::rB => {
-                ["al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil"][self.num as usize]
+                ["al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b"][self.num as usize]
             },
             RegisterBank::EIP => { "eip" },
             RegisterBank::RIP => { "rip" },
@@ -1277,16 +1308,13 @@ fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instructio
 fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
-        *result = Operand::Register(RegSpec {
-            num: m + if prefixes.rex().b() { 0b1000 } else { 0 },
-            bank: width_to_gp_reg_bank(width)
-        });
+        *result = Operand::Register(RegSpec::gp_from_parts(m, prefixes.rex().b(), width, prefixes.rex().present()))
     } else if m == 5 && modbits == 0b00 {
         let disp = read_num(bytes_iter, 4);
-        *result = Operand::RegDisp(RegSpec {
-            num: 0,
-            bank: if addr_width == 8 { RegisterBank::RIP } else { RegisterBank::EIP }
-        }, disp as i32);
+        *result = Operand::RegDisp(
+            if addr_width == 8 { RegSpec::RIP() } else { RegSpec::EIP() },
+            disp as i32
+        );
     } else if m == 4 {
         let sibbyte = *bytes_iter.next().unwrap();
         let (ss, index, base) = octets_of(sibbyte);
@@ -1306,10 +1334,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                 if modbits == 0b00 && !prefixes.rex().x() {
                     *result = Operand::DisplacementU32(disp as i32);
                 } else {
-                    let reg = RegSpec {
-                        num: 0b100 + if prefixes.rex().x() { 0b1000 } else { 0 },
-                        bank: width_to_gp_reg_bank(addr_width)
-                    };
+                    let reg = RegSpec::gp_from_parts(0b100, prefixes.rex().x(), addr_width, prefixes.rex().present());
 
                     if disp == 0 {
                         *result = Operand::RegDeref(reg);
@@ -1318,15 +1343,9 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                     }
                 }
             } else {
-                let base_reg = RegSpec {
-                    num: 5 + if prefixes.rex().b() { 0b1000 } else { 0 },
-                    bank: width_to_gp_reg_bank(addr_width)
-                };
+                let base_reg = RegSpec::gp_from_parts(5, prefixes.rex().b(), addr_width, prefixes.rex().present());
 
-                let index_reg = RegSpec {
-                    num: index + if prefixes.rex().x() { 0b1000 } else { 0 },
-                    bank: width_to_gp_reg_bank(addr_width)
-                };
+                let index_reg = RegSpec::gp_from_parts(index, prefixes.rex().x(), addr_width, prefixes.rex().present());
 
                 *result = match (ss, modbits, disp) {
                     (0, 0b00, 0) => {
@@ -1356,10 +1375,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                 };
             }
         } else {
-            let base_reg = RegSpec {
-                num: base + if prefixes.rex().b() { 0b1000 } else { 0 },
-                bank: width_to_gp_reg_bank(addr_width)
-            };
+            let base_reg = RegSpec::gp_from_parts(base, prefixes.rex().b(), addr_width, prefixes.rex().present());
 
             let disp = if modbits == 0b00 {
                 0
@@ -1376,10 +1392,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
                     *result = Operand::RegDisp(base_reg, disp as i32);
                 }
             } else {
-                let index_reg = RegSpec {
-                    num: index + if prefixes.rex().x() { 0b1000 } else { 0 },
-                    bank: width_to_gp_reg_bank(addr_width)
-                };
+                let index_reg = RegSpec::gp_from_parts(index, prefixes.rex().x(), addr_width, prefixes.rex().present());
                 if disp == 0 {
                     *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
                 } else {
@@ -1388,10 +1401,7 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
             }
         }
     } else {
-        let reg = RegSpec {
-            num: m + if prefixes.rex().b() { 0b1000 } else { 0 },
-            bank: width_to_gp_reg_bank(addr_width)
-        };
+        let reg = RegSpec::gp_from_parts(m, prefixes.rex().b(), addr_width, prefixes.rex().present());
 
         if modbits == 0b00 {
             *result = Operand::RegDeref(reg);
@@ -1736,11 +1746,7 @@ fn read_operands(
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
                     instruction.operands[1] =
-                        Operand::Register(RegSpec {
-                            num: r,
-                            // TODO: test rex
-                            bank: width_to_gp_reg_bank(opwidth)
-                        });
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
                     Ok(())
                 },
                 Err(reason) => Err(reason)
@@ -1755,10 +1761,7 @@ fn read_operands(
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
                     instruction.operands[1] =
-                        Operand::Register(RegSpec {
-                            num: r,
-                            bank: width_to_gp_reg_bank(opwidth)
-                        });
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
                     Ok(())
                 },
                 Err(reason) => Err(reason)
@@ -1773,10 +1776,7 @@ fn read_operands(
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
                 Ok(()) => {
                     instruction.operands[0] =
-                        Operand::Register(RegSpec {
-                            num: r,
-                            bank: width_to_gp_reg_bank(opwidth)
-                        });
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
                     Ok(())
                 },
                 Err(reason) => Err(reason)
@@ -1791,10 +1791,7 @@ fn read_operands(
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
                 Ok(()) => {
                     instruction.operands[0] =
-                        Operand::Register(RegSpec {
-                            num: r,
-                            bank: width_to_gp_reg_bank(opwidth)
-                        });
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
                     Ok(())
                 },
                 Err(reason) => Err(reason)
@@ -1809,10 +1806,7 @@ fn read_operands(
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[1]) {
                 Ok(()) => {
                     instruction.operands[0] =
-                        Operand::Register(RegSpec {
-                            num: r + if instruction.prefixes.rex().b() { 0b1000 } else { 0 },
-                            bank: width_to_gp_reg_bank(opwidth)
-                        });
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
                     Ok(())
                 },
                 Err(reason) => Err(reason)
@@ -1829,10 +1823,7 @@ fn read_operands(
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
                 Ok(()) => {
                     instruction.operands[0] =
-                        Operand::Register(RegSpec {
-                            num: r + if instruction.prefixes.rex().b() { 0b1000 } else { 0 },
-                            bank: width_to_gp_reg_bank(opwidth)
-                        });
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
                     Ok(())
                 },
                 Err(reason) => Err(reason)
@@ -1844,10 +1835,7 @@ fn read_operands(
             match read_imm_ivq(bytes_iter, opwidth) {
                 Ok(imm) => {
                     instruction.operands = [
-                       Operand::Register(RegSpec {
-                           num: reg_idx + if instruction.prefixes.rex().b() { 0b1000 } else { 0 },
-                           bank: width_to_gp_reg_bank(opwidth)
-                        }),
+                        Operand::Register(RegSpec::gp_from_parts(reg_idx, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present())),
                         imm
                     ];
                     Ok(())
@@ -1861,10 +1849,7 @@ fn read_operands(
             match read_imm_signed(bytes_iter, numwidth, opwidth) {
                 Ok(imm) => {
                     instruction.operands = [
-                        Operand::Register(RegSpec {
-                            num: 0,
-                            bank: width_to_gp_reg_bank(opwidth)
-                        }),
+                        Operand::Register(RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present())),
                         imm
                     ];
                     Ok(())
@@ -1877,10 +1862,7 @@ fn read_operands(
             match read_imm_unsigned(bytes_iter, 1) {
                 Ok(imm) => {
                     instruction.operands = [
-                       Operand::Register(RegSpec {
-                           num: reg_idx,
-                           bank: width_to_gp_reg_bank(1)
-                        }),
+                        Operand::Register(RegSpec::gp_from_parts(reg_idx, instruction.prefixes.rex().b(), 1, instruction.prefixes.rex().present())),
                         imm];
                     Ok(())
                 },
@@ -1931,10 +1913,11 @@ fn read_operands(
         OperandCode::Zv(opcode_byte) => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
             let index = (opcode_byte & 0b111) + if instruction.prefixes.rex().b() { 0b1000 } else { 0 };
-            instruction.operands = [Operand::Register(RegSpec {
-                num: index,
-                bank: width_to_gp_reg_bank(opwidth)
-            }), Operand::Nothing];
+            instruction.operands = [Operand::Register(
+                RegSpec::gp_from_parts(
+                    opcode_byte & 0b111, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present()
+                )
+            ), Operand::Nothing];
             Ok(())
         },
         OperandCode::Jbs => {
@@ -1959,10 +1942,10 @@ fn read_operands(
     }
 }
 
-fn width_to_gp_reg_bank(width: u8) -> RegisterBank {
+fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
     use std::hint::unreachable_unchecked;
     match width {
-        1 => return RegisterBank::B,
+        1 => return if rex { RegisterBank::rB } else { RegisterBank::B },
         2 => return RegisterBank::W,
         4 => return RegisterBank::D,
         8 => return RegisterBank::Q,

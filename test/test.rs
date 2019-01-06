@@ -45,6 +45,26 @@ fn test_mov() {
 }
 
 #[test]
+fn test_stack() {
+    assert_eq!(&format!("{}", decode(
+        &[0x66, 0x41, 0x50]
+    ).unwrap()), "push r8w");
+}
+
+#[test]
+fn test_prefixes() {
+    assert_eq!(&format!("{}", decode(
+        &[0x66, 0x41, 0x31, 0xc0]
+    ).unwrap()), "xor r8w, ax");
+    assert_eq!(&format!("{}", decode(
+        &[0x66, 0x41, 0x32, 0xc0]
+    ).unwrap()), "xor al, r8b");
+    assert_eq!(&format!("{}", decode(
+        &[0x40, 0x32, 0xc5]
+    ).unwrap()), "xor al, bpl");
+}
+
+#[test]
 fn test_control_flow() {
     assert_eq!(&format!("{}", decode(
         &[0x73, 0x31]
