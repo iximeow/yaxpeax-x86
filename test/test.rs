@@ -105,6 +105,9 @@ fn test_test_cmp() {
 #[test]
 fn test_misc() {
     assert_eq!(&format!("{}", decode(
+        &[0x48, 0x8d, 0xa4, 0xc7, 0x20, 0x00, 0x00, 0x12]
+    ).unwrap()), "lea rsp, [rdi + rax * 8 + 0x12000020]");
+    assert_eq!(&format!("{}", decode(
         &[0x33, 0xc0]
     ).unwrap()), "xor eax, eax");
     assert_eq!(&format!("{}", decode(
