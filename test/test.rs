@@ -103,6 +103,15 @@ fn test_test_cmp() {
 }
 
 #[test]
+#[ignore]
+// VEX prefixes are not supported at the moment, in any form
+fn test_avx() {
+    assert_eq!(&format!("{}", decode(
+        &[0xc5, 0xf8, 0x10, 0x00]
+    ).unwrap()), "vmovups xmm0, xmmword [rax]");
+}
+
+#[test]
 fn test_misc() {
     assert_eq!(&format!("{}", decode(
         &[0x48, 0x8d, 0xa4, 0xc7, 0x20, 0x00, 0x00, 0x12]
