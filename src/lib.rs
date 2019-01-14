@@ -21,7 +21,7 @@ impl RegSpec {
     }
 
     fn gp_from_parts(num: u8, extended: bool, width: u8, rex: bool) -> RegSpec {
-        println!("from_parts width: {}, num: {}, extended: {}", width, num, extended);
+//        println!("from_parts width: {}, num: {}, extended: {}", width, num, extended);
         RegSpec {
             num: num + if extended { 0b1000 } else { 0 },
             bank: width_to_gp_reg_bank(width, rex)
@@ -1962,7 +1962,7 @@ pub fn decode_one<'a, 'b, T: IntoIterator<Item=&'a u8>>(bytes: T, instr: &'b mut
                     Some(())
                 },
                 Err(reason) => {
-                    panic!("Decode error on operand: {:?}", reason);
+//                    panic!("Decode error on operand: {:?}", reason);
        //             println!("Invalid instruction: {}", reason);
 //                        return Instruction::invalid()
                     None
@@ -1970,7 +1970,7 @@ pub fn decode_one<'a, 'b, T: IntoIterator<Item=&'a u8>>(bytes: T, instr: &'b mut
             }
         }
         Err(reason) => {
-            panic!("Decode error on opcode: {:?}", reason);
+//            panic!("Decode error on opcode: {:?}", reason);
         //    println!("Invalid instruction: {}", reason);
 //                return Instruction::invalid()
             None

@@ -1,6 +1,6 @@
-extern crate x86_rs;
+extern crate yaxpeax_x86;
 
-use x86_rs::{Instruction, Opcode, decode_one};
+use yaxpeax_x86::{Instruction, Opcode, decode_one};
 
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
