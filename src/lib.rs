@@ -13,6 +13,7 @@ pub struct RegSpec {
 }
 
 impl RegSpec {
+    #[inline]
     fn from_parts(num: u8, extended: bool, bank: RegisterBank) -> RegSpec {
         RegSpec {
             num: num + if extended { 0b1000 } else { 0 },
@@ -20,6 +21,7 @@ impl RegSpec {
         }
     }
 
+    #[inline]
     fn gp_from_parts(num: u8, extended: bool, width: u8, rex: bool) -> RegSpec {
 //        println!("from_parts width: {}, num: {}, extended: {}", width, num, extended);
         RegSpec {
@@ -28,6 +30,7 @@ impl RegSpec {
         }
     }
 
+    #[inline]
     fn RIP() -> RegSpec {
         RegSpec {
             num: 0,
@@ -35,6 +38,7 @@ impl RegSpec {
         }
     }
 
+    #[inline]
     fn EIP() -> RegSpec {
         RegSpec {
             num: 0,
@@ -1451,6 +1455,7 @@ fn read_E<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, prefixes: &Prefixes,
     Ok(())
 }
 
+#[inline]
 fn read_operands<'a, T: Iterator<Item=&'a u8>>(
     bytes_iter: &mut T,
     instruction: &mut Instruction,
@@ -1979,6 +1984,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
     }
 }
 
+#[inline]
 fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
     use std::hint::unreachable_unchecked;
     match width {
@@ -2015,6 +2021,7 @@ pub fn decode_one<'a, 'b, T: IntoIterator<Item=&'a u8>>(bytes: T, instr: &'b mut
     }
 }
 
+#[inline]
 fn read_num<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> u64 {
     let mut result = 0u64;
     let mut idx = 0;
