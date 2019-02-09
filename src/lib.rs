@@ -405,45 +405,82 @@ impl Prefixes {
             lock: false
         }
     }
+    #[inline]
     fn rep(&self) -> bool { self.bits & 0x30 == 0x10 }
+    #[inline]
     fn set_rep(&mut self) { self.bits = (self.bits & 0xcf) | 0x10 }
+    #[inline]
     fn repz(&self) -> bool { self.bits & 0x30 == 0x20 }
+    #[inline]
     fn set_repz(&mut self) { self.bits = (self.bits & 0xcf) | 0x20 }
+    #[inline]
     fn repnz(&self) -> bool { self.bits & 0x30 == 0x30 }
+    #[inline]
     fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30 }
+    #[inline]
     fn lock(&self) -> bool { self.lock }
+    #[inline]
     fn set_lock(&mut self) { self.lock = true; }
+    #[inline]
     fn operand_size(&self) -> bool { self.bits & 0x1 == 1 }
+    #[inline]
     fn set_operand_size(&mut self) { self.bits = self.bits | 0x1 }
+    #[inline]
     fn address_size(&self) -> bool { self.bits & 0x2 == 2 }
+    #[inline]
     fn set_address_size(&mut self) { self.bits = self.bits | 0x2 }
+    #[inline]
     fn cs(&self) -> bool { self.bits & 0x70 == 0x10 }
+    #[inline]
     fn set_cs(&mut self) { self.bits = (self.bits & 0x8f) | 0x10 }
+    #[inline]
     fn ds(&self) -> bool { self.bits & 0x70 == 0x20 }
+    #[inline]
     fn set_ds(&mut self) { self.bits = (self.bits & 0x8f) | 0x20 }
+    #[inline]
     fn es(&self) -> bool { self.bits & 0x70 == 0x30 }
+    #[inline]
     fn set_es(&mut self) { self.bits = (self.bits & 0x8f) | 0x30 }
+    #[inline]
     fn fs(&self) -> bool { self.bits & 0x70 == 0x40 }
+    #[inline]
     fn set_fs(&mut self) { self.bits = (self.bits & 0x8f) | 0x40 }
+    #[inline]
     fn gs(&self) -> bool { self.bits & 0x70 == 0x50 }
+    #[inline]
     fn set_gs(&mut self) { self.bits = (self.bits & 0x8f) | 0x50 }
+    #[inline]
     fn ss(&self) -> bool { self.bits & 0x70 == 0x60 }
+    #[inline]
     fn set_ss(&mut self) { self.bits = (self.bits & 0x8f) | 0x60 }
+    #[inline]
     fn rex(&self) -> &PrefixRex { &self.rex }
+    #[inline]
     fn rex_mut(&mut self) -> &mut PrefixRex { &mut self.rex }
 }
 
 impl PrefixRex {
+    #[inline]
     fn set_present(&mut self) { self.bits |= 0x10 }
+    #[inline]
     fn present(&self) -> bool { (self.bits & 0x10) == 0x10 }
+    #[inline]
     fn set_b(&mut self) { self.bits |= 0x01 }
+    #[inline]
     fn b(&self) -> bool { (self.bits & 0x01) == 0x01 }
+    #[inline]
     fn set_x(&mut self) { self.bits |= 0x02 }
+    #[inline]
     fn x(&self) -> bool { (self.bits & 0x02) == 0x02 }
+    #[inline]
     fn set_r(&mut self) { self.bits |= 0x04 }
+    #[inline]
     fn r(&self) -> bool { (self.bits & 0x04) == 0x04 }
+    #[inline]
     fn set_w(&mut self) { self.bits |= 0x08 }
+    #[inline]
     fn w(&self) -> bool { (self.bits & 0x08) == 0x08 }
+    #[inline]
     fn from(&mut self, prefix: u8) {
         self.bits = prefix & 0x0f;
         self.set_present();
@@ -595,7 +632,7 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAR
 ];
 
-fn read_opcode_0f_map(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instruction, prefixes: Prefixes) -> Result<OperandCode, String> {
+fn read_opcode_0f_map<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
             match *b {
@@ -795,7 +832,7 @@ fn read_opcode_0f_map(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Ins
     }
 }
 
-fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instruction) -> Result<OperandCode, String> {
+fn read_opcode<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruction: &mut Instruction) -> Result<OperandCode, String> {
     use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
     let mut reading = true;
@@ -1305,7 +1342,7 @@ fn read_opcode(bytes_iter: &mut Iterator<Item=&u8>, instruction: &mut Instructio
     }
 }
 
-fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
+fn read_E<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
         *result = Operand::Register(RegSpec::gp_from_parts(m, prefixes.rex().b(), width, prefixes.rex().present()))
@@ -1414,8 +1451,8 @@ fn read_E(bytes_iter: &mut Iterator<Item=&u8>, prefixes: &Prefixes, m: u8, modbi
     Ok(())
 }
 
-fn read_operands(
-    bytes_iter: &mut Iterator<Item=&u8>,
+fn read_operands<'a, T: Iterator<Item=&'a u8>>(
+    bytes_iter: &mut T,
     instruction: &mut Instruction,
     operand_code: OperandCode
 ) -> Result<(), String> {
@@ -1978,7 +2015,7 @@ pub fn decode_one<'a, 'b, T: IntoIterator<Item=&'a u8>>(bytes: T, instr: &'b mut
     }
 }
 
-fn read_num(bytes: &mut Iterator<Item=&u8>, width: u8) -> u64 {
+fn read_num<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> u64 {
     let mut result = 0u64;
     let mut idx = 0;
     loop {
@@ -1991,7 +2028,8 @@ fn read_num(bytes: &mut Iterator<Item=&u8>, width: u8) -> u64 {
     }
 }
 
-fn read_imm_ivq(bytes: &mut Iterator<Item=&u8>, width: u8) -> Result<Operand, String> {
+#[inline]
+fn read_imm_ivq<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
     match width {
         2 => {
             Ok(Operand::ImmediateU16(read_num(bytes, 2) as u16))
@@ -2008,53 +2046,27 @@ fn read_imm_ivq(bytes: &mut Iterator<Item=&u8>, width: u8) -> Result<Operand, St
     }
 }
 
-fn read_imm_signed(bytes: &mut Iterator<Item=&u8>, num_width: u8, extend_to: u8) -> Result<Operand, String> {
-    match num_width {
-        1 => {
-            let num = read_num(bytes, 1) as i8;
-            match extend_to {
-                1 => { Ok(Operand::ImmediateI8(num)) },
-                2 => { Ok(Operand::ImmediateI16(num as i16)) },
-                4 => { Ok(Operand::ImmediateI32(num as i32)) },
-                8 => { Ok(Operand::ImmediateI64(num as i64)) },
-                _ => { unsafe { unreachable_unchecked(); } }
-            }
-        },
-        2 => {
-            let num = read_num(bytes, 2) as i16;
-            match extend_to {
-                1 => { Ok(Operand::ImmediateI8(num as i8)) },
-                2 => { Ok(Operand::ImmediateI16(num)) },
-                4 => { Ok(Operand::ImmediateI32(num as i32)) },
-                8 => { Ok(Operand::ImmediateI64(num as i64)) },
-                _ => { unsafe { unreachable_unchecked(); } }
-            }
-        },
-        4 => {
-            let num = read_num(bytes, 4) as i32;
-            match extend_to {
-                1 => { Ok(Operand::ImmediateI8(num as i8)) },
-                2 => { Ok(Operand::ImmediateI16(num as i16)) },
-                4 => { Ok(Operand::ImmediateI32(num)) },
-                8 => { Ok(Operand::ImmediateI64(num as i64)) },
-                _ => { unsafe { unreachable_unchecked(); } }
-            }
-        },
-        8 => {
-            let num = read_num(bytes, 4) as i32;
-            match extend_to {
-                1 => { Ok(Operand::ImmediateI8(num as i8)) },
-                2 => { Ok(Operand::ImmediateI16(num as i16)) },
-                4 => { Ok(Operand::ImmediateI32(num)) },
-                8 => { Ok(Operand::ImmediateI64(num as i64)) },
-                _ => { unsafe { unreachable_unchecked(); } }
-            }
-        },
-        _ => { unsafe { unreachable_unchecked(); } }
+#[inline]
+fn read_imm_signed<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, num_width: u8, extend_to: u8) -> Result<Operand, String> {
+    let num = match num_width {
+        1 => read_num(bytes, 1) as i8 as i64,
+        2 => read_num(bytes, 2) as i16 as i64,
+        4 => read_num(bytes, 4) as i32 as i64,
+        8 => read_num(bytes, 4) as i32 as i64,
+        _ => { unsafe { unreachable_unchecked() } }
+    };
+
+    match extend_to {
+        1 => Ok(Operand::ImmediateI8(num as i8)),
+        2 => Ok(Operand::ImmediateI16(num as i16)),
+        4 => Ok(Operand::ImmediateI32(num as i32)),
+        8 => Ok(Operand::ImmediateI64(num as i64)),
+        _ => { unsafe { unreachable_unchecked() } }
     }
 }
 
-fn read_imm_unsigned(bytes: &mut Iterator<Item=&u8>, width: u8) -> Result<Operand, String> {
+#[inline]
+fn read_imm_unsigned<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
     match width {
         1 => {
             Ok(Operand::ImmediateU8(read_num(bytes, 1) as u8))
@@ -2074,10 +2086,12 @@ fn read_imm_unsigned(bytes: &mut Iterator<Item=&u8>, width: u8) -> Result<Operan
     }
 }
 
+#[inline]
 fn octets_of(byte: u8) -> (u8, u8, u8) {
     (byte >> 6 & 0b11, (byte >> 3) & 0b111, byte & 0b111)
 }
 
+#[inline]
 fn imm_width_from_prefixes_64(interpretation: SizeCode, prefixes: &Prefixes) -> u8 {
     match interpretation {
         SizeCode::b => 1,
