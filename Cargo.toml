@@ -24,6 +24,14 @@ path = "test/test.rs"
 name = "bench"
 path = "test/bench.rs"
 
+[profile.bench]
+opt-level = 3
+lto = true
+
+[profile.release]
+opt-level = 3
+lto = true
+
 [features]
 default = []
 

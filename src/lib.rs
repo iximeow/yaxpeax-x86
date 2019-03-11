@@ -636,10 +636,10 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAR
 ];
 
-fn read_opcode_0f_map<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes) -> Result<OperandCode, String> {
+fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
-            match *b {
+            match b {
                 0x1f => {
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::NOP;
@@ -836,7 +836,7 @@ fn read_opcode_0f_map<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruct
     }
 }
 
-fn read_opcode<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruction: &mut Instruction) -> Result<OperandCode, String> {
+fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction) -> Result<OperandCode, String> {
     use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
     let mut reading = true;
@@ -845,7 +845,7 @@ fn read_opcode<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruction: &m
     loop {
         match bytes_iter.next() {
             Some(b) => {
-                match *b {
+                match b {
                     x if x < 0x40 => {
                         if x % 8 > 5 { // unsafe { unlikely(x % 8 > 5) } {
                             // for x86_32 this is push/pop prefixes and 0x0f escape
@@ -1346,7 +1346,7 @@ fn read_opcode<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, instruction: &m
     }
 }
 
-fn read_E<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
+fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
         *result = Operand::Register(RegSpec::gp_from_parts(m, prefixes.rex().b(), width, prefixes.rex().present()))
@@ -1357,7 +1357,7 @@ fn read_E<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, prefixes: &Prefixes,
             disp as i32
         );
     } else if m == 4 {
-        let sibbyte = *bytes_iter.next().unwrap();
+        let sibbyte = bytes_iter.next().unwrap();
         let (ss, index, base) = octets_of(sibbyte);
 
 //            println!("scale: {:b}, index: {:b}, base: {:b}", ss, index, base);
@@ -1456,7 +1456,7 @@ fn read_E<'a, T: Iterator<Item=&'a u8>>(bytes_iter: &mut T, prefixes: &Prefixes,
 }
 
 #[inline]
-fn read_operands<'a, T: Iterator<Item=&'a u8>>(
+fn read_operands<T: Iterator<Item=u8>>(
     bytes_iter: &mut T,
     instruction: &mut Instruction,
     operand_code: OperandCode
@@ -1512,7 +1512,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1529,7 +1529,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1546,7 +1546,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1563,7 +1563,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1582,7 +1582,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(e_op) => {
@@ -1602,7 +1602,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1618,7 +1618,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1633,7 +1633,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
         OperandCode::ModRM_0xf6 => {
             let opwidth = 1;
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => { },
                 Err(reason) => { return Err(reason); }
@@ -1675,7 +1675,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
         OperandCode::ModRM_0xf7 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => { },
                 Err(reason) => { return Err(reason); }
@@ -1719,7 +1719,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1744,7 +1744,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1769,7 +1769,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1783,7 +1783,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1798,7 +1798,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1813,7 +1813,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
                 Ok(()) => {
@@ -1828,7 +1828,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
                 Ok(()) => {
@@ -1843,7 +1843,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[1]) {
                 Ok(()) => {
@@ -1859,7 +1859,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
@@ -1934,7 +1934,7 @@ fn read_operands<'a, T: Iterator<Item=&'a u8>>(
             let modrm = bytes_iter.next().unwrap();
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
 
-            let (mod_bits, r, m) = octets_of(*modrm);
+            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
                 Ok(()) => {
@@ -1996,7 +1996,7 @@ fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
     }
 }
 
-pub fn decode_one<'a, 'b, T: IntoIterator<Item=&'a u8>>(bytes: T, instr: &'b mut Instruction) -> Option<()> {
+pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruction) -> Option<()> {
     let mut bytes_iter = bytes.into_iter();
     match read_opcode(&mut bytes_iter, instr) {
         Ok(operand_code) => {
@@ -2022,21 +2022,21 @@ pub fn decode_one<'a, 'b, T: IntoIterator<Item=&'a u8>>(bytes: T, instr: &'b mut
 }
 
 #[inline]
-fn read_num<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> u64 {
+fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> u64 {
     let mut result = 0u64;
     let mut idx = 0;
     loop {
         if idx == width {
             return result;
         }
-        let byte = *bytes.next().unwrap();
+        let byte = bytes.next().unwrap();
         result |= (byte as u64) << (idx * 8);
         idx += 1;
     }
 }
 
 #[inline]
-fn read_imm_ivq<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
+fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
     match width {
         2 => {
             Ok(Operand::ImmediateU16(read_num(bytes, 2) as u16))
@@ -2054,7 +2054,7 @@ fn read_imm_ivq<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> Resul
 }
 
 #[inline]
-fn read_imm_signed<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, num_width: u8, extend_to: u8) -> Result<Operand, String> {
+fn read_imm_signed<T: Iterator<Item=u8>>(bytes: &mut T, num_width: u8, extend_to: u8) -> Result<Operand, String> {
     let num = match num_width {
         1 => read_num(bytes, 1) as i8 as i64,
         2 => read_num(bytes, 2) as i16 as i64,
@@ -2073,7 +2073,7 @@ fn read_imm_signed<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, num_width: u8, e
 }
 
 #[inline]
-fn read_imm_unsigned<'a, T: Iterator<Item=&'a u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
+fn read_imm_unsigned<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
     match width {
         1 => {
             Ok(Operand::ImmediateU8(read_num(bytes, 1) as u8))
