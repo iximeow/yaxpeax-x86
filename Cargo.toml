@@ -9,6 +9,7 @@ A rust x86-64 decoder
 """
 
 [dependencies]
+yaxpeax-arch = { path = "../../yaxpeax-arch" }
 "num-traits" = "0.2"
 "termios" = "0.2.2"
 "termion" = "1.4.0"

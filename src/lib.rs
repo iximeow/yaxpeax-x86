@@ -1,10 +1,10 @@
-use std::fs::File;
-use std::io::Read;
+extern crate yaxpeax_arch;
 
-//use std;
 use std::fmt;
 
 use std::hint::unreachable_unchecked;
+
+use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct RegSpec {
@@ -12,6 +12,7 @@ pub struct RegSpec {
     bank: RegisterBank
 }
 
+#[allow(non_snake_case)]
 impl RegSpec {
     #[inline]
     fn from_parts(num: u8, extended: bool, bank: RegisterBank) -> RegSpec {
@@ -73,6 +74,7 @@ impl fmt::Display for RegSpec {
     }
 }
 
+#[allow(non_camel_case_types)]
 enum SizeCode {
     b,
     vd,
@@ -255,7 +257,6 @@ impl fmt::Display for Opcode {
             &Opcode::NEG => write!(f, "{}", "neg"),
             &Opcode::NOT => write!(f, "{}", "not"),
             &Opcode::MUL => write!(f, "{}", "mul"),
-            &Opcode::IMUL => write!(f, "{}", "imul"),
             &Opcode::DIV => write!(f, "{}", "div"),
             &Opcode::IDIV => write!(f, "{}", "idiv"),
             &Opcode::CMPXCHG => write!(f, "{}", "cmpxchg"),
@@ -267,6 +268,7 @@ impl fmt::Display for Opcode {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
     MOVZX_b,
@@ -368,7 +370,40 @@ pub enum Opcode {
 pub struct Instruction {
     pub prefixes: Prefixes,
     pub opcode: Opcode,
-    pub operands: [Operand; 2]
+    pub operands: [Operand; 2],
+    pub length: u8
+}
+
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub struct x86_64;
+impl Arch for x86_64 {
+    type Address = u64;
+    type Instruction = Instruction;
+    type Operand = Operand;
+}
+
+impl LengthedInstruction for Instruction {
+    type Unit = u64;
+    fn len(&self) -> u64 {
+        self.length.into()
+    }
+    fn min_size() -> u64 {
+        1
+    }
+}
+
+impl Decodable for Instruction {
+    fn decode<T: IntoIterator<Item=u8>>(bytes: T) -> Option<Self> {
+        let mut instr = Instruction::invalid();
+        match decode_one(bytes, &mut instr) {
+            Some(_) => Some(instr),
+            None => None
+        }
+    }
+    fn decode_into<T: IntoIterator<Item=u8>>(&mut self, bytes: T) -> Option<()> {
+        decode_one(bytes, self)
+    }
 }
 
 impl Instruction {
@@ -376,7 +411,8 @@ impl Instruction {
         Instruction {
             prefixes: Prefixes::new(0),
             opcode: Opcode::Invalid,
-            operands: [Operand::Nothing, Operand::Nothing]
+            operands: [Operand::Nothing, Operand::Nothing],
+            length: 0
         }
     }
     pub fn is_invalid(&self) -> bool {
@@ -400,6 +436,7 @@ pub struct PrefixRex {
     bits: u8
 }
 
+#[allow(dead_code)]
 impl Prefixes {
     fn new(bits: u8) -> Prefixes {
         Prefixes {
@@ -465,23 +502,15 @@ impl Prefixes {
 
 impl PrefixRex {
     #[inline]
-    fn set_present(&mut self) { self.bits |= 0x10 }
-    #[inline]
     fn present(&self) -> bool { (self.bits & 0x10) == 0x10 }
     #[inline]
-    fn set_b(&mut self) { self.bits |= 0x01 }
+    fn set_present(&mut self) { self.bits |= 0x10; }
     #[inline]
     fn b(&self) -> bool { (self.bits & 0x01) == 0x01 }
     #[inline]
-    fn set_x(&mut self) { self.bits |= 0x02 }
-    #[inline]
     fn x(&self) -> bool { (self.bits & 0x02) == 0x02 }
     #[inline]
-    fn set_r(&mut self) { self.bits |= 0x04 }
-    #[inline]
     fn r(&self) -> bool { (self.bits & 0x04) == 0x04 }
-    #[inline]
-    fn set_w(&mut self) { self.bits |= 0x08 }
     #[inline]
     fn w(&self) -> bool { (self.bits & 0x08) == 0x08 }
     #[inline]
@@ -494,9 +523,9 @@ impl PrefixRex {
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.prefixes.lock {
-            write!(f, "lock ");
+            write!(f, "lock ")?;
         }
-        write!(f, "{}", self.opcode);
+        write!(f, "{}", self.opcode)?;
         match &self.operands[0] {
             &Operand::Nothing => {
                 return Ok(());
@@ -504,7 +533,7 @@ impl fmt::Display for Instruction {
             x @ &_ => {
                 write!(f, " {}", x)
             }
-        };
+        }?;
         match self.opcode {
             Opcode::MOVZX_b => {
                 match &self.operands[1] {
@@ -546,6 +575,7 @@ impl fmt::Display for Instruction {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug)]
 pub enum OperandCode {
     ModRM_0xf6,
@@ -636,9 +666,10 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAR
 ];
 
-fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes) -> Result<OperandCode, String> {
+fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
+            *length += 1;
             match b {
                 0x1f => {
                     instruction.prefixes = prefixes;
@@ -836,15 +867,14 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
     }
 }
 
-fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction) -> Result<OperandCode, String> {
+fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, length: &mut u8) -> Result<OperandCode, String> {
     use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
-    let mut reading = true;
     let mut prefixes = Prefixes::new(0);
-    let mut two_byte_map = false;
     loop {
         match bytes_iter.next() {
             Some(b) => {
+                *length += 1;
                 match b {
                     x if x < 0x40 => {
                         if x % 8 > 5 { // unsafe { unlikely(x % 8 > 5) } {
@@ -852,7 +882,7 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             // for x86_64 this is mostly invalid
                             match x {
                                 0x0f => {
-                                    return read_opcode_0f_map(bytes_iter, instruction, prefixes);
+                                    return read_opcode_0f_map(bytes_iter, instruction, prefixes, length);
                                 },
                                 0x26 => {
                                     prefixes.set_es()
@@ -988,7 +1018,7 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     x if x < 0x84 => {
                         // oh right op depends on modrm....
                         if x == 0x82 {
-                            return (Err("invalid opcode".to_owned()));
+                            return Err("invalid opcode".to_owned());
                         } else {
                             let op = Opcode::Invalid;
                             let operand = if x == 0x80 {
@@ -1346,29 +1376,31 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
     }
 }
 
-fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand) -> Result<(), String> {
+#[allow(non_snake_case)]
+fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
         *result = Operand::Register(RegSpec::gp_from_parts(m, prefixes.rex().b(), width, prefixes.rex().present()))
     } else if m == 5 && modbits == 0b00 {
-        let disp = read_num(bytes_iter, 4);
+        let disp = read_num(bytes_iter, 4, length);
         *result = Operand::RegDisp(
             if addr_width == 8 { RegSpec::RIP() } else { RegSpec::EIP() },
             disp as i32
         );
     } else if m == 4 {
         let sibbyte = bytes_iter.next().unwrap();
+        *length += 1;
         let (ss, index, base) = octets_of(sibbyte);
 
 //            println!("scale: {:b}, index: {:b}, base: {:b}", ss, index, base);
 
         if base == 0b101 {
             let disp = if modbits == 0b00 {
-                read_num(bytes_iter, 4)
+                read_num(bytes_iter, 4, length)
             } else if modbits == 0b01 {
-                read_num(bytes_iter, 1)
+                read_num(bytes_iter, 1, length)
             } else {
-                read_num(bytes_iter, 4)
+                read_num(bytes_iter, 4, length)
             };
 
             if index == 0b100 {
@@ -1421,9 +1453,9 @@ fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, 
             let disp = if modbits == 0b00 {
                 0
             } else if modbits == 0b01 {
-                read_num(bytes_iter, 1)
+                read_num(bytes_iter, 1, length)
             } else {
-                read_num(bytes_iter, 4)
+                read_num(bytes_iter, 4, length)
             };
 
             if index == 0b100 {
@@ -1448,7 +1480,7 @@ fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, 
             *result = Operand::RegDeref(reg);
         } else {
             let disp_width = if modbits == 0b01 { 1 } else { 4 };
-            let disp = read_num(bytes_iter, disp_width) as i32;
+            let disp = read_num(bytes_iter, disp_width, length) as i32;
             *result = Operand::RegDisp(reg, disp);
         }
     }
@@ -1459,7 +1491,8 @@ fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, 
 fn read_operands<T: Iterator<Item=u8>>(
     bytes_iter: &mut T,
     instruction: &mut Instruction,
-    operand_code: OperandCode
+    operand_code: OperandCode,
+    length: &mut u8
 ) -> Result<(), String> {
     match operand_code {
         /*
@@ -1512,11 +1545,12 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
-                    let num = read_num(bytes_iter, 1) as i8;
+                    let num = read_num(bytes_iter, 1, length) as i8;
                     let opcode = BASE_OPCODE_MAP[r as usize].clone();
                     instruction.opcode = opcode;
                     instruction.operands[1] = Operand::ImmediateI8(num);
@@ -1529,11 +1563,12 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
-                    let num = read_num(bytes_iter, 1) as i8;
+                    let num = read_num(bytes_iter, 1, length) as i8;
                     let opcode = BITWISE_OPCODE_MAP[r as usize].clone();
                     instruction.opcode = opcode;
                     instruction.operands[1] = Operand::ImmediateI8(num);
@@ -1546,11 +1581,12 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
-                    let num = read_num(bytes_iter, 1) as i8;
+                    let num = read_num(bytes_iter, 1, length) as i8;
                     let opcode = BITWISE_OPCODE_MAP[r as usize].clone();
                     instruction.opcode = opcode;
                     instruction.operands[1] = Operand::ImmediateI8(num);
@@ -1563,13 +1599,14 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
-                    let num = read_num(bytes_iter, 1) as i8;
+                    let num = read_num(bytes_iter, 1, length) as i8;
                     if r != 0 {
-                        return (Err("modrm invalid".to_owned()));
+                        return Err("modrm invalid".to_owned());
                     }
                     instruction.opcode = Opcode::MOV;
                     instruction.operands[1] = Operand::ImmediateI8(num);
@@ -1582,11 +1619,17 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
-                Ok(e_op) => {
-                    match read_imm_unsigned(bytes_iter, opwidth) {
+            if r != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err("Invalid modr/m for opcode 0xc7".to_string());
+            }
+
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
+                Ok(()) => {
+                    match read_imm_unsigned(bytes_iter, opwidth, length) {
                         Ok(imm) => {
                             instruction.opcode = Opcode::MOV;
                             instruction.operands[1] = imm;
@@ -1602,9 +1645,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     let opcode = BITWISE_OPCODE_MAP[r as usize].clone();
                     instruction.opcode = opcode;
@@ -1618,9 +1662,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     let opcode = BITWISE_OPCODE_MAP[r as usize].clone();
                     instruction.opcode = opcode;
@@ -1633,15 +1678,16 @@ fn read_operands<T: Iterator<Item=u8>>(
         OperandCode::ModRM_0xf6 => {
             let opwidth = 1;
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => { },
                 Err(reason) => { return Err(reason); }
             };
             match r {
                 0 | 1 => {
                     instruction.opcode = Opcode::TEST;
-                    match read_imm_signed(bytes_iter, 1, opwidth) {
+                    match read_imm_signed(bytes_iter, 1, opwidth, length) {
                         Ok(imm) => {
                             instruction.operands[1] = imm;
                         },
@@ -1675,8 +1721,9 @@ fn read_operands<T: Iterator<Item=u8>>(
         OperandCode::ModRM_0xf7 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => { },
                 Err(reason) => { return Err(reason); }
             };
@@ -1684,7 +1731,7 @@ fn read_operands<T: Iterator<Item=u8>>(
                 0 | 1 => {
                     instruction.opcode = Opcode::TEST;
                     let numwidth = if opwidth == 8 { 4 } else { opwidth };
-                    match read_imm_signed(bytes_iter, numwidth, opwidth) {
+                    match read_imm_signed(bytes_iter, numwidth, opwidth, length) {
                         Ok(imm) => {
                             instruction.operands[1] = imm;
                         },
@@ -1719,9 +1766,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     let opcode = [
                         Opcode::INC,
@@ -1744,9 +1792,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     let opcode = [
                         Opcode::INC,
@@ -1769,9 +1818,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
-            let (mod_bits, r, m) = octets_of(modrm);
+            *length += 1;
+            let (mod_bits, _, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     instruction.operands[1] = Operand::Nothing;
                     Ok(())
@@ -1783,9 +1833,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     instruction.operands[1] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
@@ -1798,9 +1849,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     instruction.operands[1] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
@@ -1813,9 +1865,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = 1;
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
                 Ok(()) => {
                     instruction.operands[0] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
@@ -1828,9 +1881,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
                 Ok(()) => {
                     instruction.operands[0] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
@@ -1843,9 +1897,10 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[1]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[1], length) {
                 Ok(()) => {
                     instruction.operands[0] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
@@ -1859,10 +1914,11 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let (mod_bits, r, m) = octets_of(modrm);
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
                 Ok(()) => {
                     instruction.operands[0] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
@@ -1874,7 +1930,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         OperandCode::Zv_Ivq(opcode_byte) => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let reg_idx = opcode_byte & 0x7;
-            match read_imm_ivq(bytes_iter, opwidth) {
+            match read_imm_ivq(bytes_iter, opwidth, length) {
                 Ok(imm) => {
                     instruction.operands = [
                         Operand::Register(RegSpec::gp_from_parts(reg_idx, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present())),
@@ -1888,7 +1944,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         OperandCode::AX_Ivd => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
-            match read_imm_signed(bytes_iter, numwidth, opwidth) {
+            match read_imm_signed(bytes_iter, numwidth, opwidth, length) {
                 Ok(imm) => {
                     instruction.operands = [
                         Operand::Register(RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present())),
@@ -1901,7 +1957,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::Zb_Ib(opcode_byte) => {
             let reg_idx = opcode_byte & 0x7;
-            match read_imm_unsigned(bytes_iter, 1) {
+            match read_imm_unsigned(bytes_iter, 1, length) {
                 Ok(imm) => {
                     instruction.operands = [
                         Operand::Register(RegSpec::gp_from_parts(reg_idx, instruction.prefixes.rex().b(), 1, instruction.prefixes.rex().present())),
@@ -1912,7 +1968,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             }
         },
         OperandCode::Iw => {
-            match read_imm_unsigned(bytes_iter, 2) {
+            match read_imm_unsigned(bytes_iter, 2, length) {
                 Ok(imm) => {
                     instruction.operands = [imm, Operand::Nothing];
                     Ok(())
@@ -1922,7 +1978,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::Jbs => {
             // TODO: arch width (8 in 64, 4 in 32, 2 in 16)
-            match read_imm_signed(bytes_iter, 1, 8) {
+            match read_imm_signed(bytes_iter, 1, 8, length) {
                 Ok(imm) => {
                     instruction.operands = [imm, Operand::Nothing];
                     Ok(())
@@ -1932,16 +1988,17 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0x83_Ev_Ibs => {
             let modrm = bytes_iter.next().unwrap();
+            *length += 1;
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
 
             let (mod_bits, r, m) = octets_of(modrm);
 
-            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0]) {
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     let opcode = BASE_OPCODE_MAP[r as usize].clone();
 
                     instruction.opcode = opcode;
-                    match read_imm_signed(bytes_iter, 1, opwidth) {
+                    match read_imm_signed(bytes_iter, 1, opwidth, length) {
                         Ok(op) => {
                             instruction.operands[1] = op;
                             Ok(())
@@ -1954,7 +2011,6 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Zv(opcode_byte) => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
-            let index = (opcode_byte & 0b111) + if instruction.prefixes.rex().b() { 0b1000 } else { 0 };
             instruction.operands = [Operand::Register(
                 RegSpec::gp_from_parts(
                     opcode_byte & 0b111, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present()
@@ -1962,13 +2018,8 @@ fn read_operands<T: Iterator<Item=u8>>(
             ), Operand::Nothing];
             Ok(())
         },
-        OperandCode::Jbs => {
-            let offset = read_num(bytes_iter, 1);
-            instruction.operands = [Operand::ImmediateI8(offset as i8), Operand::Nothing];
-            Ok(())
-        },
         OperandCode::Jvds => {
-            let offset = read_num(bytes_iter, 4);
+            let offset = read_num(bytes_iter, 4, length);
             instruction.operands = [Operand::ImmediateI32(offset as i32), Operand::Nothing];
             Ok(())
         }
@@ -1998,13 +2049,15 @@ fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
 
 pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruction) -> Option<()> {
     let mut bytes_iter = bytes.into_iter();
-    match read_opcode(&mut bytes_iter, instr) {
+    let mut len: u8 = 0;
+    match read_opcode(&mut bytes_iter, instr, &mut len) {
         Ok(operand_code) => {
-            match read_operands(&mut bytes_iter, instr, operand_code) {
+            match read_operands(&mut bytes_iter, instr, operand_code, &mut len) {
                 Ok(()) => {
+                    instr.length = len;
                     Some(())
                 },
-                Err(reason) => {
+                Err(_reason) => {
 //                    panic!("Decode error on operand: {:?}", reason);
        //             println!("Invalid instruction: {}", reason);
 //                        return Instruction::invalid()
@@ -2012,7 +2065,7 @@ pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruc
                 }
             }
         }
-        Err(reason) => {
+        Err(_reason) => {
 //            panic!("Decode error on opcode: {:?}", reason);
         //    println!("Invalid instruction: {}", reason);
 //                return Instruction::invalid()
@@ -2022,7 +2075,7 @@ pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruc
 }
 
 #[inline]
-fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> u64 {
+fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8) -> u64 {
     let mut result = 0u64;
     let mut idx = 0;
     loop {
@@ -2030,22 +2083,23 @@ fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> u64 {
             return result;
         }
         let byte = bytes.next().unwrap();
+        *length += 1;
         result |= (byte as u64) << (idx * 8);
         idx += 1;
     }
 }
 
 #[inline]
-fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
+fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8) -> Result<Operand, String> {
     match width {
         2 => {
-            Ok(Operand::ImmediateU16(read_num(bytes, 2) as u16))
+            Ok(Operand::ImmediateU16(read_num(bytes, 2, length) as u16))
         },
         4 => {
-            Ok(Operand::ImmediateU32(read_num(bytes, 4) as u32))
+            Ok(Operand::ImmediateU32(read_num(bytes, 4, length) as u32))
         },
         8 => {
-            Ok(Operand::ImmediateU64(read_num(bytes, 8) as u64))
+            Ok(Operand::ImmediateU64(read_num(bytes, 8, length) as u64))
         },
         _ => {
             unsafe { unreachable_unchecked(); }
@@ -2054,12 +2108,12 @@ fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<Operan
 }
 
 #[inline]
-fn read_imm_signed<T: Iterator<Item=u8>>(bytes: &mut T, num_width: u8, extend_to: u8) -> Result<Operand, String> {
+fn read_imm_signed<T: Iterator<Item=u8>>(bytes: &mut T, num_width: u8, extend_to: u8, length: &mut u8) -> Result<Operand, String> {
     let num = match num_width {
-        1 => read_num(bytes, 1) as i8 as i64,
-        2 => read_num(bytes, 2) as i16 as i64,
-        4 => read_num(bytes, 4) as i32 as i64,
-        8 => read_num(bytes, 4) as i32 as i64,
+        1 => read_num(bytes, 1, length) as i8 as i64,
+        2 => read_num(bytes, 2, length) as i16 as i64,
+        4 => read_num(bytes, 4, length) as i32 as i64,
+        8 => read_num(bytes, 4, length) as i32 as i64,
         _ => { unsafe { unreachable_unchecked() } }
     };
 
@@ -2073,19 +2127,19 @@ fn read_imm_signed<T: Iterator<Item=u8>>(bytes: &mut T, num_width: u8, extend_to
 }
 
 #[inline]
-fn read_imm_unsigned<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<Operand, String> {
+fn read_imm_unsigned<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8) -> Result<Operand, String> {
     match width {
         1 => {
-            Ok(Operand::ImmediateU8(read_num(bytes, 1) as u8))
+            Ok(Operand::ImmediateU8(read_num(bytes, 1, length) as u8))
         },
         2 => {
-            Ok(Operand::ImmediateU16(read_num(bytes, 2) as u16))
+            Ok(Operand::ImmediateU16(read_num(bytes, 2, length) as u16))
         },
         4 => {
-            Ok(Operand::ImmediateU32(read_num(bytes, 4) as u32))
+            Ok(Operand::ImmediateU32(read_num(bytes, 4, length) as u32))
         },
         8 => {
-            Ok(Operand::ImmediateU64(read_num(bytes, 4) as u64))
+            Ok(Operand::ImmediateU64(read_num(bytes, 4, length) as u64))
         }
         _ => {
             unsafe { unreachable_unchecked(); }
