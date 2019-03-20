@@ -1,10 +1,13 @@
 extern crate yaxpeax_arch;
+extern crate termion;
+
+use termion::color;
 
 use std::fmt;
 
 use std::hint::unreachable_unchecked;
 
-use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
+use yaxpeax_arch::{Arch, Colorize, ColorSettings, Decodable, LengthedInstruction};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct RegSpec {
@@ -83,7 +86,13 @@ enum SizeCode {
 }
 
 impl fmt::Display for Operand {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.colorize(None, fmt)
+    }
+}
+
+impl <T: std::fmt::Write> Colorize<T> for Operand {
+    fn colorize(&self, colors: Option<&ColorSettings>, f: &mut T) -> std::fmt::Result {
         match self {
             &Operand::ImmediateI16(imm) => write!(f, "0x{:x}", imm),
             &Operand::ImmediateU16(imm) => write!(f, "0x{:x}", imm),
@@ -557,56 +566,240 @@ impl PrefixRex {
     }
 }
 
+fn color_for(opcode: Opcode, colors: &ColorSettings) -> &'static color::Fg<&'static color::Color> {
+    match opcode {
+        Opcode::DIV |
+        Opcode::IDIV |
+        Opcode::MUL |
+        Opcode::NEG |
+        Opcode::NOT |
+        Opcode::SAR |
+        Opcode::SAL |
+        Opcode::SHR |
+        Opcode::SHL |
+        Opcode::RCR |
+        Opcode::RCL |
+        Opcode::ROR |
+        Opcode::ROL |
+        Opcode::INC |
+        Opcode::DEC |
+        Opcode::SBB |
+        Opcode::AND |
+        Opcode::XOR |
+        Opcode::OR |
+        Opcode::LEA |
+        Opcode::ADD |
+        Opcode::ADC |
+        Opcode::SUB |
+        Opcode::IMUL |
+        Opcode::PUSH |
+        Opcode::POP |
+        Opcode::NOP |
+        Opcode::XCHG |
+        Opcode::POPF |
+        Opcode::ENTER |
+        Opcode::LEAVE |
+        Opcode::PUSHF |
+        Opcode::WAIT |
+        Opcode::CMPS |
+        Opcode::SCAS |
+        Opcode::TEST |
+        Opcode::CMP |
+
+        /* Control flow */
+        Opcode::HLT |
+        Opcode::CALL |
+        Opcode::CALLF |
+        Opcode::JMP |
+        Opcode::JMPF |
+        Opcode::INT |
+        Opcode::INTO |
+        Opcode::IRET |
+        Opcode::RETF |
+        Opcode::RETURN |
+        Opcode::JO |
+        Opcode::JNO |
+        Opcode::JB |
+        Opcode::JNB |
+        Opcode::JZ |
+        Opcode::JNZ |
+        Opcode::JA |
+        Opcode::JNA |
+        Opcode::JS |
+        Opcode::JNS |
+        Opcode::JP |
+        Opcode::JNP |
+        Opcode::JL |
+        Opcode::JGE |
+        Opcode::JLE |
+        Opcode::JG |
+
+        /* Data transfer */
+        Opcode::MOV |
+        Opcode::CBW |
+        Opcode::CDW |
+        Opcode::LODS |
+        Opcode::STOS |
+        Opcode::LAHF |
+        Opcode::SAHF |
+        Opcode::MOVS |
+        Opcode::INS |
+        Opcode::OUTS |
+        Opcode::MOVZX_b |
+        Opcode::MOVZX_w |
+        Opcode::MOVSX |
+        Opcode::CMOVA |
+        Opcode::CMOVB |
+        Opcode::CMOVG |
+        Opcode::CMOVGE |
+        Opcode::CMOVL |
+        Opcode::CMOVLE |
+        Opcode::CMOVNA |
+        Opcode::CMOVNB |
+        Opcode::CMOVNO |
+        Opcode::CMOVNP |
+        Opcode::CMOVNS |
+        Opcode::CMOVNZ |
+        Opcode::CMOVO |
+        Opcode::CMOVP |
+        Opcode::CMOVS |
+        Opcode::CMOVZ |
+
+        Opcode::CMPXCHG |
+        Opcode::SETO |
+        Opcode::SETNO |
+        Opcode::SETB |
+        Opcode::SETAE |
+        Opcode::SETZ |
+        Opcode::SETNZ |
+        Opcode::SETBE |
+        Opcode::SETA |
+        Opcode::SETS |
+        Opcode::SETNS |
+        Opcode::SETP |
+        Opcode::SETNP |
+        Opcode::SETL |
+        Opcode::SETGE |
+        Opcode::SETLE |
+        Opcode::SETG |
+
+        Opcode::Invalid => {
+            &color::Fg(&color::Red)
+        }
+    }
+}
+
 impl fmt::Display for Instruction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.colorize(None, fmt)
+    }
+}
+
+/*
+ * Can't implement this as accepting a formatter because rust
+ * doesn't let me build one outside println! or write! or whatever.
+ *
+ * can't write this as an intermediate struct because i refuse to copy
+ * all data into the struct, and having a function producing a struct with
+ * some lifetimes gets really hairy if it's from a trait - same GAT kind
+ * of nonsense as i saw with ContextRead, because someone could hold onto
+ * the dang intermediate struct forever.
+ *
+ * so write to some Write thing i guess. bite me. i really just want to
+ * stop thinking about how to support printing instructions...
+ */
+impl <T: std::fmt::Write> Colorize<T> for Instruction {
+    fn colorize(&self, colors: Option<&ColorSettings>, f: &mut T) -> std::fmt::Result {
         if self.prefixes.lock {
             write!(f, "lock ")?;
         }
-        write!(f, "{}", self.opcode)?;
-        match &self.operands[0] {
-            &Operand::Nothing => {
-                return Ok(());
-            },
-            x @ &_ => {
-                write!(f, " {}", x)
+        colors.map(|c| { write!(f, "{}{}{}", color_for(self.opcode, c), self.opcode, color::Fg(&color::Reset as &color::Color)) })
+            .unwrap_or_else(|| { write!(f, "{}", self.opcode) })?;
+        /* For when contextualization is a thing we can do?
+        match self.0.opers.as_ref().and_then(|xs| xs[0].as_ref()) {
+            Some(s) => { write!(f, " {}", s)?; },
+            None => {
+        */
+                match self.operands[0] {
+                    Operand::Nothing => {
+                        return Ok(());
+                    },
+                    ref x @ _ => {
+                        write!(f, " ")?;
+                        x.colorize(colors, f)?;
+                    }
+                }
+                /*
             }
-        }?;
+        }*/;
         match self.opcode {
             Opcode::MOVZX_b => {
-                match &self.operands[1] {
-                    &Operand::Nothing => {
-                        return Ok(());
-                    },
-                    x @ &Operand::Register(_) => {
-                        write!(f, ", {}", x)
-                    }
-                    x @ _ => {
-                        write!(f, ", byte {}", x)
+                /*
+                match self.0.opers.as_ref().and_then(|xs| xs[1].as_ref()) {
+                    Some(s) => { write!(f, ", {}", s) }
+                    None => {
+                    */
+                        match &self.operands[1] {
+                            &Operand::Nothing => {
+                                return Ok(());
+                            },
+                            x @ &Operand::Register(_) => {
+                                write!(f, ", ")?;
+                                x.colorize(colors, f)
+                            }
+                            x @ _ => {
+                                write!(f, ", byte ")?;
+                                x.colorize(colors, f)
+                            }
+                        }
+                        /*
                     }
                 }
+                */
             },
             Opcode::MOVZX_w => {
-                match &self.operands[1] {
-                    &Operand::Nothing => {
-                        return Ok(());
-                    },
-                    x @ &Operand::Register(_) => {
-                        write!(f, ", {}", x)
-                    }
-                    x @ _ => {
-                        write!(f, ", word {}", x)
+                /*
+                match self.0.opers.as_ref().and_then(|xs| xs[1].as_ref()) {
+                    Some(s) => { write!(f, ", {}", s) }
+                    None => {
+                    */
+                        match &self.operands[1] {
+                            &Operand::Nothing => {
+                                return Ok(());
+                            },
+                            x @ &Operand::Register(_) => {
+                                write!(f, ", ")?;
+                                x.colorize(colors, f)
+                            }
+                            x @ _ => {
+                                write!(f, ", word ")?;
+                                x.colorize(colors, f)
+                            }
+                        }
+                        /*
                     }
                 }
+                */
             },
             _ => {
-                match &self.operands[1] {
-                    &Operand::Nothing => {
-                        return Ok(());
-                    },
-                    x @ &_ => {
-                        write!(f, ", {}", x)
+                /*
+                match self.0.opers.as_ref().and_then(|xs| xs[1].as_ref()) {
+                    Some(s) => { write!(f, ", {}", s) }
+                    None => {
+                    */
+                        match &self.operands[1] {
+                            &Operand::Nothing => {
+                                return Ok(());
+                            },
+                            x @ _ => {
+                                write!(f, ", ")?;
+                                x.colorize(colors, f)
+                            }
+                        }
+                        /*
                     }
                 }
+                */
             }
         }
     }
