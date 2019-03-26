@@ -13,8 +13,8 @@ use yaxpeax_arch::{Arch,  ColorSettings, Decodable, LengthedInstruction};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct RegSpec {
-    num: u8,
-    bank: RegisterBank
+    pub num: u8,
+    pub bank: RegisterBank
 }
 
 #[allow(non_snake_case)]

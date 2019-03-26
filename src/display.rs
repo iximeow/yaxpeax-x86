@@ -46,47 +46,393 @@ impl fmt::Display for Operand {
 impl <T: std::fmt::Write> Colorize<T> for Operand {
     fn colorize(&self, colors: Option<&ColorSettings>, f: &mut T) -> std::fmt::Result {
         match self {
-            &Operand::ImmediateI16(imm) => write!(f, "0x{:x}", imm),
-            &Operand::ImmediateU16(imm) => write!(f, "0x{:x}", imm),
-            &Operand::ImmediateU32(imm) => write!(f, "0x{:x}", imm),
-            &Operand::ImmediateI32(imm) => write!(f, "0x{:x}", imm),
-            &Operand::ImmediateU64(imm) => write!(f, "0x{:x}", imm),
-            &Operand::ImmediateI64(imm) => write!(f, "0x{:x}", imm),
-            &Operand::Register(ref spec) => write!(f, "{}", spec),
-            &Operand::ImmediateI8(imm) => write!(f, "0x{:x}", imm),
-            &Operand::ImmediateU8(imm) => write!(f, "0x{:x}", imm),
-            &Operand::DisplacementU32(imm) => write!(f, "[0x{:x}]", imm),
-            &Operand::DisplacementU64(imm) => write!(f, "[0x{:x}]", imm),
-            &Operand::RegDisp(ref spec, ref disp) => {
-                if *disp < 0 {
-                    write!(f, "[{} - 0x{:x}]", spec, -disp)
+            &Operand::ImmediateU8(imm) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{:#x}{}",
+                            colors.number(),
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{:#x}",
+                            imm
+                        )
+                    }
+                }
+            }
+            &Operand::ImmediateI8(imm) => {
+                let (sign, imm) = if imm < 0 {
+                    (true, -imm)
                 } else {
-                    write!(f, "[{} + 0x{:x}]", spec, disp)
+                    (false, imm)
+                };
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{}{:#x}{}",
+                            colors.number(),
+                            if sign { "-" } else { "" },
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{}{:#x}",
+                            if sign { "-" } else { "" },
+                            imm
+                        )
+                    }
                 }
             },
-            &Operand::RegDeref(ref spec) => write!(f, "[{}]", spec),
-            &Operand::RegScale(ref spec, scale) => write!(f, "[{} * {}]", spec, scale),
+            &Operand::ImmediateU16(imm) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{:#x}{}",
+                            colors.number(),
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{:#x}",
+                            imm
+                        )
+                    }
+                }
+            }
+            &Operand::ImmediateI16(imm) => {
+                let (sign, imm) = if imm < 0 {
+                    (true, -imm)
+                } else {
+                    (false, imm)
+                };
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{}{:#x}{}",
+                            colors.number(),
+                            if sign { "-" } else { "" },
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{}{:#x}",
+                            if sign { "-" } else { "" },
+                            imm
+                        )
+                    }
+                }
+            },
+            &Operand::ImmediateU32(imm) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{:#x}{}",
+                            colors.number(),
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{:#x}",
+                            imm,
+                        )
+                    }
+                }
+            }
+            &Operand::ImmediateI32(imm) => {
+                let (sign, imm) = if imm < 0 {
+                    (true, -imm)
+                } else {
+                    (false, imm)
+                };
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{}{:#x}{}",
+                            colors.number(),
+                            if sign { "-" } else { "" },
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{}{:#x}",
+                            if sign { "-" } else { "" },
+                            imm
+                        )
+                    }
+                }
+            },
+            &Operand::ImmediateU64(imm) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}0x{:x}{}",
+                            colors.number(),
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "0x{:x}",
+                            imm
+                        )
+
+                    }
+                }
+            }
+            &Operand::ImmediateI64(imm) => {
+                let (sign, imm) = if imm < 0 {
+                    (true, -imm)
+                } else {
+                    (false, imm)
+                };
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{}{:#x}{}",
+                            colors.number(),
+                            if sign { "-" } else { "" },
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{}{:#x}",
+                            if sign { "-" } else { "" },
+                            imm
+                        )
+                    }
+                }
+            },
+            &Operand::Register(ref spec) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "{}{}{}",
+                            colors.register(),
+                            spec,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "{}",
+                            spec
+                        )
+
+                    }
+                }
+            }
+            &Operand::DisplacementU32(imm) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{:#x}{}]",
+                            colors.address(),
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{:#x}]",
+                            imm
+                        )
+                    }
+                }
+            }
+            &Operand::DisplacementU64(imm) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{:#x}{}]",
+                            colors.address(),
+                            imm,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{:#x}]",
+                            imm
+                        )
+                    }
+                }
+            }
+            &Operand::RegDisp(ref spec, ref disp) => {
+                let (sign, disp) = if *disp < 0 {
+                    (true, -*disp)
+                } else {
+                    (false, *disp)
+                };
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} {} {}{:#x}{}]",
+                            colors.register(),
+                            spec,
+                            color::Fg(color::Reset),
+                            if sign { "-" } else { "+" },
+                            colors.number(),
+                            disp,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} {} {:#x}]",
+                            spec,
+                            if sign { "-" } else { "+" },
+                            disp,
+                        )
+                    }
+                }
+            },
+            &Operand::RegDeref(ref spec) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{}]",
+                            colors.register(),
+                            spec,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{}]",
+                            spec
+                        )
+                    }
+                }
+            },
+            &Operand::RegScale(ref spec, scale) => {
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} * {}{}{}]",
+                            colors.register(),
+                            spec,
+                            color::Fg(color::Reset),
+                            colors.number(),
+                            scale,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} * {}]",
+                            spec,
+                            scale
+                        )
+                    }
+                }
+            },
             &Operand::RegScaleDisp(ref spec, scale, disp) => {
-                write!(f, "[{} * {} + 0x{:x}]", spec, scale, disp)
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} * {}{}{} + {}{}{}]",
+                            colors.register(),
+                            spec,
+                            color::Fg(color::Reset),
+                            colors.number(),
+                            scale,
+                            color::Fg(color::Reset),
+                            colors.number(),
+                            disp,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} * {} + {:#x}]",
+                            spec,
+                            scale,
+                            disp
+                        )
+                    }
+                }
             },
             &Operand::RegIndexBase(ref base, ref index) => {
-                write!(f, "[{} + {}]", base, index)
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} + {}{}{}]",
+                            colors.register(),
+                            base,
+                            color::Fg(color::Reset),
+                            colors.register(),
+                            index,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} + {}]",
+                            base,
+                            index
+                        )
+                    }
+                }
             }
             &Operand::RegIndexBaseDisp(ref base, ref index, disp) => {
-                write!(f, "[{} + {} + 0x{:x}]", base, index, disp)
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} + {}{}{} + {}{:#x}{}]",
+                            colors.register(),
+                            base,
+                            color::Fg(color::Reset),
+                            colors.register(),
+                            index,
+                            color::Fg(color::Reset),
+                            colors.number(),
+                            disp,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} + {} + {:#x}]",
+                            base,
+                            index,
+                            disp
+                        )
+                    }
+                }
             },
             &Operand::RegIndexBaseScale(ref base, ref index, scale) => {
-                if scale == 1 {
-                    write!(f, "[{} + {}]", base, index)
-                } else {
-                    write!(f, "[{} + {} * {}]", base, index, scale)
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} + {}{}{} * {}{}{}]",
+                            colors.register(),
+                            base,
+                            color::Fg(color::Reset),
+                            colors.register(),
+                            index,
+                            color::Fg(color::Reset),
+                            colors.number(),
+                            scale,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} + {} * {}]",
+                            base,
+                            index,
+                            scale
+                        )
+                    }
                 }
             }
             &Operand::RegIndexBaseScaleDisp(ref base, ref index, scale, disp) => {
-                if scale == 1 {
-                    write!(f, "[{} + {} + {:#x}]", base, index, disp)
-                } else {
-                    write!(f, "[{} + {} * {} + {:#x}]", base, index, scale, disp)
+                match colors {
+                    Some(colors) => {
+                        write!(f, "[{}{}{} + {}{}{} * {}{}{} + {}{:#x}{}]",
+                            colors.register(),
+                            base,
+                            color::Fg(color::Reset),
+                            colors.register(),
+                            index,
+                            color::Fg(color::Reset),
+                            colors.number(),
+                            scale,
+                            color::Fg(color::Reset),
+ *                           colors.number(),
+                            disp,
+                            color::Fg(color::Reset)
+                        )
+                    },
+                    None => {
+                        write!(f, "[{} + {} * {} + {:#x}]",
+                            base,
+                            index,
+                            scale,
+                            disp
+                        )
+                    }
                 }
             },
             &Operand::Nothing => { Ok(()) },
@@ -380,11 +726,9 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
         }
         colors.map(|c| { write!(out, "{}{}{}", color_for(self.opcode, c), self.opcode, color::Fg(&color::Reset as &color::Color)) })
             .unwrap_or_else(|| { write!(out, "{}", self.opcode) })?;
-        /* For when contextualization is a thing we can do?
-        match self.0.opers.as_ref().and_then(|xs| xs[0].as_ref()) {
+        match context.and_then(|xs| xs[0].as_ref()) {
             Some(s) => { write!(out, " {}", s)?; },
             None => {
-        */
                 match self.operands[0] {
                     Operand::Nothing => {
                         return Ok(());
@@ -394,16 +738,13 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                         x.colorize(colors, out)?;
                     }
                 }
-                /*
             }
-        }*/;
+        };
         match self.opcode {
             Opcode::MOVZX_b => {
-                /*
-                match self.0.opers.as_ref().and_then(|xs| xs[1].as_ref()) {
+                match context.and_then(|xs| xs[1].as_ref()) {
                     Some(s) => { write!(out, ", {}", s) }
                     None => {
-                    */
                         match &self.operands[1] {
                             &Operand::Nothing => {
                                 return Ok(());
@@ -417,17 +758,13 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                                 x.colorize(colors, out)
                             }
                         }
-                        /*
                     }
                 }
-                */
             },
             Opcode::MOVZX_w => {
-                /*
-                match self.0.opers.as_ref().and_then(|xs| xs[1].as_ref()) {
+                match context.and_then(|xs| xs[1].as_ref()) {
                     Some(s) => { write!(out, ", {}", s) }
                     None => {
-                    */
                         match &self.operands[1] {
                             &Operand::Nothing => {
                                 return Ok(());
@@ -441,17 +778,13 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                                 x.colorize(colors, out)
                             }
                         }
-                        /*
                     }
                 }
-                */
             },
             _ => {
-                /*
-                match self.0.opers.as_ref().and_then(|xs| xs[1].as_ref()) {
+                match context.and_then(|xs| xs[1].as_ref()) {
                     Some(s) => { write!(out, ", {}", s) }
                     None => {
-                    */
                         match &self.operands[1] {
                             &Operand::Nothing => {
                                 return Ok(());
@@ -461,10 +794,8 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                                 x.colorize(colors, out)
                             }
                         }
-                        /*
                     }
                 }
-                */
             }
         }
     }
