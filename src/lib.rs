@@ -11,7 +11,7 @@ use std::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{Arch,  ColorSettings, Decodable, LengthedInstruction};
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct RegSpec {
     pub num: u8,
     pub bank: RegisterBank
@@ -37,7 +37,7 @@ impl RegSpec {
     }
 
     #[inline]
-    fn RIP() -> RegSpec {
+    pub fn RIP() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::RIP
@@ -45,11 +45,68 @@ impl RegSpec {
     }
 
     #[inline]
-    fn EIP() -> RegSpec {
+    pub fn EIP() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::EIP
         }
+    }
+
+    #[inline]
+    pub fn eflags() -> RegSpec {
+        RegSpec {
+            num: 0,
+            bank: RegisterBank::EFlags
+        }
+    }
+
+    #[inline]
+    pub fn rflags() -> RegSpec {
+        RegSpec {
+            num: 0,
+            bank: RegisterBank::RFlags
+        }
+    }
+
+    #[inline]
+    pub fn rbp() -> RegSpec {
+        RegSpec {
+            num: 5,
+            bank: RegisterBank::RFlags
+        }
+    }
+
+    #[inline]
+    pub fn rsp() -> RegSpec {
+        RegSpec {
+            num: 4,
+            bank: RegisterBank::RFlags
+        }
+    }
+
+    #[inline]
+    pub fn rax() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 0 }
+    }
+
+    #[inline]
+    pub fn rdx() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 2 }
+    }
+
+    #[inline]
+    pub fn eax() -> RegSpec {
+        RegSpec { bank: RegisterBank::D, num: 0 }
+    }
+
+    #[inline]
+    pub fn ax() -> RegSpec {
+        RegSpec { bank: RegisterBank::W, num: 0 }
+    }
+
+    #[inline]
+    pub fn al() -> RegSpec {
+        RegSpec { bank: RegisterBank::B, num: 0 }
     }
 }
 
@@ -86,10 +143,10 @@ pub enum Operand {
     Nothing
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum RegisterBank {
     Q, D, W, B, rB, // Quadword, Dword, Word, Byte
-    CR, DR, S, EIP, RIP,  // Control reg, Debug reg, Selector, ...
+    CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
     X, Y, Z,    // XMM, YMM, ZMM
     ST, MM,     // ST, MM regs (x87, mmx)
 }
