@@ -13,7 +13,7 @@ use yaxpeax_x86::{Instruction, Opcode, decode_one};
 
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
-    match decode_one(bytes, &mut instr) {
+    match decode_one(bytes.iter().map(|x| *x), &mut instr) {
         Some(()) => Some(instr),
         None => None
     }
@@ -81,7 +81,7 @@ const decode_data: [u8; 130] = [
 
 fn do_decode_swathe() {
     let mut buf = [0u8; 128];
-    let mut iter = decode_data.iter();
+    let mut iter = decode_data.iter().map(|x| *x);
     let mut result = yaxpeax_x86::Instruction::invalid();
     loop {
         match yaxpeax_x86::decode_one(&mut iter, &mut result) {
