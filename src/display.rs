@@ -31,7 +31,32 @@ impl fmt::Display for RegSpec {
             },
             RegisterBank::EIP => { "eip" },
             RegisterBank::RIP => { "rip" },
-            _ => panic!("unnamable register")
+            RegisterBank::EFlags => { "eflags" },
+            RegisterBank::RFlags => { "rflags" },
+            RegisterBank::CR => {
+                ["cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7", "cr8", "cr9", "cr10", "cr11", "cr12", "cr13", "cr14", "cr15"][self.num as usize]
+            }
+            RegisterBank::DR => {
+                ["dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7", "dr8", "dr9", "dr10", "dr11", "dr12", "dr13", "dr14", "dr15"][self.num as usize]
+            }
+            RegisterBank::X => {
+                ["xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"][self.num as usize]
+            },
+            RegisterBank::Y => {
+                ["ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"][self.num as usize]
+            },
+            RegisterBank::Z => {
+                ["zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31"][self.num as usize]
+            },
+            RegisterBank::ST => {
+                ["st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"][self.num as usize]
+            },
+            RegisterBank::MM => {
+                ["mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"][self.num as usize]
+            }
+            RegisterBank::S => {
+                ["cs", "ds", "es", "fs", "gs", "ss"][self.num as usize]
+            }
         };
         write!(f, "{}", name)
     }
