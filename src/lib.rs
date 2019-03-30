@@ -1342,9 +1342,18 @@ fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, 
             } else {
                 let index_reg = RegSpec::gp_from_parts(index, prefixes.rex().x(), addr_width, prefixes.rex().present());
                 if disp == 0 {
-                    *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
+                    if ss == 0 {
+                        *result = Operand::RegIndexBase(base_reg, index_reg)
+                    } else {
+                        *result = Operand::RegIndexBaseScale(base_reg, index_reg, 1u8 << ss);
+                    }
                 } else {
-                    *result = Operand::RegIndexBaseScaleDisp(base_reg, index_reg, 1u8 << ss, disp as i32);
+                    if ss == 0 {
+
+                        *result = Operand::RegIndexBaseDisp(base_reg, index_reg, disp as i32);
+                    } else {
+                        *result = Operand::RegIndexBaseScaleDisp(base_reg, index_reg, 1u8 << ss, disp as i32);
+                    }
                 }
             }
         }

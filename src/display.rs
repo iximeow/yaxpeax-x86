@@ -162,7 +162,7 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
                     colors.register(base),
                     colors.register(index),
                     colors.number(scale),
-                    colors.number(format!("{:#x}", scale))
+                    colors.number(format!("{:#x}", disp))
                 )
             },
             &Operand::Nothing => { Ok(()) },
