@@ -174,6 +174,15 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::CPUID => write!(f, "{}", "cpuid"),
+            &Opcode::UD2 => write!(f, "{}", "ud2"),
+            &Opcode::WBINVD => write!(f, "{}", "wbinvd"),
+            &Opcode::INVD => write!(f, "{}", "invd"),
+            &Opcode::SYSRET => write!(f, "{}", "sysret"),
+            &Opcode::CLTS => write!(f, "{}", "clts"),
+            &Opcode::SYSCALL => write!(f, "{}", "syscall"),
+            &Opcode::LSL => write!(f, "{}", "lsl"),
+            &Opcode::LAR => write!(f, "{}", "lar"),
             &Opcode::INC => write!(f, "{}", "inc"),
             &Opcode::DEC => write!(f, "{}", "dec"),
             &Opcode::HLT => write!(f, "{}", "hlt"),
@@ -406,6 +415,16 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CMP |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
+            Opcode::CPUID |
+            Opcode::WBINVD |
+            Opcode::INVD |
+            Opcode::SYSRET |
+            Opcode::CLTS |
+            Opcode::SYSCALL |
+            Opcode::LSL |
+            Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
+
+            Opcode::UD2 |
             Opcode::Invalid => { write!(out, "{}", colors.invalid_op(self)) }
         }
     }

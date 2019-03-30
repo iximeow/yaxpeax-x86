@@ -85,6 +85,16 @@ impl RegSpec {
     }
 
     #[inline]
+    pub fn fs() -> RegSpec {
+        RegSpec { bank: RegisterBank::S, num: 3 }
+    }
+
+    #[inline]
+    pub fn gs() -> RegSpec {
+        RegSpec { bank: RegisterBank::S, num: 4 }
+    }
+
+    #[inline]
     pub fn rax() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 0 }
     }
@@ -268,6 +278,15 @@ pub enum Opcode {
     SETGE,
     SETLE,
     SETG,
+    CPUID,
+    UD2,
+    WBINVD,
+    INVD,
+    SYSRET,
+    CLTS,
+    SYSCALL,
+    LSL,
+    LAR,
     Invalid
 }
 #[derive(Debug)]
@@ -427,6 +446,14 @@ impl PrefixRex {
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug)]
 pub enum OperandCode {
+    ModRM_0x0f00,
+    ModRM_0x0f01,
+    Rq_Cq_0,
+    Rq_Dq_0,
+    Cq_Rq_0,
+    Dq_Rq_0,
+    FS,
+    GS,
     Eb_R0,
     ModRM_0xf6,
     ModRM_0xf7,
@@ -521,10 +548,78 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
         Some(b) => {
             *length += 1;
             match b {
+                0x00 => {
+                    instruction.prefixes = prefixes;
+                    Ok(OperandCode::ModRM_0x0f00)
+                }
+                0x01 => {
+                    instruction.prefixes = prefixes;
+                    Ok(OperandCode::ModRM_0x0f00)
+                }
+                0x02 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::LAR;
+                    Ok(OperandCode::Gv_M)
+                }
+                0x03 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::LSL;
+                    Ok(OperandCode::Gv_M)
+                }
+                0x05 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::SYSCALL;
+                    Ok(OperandCode::Nothing)
+                }
+                0x06 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CLTS;
+                    Ok(OperandCode::Nothing)
+                }
+                0x07 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::SYSRET;
+                    Ok(OperandCode::Nothing)
+                }
+                0x08 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::INVD;
+                    Ok(OperandCode::Nothing)
+                }
+                0x09 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::WBINVD;
+                    Ok(OperandCode::Nothing)
+                }
+                0x0b => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::UD2;
+                    Ok(OperandCode::Nothing)
+                }
                 0x1f => {
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::NOP;
                     Ok(OperandCode::Ev)
+                },
+                0x20 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOV;
+                    Ok(OperandCode::Rq_Cq_0)
+                },
+                0x21 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOV;
+                    Ok(OperandCode::Rq_Dq_0)
+                },
+                0x22 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOV;
+                    Ok(OperandCode::Cq_Rq_0)
+                },
+                0x23 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOV;
+                    Ok(OperandCode::Dq_Rq_0)
                 },
                 0x40 => {
                     instruction.prefixes = prefixes;
@@ -707,6 +802,36 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                         Opcode::SETG
                     ][(x & 0xf) as usize];
                     Ok(OperandCode::Eb_R0)
+                }
+                0xa0 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::PUSH;
+                    Ok(OperandCode::FS)
+                }
+                0xa1 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::POP;
+                    Ok(OperandCode::GS)
+                }
+                0xa2 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CPUID;
+                    Ok(OperandCode::Nothing)
+                }
+                0xa8 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::PUSH;
+                    Ok(OperandCode::Nothing)
+                }
+                0xa9 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::PUSH;
+                    Ok(OperandCode::GS)
+                }
+                0xae => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::PUSH;
+                    Ok(OperandCode::GS)
                 }
                 0xb0 => {
                     instruction.prefixes = prefixes;
@@ -2095,6 +2220,93 @@ fn read_operands<T: Iterator<Item=u8>>(
         OperandCode::Jvds => {
             let offset = read_num(bytes_iter, 4, length);
             instruction.operands = [Operand::ImmediateI32(offset as i32), Operand::Nothing];
+            Ok(())
+        }
+        OperandCode::Rq_Cq_0 => {
+            let opwidth = 8;
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (_, mut r, mut m) = octets_of(modrm);
+            if instruction.prefixes.rex().r() {
+                r += 0b1000;
+            }
+            if instruction.prefixes.rex().b() {
+                m += 0b1000;
+            }
+            instruction.operands = [
+                Operand::Register(RegSpec { bank: RegisterBank::Q, num: m }),
+                Operand::Register(RegSpec { bank: RegisterBank::CR, num: r })
+            ];
+            Ok(())
+        }
+        OperandCode::Rq_Dq_0 => {
+            let opwidth = 8;
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            let (_, mut r, mut m) = octets_of(modrm);
+            if instruction.prefixes.rex().r() {
+                r += 0b1000;
+            }
+            if instruction.prefixes.rex().b() {
+                m += 0b1000;
+            }
+            instruction.operands = [
+                Operand::Register(RegSpec { bank: RegisterBank::Q, num: m }),
+                Operand::Register(RegSpec { bank: RegisterBank::DR, num: r })
+            ];
+            Ok(())
+        }
+        OperandCode::Cq_Rq_0 => {
+            let opwidth = 8;
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (_, mut r, mut m) = octets_of(modrm);
+            if instruction.prefixes.rex().r() {
+                r += 0b1000;
+            }
+            if instruction.prefixes.rex().b() {
+                m += 0b1000;
+            }
+            instruction.operands = [
+                Operand::Register(RegSpec { bank: RegisterBank::CR, num: r }),
+                Operand::Register(RegSpec { bank: RegisterBank::Q, num: m })
+            ];
+            Ok(())
+        }
+        OperandCode::Dq_Rq_0 => {
+            let opwidth = 8;
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (_, mut r, mut m) = octets_of(modrm);
+            if instruction.prefixes.rex().r() {
+                r += 0b1000;
+            }
+            if instruction.prefixes.rex().b() {
+                m += 0b1000;
+            }
+            instruction.operands = [
+                Operand::Register(RegSpec { bank: RegisterBank::DR, num: r }),
+                Operand::Register(RegSpec { bank: RegisterBank::Q, num: m })
+            ];
+            Ok(())
+        }
+        OperandCode::FS => {
+            instruction.operands = [Operand::Register(RegSpec::fs()), Operand::Nothing];
+            Ok(())
+        }
+        OperandCode::GS => {
+            instruction.operands = [Operand::Register(RegSpec::fs()), Operand::Nothing];
             Ok(())
         }
         OperandCode::Nothing => {
