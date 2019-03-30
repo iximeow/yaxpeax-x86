@@ -8,6 +8,7 @@ use std::fmt;
 use std::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{Arch, Colorize, ColorSettings, Decodable, LengthedInstruction, ShowContextual, YaxColors};
+use yaxpeax_arch::display::*;
 
 use ::{RegSpec, RegisterBank, Opcode, Operand, Instruction};
 
@@ -75,65 +76,29 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
                 write!(f, "{}", colors.number(format!("{:#x}", imm)))
             }
             &Operand::ImmediateI8(imm) => {
-                let (sign, imm) = if imm < 0 {
-                    (true, -imm)
-                } else {
-                    (false, imm)
-                };
                 write!(f, "{}",
-                    colors.number(format!("{}{:#x}",
-                        if sign { "-" } else { "" },
-                        imm))
-                )
+                    colors.number(signed_i8_hex(imm)))
             },
             &Operand::ImmediateU16(imm) => {
                 write!(f, "{}", colors.number(format!("{:#x}", imm)))
             }
             &Operand::ImmediateI16(imm) => {
-                let (sign, imm) = if imm < 0 {
-                    (true, -imm)
-                } else {
-                    (false, imm)
-                };
                 write!(f, "{}",
-                    colors.number(format!("{}{:#x}",
-                        if sign { "-" } else { "" },
-                        imm))
-                )
+                    colors.number(signed_i16_hex(imm)))
             },
             &Operand::ImmediateU32(imm) => {
                 write!(f, "{}", colors.number(format!("{:#x}", imm)))
             }
             &Operand::ImmediateI32(imm) => {
-                let (sign, imm) = if imm == std::i32::MIN {
-                    (false, imm)
-                } else if imm < 0 {
-                    (true, -imm)
-                } else {
-                    (false, imm)
-                };
                 write!(f, "{}",
-                    colors.number(format!("{}{:#x}",
-                        if sign { "-" } else { "" },
-                        imm))
-                )
+                    colors.number(signed_i32_hex(imm)))
             },
             &Operand::ImmediateU64(imm) => {
                 write!(f, "{}", colors.number(format!("{:#x}", imm)))
             }
             &Operand::ImmediateI64(imm) => {
-                let (sign, imm) = if imm == std::i64::MIN {
-                    (false, imm)
-                } else if imm < 0 {
-                    (true, -imm)
-                } else {
-                    (false, imm)
-                };
                 write!(f, "{}",
-                    colors.number(format!("{}{:#x}",
-                        if sign { "-" } else { "" },
-                        imm))
-                )
+                    colors.number(signed_i64_hex(imm)))
             },
             &Operand::Register(ref spec) => {
                 write!(f, "{}", colors.register(spec))
