@@ -174,6 +174,30 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::WRMSR => write!(f, "{}", "wrmsr"),
+            &Opcode::RDMSR => write!(f, "{}", "rdmsr"),
+            &Opcode::RDTSC => write!(f, "{}", "rdtsc"),
+            &Opcode::RDPMC => write!(f, "{}", "rdpmc"),
+            &Opcode::FXSAVE => write!(f, "{}", "fxsave"),
+            &Opcode::FXRSTOR => write!(f, "{}", "fxstor"),
+            &Opcode::LDMXCSR => write!(f, "{}", "ldmxcsr"),
+            &Opcode::STMXCSR => write!(f, "{}", "stmxcsr"),
+            &Opcode::XSAVE => write!(f, "{}", "xsave"),
+            &Opcode::XSTOR => write!(f, "{}", "xstor"),
+            &Opcode::XSAVEOPT => write!(f, "{}", "xsaveopt"),
+            &Opcode::LFENCE => write!(f, "{}", "lfence"),
+            &Opcode::MFENCE => write!(f, "{}", "mfence"),
+            &Opcode::SFENCE => write!(f, "{}", "sfence"),
+            &Opcode::CLFLUSH => write!(f, "{}", "clflush"),
+            &Opcode::SGDT => write!(f, "{}", "sgdt"),
+            &Opcode::SIDT => write!(f, "{}", "sidt"),
+            &Opcode::LGDT => write!(f, "{}", "lgdt"),
+            &Opcode::LIDT => write!(f, "{}", "lidt"),
+            &Opcode::SMSW => write!(f, "{}", "smsw"),
+            &Opcode::LMSW => write!(f, "{}", "lmsw"),
+            &Opcode::SWAPGS => write!(f, "{}", "swapgs"),
+            &Opcode::RDTSCP => write!(f, "{}", "rdtscp"),
+            &Opcode::INVLPG => write!(f, "{}", "invlpg"),
             &Opcode::CPUID => write!(f, "{}", "cpuid"),
             &Opcode::UD2 => write!(f, "{}", "ud2"),
             &Opcode::WBINVD => write!(f, "{}", "wbinvd"),
@@ -415,6 +439,30 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CMP |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
+            Opcode::WRMSR |
+            Opcode::RDMSR |
+            Opcode::RDTSC |
+            Opcode::RDPMC |
+            Opcode::FXSAVE |
+            Opcode::FXRSTOR |
+            Opcode::LDMXCSR |
+            Opcode::STMXCSR |
+            Opcode::XSAVE |
+            Opcode::XSTOR |
+            Opcode::XSAVEOPT |
+            Opcode::LFENCE |
+            Opcode::MFENCE |
+            Opcode::SFENCE |
+            Opcode::CLFLUSH |
+            Opcode::SGDT |
+            Opcode::SIDT |
+            Opcode::LGDT |
+            Opcode::LIDT |
+            Opcode::SMSW |
+            Opcode::LMSW |
+            Opcode::SWAPGS |
+            Opcode::RDTSCP |
+            Opcode::INVLPG |
             Opcode::CPUID |
             Opcode::WBINVD |
             Opcode::INVD |

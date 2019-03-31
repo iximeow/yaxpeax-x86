@@ -100,6 +100,11 @@ impl RegSpec {
     }
 
     #[inline]
+    pub fn rcx() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 1 }
+    }
+
+    #[inline]
     pub fn rdx() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 2 }
     }
@@ -287,6 +292,30 @@ pub enum Opcode {
     SYSCALL,
     LSL,
     LAR,
+    SGDT,
+    SIDT,
+    LGDT,
+    LIDT,
+    SMSW,
+    LMSW,
+    SWAPGS,
+    RDTSCP,
+    INVLPG,
+    FXSAVE,
+    FXRSTOR,
+    LDMXCSR,
+    STMXCSR,
+    XSAVE,
+    XSTOR,
+    XSAVEOPT,
+    LFENCE,
+    MFENCE,
+    SFENCE,
+    CLFLUSH,
+    WRMSR,
+    RDTSC,
+    RDMSR,
+    RDPMC,
     Invalid
 }
 #[derive(Debug)]
@@ -448,6 +477,7 @@ impl PrefixRex {
 pub enum OperandCode {
     ModRM_0x0f00,
     ModRM_0x0f01,
+    ModRM_0x0fae,
     Rq_Cq_0,
     Rq_Dq_0,
     Cq_Rq_0,
@@ -554,7 +584,7 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                 }
                 0x01 => {
                     instruction.prefixes = prefixes;
-                    Ok(OperandCode::ModRM_0x0f00)
+                    Ok(OperandCode::ModRM_0x0f01)
                 }
                 0x02 => {
                     instruction.prefixes = prefixes;
@@ -620,6 +650,26 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOV;
                     Ok(OperandCode::Dq_Rq_0)
+                },
+                0x30 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::WRMSR;
+                    Ok(OperandCode::Nothing)
+                },
+                0x31 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::RDTSC;
+                    Ok(OperandCode::Nothing)
+                },
+                0x32 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::RDMSR;
+                    Ok(OperandCode::Nothing)
+                },
+                0x33 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::RDPMC;
+                    Ok(OperandCode::Nothing)
                 },
                 0x40 => {
                     instruction.prefixes = prefixes;
@@ -830,8 +880,7 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                 }
                 0xae => {
                     instruction.prefixes = prefixes;
-                    instruction.opcode = Opcode::PUSH;
-                    Ok(OperandCode::GS)
+                    Ok(OperandCode::ModRM_0x0fae)
                 }
                 0xb0 => {
                     instruction.prefixes = prefixes;
@@ -2083,6 +2132,56 @@ fn read_operands<T: Iterator<Item=u8>>(
                 Err(reason) => Err(reason)
             }
         },
+        OperandCode::Ew_Sw => {
+            let opwidth = 2;
+            // TODO: ...
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+
+            if r > 5 {
+                return Err("Invalid r".to_owned());
+            }
+
+            instruction.operands[1] =
+                Operand::Register(RegSpec { bank: RegisterBank::S, num: r });
+
+            if mod_bits == 0b11 {
+                instruction.operands[0] =
+                    Operand::Register(RegSpec { bank: RegisterBank::W, num: m });
+                Ok(())
+            } else {
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
+            }
+        },
+        OperandCode::Sw_Ew => {
+            let opwidth = 2;
+            // TODO: ...
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+
+            if r > 5 {
+                return Err("Invalid r".to_owned());
+            }
+
+            instruction.operands[0] =
+                Operand::Register(RegSpec { bank: RegisterBank::S, num: r });
+
+            if mod_bits == 0b11 {
+                instruction.operands[1] =
+                    Operand::Register(RegSpec { bank: RegisterBank::W, num: m });
+                Ok(())
+            } else {
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length)
+            }
+        },
         // TODO: verify M
         OperandCode::Gv_Ev | OperandCode::Gv_M => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
@@ -2118,13 +2217,27 @@ fn read_operands<T: Iterator<Item=u8>>(
                 Err(reason) => Err(reason)
             }
         },
+        OperandCode::AL_Ib => {
+            let opwidth = 1;
+            let numwidth = 1;
+            match read_imm_signed(bytes_iter, numwidth, opwidth, length) {
+                Ok(imm) => {
+                    instruction.operands = [
+                        Operand::Register(RegSpec::al()),
+                        imm
+                    ];
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        }
         OperandCode::AX_Ivd => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             match read_imm_signed(bytes_iter, numwidth, opwidth, length) {
                 Ok(imm) => {
                     instruction.operands = [
-                        Operand::Register(RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present())),
+                        Operand::Register(RegSpec::gp_from_parts(0, false, opwidth, false)),
                         imm
                     ];
                     Ok(())
@@ -2222,6 +2335,174 @@ fn read_operands<T: Iterator<Item=u8>>(
             instruction.operands = [Operand::ImmediateI32(offset as i32), Operand::Nothing];
             Ok(())
         }
+        OperandCode::ModRM_0x0f00 => {
+            Ok(())
+        }
+        OperandCode::ModRM_0x0f01 => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+            if r == 0 {
+                if mod_bits == 0b11 {
+                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 000 ___");
+                } else {
+                    instruction.opcode = Opcode::SGDT;
+                    instruction.operands[1] = Operand::Nothing;
+                    read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
+                }
+            } else if r == 1 {
+                if mod_bits == 0b11 {
+                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 001 ___");
+                } else {
+                    instruction.opcode = Opcode::SIDT;
+                    instruction.operands[1] = Operand::Nothing;
+                    read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
+                }
+            } else if r == 2 {
+                if mod_bits == 0b11 {
+                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 010 ___");
+                } else {
+                    instruction.opcode = Opcode::LGDT;
+                    instruction.operands[1] = Operand::Nothing;
+                    read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
+                }
+            } else if r == 3 {
+                if mod_bits == 0b11 {
+                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 011 ___");
+                } else {
+                    instruction.opcode = Opcode::LIDT;
+                    instruction.operands[1] = Operand::Nothing;
+                    read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
+                }
+            } else if r == 4 {
+                // TODO: this permits storing only to word-size registers
+                // spec suggets this might do something different for f.ex rdi?
+                instruction.opcode = Opcode::SMSW;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 5 {
+                panic!("Unsupported instruction: 0x0f01 with modrm: __ 101 ___");
+            } else if r == 6 {
+                instruction.opcode = Opcode::LMSW;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 7 {
+                if mod_bits == 0b11 {
+                    if m == 1 {
+                        instruction.opcode == Opcode::SWAPGS;
+                        instruction.operands = [Operand::Nothing, Operand::Nothing];
+                        Ok(())
+                    } else if m == 2 {
+                        instruction.opcode == Opcode::RDTSCP;
+                        instruction.operands = [Operand::Nothing, Operand::Nothing];
+                        Ok(())
+                    } else {
+                        panic!("Unsupported instruction: 0x0f01 with modrm: 11 110 r >= 2");
+                    }
+                } else {
+                    instruction.opcode = Opcode::INVLPG;
+                    instruction.operands[1] = Operand::Nothing;
+                    read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
+                }
+            } else {
+                unreachable!("r <= 8");
+            }
+        }
+        OperandCode::ModRM_0x0fae => {
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+            match r {
+                0 => {
+                    if mod_bits == 0b11 {
+                        Err("Invalid mod bits".to_owned())
+                    } else {
+                        instruction.opcode = Opcode::FXSAVE;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                1 => {
+                    if mod_bits == 0b11 {
+                        Err("Invalid mod bits".to_owned())
+                    } else {
+                        instruction.opcode = Opcode::FXRSTOR;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                2 => {
+                    if mod_bits == 0b11 {
+                        Err("Invalid mod bits".to_owned())
+                    } else {
+                        instruction.opcode = Opcode::LDMXCSR;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                3 => {
+                    if mod_bits == 0b11 {
+                        Err("Invalid mod bits".to_owned())
+                    } else {
+                        instruction.opcode = Opcode::STMXCSR;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                4 => {
+                    if mod_bits == 0b11 {
+                        Err("Invalid mod bits".to_owned())
+                    } else {
+                        instruction.opcode = Opcode::XSAVE;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                5 => {
+                    if mod_bits == 0b11 {
+                        instruction.opcode = Opcode::LFENCE;
+                        instruction.operands = [Operand::Nothing, Operand::Nothing];
+                        Ok(())
+                    } else {
+                        instruction.opcode = Opcode::XSTOR;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                6 => {
+                    if mod_bits == 0b11 {
+                        instruction.opcode = Opcode::MFENCE;
+                        instruction.operands = [Operand::Nothing, Operand::Nothing];
+                        Ok(())
+                    } else {
+                        // TODO: radare reports this, but i'm not sure?
+                        instruction.opcode = Opcode::XSAVEOPT;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                7 => {
+                    if mod_bits == 0b11 {
+                        instruction.opcode = Opcode::SFENCE;
+                        instruction.operands = [Operand::Nothing, Operand::Nothing];
+                        Ok(())
+                    } else {
+                        // TODO: radare reports this, but i'm not sure?
+                        instruction.opcode = Opcode::CLFLUSH;
+                        instruction.operands[1] = Operand::Nothing;
+                        read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 8, &mut instruction.operands[0], length)
+                    }
+                }
+                _ => { unreachable!("r < 6"); }
+            }
+        }
         OperandCode::Rq_Cq_0 => {
             let opwidth = 8;
             let modrm = match bytes_iter.next() {
@@ -2307,6 +2588,10 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::GS => {
             instruction.operands = [Operand::Register(RegSpec::fs()), Operand::Nothing];
+            Ok(())
+        }
+        OperandCode::I_3 => {
+            instruction.operands = [Operand::ImmediateU8(3), Operand::Nothing];
             Ok(())
         }
         OperandCode::Nothing => {
