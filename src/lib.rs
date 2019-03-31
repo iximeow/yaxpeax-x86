@@ -316,6 +316,13 @@ pub enum Opcode {
     RDTSC,
     RDMSR,
     RDPMC,
+    SLDT,
+    STR,
+    LLDT,
+    LTR,
+    VERR,
+    VERW,
+    JMPE,
     Invalid
 }
 #[derive(Debug)]
@@ -2336,7 +2343,45 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::ModRM_0x0f00 => {
-            Ok(())
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+            if r == 0 {
+                instruction.opcode = Opcode::SLDT;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 1 {
+                instruction.opcode = Opcode::STR;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 2 {
+                instruction.opcode = Opcode::LLDT;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 3 {
+                instruction.opcode = Opcode::LTR;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 4 {
+                instruction.opcode = Opcode::VERR;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 5 {
+                instruction.opcode = Opcode::VERW;
+                instruction.operands[1] = Operand::Nothing;
+                read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[0], length)
+            } else if r == 6 {
+                instruction.opcode = Opcode::JMPE;
+                instruction.operands = [Operand::Nothing, Operand::Nothing];
+                Ok(())
+            } else if r == 7 {
+                Err("Invalid modr/m bits".to_owned())
+            } else {
+                unreachable!("r <= 8");
+            }
         }
         OperandCode::ModRM_0x0f01 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
@@ -2599,6 +2644,8 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         _ => {
+            instruction.operands = [Operand::Nothing, Operand::Nothing];
+            instruction.opcode = Opcode::Invalid;
         //    use std::hint::unreachable_unchecked;
             Err(format!("unsupported operand code: {:?}", operand_code))
         //    unsafe { unreachable_unchecked(); }

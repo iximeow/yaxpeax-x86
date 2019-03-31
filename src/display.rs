@@ -174,6 +174,13 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::SLDT => write!(f, "{}", "sldt"),
+            &Opcode::STR => write!(f, "{}", "str"),
+            &Opcode::LLDT => write!(f, "{}", "lldt"),
+            &Opcode::LTR => write!(f, "{}", "ltr"),
+            &Opcode::VERR => write!(f, "{}", "verr"),
+            &Opcode::VERW => write!(f, "{}", "verw"),
+            &Opcode::JMPE => write!(f, "{}", "jmpe"),
             &Opcode::WRMSR => write!(f, "{}", "wrmsr"),
             &Opcode::RDMSR => write!(f, "{}", "rdmsr"),
             &Opcode::RDTSC => write!(f, "{}", "rdtsc"),
@@ -470,6 +477,13 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CLTS |
             Opcode::SYSCALL |
             Opcode::LSL |
+            Opcode::SLDT |
+            Opcode::STR |
+            Opcode::LLDT |
+            Opcode::LTR |
+            Opcode::VERR |
+            Opcode::VERW |
+            Opcode::JMPE |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::UD2 |
