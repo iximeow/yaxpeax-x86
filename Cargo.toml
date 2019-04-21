@@ -39,3 +39,5 @@ default = []
 # This enables some capstone benchmarks over the same
 # instruction bytes used to bench this code.
 capstone_bench = []
+
+use-serde = []

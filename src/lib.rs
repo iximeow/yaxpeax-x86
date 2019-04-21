@@ -1,3 +1,10 @@
+#[cfg(feature="use-serde")]
+#[macro_use] extern crate serde_derive;
+#[cfg(feature="use-serde")]
+extern crate serde;
+#[cfg(feature="use-serde")]
+use serde::{Serialize, Deserialize};
+
 extern crate yaxpeax_arch;
 extern crate termion;
 
@@ -333,9 +340,16 @@ pub struct Instruction {
     pub length: u8
 }
 
+#[cfg(feature="use-serde")]
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(non_camel_case_types)]
+pub struct x86_64;
+
+#[cfg(not(feature="use-serde"))]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub struct x86_64;
+
 impl Arch for x86_64 {
     type Address = u64;
     type Instruction = Instruction;
