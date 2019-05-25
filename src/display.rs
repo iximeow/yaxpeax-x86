@@ -174,6 +174,12 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::STI => write!(f, "{}", "sti"),
+            &Opcode::STD => write!(f, "{}", "std"),
+            &Opcode::STC => write!(f, "{}", "stc"),
+            &Opcode::CLI => write!(f, "{}", "cli"),
+            &Opcode::CLD => write!(f, "{}", "cld"),
+            &Opcode::CLC => write!(f, "{}", "clc"),
             &Opcode::SLDT => write!(f, "{}", "sldt"),
             &Opcode::STR => write!(f, "{}", "str"),
             &Opcode::LLDT => write!(f, "{}", "lldt"),
@@ -393,6 +399,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::JG => { write!(out, "{}", colors.control_flow_op(self)) }
 
             /* Data transfer */
+            Opcode::CLC |
+            Opcode::CLI |
+            Opcode::CLD |
+            Opcode::STC |
+            Opcode::STI |
+            Opcode::STD |
             Opcode::MOV |
             Opcode::CBW |
             Opcode::CDW |

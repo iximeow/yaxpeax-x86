@@ -18,6 +18,13 @@ use std::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{Arch,  ColorSettings, Decodable, LengthedInstruction};
 
+#[cfg(feature="use-serde")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct RegSpec {
+    pub num: u8,
+    pub bank: RegisterBank
+}
+#[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct RegSpec {
     pub num: u8,
@@ -165,6 +172,15 @@ pub enum Operand {
     Nothing
 }
 
+#[cfg(feature="use-serde")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum RegisterBank {
+    Q, D, W, B, rB, // Quadword, Dword, Word, Byte
+    CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
+    X, Y, Z,    // XMM, YMM, ZMM
+    ST, MM,     // ST, MM regs (x87, mmx)
+}
+#[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum RegisterBank {
     Q, D, W, B, rB, // Quadword, Dword, Word, Byte
@@ -329,6 +345,12 @@ pub enum Opcode {
     LTR,
     VERR,
     VERW,
+    CLC,
+    STC,
+    CLI,
+    STI,
+    CLD,
+    STD,
     JMPE,
     Invalid
 }
@@ -340,13 +362,18 @@ pub struct Instruction {
     pub length: u8
 }
 
+// the Hash, Eq, and PartialEq impls here are possibly misleading.
+// They exist because downstream some structs are spelled like
+// Foo<T> for T == x86_64. This is only to access associated types
+// which themselves are bounded, but their #[derive] require T to
+// implement these traits.
 #[cfg(feature="use-serde")]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 pub struct x86_64;
 
 #[cfg(not(feature="use-serde"))]
-#[derive(Debug)]
+#[derive(Hash, Eq, PartialEq, Debug)]
 #[allow(non_camel_case_types)]
 pub struct x86_64;
 
@@ -1420,6 +1447,36 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xf7);
                     },
+                    0xf8 => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::CLC;
+                        return Ok(OperandCode::Nothing);
+                    }
+                    0xf9 => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::STC;
+                        return Ok(OperandCode::Nothing);
+                    }
+                    0xfa => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::CLI;
+                        return Ok(OperandCode::Nothing);
+                    }
+                    0xfb => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::STI;
+                        return Ok(OperandCode::Nothing);
+                    }
+                    0xfc => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::CLD;
+                        return Ok(OperandCode::Nothing);
+                    }
+                    0xfd => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::STD;
+                        return Ok(OperandCode::Nothing);
+                    }
                     0xfe => {
                         instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
