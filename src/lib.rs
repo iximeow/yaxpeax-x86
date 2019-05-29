@@ -10,13 +10,9 @@ extern crate termion;
 
 mod display;
 
-use termion::color;
-
-use std::fmt;
-
 use std::hint::unreachable_unchecked;
 
-use yaxpeax_arch::{Arch,  ColorSettings, Decodable, LengthedInstruction};
+use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
 
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -212,6 +208,7 @@ pub enum RegisterBank {
     X, Y, Z,    // XMM, YMM, ZMM
     ST, MM,     // ST, MM regs (x87, mmx)
 }
+#[allow(non_camel_case_types)]
 #[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum RegisterBank {
@@ -2586,11 +2583,11 @@ fn read_operands<T: Iterator<Item=u8>>(
             } else if r == 7 {
                 if mod_bits == 0b11 {
                     if m == 1 {
-                        instruction.opcode == Opcode::SWAPGS;
+                        instruction.opcode = Opcode::SWAPGS;
                         instruction.operands = [Operand::Nothing, Operand::Nothing];
                         Ok(())
                     } else if m == 2 {
-                        instruction.opcode == Opcode::RDTSCP;
+                        instruction.opcode = Opcode::RDTSCP;
                         instruction.operands = [Operand::Nothing, Operand::Nothing];
                         Ok(())
                     } else {
@@ -2697,7 +2694,6 @@ fn read_operands<T: Iterator<Item=u8>>(
             }
         }
         OperandCode::Rq_Cq_0 => {
-            let opwidth = 8;
             let modrm = match bytes_iter.next() {
                 Some(b) => b,
                 None => return Err("Out of bytes".to_string())
@@ -2717,7 +2713,6 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Rq_Dq_0 => {
-            let opwidth = 8;
             let modrm = match bytes_iter.next() {
                 Some(b) => b,
                 None => return Err("Out of bytes".to_string())
@@ -2736,7 +2731,6 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Cq_Rq_0 => {
-            let opwidth = 8;
             let modrm = match bytes_iter.next() {
                 Some(b) => b,
                 None => return Err("Out of bytes".to_string())
@@ -2756,7 +2750,6 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Dq_Rq_0 => {
-            let opwidth = 8;
             let modrm = match bytes_iter.next() {
                 Some(b) => b,
                 None => return Err("Out of bytes".to_string())

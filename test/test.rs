@@ -4,7 +4,7 @@ extern crate yaxpeax_x86;
 use std::fmt::Write;
 
 use yaxpeax_arch::Decodable;
-use yaxpeax_x86::{Instruction, Opcode, decode_one};
+use yaxpeax_x86::{Instruction, decode_one};
 
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
@@ -17,7 +17,7 @@ fn decode(bytes: &[u8]) -> Option<Instruction> {
 fn test_display(data: &[u8], expected: &'static str) {
     let mut hex = String::new();
     for b in data {
-        write!(hex, "{:02x}", b);
+        write!(hex, "{:02x}", b).unwrap();
     }
     match Instruction::decode(data.into_iter().map(|x| *x)) {
         Some(instr) => {
@@ -60,6 +60,7 @@ fn test_arithmetic() {
 }
 
 #[test]
+#[allow(non_snake_case)]
 fn test_E_decode() {
     test_display(&[0xff, 0x75, 0xb8], "push [rbp - 0x48]");
     test_display(&[0xff, 0x75, 0x08], "push [rbp + 0x8]");
