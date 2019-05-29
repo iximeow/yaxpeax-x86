@@ -172,6 +172,38 @@ pub enum Operand {
     Nothing
 }
 
+impl Operand {
+    pub fn is_memory(&self) -> bool {
+        match self {
+            Operand::DisplacementU32(_) |
+            Operand::DisplacementU64(_) |
+            Operand::RegDeref(_) |
+            Operand::RegDisp(_, _) |
+            Operand::RegScale(_, _) |
+            Operand::RegIndexBase(_, _) |
+            Operand::RegIndexBaseDisp(_, _, _) |
+            Operand::RegScaleDisp(_, _, _) |
+            Operand::RegIndexBaseScale(_, _, _) |
+            Operand::RegIndexBaseScaleDisp(_, _, _, _) => {
+                true
+            },
+            Operand::ImmediateI8(_) |
+            Operand::ImmediateU8(_) |
+            Operand::ImmediateI16(_) |
+            Operand::ImmediateU16(_) |
+            Operand::ImmediateU32(_) |
+            Operand::ImmediateI32(_) |
+            Operand::ImmediateU64(_) |
+            Operand::ImmediateI64(_) |
+            Operand::Register(_) |
+            Operand::Many(_) |
+            Operand::Nothing => {
+                false
+            }
+        }
+    }
+}
+
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum RegisterBank {
@@ -189,7 +221,7 @@ pub enum RegisterBank {
     ST, MM,     // ST, MM regs (x87, mmx)
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Segment {
     CS, DS, ES, FS, GS, SS
 }
@@ -419,6 +451,51 @@ impl Instruction {
         match self.opcode {
             Opcode::Invalid => true,
             _ => false
+        }
+    }
+    pub fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
+        match self.opcode {
+            Opcode::STOS => {
+                if op == 0 {
+                    Some(Segment::ES)
+                } else {
+                    None
+                }
+            }
+            Opcode::LODS => {
+                if op == 1 {
+                    Some(self.prefixes.segment)
+                } else {
+                    None
+                }
+            }
+            Opcode::MOVS => {
+                if op == 0 {
+                    Some(Segment::ES)
+                } else if op == 1 {
+                    Some(self.prefixes.segment)
+                } else {
+                    None
+                }
+            }
+            Opcode::CMPS => {
+                if op == 0 {
+                    Some(self.prefixes.segment)
+                } else if op == 1 {
+                    Some(Segment::ES)
+                } else {
+                    None
+                }
+            },
+            _ => {
+                // most operands are pretty simple:
+                if self.operands[op as usize].is_memory() &&
+                    self.prefixes.segment != Segment::DS {
+                    Some(self.prefixes.segment)
+                } else {
+                    None
+                }
+            }
         }
     }
 }
