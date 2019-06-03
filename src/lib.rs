@@ -545,27 +545,27 @@ impl Prefixes {
     #[inline]
     fn set_address_size(&mut self) { self.bits = self.bits | 0x2 }
     #[inline]
-    fn cs(&self) -> bool { self.segment == Segment::CS }
+    pub fn cs(&self) -> bool { self.segment == Segment::CS }
     #[inline]
     fn set_cs(&mut self) { self.segment = Segment::CS }
     #[inline]
-    fn ds(&self) -> bool { self.segment == Segment::DS }
+    pub fn ds(&self) -> bool { self.segment == Segment::DS }
     #[inline]
     fn set_ds(&mut self) { self.segment = Segment::DS }
     #[inline]
-    fn es(&self) -> bool { self.segment == Segment::ES }
+    pub fn es(&self) -> bool { self.segment == Segment::ES }
     #[inline]
     fn set_es(&mut self) { self.segment = Segment::ES }
     #[inline]
-    fn fs(&self) -> bool { self.segment == Segment::FS }
+    pub fn fs(&self) -> bool { self.segment == Segment::FS }
     #[inline]
     fn set_fs(&mut self) { self.segment = Segment::FS }
     #[inline]
-    fn gs(&self) -> bool { self.segment == Segment::GS }
+    pub fn gs(&self) -> bool { self.segment == Segment::GS }
     #[inline]
     fn set_gs(&mut self) { self.segment = Segment::GS }
     #[inline]
-    fn ss(&self) -> bool { self.segment == Segment::SS }
+    pub fn ss(&self) -> bool { self.segment == Segment::SS }
     #[inline]
     fn set_ss(&mut self) { self.segment = Segment::SS }
     #[inline]
