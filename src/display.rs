@@ -184,6 +184,13 @@ impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             &Opcode::MOVSS => write!(f, "{}", "movss"),
+            &Opcode::SQRTSS => write!(f, "{}", "sqrtss"),
+            &Opcode::ADDSS => write!(f, "{}", "addss"),
+            &Opcode::SUBSS => write!(f, "{}", "subss"),
+            &Opcode::MULSS => write!(f, "{}", "mulss"),
+            &Opcode::DIVSS => write!(f, "{}", "divss"),
+            &Opcode::MINSS => write!(f, "{}", "minss"),
+            &Opcode::MAXSS => write!(f, "{}", "maxss"),
             &Opcode::MOVSD => write!(f, "{}", "movsd"),
             &Opcode::SQRTSD => write!(f, "{}", "sqrtsd"),
             &Opcode::ADDSD => write!(f, "{}", "addsd"),
@@ -193,6 +200,7 @@ impl fmt::Display for Opcode {
             &Opcode::MINSD => write!(f, "{}", "minsd"),
             &Opcode::MAXSD => write!(f, "{}", "maxsd"),
             &Opcode::MOVDDUP => write!(f, "{}", "movddup"),
+            &Opcode::MOVSLDUP => write!(f, "{}", "movsldup"),
             &Opcode::HADDPS => write!(f, "{}", "haddps"),
             &Opcode::HSUBPS => write!(f, "{}", "hsubps"),
             &Opcode::ADDSUBPS => write!(f, "{}", "addsubps"),
@@ -201,6 +209,9 @@ impl fmt::Display for Opcode {
             &Opcode::CVTTSD2SI => write!(f, "{}", "cvttsd2si"),
             &Opcode::CVTSD2SI => write!(f, "{}", "cvtsd2si"),
             &Opcode::CVTSD2SS => write!(f, "{}", "cvtsd2ss"),
+            &Opcode::CVTTSS2SI => write!(f, "{}", "cvttss2si"),
+            &Opcode::CVTSS2SI => write!(f, "{}", "cvtss2si"),
+            &Opcode::CVTSS2SD => write!(f, "{}", "cvtss2sd"),
             &Opcode::LDDQU => write!(f, "{}", "lddqu"),
             &Opcode::STI => write!(f, "{}", "sti"),
             &Opcode::STD => write!(f, "{}", "std"),
@@ -371,7 +382,13 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::SUBSD |
             Opcode::MULSD |
             Opcode::DIVSD |
+            Opcode::SQRTSS |
+            Opcode::ADDSS |
+            Opcode::SUBSS |
+            Opcode::MULSS |
+            Opcode::DIVSS |
             Opcode::MOVDDUP |
+            Opcode::MOVSLDUP |
             Opcode::HADDPS |
             Opcode::HSUBPS |
             Opcode::ADDSUBPS |
@@ -444,6 +461,9 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CVTTSD2SI |
             Opcode::CVTSD2SI |
             Opcode::CVTSD2SS |
+            Opcode::CVTTSS2SI |
+            Opcode::CVTSS2SI |
+            Opcode::CVTSS2SD |
             Opcode::LDDQU |
             Opcode::CLC |
             Opcode::CLI |
@@ -501,6 +521,8 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
 
             Opcode::MINSD |
             Opcode::MAXSD |
+            Opcode::MINSS |
+            Opcode::MAXSS |
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |

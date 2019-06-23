@@ -235,8 +235,15 @@ pub enum Segment {
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
-    MOVSD,
     MOVSS,
+    ADDSS,
+    SUBSS,
+    MULSS,
+    DIVSS,
+    MINSS,
+    MAXSS,
+    SQRTSS,
+    MOVSD,
     SQRTSD,
     ADDSD,
     SUBSD,
@@ -244,6 +251,7 @@ pub enum Opcode {
     DIVSD,
     MINSD,
     MAXSD,
+    MOVSLDUP,
     MOVDDUP,
     HADDPS,
     HSUBPS,
@@ -253,6 +261,9 @@ pub enum Opcode {
     CVTTSD2SI,
     CVTSD2SI,
     CVTSD2SS,
+    CVTTSS2SI,
+    CVTSS2SI,
+    CVTSS2SD,
     LDDQU,
     MOVZX_b,
     MOVZX_w,
@@ -862,7 +873,91 @@ fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &
     }
 }
 fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
-    Err("f30f opcode map unsupported".to_string())
+    match bytes_iter.next() {
+        Some(b) => {
+            *length += 1;
+            match b {
+                0x10 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x11 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSS;
+                    Ok(OperandCode::E_G_xmm)
+                },
+                0x12 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSLDUP;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x2a => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTSI2SS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x2c => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTTSS2SI;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x2d => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTSS2SI;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x51 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::SQRTSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x58 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::ADDSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x59 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MULSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5a => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTSS2SD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5c => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::SUBSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5d => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MINSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5e => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::DIVSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5f => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MAXSS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                _ => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::Invalid;
+                    Err("Invalid opcode".to_string())
+                }
+            }
+        }
+        None => {
+            Err("No more bytes".to_owned())
+        }
+    }
 }
 fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
     match bytes_iter.next() {
@@ -1236,16 +1331,20 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                                     };
                                 },
                                 0x26 => {
-                                    prefixes.set_es()
+                                    prefixes.set_es();
+                                    alternate_opcode_map = None;
                                 },
                                 0x2e => {
-                                    prefixes.set_cs()
+                                    prefixes.set_cs();
+                                    alternate_opcode_map = None;
                                 },
                                 0x36 => {
-                                    prefixes.set_ss()
+                                    prefixes.set_ss();
+                                    alternate_opcode_map = None;
                                 },
                                 0x3e => {
-                                    prefixes.set_ds()
+                                    prefixes.set_ds();
+                                    alternate_opcode_map = None;
                                 },
                                 0x06
                                 | 0x07
@@ -1293,9 +1392,11 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     },
                     0x64 => {
                         prefixes.set_fs();
+                        alternate_opcode_map = None;
                     },
                     0x65 => {
                         prefixes.set_gs();
+                        alternate_opcode_map = None;
                     },
                     0x66 => {
                         prefixes.set_operand_size();
@@ -1303,6 +1404,7 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     },
                     0x67 => {
                         prefixes.set_address_size();
+                        alternate_opcode_map = None;
                     },
                     0x68 => {
                         instruction.prefixes = prefixes;
