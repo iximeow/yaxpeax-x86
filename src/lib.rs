@@ -27,6 +27,15 @@ pub struct RegSpec {
     pub bank: RegisterBank
 }
 
+// This is only to select alternate opcode maps for the 0f escape byte.
+// This often could be treated as a size prefix but in some cases selects
+// an entirely different operation.
+enum OpcodeMap {
+    Map66,
+    MapF2,
+    MapF3,
+}
+
 #[allow(non_snake_case)]
 impl RegSpec {
     #[inline]
@@ -226,6 +235,25 @@ pub enum Segment {
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
+    MOVSD,
+    MOVSS,
+    SQRTSD,
+    ADDSD,
+    SUBSD,
+    MULSD,
+    DIVSD,
+    MINSD,
+    MAXSD,
+    MOVDDUP,
+    HADDPS,
+    HSUBPS,
+    ADDSUBPS,
+    CVTSI2SS,
+    CVTSI2SD,
+    CVTTSD2SI,
+    CVTSD2SI,
+    CVTSD2SS,
+    LDDQU,
     MOVZX_b,
     MOVZX_w,
     MOVSX,
@@ -500,9 +528,15 @@ impl Instruction {
 #[derive(Debug)]
 pub struct Prefixes {
     bits: u8,
+    rep_prefix: Option<RepPrefix>,
     rex: PrefixRex,
     segment: Segment,
-    lock: bool
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum RepPrefix {
+    E,
+    NE
 }
 
 #[derive(Debug)]
@@ -515,9 +549,9 @@ impl Prefixes {
     fn new(bits: u8) -> Prefixes {
         Prefixes {
             bits: bits,
+            rep_prefix: None,
             rex: PrefixRex { bits: 0 },
             segment: Segment::DS,
-            lock: false
         }
     }
     #[inline]
@@ -533,10 +567,6 @@ impl Prefixes {
     #[inline]
     fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30 }
     #[inline]
-    fn lock(&self) -> bool { self.lock }
-    #[inline]
-    fn set_lock(&mut self) { self.lock = true; }
-    #[inline]
     fn operand_size(&self) -> bool { self.bits & 0x1 == 1 }
     #[inline]
     fn set_operand_size(&mut self) { self.bits = self.bits | 0x1 }
@@ -545,7 +575,19 @@ impl Prefixes {
     #[inline]
     fn set_address_size(&mut self) { self.bits = self.bits | 0x2 }
     #[inline]
-    pub fn cs(&self) -> bool { self.segment == Segment::CS }
+    pub fn repne(&self) -> bool { self.rep_prefix == Some(RepPrefix::NE) }
+    #[inline]
+    fn set_repne(&mut self) { self.rep_prefix = Some(RepPrefix::NE); }
+    #[inline]
+    pub fn repe(&self) -> bool { self.rep_prefix == Some(RepPrefix::E) }
+    #[inline]
+    fn set_repe(&mut self) { self.rep_prefix = Some(RepPrefix::E); }
+    #[inline]
+    pub fn set_lock(&mut self) { self.bits |= 0x4 }
+    #[inline]
+    pub fn lock(&self) -> bool { self.bits & 0x4 == 4 }
+    #[inline]
+    fn cs(&mut self) { self.segment = Segment::CS }
     #[inline]
     fn set_cs(&mut self) { self.segment = Segment::CS }
     #[inline]
@@ -641,6 +683,7 @@ pub enum OperandCode {
     ModRM_0xc7_Ev_Iv,
     Eb_Gb,
     Ev_Gv,
+    E_G_xmm,
     Ev_Ivs,
     Ev,
     Ew_Sw,
@@ -649,6 +692,7 @@ pub enum OperandCode {
     Gv_Eb,
     Gv_Ew,
     Gv_Ev,
+    G_E_xmm,
     Gv_M,
     I_3,
     Ib,
@@ -694,7 +738,132 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAL,
     Opcode::SAR
 ];
-
+fn read_opcode_660f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+    Err("660f opcode map unsupported".to_string())
+}
+fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+    match bytes_iter.next() {
+        Some(b) => {
+            *length += 1;
+            match b {
+                0x10 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x11 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSD;
+                    Ok(OperandCode::E_G_xmm)
+                },
+                0x12 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVDDUP;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x2a => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTSI2SD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x2c => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTTSD2SI;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x2d => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTSD2SI;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x38 => {
+                    /*
+                     * There are a handful of instruction variants here, but
+                     * in the f20f opcode map, only the CRC32 instruction is valid
+                     */
+                    Err("x86_64 CRC32 not currently supported".to_string())
+                }
+                0x51 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::SQRTSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x58 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::ADDSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x59 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MULSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5a => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::CVTSD2SS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5c => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::SUBSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5d => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MINSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5e => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::DIVSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x5f => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MAXSD;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x7c => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::HADDPS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0x7d => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::HSUBPS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0xD0 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::ADDSUBPS;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                0xf0 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::LDDQU;
+                    Ok(OperandCode::G_E_xmm)
+                },
+                /*
+                0x70 PSHUFLW
+                0xc2 CMPSD
+                0xd6 MOVDQ2Q
+                0xe6 CVTPD2DQ
+                */
+                _ => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::Invalid;
+                    Err("Invalid opcode".to_string())
+                }
+            }
+        }
+        None => {
+            Err("No more bytes".to_owned())
+        }
+    }
+}
+fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+    Err("f30f opcode map unsupported".to_string())
+}
 fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
@@ -1036,6 +1205,7 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
 }
 
 fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, length: &mut u8) -> Result<OperandCode, String> {
+    let mut alternate_opcode_map: Option<OpcodeMap> = None;
     use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
@@ -1050,7 +1220,20 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             // for x86_64 this is mostly invalid
                             match x {
                                 0x0f => {
-                                    return read_opcode_0f_map(bytes_iter, instruction, prefixes, length);
+                                    return match alternate_opcode_map {
+                                        Some(OpcodeMap::Map66) => {
+                                            read_opcode_660f_map(bytes_iter, instruction, prefixes, length)
+                                        },
+                                        Some(OpcodeMap::MapF2) => {
+                                            read_opcode_f20f_map(bytes_iter, instruction, prefixes, length)
+                                        },
+                                        Some(OpcodeMap::MapF3) => {
+                                            read_opcode_f30f_map(bytes_iter, instruction, prefixes, length)
+                                        },
+                                        None => {
+                                            read_opcode_0f_map(bytes_iter, instruction, prefixes, length)
+                                        }
+                                    };
                                 },
                                 0x26 => {
                                     prefixes.set_es()
@@ -1116,6 +1299,7 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     },
                     0x66 => {
                         prefixes.set_operand_size();
+                        alternate_opcode_map = Some(OpcodeMap::Map66);
                     },
                     0x67 => {
                         prefixes.set_address_size();
@@ -1502,9 +1686,11 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     },
                     0xf2 => {
                         prefixes.set_repnz();
+                        alternate_opcode_map = Some(OpcodeMap::MapF2);
                     },
                     0xf3 => {
                         prefixes.set_rep();
+                        alternate_opcode_map = Some(OpcodeMap::MapF3);
                     },
                     0xf4 => {
                         instruction.prefixes = prefixes;
@@ -1576,9 +1762,16 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
 
 #[allow(non_snake_case)]
 fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8) -> Result<(), String> {
+    read_E_anybank(bytes_iter, prefixes, m, modbits, width, result, length, width_to_gp_reg_bank(width, prefixes.rex().present()))
+}
+fn read_E_xmm<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8) -> Result<(), String> {
+    read_E_anybank(bytes_iter, prefixes, m, modbits, width, result, length, RegisterBank::X)
+}
+
+fn read_E_anybank<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8, reg_bank: RegisterBank) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
-        *result = Operand::Register(RegSpec::gp_from_parts(m, prefixes.rex().b(), width, prefixes.rex().present()))
+        *result = Operand::Register(RegSpec::from_parts(m, prefixes.rex().b(), reg_bank))
     } else if m == 5 && modbits == 0b00 {
         let disp = read_num(bytes_iter, 4, length);
         *result = Operand::RegDisp(
@@ -2350,6 +2543,66 @@ fn read_operands<T: Iterator<Item=u8>>(
                 Ok(()) => {
                     instruction.operands[0] =
                         Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        },
+        OperandCode::E_G_xmm => {
+            let opwidth = 8;
+            // TODO: ...
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
+                Ok(()) => {
+                    instruction.operands[1] =
+                        Operand::Register(RegSpec::from_parts(r, instruction.prefixes.rex().r(), RegisterBank::X));
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        },
+        OperandCode::G_E_xmm => {
+            let opwidth = 8;
+            // TODO: ...
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
+                Ok(()) => {
+                    instruction.operands[0] =
+                        Operand::Register(RegSpec::from_parts(r, instruction.prefixes.rex().r(), RegisterBank::X));
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        },
+        OperandCode::G_E_xmm => {
+            let opwidth = 8;
+            // TODO: ...
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
+                Ok(()) => {
+                    instruction.operands[0] =
+                        Operand::Register(RegSpec::from_parts(r, instruction.prefixes.rex().r(), RegisterBank::X));
                     Ok(())
                 },
                 Err(reason) => Err(reason)

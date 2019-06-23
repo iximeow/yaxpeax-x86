@@ -183,6 +183,25 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::MOVSS => write!(f, "{}", "movss"),
+            &Opcode::MOVSD => write!(f, "{}", "movsd"),
+            &Opcode::SQRTSD => write!(f, "{}", "sqrtsd"),
+            &Opcode::ADDSD => write!(f, "{}", "addsd"),
+            &Opcode::SUBSD => write!(f, "{}", "subsd"),
+            &Opcode::MULSD => write!(f, "{}", "mulsd"),
+            &Opcode::DIVSD => write!(f, "{}", "divsd"),
+            &Opcode::MINSD => write!(f, "{}", "minsd"),
+            &Opcode::MAXSD => write!(f, "{}", "maxsd"),
+            &Opcode::MOVDDUP => write!(f, "{}", "movddup"),
+            &Opcode::HADDPS => write!(f, "{}", "haddps"),
+            &Opcode::HSUBPS => write!(f, "{}", "hsubps"),
+            &Opcode::ADDSUBPS => write!(f, "{}", "addsubps"),
+            &Opcode::CVTSI2SS => write!(f, "{}", "cvtsi2ss"),
+            &Opcode::CVTSI2SD => write!(f, "{}", "cvtsi2sd"),
+            &Opcode::CVTTSD2SI => write!(f, "{}", "cvttsd2si"),
+            &Opcode::CVTSD2SI => write!(f, "{}", "cvtsd2si"),
+            &Opcode::CVTSD2SS => write!(f, "{}", "cvtsd2ss"),
+            &Opcode::LDDQU => write!(f, "{}", "lddqu"),
             &Opcode::STI => write!(f, "{}", "sti"),
             &Opcode::STD => write!(f, "{}", "std"),
             &Opcode::STC => write!(f, "{}", "stc"),
@@ -252,6 +271,7 @@ impl fmt::Display for Opcode {
             &Opcode::ENTER => write!(f, "{}", "enter"),
             &Opcode::LEAVE => write!(f, "{}", "leave"),
             &Opcode::MOV => write!(f, "{}", "mov"),
+            &Opcode::MOVSD => write!(f, "{}", "movsd"),
             &Opcode::RETURN => write!(f, "{}", "ret"),
             &Opcode::PUSHF => write!(f, "{}", "pushf"),
             &Opcode::WAIT => write!(f, "{}", "wait"),
@@ -346,6 +366,15 @@ impl fmt::Display for Opcode {
 impl <T: std::fmt::Write> Colorize<T> for Opcode {
     fn colorize(&self, colors: Option<&ColorSettings>, out: &mut T) -> std::fmt::Result {
         match self {
+            Opcode::SQRTSD |
+            Opcode::ADDSD |
+            Opcode::SUBSD |
+            Opcode::MULSD |
+            Opcode::DIVSD |
+            Opcode::MOVDDUP |
+            Opcode::HADDPS |
+            Opcode::HSUBPS |
+            Opcode::ADDSUBPS |
             Opcode::DIV |
             Opcode::IDIV |
             Opcode::MUL |
@@ -408,6 +437,14 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::JG => { write!(out, "{}", colors.control_flow_op(self)) }
 
             /* Data transfer */
+            Opcode::MOVSS |
+            Opcode::MOVSD |
+            Opcode::CVTSI2SS |
+            Opcode::CVTSI2SD |
+            Opcode::CVTTSD2SI |
+            Opcode::CVTSD2SI |
+            Opcode::CVTSD2SS |
+            Opcode::LDDQU |
             Opcode::CLC |
             Opcode::CLI |
             Opcode::CLD |
@@ -415,6 +452,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::STI |
             Opcode::STD |
             Opcode::MOV |
+            Opcode::MOVSD |
             Opcode::CBW |
             Opcode::CDW |
             Opcode::LODS |
@@ -461,6 +499,8 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::SETLE |
             Opcode::SETG => { write!(out, "{}", colors.data_op(self)) }
 
+            Opcode::MINSD |
+            Opcode::MAXSD |
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
@@ -542,7 +582,7 @@ impl <T: std::fmt::Write> Colorize<T> for Instruction {
 
 impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instruction {
     fn contextualize(&self, colors: Option<&ColorSettings>, _address: u64, context: Option<&[Option<String>]>, out: &mut T) -> std::fmt::Result {
-        if self.prefixes.lock {
+        if self.prefixes.lock() {
             write!(out, "lock ")?;
         }
         self.opcode.colorize(colors, out)?;

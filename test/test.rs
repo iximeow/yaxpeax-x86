@@ -66,6 +66,14 @@ fn test_E_decode() {
     test_display(&[0xff, 0x75, 0x08], "push [rbp + 0x8]");
 }
 
+#[test]
+fn test_sse() {
+    test_display(&[0xf2, 0x0f, 0x10, 0x0c, 0xc6], "movsd xmm1, [rsi + rax * 8]");
+    test_display(&[0xf2, 0x0f, 0x59, 0xc8], "mulsd xmm1, xmm0");
+    test_display(&[0xf2, 0x4f, 0x0f, 0x59, 0xc8], "mulsd xmm9, xmm8");
+    test_display(&[0xf2, 0x0f, 0x11, 0x0c, 0xc7], "movsd [rdi + rax * 8], xmm1");
+}
+
 // SETLE, SETNG, ...
 
 #[test]
