@@ -1987,7 +1987,7 @@ fn read_E_anybank<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes,
             let disp = if modbits == 0b01 {
                 read_num(bytes_iter, 1, length) as i8 as i32
             } else {
-                read_num(bytes_iter, 4, length) as i8 as i32
+                read_num(bytes_iter, 4, length) as i32
             };
             *result = Operand::RegDisp(reg, disp);
         }
