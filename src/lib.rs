@@ -30,6 +30,7 @@ pub struct RegSpec {
 // This is only to select alternate opcode maps for the 0f escape byte.
 // This often could be treated as a size prefix but in some cases selects
 // an entirely different operation.
+#[derive(Debug)]
 enum OpcodeMap {
     Map66,
     MapF2,
