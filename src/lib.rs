@@ -236,6 +236,13 @@ pub enum Segment {
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
+    XADD,
+    BT,
+    BTS,
+    BTC,
+    BTR,
+    BSF,
+    BSR,
     MOVSS,
     ADDSS,
     SUBSS,
@@ -266,9 +273,12 @@ pub enum Opcode {
     CVTSS2SI,
     CVTSS2SD,
     LDDQU,
+    MOVSX_b,
+    MOVSX_w,
     MOVZX_b,
     MOVZX_w,
     MOVSX,
+    MOVSXD,
     SAR,
     SAL,
     SHR,
@@ -654,6 +664,7 @@ pub enum OperandCode {
     ModRM_0x0f00,
     ModRM_0x0f01,
     ModRM_0x0fae,
+    ModRM_0x0fba,
     Rq_Cq_0,
     Rq_Dq_0,
     Cq_Rq_0,
@@ -703,6 +714,7 @@ pub enum OperandCode {
     Gb_Eb,
     Gv_Eb,
     Gv_Ew,
+    Gv_Ed,
     Gv_Ev,
     G_E_xmm,
     Gv_M,
@@ -1013,6 +1025,11 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                     instruction.opcode = Opcode::UD2;
                     Ok(OperandCode::Nothing)
                 }
+                0x0d => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::NOP;
+                    Ok(OperandCode::Ev)
+                }
                 0x1f => {
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::NOP;
@@ -1255,6 +1272,11 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                     instruction.opcode = Opcode::CPUID;
                     Ok(OperandCode::Nothing)
                 }
+                0xa3 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::BT;
+                    Ok(OperandCode::Gv_Ev)
+                }
                 0xa8 => {
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::PUSH;
@@ -1268,6 +1290,11 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                 0xae => {
                     instruction.prefixes = prefixes;
                     Ok(OperandCode::ModRM_0x0fae)
+                }
+                0xaf => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::IMUL;
+                    Ok(OperandCode::Gv_Ev)
                 }
                 0xb0 => {
                     instruction.prefixes = prefixes;
@@ -1288,6 +1315,45 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                     instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVZX_w;
                     Ok(OperandCode::Gv_Ew)
+                }
+                0xba => {
+                    instruction.prefixes = prefixes;
+                    Ok(OperandCode::ModRM_0x0fba)
+                }
+                0xbb => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::BTC;
+                    Ok(OperandCode::Gv_Ev)
+                }
+                0xbc => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::BSF;
+                    Ok(OperandCode::Gv_Ev)
+                }
+                0xbd => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::BSR;
+                    Ok(OperandCode::Gv_Ev)
+                }
+                0xbe => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSX_b;
+                    Ok(OperandCode::Gv_Eb)
+                }
+                0xbf => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::MOVSX_w;
+                    Ok(OperandCode::Gv_Ew)
+                }
+                0xc0 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::XADD;
+                    Ok(OperandCode::Eb_Gb)
+                }
+                0xc1 => {
+                    instruction.prefixes = prefixes;
+                    instruction.opcode = Opcode::XADD;
+                    Ok(OperandCode::Ev_Gv)
                 }
                 _ => {
                     Err(format!("Unknown opcode: 0f{:x}", b))
@@ -1390,6 +1456,11 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         instruction.prefixes = prefixes;
                         instruction.opcode = op;
                         return Ok(OperandCode::Zv(x));
+                    },
+                    0x63 => {
+                        instruction.prefixes = prefixes;
+                        instruction.opcode = Opcode::MOVSXD;
+                        return Ok(OperandCode::Gv_Ed);
                     },
                     0x64 => {
                         prefixes.set_fs();
@@ -1577,12 +1648,12 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     0x9c => {
                         instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::PUSHF;
-                        return Ok(OperandCode::Fw);
+                        return Ok(OperandCode::Nothing);
                     },
                     0x9d => {
                         instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::POPF;
-                        return Ok(OperandCode::Fw);
+                        return Ok(OperandCode::Nothing);
                     },
                     0x9e => {
                         instruction.prefixes = prefixes;
@@ -1768,6 +1839,20 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         instruction.opcode = Opcode::Invalid;
                         return Ok(operand);
                     },
+                    0xdc => {
+                        // TODO: WRONG
+                        // x87 instructions
+                        instruction.opcode = Opcode::NOP;
+                        let _ = read_imm_unsigned(bytes_iter, 2, length)?;
+                        return Ok(OperandCode::Nothing);
+                    }
+                    0xdd => {
+                        // x87 instructions
+                        // TODO: WRONG
+                        instruction.opcode = Opcode::NOP;
+                        let _ = read_imm_unsigned(bytes_iter, 2, length)?;
+                        return Ok(OperandCode::Nothing);
+                    }
                     // TODO: GAP
                     0xe8 => {
                         instruction.prefixes = prefixes;
@@ -2631,6 +2716,26 @@ fn read_operands<T: Iterator<Item=u8>>(
             }
         },
         // TODO: verify M
+        OperandCode::Gv_Ed => {
+            let opwidth = 4;
+            // TODO: ...
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
+                Ok(()) => {
+                    instruction.operands[0] =
+                        Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        },
         OperandCode::Gv_Ev | OperandCode::Gv_M => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             // TODO: ...
@@ -2947,7 +3052,8 @@ fn read_operands<T: Iterator<Item=u8>>(
                         instruction.operands = [Operand::Nothing, Operand::Nothing];
                         Ok(())
                     } else {
-                        panic!("Unsupported instruction: 0x0f01 with modrm: 11 110 r >= 2");
+                    //    panic!("Unsupported instruction: 0x0f01 with modrm: 11 110 r >= 2");
+                        Err("unsupported 0x0f01 variant".to_string())
                     }
                 } else {
                     instruction.opcode = Opcode::INVLPG;
@@ -3049,6 +3155,47 @@ fn read_operands<T: Iterator<Item=u8>>(
                 _ => { unreachable!("r < 6"); }
             }
         }
+        OperandCode::ModRM_0x0fba => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
+            let modrm = match bytes_iter.next() {
+                Some(b) => b,
+                None => return Err("Out of bytes".to_string())
+            };
+            *length += 1;
+            let (mod_bits, r, m) = octets_of(modrm);
+            match r {
+                0 | 1 | 2 | 3 => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err("invalid instruction".to_string());
+                },
+                4 => {
+                    instruction.opcode = Opcode::BT;
+                }
+                5 => {
+                    instruction.opcode = Opcode::BTS;
+                }
+                6 => {
+                    instruction.opcode = Opcode::BTR;
+                }
+                7 => {
+                    instruction.opcode = Opcode::BTC;
+                }
+                _ => {
+                    unreachable!("r < 8");
+                }
+            }
+
+            read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)?;
+
+            match read_imm_signed(bytes_iter, 1, 1, length) {
+                Ok(op) => {
+                    instruction.operands[1] = op;
+                    Ok(())
+                },
+                Err(reason) => Err(reason)
+            }
+        }
+
         OperandCode::Rq_Cq_0 => {
             let modrm = match bytes_iter.next() {
                 Some(b) => b,

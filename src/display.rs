@@ -183,6 +183,13 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::XADD => write!(f, "{}", "xadd"),
+            &Opcode::BT => write!(f, "{}", "bt"),
+            &Opcode::BTS => write!(f, "{}", "bts"),
+            &Opcode::BTR => write!(f, "{}", "btr"),
+            &Opcode::BTC => write!(f, "{}", "btc"),
+            &Opcode::BSF => write!(f, "{}", "bsf"),
+            &Opcode::BSR => write!(f, "{}", "bsr"),
             &Opcode::MOVSS => write!(f, "{}", "movss"),
             &Opcode::SQRTSS => write!(f, "{}", "sqrtss"),
             &Opcode::ADDSS => write!(f, "{}", "addss"),
@@ -350,8 +357,11 @@ impl fmt::Display for Opcode {
             &Opcode::DIV => write!(f, "{}", "div"),
             &Opcode::IDIV => write!(f, "{}", "idiv"),
             &Opcode::CMPXCHG => write!(f, "{}", "cmpxchg"),
+            &Opcode::MOVSX_b => write!(f, "{}", "movsx"),
+            &Opcode::MOVSX_w => write!(f, "{}", "movsx"),
             &Opcode::MOVZX_b => write!(f, "{}", "movzx"),
             &Opcode::MOVZX_w => write!(f, "{}", "movzx"),
+            &Opcode::MOVSXD => write!(f, "{}", "movsxd"),
             &Opcode::MOVSX => write!(f, "{}", "movsx"),
             &Opcode::SETO => write!(f, "{}", "seto"),
             &Opcode::SETNO => write!(f, "{}", "setno"),
@@ -387,11 +397,10 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::SUBSS |
             Opcode::MULSS |
             Opcode::DIVSS |
-            Opcode::MOVDDUP |
-            Opcode::MOVSLDUP |
             Opcode::HADDPS |
             Opcode::HSUBPS |
             Opcode::ADDSUBPS |
+            Opcode::XADD|
             Opcode::DIV |
             Opcode::IDIV |
             Opcode::MUL |
@@ -415,6 +424,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::ADD |
             Opcode::ADC |
             Opcode::SUB |
+            Opcode::BT |
+            Opcode::BTS |
+            Opcode::BTR |
+            Opcode::BTC |
+            Opcode::BSF |
+            Opcode::BSR |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
             Opcode::PUSHF |
@@ -471,6 +486,8 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::STC |
             Opcode::STI |
             Opcode::STD |
+            Opcode::MOVDDUP |
+            Opcode::MOVSLDUP |
             Opcode::MOV |
             Opcode::MOVSD |
             Opcode::CBW |
@@ -482,9 +499,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::MOVS |
             Opcode::INS |
             Opcode::OUTS |
+            Opcode::MOVSX_b |
+            Opcode::MOVSX_w |
             Opcode::MOVZX_b |
             Opcode::MOVZX_w |
             Opcode::MOVSX |
+            Opcode::MOVSXD |
             Opcode::XCHG |
             Opcode::CMOVA |
             Opcode::CMOVB |
@@ -627,6 +647,7 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
             }
         };
         match self.opcode {
+            Opcode::MOVSX_b |
             Opcode::MOVZX_b => {
                 match context.and_then(|xs| xs[1].as_ref()) {
                     Some(s) => { write!(out, ", {}", s) }
@@ -653,6 +674,7 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                     }
                 }
             },
+            Opcode::MOVSX_w |
             Opcode::MOVZX_w => {
                 match context.and_then(|xs| xs[1].as_ref()) {
                     Some(s) => { write!(out, ", {}", s) }
