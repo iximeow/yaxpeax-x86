@@ -3007,7 +3007,10 @@ fn read_operands<T: Iterator<Item=u8>>(
                 }
             } else if r == 1 {
                 if mod_bits == 0b11 {
-                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 001 ___");
+                    // TOOD: MONITOR
+                    instruction.opcode = Opcode::NOP;
+                    instruction.operands[0] = Operand::Nothing;
+                    Ok(())
                 } else {
                     instruction.opcode = Opcode::SIDT;
                     instruction.operands[1] = Operand::Nothing;
@@ -3015,7 +3018,10 @@ fn read_operands<T: Iterator<Item=u8>>(
                 }
             } else if r == 2 {
                 if mod_bits == 0b11 {
-                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 010 ___");
+                    // TOOD: XGETBV
+                    instruction.opcode = Opcode::NOP;
+                    instruction.operands[0] = Operand::Nothing;
+                    Ok(())
                 } else {
                     instruction.opcode = Opcode::LGDT;
                     instruction.operands[1] = Operand::Nothing;
@@ -3023,7 +3029,10 @@ fn read_operands<T: Iterator<Item=u8>>(
                 }
             } else if r == 3 {
                 if mod_bits == 0b11 {
-                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 011 ___");
+                    // TOOD: VMRUN
+                    instruction.opcode = Opcode::NOP;
+                    instruction.operands[0] = Operand::Nothing;
+                    Ok(())
                 } else {
                     instruction.opcode = Opcode::LIDT;
                     instruction.operands[1] = Operand::Nothing;
