@@ -213,6 +213,7 @@ impl Operand {
 
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[repr(u8)]
 pub enum RegisterBank {
     Q, D, W, B, rB, // Quadword, Dword, Word, Byte
     CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
@@ -222,6 +223,7 @@ pub enum RegisterBank {
 #[allow(non_camel_case_types)]
 #[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[repr(u8)]
 pub enum RegisterBank {
     Q, D, W, B, rB, // Quadword, Dword, Word, Byte
     CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
@@ -230,12 +232,14 @@ pub enum RegisterBank {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[repr(u8)]
 pub enum Segment {
     CS, DS, ES, FS, GS, SS
 }
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
 pub enum Opcode {
     XADD,
     BT,
