@@ -289,7 +289,6 @@ impl fmt::Display for Opcode {
             &Opcode::ENTER => write!(f, "{}", "enter"),
             &Opcode::LEAVE => write!(f, "{}", "leave"),
             &Opcode::MOV => write!(f, "{}", "mov"),
-            &Opcode::MOVSD => write!(f, "{}", "movsd"),
             &Opcode::RETURN => write!(f, "{}", "ret"),
             &Opcode::PUSHF => write!(f, "{}", "pushf"),
             &Opcode::WAIT => write!(f, "{}", "wait"),
@@ -489,7 +488,6 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::MOVDDUP |
             Opcode::MOVSLDUP |
             Opcode::MOV |
-            Opcode::MOVSD |
             Opcode::CBW |
             Opcode::CDW |
             Opcode::LODS |

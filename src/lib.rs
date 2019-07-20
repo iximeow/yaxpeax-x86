@@ -146,6 +146,7 @@ impl RegSpec {
 }
 
 #[allow(non_camel_case_types)]
+#[allow(dead_code)]
 enum SizeCode {
     b,
     vd,
@@ -762,7 +763,7 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAL,
     Opcode::SAR
 ];
-fn read_opcode_660f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+fn read_opcode_660f_map<T: Iterator<Item=u8>>(_bytes_iter: &mut T, _instruction: &mut Instruction, _prefixes: Prefixes, _length: &mut u8) -> Result<OperandCode, String> {
     Err("660f opcode map unsupported".to_string())
 }
 fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
@@ -1952,11 +1953,13 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
 fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8) -> Result<(), String> {
     read_E_anybank(bytes_iter, prefixes, m, modbits, width, result, length, width_to_gp_reg_bank(width, prefixes.rex().present()))
 }
+#[allow(non_snake_case)]
 fn read_E_xmm<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8) -> Result<(), String> {
     read_E_anybank(bytes_iter, prefixes, m, modbits, width, result, length, RegisterBank::X)
 }
 
-fn read_E_anybank<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, width: u8, result: &mut Operand, length: &mut u8, reg_bank: RegisterBank) -> Result<(), String> {
+#[allow(non_snake_case)]
+fn read_E_anybank<T: Iterator<Item=u8>>(bytes_iter: &mut T, prefixes: &Prefixes, m: u8, modbits: u8, _width: u8, result: &mut Operand, length: &mut u8, reg_bank: RegisterBank) -> Result<(), String> {
     let addr_width = if prefixes.address_size() { 4 } else { 8 };
     if modbits == 0b11 {
         *result = Operand::Register(RegSpec::from_parts(m, prefixes.rex().b(), reg_bank))
@@ -2153,7 +2156,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)
         },
         OperandCode::AL_Ob => {
-            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
+            let _addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             // stupid RCT thing:
             let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
             let opwidth = 1;
@@ -2169,7 +2172,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::AX_Ov => {
-            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
+            let _addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             // stupid RCT thing:
             let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
@@ -2185,7 +2188,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Ob_AL => {
-            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
+            let _addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             // stupid RCT thing:
             let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
             let opwidth = 1;
@@ -2201,7 +2204,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Ov_AX => {
-            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
+            let _addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             // stupid RCT thing:
             let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
@@ -2770,26 +2773,6 @@ fn read_operands<T: Iterator<Item=u8>>(
             match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
                     instruction.operands[1] =
-                        Operand::Register(RegSpec::from_parts(r, instruction.prefixes.rex().r(), RegisterBank::X));
-                    Ok(())
-                },
-                Err(reason) => Err(reason)
-            }
-        },
-        OperandCode::G_E_xmm => {
-            let opwidth = 8;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
-
-//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
-            match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
-                Ok(()) => {
-                    instruction.operands[0] =
                         Operand::Register(RegSpec::from_parts(r, instruction.prefixes.rex().r(), RegisterBank::X));
                     Ok(())
                 },

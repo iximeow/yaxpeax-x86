@@ -3,13 +3,16 @@
 extern crate test;
 extern crate yaxpeax_x86;
 
+#[cfg(feature = "capstone_bench")]
 use std::ffi::c_void;
 
+#[cfg(feature = "capstone_bench")]
 use std::io::Write;
 
 use test::Bencher;
 
-use yaxpeax_x86::{Instruction, Opcode, decode_one};
+/*
+use yaxpeax_x86::{Instruction, decode_one};
 
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
@@ -18,11 +21,12 @@ fn decode(bytes: &[u8]) -> Option<Instruction> {
         None => None
     }
 }
+*/
 
 #[bench]
 fn bench_102000_instrs(b: &mut Bencher) {
     b.iter(|| {
-        for i in (0..3000) {
+        for _i in 0..3000 {
             test::black_box(do_decode_swathe());
         }
     })
@@ -42,7 +46,7 @@ fn bench_102000_intrs_capstone(b: &mut Bencher) {
     })
 }
 
-const decode_data: [u8; 130] = [
+const DECODE_DATA: [u8; 130] = [
     0x48, 0xc7, 0x04, 0x24, 0x00, 0x00, 0x00, 0x00,
     0x48, 0x89, 0x44, 0x24, 0x08,
     0x48, 0x89, 0x43, 0x18,
@@ -80,8 +84,8 @@ const decode_data: [u8; 130] = [
 ];
 
 fn do_decode_swathe() {
-    let mut buf = [0u8; 128];
-    let mut iter = decode_data.iter().map(|x| *x);
+//    let mut buf = [0u8; 128];
+    let mut iter = DECODE_DATA.iter().map(|x| *x);
     let mut result = yaxpeax_x86::Instruction::invalid();
     loop {
         match yaxpeax_x86::decode_one(&mut iter, &mut result) {
@@ -134,8 +138,8 @@ fn get_instr(handle: usize) -> *mut c_void {
 #[cfg(feature = "capstone_bench")]
 fn do_capstone_decode_swathe(cs: usize, instr: *mut c_void) {
     unsafe {
-        let mut code = &decode_data as *const u8;
-        let mut len = decode_data.len();
+        let mut code = &DECODE_DATA as *const u8;
+        let mut len = DECODE_DATA.len();
         let mut addr = 0u64;
         loop {
             let result = cs_disasm_iter(
