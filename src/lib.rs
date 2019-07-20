@@ -1731,13 +1731,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         */
         OperandCode::Eb_R0 => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             if r != 0 {
                 instruction.opcode = Opcode::Invalid;
@@ -1812,13 +1806,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::ModRM_0x80_Eb_Ib => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1833,13 +1821,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0x81_Ev_Ivs => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1862,13 +1844,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xc0_Eb_Ib => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1883,13 +1859,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xc1_Ev_Ib => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1904,13 +1874,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xc6_Eb_Ib => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1928,13 +1892,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xc7_Ev_Iv => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             if r != 0 {
                 instruction.opcode = Opcode::Invalid;
@@ -1957,13 +1915,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xd0_Eb_1 => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1977,13 +1929,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xd1_Ev_1 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -1997,12 +1943,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xf6 => {
             let opwidth = 1;
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => { },
                 Err(reason) => { return Err(reason); }
@@ -2043,12 +1984,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xf7 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => { },
                 Err(reason) => { return Err(reason); }
@@ -2090,13 +2026,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::ModRM_0xfe_Eb => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -2119,13 +2049,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::ModRM_0xff_Ev => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -2148,13 +2072,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::Ev => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, _, m) = octets_of(modrm);
+            let (mod_bits, _, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -2166,13 +2084,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Eb_Gb => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -2185,13 +2097,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Ev_Gv => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -2204,13 +2110,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Gb_Eb => {
             let opwidth = 1;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
                 Ok(()) => {
@@ -2223,13 +2123,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Gv_Eb => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
                 Ok(()) => {
@@ -2242,13 +2136,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Gv_Ew => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, 2, &mut instruction.operands[1], length) {
                 Ok(()) => {
@@ -2261,13 +2149,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Ew_Sw => {
             let opwidth = 2;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             if r > 5 {
                 return Err("Invalid r".to_owned());
@@ -2286,13 +2168,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Sw_Ew => {
             let opwidth = 2;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
             if r > 5 {
                 return Err("Invalid r".to_owned());
@@ -2312,13 +2188,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         // TODO: verify M
         OperandCode::Gv_Ed => {
             let opwidth = 4;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
@@ -2332,13 +2202,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::Gv_Ev | OperandCode::Gv_M => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
@@ -2352,13 +2216,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::E_G_xmm => {
             let opwidth = 8;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
             match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
@@ -2372,13 +2230,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         },
         OperandCode::G_E_xmm => {
             let opwidth = 8;
-            // TODO: ...
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
             match read_E_xmm(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[1], length) {
@@ -2483,14 +2335,8 @@ fn read_operands<T: Iterator<Item=u8>>(
             }
         },
         OperandCode::ModRM_0x83_Ev_Ibs => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
-
-            let (mod_bits, r, m) = octets_of(modrm);
 
             match read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length) {
                 Ok(()) => {
@@ -2523,12 +2369,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::ModRM_0x0f00 => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             if r == 0 {
                 instruction.opcode = Opcode::SLDT;
                 instruction.operands[1] = Operand::Nothing;
@@ -2565,12 +2406,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::ModRM_0x0f01 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             if r == 0 {
                 if mod_bits == 0b11 {
                     panic!("Unsupported instruction: 0x0f01 with modrm: 11 000 ___");
@@ -2648,12 +2484,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             }
         }
         OperandCode::ModRM_0x0fae => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             match r {
                 0 => {
                     if mod_bits == 0b11 {
@@ -2740,12 +2571,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
         OperandCode::ModRM_0x0fba => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, &instruction.prefixes);
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (mod_bits, r, m) = octets_of(modrm);
+            let (mod_bits, r, m) = read_modrm(bytes_iter, length)?;
             match r {
                 0 | 1 | 2 | 3 => {
                     instruction.opcode = Opcode::Invalid;
@@ -2780,12 +2606,7 @@ fn read_operands<T: Iterator<Item=u8>>(
         }
 
         OperandCode::Rq_Cq_0 => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (_, mut r, mut m) = octets_of(modrm);
+            let (_, mut r, mut m) = read_modrm(bytes_iter, length)?;
             if instruction.prefixes.rex().r() {
                 r += 0b1000;
             }
@@ -2799,11 +2620,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Rq_Dq_0 => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            let (_, mut r, mut m) = octets_of(modrm);
+            let (_, mut r, mut m) = read_modrm(bytes_iter, length)?;
             if instruction.prefixes.rex().r() {
                 r += 0b1000;
             }
@@ -2817,12 +2634,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Cq_Rq_0 => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (_, mut r, mut m) = octets_of(modrm);
+            let (_, mut r, mut m) = read_modrm(bytes_iter, length)?;
             if instruction.prefixes.rex().r() {
                 r += 0b1000;
             }
@@ -2836,12 +2648,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             Ok(())
         }
         OperandCode::Dq_Rq_0 => {
-            let modrm = match bytes_iter.next() {
-                Some(b) => b,
-                None => return Err("Out of bytes".to_string())
-            };
-            *length += 1;
-            let (_, mut r, mut m) = octets_of(modrm);
+            let (_, mut r, mut m) = read_modrm(bytes_iter, length)?;
             if instruction.prefixes.rex().r() {
                 r += 0b1000;
             }
@@ -3023,4 +2830,15 @@ fn imm_width_from_prefixes_64(interpretation: SizeCode, prefixes: &Prefixes) -> 
             }
         },
     }
+}
+
+#[inline]
+fn read_modrm<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Result<(u8, u8, u8), String> {
+    let modrm = match bytes_iter.next() {
+        Some(b) => b,
+        // TODO: ...
+        None => return Err("Out of bytes".to_string()),
+    };
+    *length += 1;
+    Ok(octets_of(modrm))
 }
