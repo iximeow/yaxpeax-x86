@@ -1269,13 +1269,13 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
     use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
     instruction.prefixes = Prefixes::new(0);
-    loop {
+    let (opcode, operand_code) = loop {
         match bytes_iter.next() {
             Some(b) => {
                 *length += 1;
                 match b {
                     x if x < 0x40 => {
-                        if x % 8 > 5 { // unsafe { unlikely(x % 8 > 5) } {
+                        if x % 8 > 5 {
                             // for x86_32 this is push/pop prefixes and 0x0f escape
                             // for x86_64 this is mostly invalid
                             match x {
@@ -1321,10 +1321,7 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                                 | 0x27
                                 | 0x2f
                                 | 0x37
-                                | 0x3f => {
-                                    instruction.opcode = Opcode::Invalid;
-                                    return Ok(OperandCode::Nothing);
-                                },
+                                | 0x3f => { break (Opcode::Invalid, OperandCode::Nothing); },
                                 _ => { unsafe { unreachable_unchecked(); } }
                             }
                             continue;
@@ -1337,10 +1334,9 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             OperandCode::Gv_Ev,
                             OperandCode::AL_Ib,
                             OperandCode::AX_Ivd
-                        ][(x % 8) as usize].clone();
+                        ][(x % 8) as usize];
 
-                        instruction.opcode = op;
-                        return Ok(operand_code);
+                        break (op, operand_code);
                     },
                     x if x < 0x50 => {
                         // x86_32 inc/dec
@@ -1349,13 +1345,9 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     },
                     x if x < 0x60 => {
                         let op = if x < 0x58 { Opcode::PUSH } else { Opcode::POP };
-                        instruction.opcode = op;
-                        return Ok(OperandCode::Zv(x));
+                        break (op, OperandCode::Zv(x));
                     },
-                    0x63 => {
-                        instruction.opcode = Opcode::MOVSXD;
-                        return Ok(OperandCode::Gv_Ed);
-                    },
+                    0x63 => { break (Opcode::MOVSXD, OperandCode::Gv_Ed); }
                     0x64 => {
                         instruction.prefixes.set_fs();
                         alternate_opcode_map = None;
@@ -1372,38 +1364,14 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         instruction.prefixes.set_address_size();
                         alternate_opcode_map = None;
                     },
-                    0x68 => {
-                        instruction.opcode = Opcode::PUSH;
-                        return Ok(OperandCode::Ivs);
-                    },
-                    0x69 => {
-                        instruction.opcode = Opcode::IMUL;
-                        return Ok(OperandCode::Gv_Ev_Iv);
-                    },
-                    0x6a => {
-                        instruction.opcode = Opcode::PUSH;
-                        return Ok(OperandCode::Ibs);
-                    },
-                    0x6b => {
-                        instruction.opcode = Opcode::IMUL;
-                        return Ok(OperandCode::Gb_Eb_Ib);
-                    },
-                    0x6c => {
-                        instruction.opcode = Opcode::INS;
-                        return Ok(OperandCode::Yb_DX);
-                    },
-                    0x6d => {
-                        instruction.opcode = Opcode::INS;
-                        return Ok(OperandCode::Yv_DX);
-                    },
-                    0x6e => {
-                        instruction.opcode = Opcode::OUTS;
-                        return Ok(OperandCode::DX_Xb);
-                    },
-                    0x6f => {
-                        instruction.opcode = Opcode::OUTS;
-                        return Ok(OperandCode::DX_Xv);
-                    },
+                    0x68 => { break (Opcode::PUSH, OperandCode::Ivs); },
+                    0x69 => { break (Opcode::IMUL, OperandCode::Gv_Ev_Iv); },
+                    0x6a => { break (Opcode::PUSH, OperandCode::Ibs); },
+                    0x6b => { break (Opcode::IMUL, OperandCode::Gb_Eb_Ib); },
+                    0x6c => { break (Opcode::INS, OperandCode::Yb_DX); },
+                    0x6d => { break (Opcode::INS, OperandCode::Yv_DX); },
+                    0x6e => { break (Opcode::OUTS, OperandCode::DX_Xb); },
+                    0x6f => { break (Opcode::OUTS, OperandCode::DX_Xv); },
                     x if x < 0x80 => {
                         let op = [
                             Opcode::JO,
@@ -1443,155 +1411,44 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             return Ok(operand);
                         }
                     },
-                    0x84 => {
-                        instruction.opcode = Opcode::TEST;
-                        return Ok(OperandCode::Eb_Gb);
-                    },
-                    0x85 => {
-                        instruction.opcode = Opcode::TEST;
-                        return Ok(OperandCode::Ev_Gv);
-                    },
-                    0x86 => {
-                        instruction.opcode = Opcode::XCHG;
-                        return Ok(OperandCode::Gb_Eb);
-                    },
-                    0x87 => {
-                        instruction.opcode = Opcode::XCHG;
-                        return Ok(OperandCode::Gv_Ev);
-                    },
-                    0x88 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Eb_Gb);
-                    }
-                    0x89 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Ev_Gv);
-                    }
-                    0x8a => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Gb_Eb);
-                    }
-                    0x8b => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Gv_Ev);
-                    }
-                    0x8c => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Ew_Sw);
-                    }
-                    0x8d => {
-                        instruction.opcode = Opcode::LEA;
-                        return Ok(OperandCode::Gv_M);
-                    }
-                    0x8e => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Sw_Ew);
-                    },
-                    0x8f => {
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0x8f_Ev);
-                    },
-                    0x90 => {
-                        instruction.opcode = Opcode::NOP;
-                        return Ok(OperandCode::Nothing);
-                    },
-                    x if x < 0x98 => {
-                        instruction.opcode = Opcode::XCHG;
-                        return Ok(OperandCode::Zv_AX(x));
-                    },
-                    0x98 => {
-                        instruction.opcode = Opcode::CBW;
-                        return Ok(OperandCode::AX_AL);
-                    },
-                    0x99 => {
-                        instruction.opcode = Opcode::CBW;
-                        return Ok(OperandCode::DX_AX);
-                    },
+                    0x84 => { break (Opcode::TEST, OperandCode::Eb_Gb); },
+                    0x85 => { break (Opcode::TEST, OperandCode::Ev_Gv); },
+                    0x86 => { break (Opcode::XCHG, OperandCode::Gb_Eb); },
+                    0x87 => { break (Opcode::XCHG, OperandCode::Gv_Ev); },
+                    0x88 => { break (Opcode::MOV, OperandCode::Eb_Gb); },
+                    0x89 => { break (Opcode::MOV, OperandCode::Ev_Gv); },
+                    0x8a => { break (Opcode::MOV, OperandCode::Gb_Eb); },
+                    0x8b => { break (Opcode::MOV, OperandCode::Gv_Ev); },
+                    0x8c => { break (Opcode::MOV, OperandCode::Ew_Sw); },
+                    0x8d => { break (Opcode::LEA, OperandCode::Gv_M); },
+                    0x8e => { break (Opcode::MOV, OperandCode::Sw_Ew); },
+                    0x8f => { break (Opcode::Invalid, OperandCode::ModRM_0x8f_Ev); },
+                    0x90 => { break (Opcode::NOP, OperandCode::Nothing); },
+                    x if x < 0x98 => { break (Opcode::XCHG, OperandCode::Zv_AX(x)); },
+                    0x98 => { break (Opcode::CBW, OperandCode::AX_AL); },
+                    0x99 => { break (Opcode::CBW, OperandCode::DX_AX); },
                     0x9a => { return Err("invalid opcode".to_owned()); },
-                    0x9b => {
-                        instruction.opcode = Opcode::WAIT;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0x9c => {
-                        instruction.opcode = Opcode::PUSHF;
-                        return Ok(OperandCode::Nothing);
-                    },
-                    0x9d => {
-                        instruction.opcode = Opcode::POPF;
-                        return Ok(OperandCode::Nothing);
-                    },
-                    0x9e => {
-                        instruction.opcode = Opcode::SAHF;
-                        return Ok(OperandCode::AH);
-                    },
-                    0x9f => {
-                        instruction.opcode = Opcode::LAHF;
-                        return Ok(OperandCode::AH);
-                    },
-                    0xa0 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::AL_Ob);
-                    },
-                    0xa1 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::AX_Ov);
-                    },
-                    0xa2 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Ob_AL);
-                    },
-                    0xa3 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::Ov_AX);
-                    },
-                    0xa4 => {
-                        instruction.opcode = Opcode::MOVS;
-                        return Ok(OperandCode::Yb_Xb);
-                    },
-                    0xa5 => {
-                        instruction.opcode = Opcode::MOVS;
-                        return Ok(OperandCode::Yv_Xv);
-                    },
-                    0xa6 => {
-                        instruction.opcode = Opcode::CMPS;
-                        return Ok(OperandCode::Yb_Xb);
-                    },
-                    0xa7 => {
-                        instruction.opcode = Opcode::CMPS;
-                        return Ok(OperandCode::Yv_Xv);
-                    },
-                    0xa8 => {
-                        instruction.opcode = Opcode::TEST;
-                        return Ok(OperandCode::AL_Ib);
-                    },
-                    0xa9 => {
-                        instruction.opcode = Opcode::TEST;
-                        return Ok(OperandCode::AX_Ivd);
-                    },
-                    0xaa => {
-                        instruction.opcode = Opcode::STOS;
-                        return Ok(OperandCode::Yb_AL);
-                    },
-                    0xab => {
-                        instruction.opcode = Opcode::STOS;
-                        return Ok(OperandCode::Yv_AX);
-                    },
-                    0xac => {
-                        instruction.opcode = Opcode::LODS;
-                        return Ok(OperandCode::AL_Xb);
-                    },
-                    0xad => {
-                        instruction.opcode = Opcode::LODS;
-                        return Ok(OperandCode::AX_Xv);
-                    },
-                    0xae => {
-                        instruction.opcode = Opcode::SCAS;
-                        return Ok(OperandCode::Yb_AL);
-                    },
-                    0xaf => {
-                        instruction.opcode = Opcode::SCAS;
-                        return Ok(OperandCode::Yv_AX);
-                    },
+                    0x9b => { break (Opcode::WAIT, OperandCode::Nothing); },
+                    0x9c => { break (Opcode::PUSHF, OperandCode::Nothing); },
+                    0x9d => { break (Opcode::POPF, OperandCode::Nothing); },
+                    0x9e => { break (Opcode::SAHF, OperandCode::AH); },
+                    0x9f => { break (Opcode::LAHF, OperandCode::AH); },
+                    0xa0 => { break (Opcode::MOV, OperandCode::AL_Ob); },
+                    0xa1 => { break (Opcode::MOV, OperandCode::AX_Ov); },
+                    0xa2 => { break (Opcode::MOV, OperandCode::Ob_AL); },
+                    0xa3 => { break (Opcode::MOV, OperandCode::Ov_AX); },
+                    0xa4 => { break (Opcode::MOVS, OperandCode::Yb_Xb); },
+                    0xa5 => { break (Opcode::MOVS, OperandCode::Yv_Xv); },
+                    0xa6 => { break (Opcode::CMPS, OperandCode::Yb_Xb); },
+                    0xa7 => { break (Opcode::CMPS, OperandCode::Yv_Xv); },
+                    0xa8 => { break (Opcode::TEST, OperandCode::AL_Ib); },
+                    0xa9 => { break (Opcode::TEST, OperandCode::AX_Ivd); },
+                    0xaa => { break (Opcode::STOS, OperandCode::Yb_AL); },
+                    0xab => { break (Opcode::STOS, OperandCode::Yv_AX); },
+                    0xac => { break (Opcode::LODS, OperandCode::AL_Xb); },
+                    0xad => { break (Opcode::LODS, OperandCode::AX_Xv); },
+                    0xae => { break (Opcode::SCAS, OperandCode::Yb_AL); },
+                    0xaf => { break (Opcode::SCAS, OperandCode::Yv_AX); },
                     x if x < 0xc0 => {
                         let operand = if x < 0xb8 {
                             OperandCode::Zb_Ib(x)
@@ -1601,65 +1458,23 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         instruction.opcode = Opcode::MOV;
                         return Ok(operand);
                     },
-                    0xc0 => {
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0xc0_Eb_Ib);
-                    },
-                    0xc1 => {
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0xc1_Ev_Ib);
-                    },
-                    0xc2 => {
-                        instruction.opcode = Opcode::RETURN;
-                        return Ok(OperandCode::Iw);
-                    },
-                    0xc3 => {
-                        instruction.opcode = Opcode::RETURN;
-                        return Ok(OperandCode::Nothing);
-                    },
+                    0xc0 => { break (Opcode::Invalid, OperandCode::ModRM_0xc0_Eb_Ib); },
+                    0xc1 => { break (Opcode::Invalid, OperandCode::ModRM_0xc1_Ev_Ib); },
+                    0xc2 => { break (Opcode::RETURN, OperandCode::Iw); },
+                    0xc3 => { break (Opcode::RETURN, OperandCode::Nothing); },
                     0xc4  | 0xc5 => {
                         return Err("invalid opcode".to_owned());
                     },
-                    0xc6 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::ModRM_0xc6_Eb_Ib);
-                    },
-                    0xc7 => {
-                        instruction.opcode = Opcode::MOV;
-                        return Ok(OperandCode::ModRM_0xc7_Ev_Iv);
-                    },
-                    0xc8 => {
-                        instruction.opcode = Opcode::ENTER;
-                        return Ok(OperandCode::Iw_Ib);
-                    },
-                    0xc9 => {
-                        instruction.opcode = Opcode::LEAVE;
-                        return Ok(OperandCode::Nothing);
-                    },
-                    0xca => {
-                        instruction.opcode = Opcode::RETF;
-                        return Ok(OperandCode::Iw);
-                    }
-                    0xcb => {
-                        instruction.opcode = Opcode::RETF;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xcc => {
-                        instruction.opcode = Opcode::INT;
-                        return Ok(OperandCode::I_3);
-                    },
-                    0xcd => {
-                        instruction.opcode = Opcode::INT;
-                        return Ok(OperandCode::Ib);
-                    },
-                    0xce => {
-                        instruction.opcode = Opcode::INTO;
-                        return Ok(OperandCode::Fw);
-                    },
-                    0xcf => {
-                        instruction.opcode = Opcode::IRET;
-                        return Ok(OperandCode::Fw);
-                    },
+                    0xc6 => { break (Opcode::MOV, OperandCode::ModRM_0xc6_Eb_Ib); },
+                    0xc7 => { break (Opcode::MOV, OperandCode::ModRM_0xc7_Ev_Iv); },
+                    0xc8 => { break (Opcode::ENTER, OperandCode::Iw_Ib); },
+                    0xc9 => { break (Opcode::LEAVE, OperandCode::Nothing); },
+                    0xca => { break (Opcode::RETF, OperandCode::Iw); },
+                    0xcb => { break (Opcode::RETF, OperandCode::Nothing); },
+                    0xcc => { break (Opcode::INT, OperandCode::I_3); },
+                    0xcd => { break (Opcode::INT, OperandCode::Ib); },
+                    0xce => { break (Opcode::INTO, OperandCode::Fw); },
+                    0xcf => { break (Opcode::IRET, OperandCode::Fw); },
                     x if x < 0xd4 => {
                         let operand = [
                             OperandCode::ModRM_0xd0_Eb_1,
@@ -1685,18 +1500,9 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         return Ok(OperandCode::Nothing);
                     }
                     // TODO: GAP
-                    0xe8 => {
-                        instruction.opcode = Opcode::CALL;
-                        return Ok(OperandCode::Jvds);
-                    },
-                    0xe9 => {
-                        instruction.opcode = Opcode::JMP;
-                        return Ok(OperandCode::Jvds);
-                    },
-                    0xeb => {
-                        instruction.opcode = Opcode::JMP;
-                        return Ok(OperandCode::Jbs);
-                    },
+                    0xe8 => { break (Opcode::CALL, OperandCode::Jvds); },
+                    0xe9 => { break (Opcode::JMP, OperandCode::Jvds); },
+                    0xeb => { break (Opcode::JMP, OperandCode::Jbs); },
                     0xf0 => {
                         instruction.prefixes.set_lock();
                     },
@@ -1708,51 +1514,18 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         instruction.prefixes.set_rep();
                         alternate_opcode_map = Some(OpcodeMap::MapF3);
                     },
-                    0xf4 => {
-                        instruction.opcode = Opcode::HLT;
-                        return Ok(OperandCode::Nothing);
-                    },
-                    0xf6 => {
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0xf6);
-                    },
-                    0xf7 => {
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0xf7);
-                    },
-                    0xf8 => {
-                        instruction.opcode = Opcode::CLC;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xf9 => {
-                        instruction.opcode = Opcode::STC;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xfa => {
-                        instruction.opcode = Opcode::CLI;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xfb => {
-                        instruction.opcode = Opcode::STI;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xfc => {
-                        instruction.opcode = Opcode::CLD;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xfd => {
-                        instruction.opcode = Opcode::STD;
-                        return Ok(OperandCode::Nothing);
-                    }
-                    0xfe => {
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0xfe_Eb);
-                    },
-                    0xff => {
-                        // TODO: test 0xff /3
-                        instruction.opcode = Opcode::Invalid;
-                        return Ok(OperandCode::ModRM_0xff_Ev);
-                    },
+                    0xf4 => { break (Opcode::HLT, OperandCode::Nothing); },
+                    0xf6 => { break (Opcode::Invalid, OperandCode::ModRM_0xf6); },
+                    0xf7 => { break (Opcode::Invalid, OperandCode::ModRM_0xf7); },
+                    0xf8 => { break (Opcode::CLC, OperandCode::Nothing); },
+                    0xf9 => { break (Opcode::STC, OperandCode::Nothing); },
+                    0xfa => { break (Opcode::CLI, OperandCode::Nothing); },
+                    0xfb => { break (Opcode::STI, OperandCode::Nothing); },
+                    0xfc => { break (Opcode::CLD, OperandCode::Nothing); },
+                    0xfd => { break (Opcode::STD, OperandCode::Nothing); },
+                    0xfe => { break (Opcode::Invalid, OperandCode::ModRM_0xfe_Eb); },
+                    // TODO: test 0xff /3
+                    0xff => { break (Opcode::Invalid, OperandCode::ModRM_0xff_Ev); },
                     _ => {
                         return Err("unsupported opcode".to_owned());
                     }
@@ -1762,7 +1535,9 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                 return Err("no more bytes".to_owned());
             }
         }
-    }
+    };
+    instruction.opcode = opcode;
+    Ok(operand_code)
 }
 
 #[allow(non_snake_case)]
