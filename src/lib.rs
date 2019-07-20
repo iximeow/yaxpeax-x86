@@ -234,13 +234,21 @@ pub enum RegisterBank {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 #[repr(u8)]
 pub enum Segment {
-    CS, DS, ES, FS, GS, SS
+    DS = 0, CS, ES, FS, GS, SS
 }
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Opcode {
+    ADD = 0,
+    OR = 1,
+    ADC = 2,
+    SBB = 3,
+    AND = 4,
+    XOR = 6,
+    SUB = 5,
+    CMP = 7,
     XADD,
     BT,
     BTS,
@@ -299,19 +307,12 @@ pub enum Opcode {
     CALLF,
     JMP,
     JMPF,
-    SBB,
-    AND,
-    XOR,
-    OR,
     PUSH,
     POP,
     LEA,
     NOP,
     XCHG,
     POPF,
-    ADD,
-    ADC,
-    SUB,
     INT,
     INTO,
     IRET,
@@ -332,7 +333,6 @@ pub enum Opcode {
     SCAS,
     MOVS,
     TEST,
-    CMP,
     INS,
     OUTS,
     IMUL,
@@ -666,6 +666,12 @@ impl PrefixRex {
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug)]
 pub enum OperandCode {
+    Eb_Gb,
+    Ev_Gv,
+    Gb_Eb,
+    Gv_Ev,
+    AL_Ib,
+    AX_Ivd,
     ModRM_0x0f00,
     ModRM_0x0f01,
     ModRM_0x0fae,
@@ -687,11 +693,9 @@ pub enum OperandCode {
     DX_Xv,
     OR,
     AH,
-    AL_Ib,
     AL_Ob,
     AL_Xb,
     AX_AL,
-    AX_Ivd,
     AX_Ov,
     AX_Xv,
     DX_AX,
@@ -709,18 +713,14 @@ pub enum OperandCode {
     ModRM_0x83_Ev_Ibs,
     ModRM_0xc6_Eb_Ib,
     ModRM_0xc7_Ev_Iv,
-    Eb_Gb,
-    Ev_Gv,
     E_G_xmm,
     Ev_Ivs,
     Ev,
     Ew_Sw,
     Fw,
-    Gb_Eb,
     Gv_Eb,
     Gv_Ew,
     Gv_Ed,
-    Gv_Ev,
     G_E_xmm,
     Gv_M,
     I_3,
@@ -746,16 +746,19 @@ pub enum OperandCode {
     Implied
 }
 
-const BASE_OPCODE_MAP: [Opcode; 8] = [
-    Opcode::ADD,
-    Opcode::OR,
-    Opcode::ADC,
-    Opcode::SBB,
-    Opcode::AND,
-    Opcode::SUB,
-    Opcode::XOR,
-    Opcode::CMP
-];
+fn base_opcode_map(v: u8) -> Opcode {
+    match v {
+        0 => Opcode::ADD,
+        1 => Opcode::OR,
+        2 => Opcode::ADC,
+        3 => Opcode::SBB,
+        4 => Opcode::AND,
+        5 => Opcode::SUB,
+        6 => Opcode::XOR,
+        7 => Opcode::CMP,
+        _ => { unsafe { unreachable_unchecked() } }
+    }
+}
 
 const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::ROL,
@@ -1504,7 +1507,7 @@ fn read_operands<T: Iterator<Item=u8>>(
 
             read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)?;
             let num = read_num(bytes_iter, 1, length) as i8;
-            instruction.opcode = BASE_OPCODE_MAP[r as usize];
+            instruction.opcode = base_opcode_map(r);
             instruction.operands[1] = Operand::ImmediateI8(num);
         },
         OperandCode::ModRM_0x81_Ev_Ivs => {
@@ -1513,7 +1516,7 @@ fn read_operands<T: Iterator<Item=u8>>(
 
             read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)?;
             let imm = read_imm_signed(bytes_iter, if opwidth == 8 { 4 } else { opwidth }, opwidth, length)?;
-            instruction.opcode = BASE_OPCODE_MAP[r as usize];
+            instruction.opcode = base_opcode_map(r);
             instruction.operands[1] = imm;
         },
         OperandCode::ModRM_0xc0_Eb_Ib => {
@@ -1858,7 +1861,7 @@ fn read_operands<T: Iterator<Item=u8>>(
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
 
             read_E(bytes_iter, &instruction.prefixes, m, mod_bits, opwidth, &mut instruction.operands[0], length)?;
-            instruction.opcode = BASE_OPCODE_MAP[r as usize];
+            instruction.opcode = base_opcode_map(r);
             instruction.operands[1] = read_imm_signed(bytes_iter, 1, opwidth, length)?;
         },
         OperandCode::Zv(opcode_byte) => {
