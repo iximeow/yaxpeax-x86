@@ -763,41 +763,35 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAL,
     Opcode::SAR
 ];
-fn read_opcode_660f_map<T: Iterator<Item=u8>>(_bytes_iter: &mut T, _instruction: &mut Instruction, _prefixes: Prefixes, _length: &mut u8) -> Result<OperandCode, String> {
+fn read_opcode_660f_map<T: Iterator<Item=u8>>(_bytes_iter: &mut T, _instruction: &mut Instruction, _length: &mut u8) -> Result<OperandCode, String> {
     Err("660f opcode map unsupported".to_string())
 }
-fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, length: &mut u8) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
             *length += 1;
             match b {
                 0x10 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x11 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSD;
                     Ok(OperandCode::E_G_xmm)
                 },
                 0x12 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVDDUP;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x2a => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTSI2SD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x2c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTTSD2SI;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x2d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTSD2SI;
                     Ok(OperandCode::G_E_xmm)
                 },
@@ -809,62 +803,50 @@ fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &
                     Err("x86_64 CRC32 not currently supported".to_string())
                 }
                 0x51 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::SQRTSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x58 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::ADDSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x59 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MULSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5a => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTSD2SS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::SUBSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MINSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5e => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::DIVSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5f => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MAXSD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x7c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::HADDPS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x7d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::HSUBPS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0xD0 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::ADDSUBPS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0xf0 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::LDDQU;
                     Ok(OperandCode::G_E_xmm)
                 },
@@ -875,7 +857,6 @@ fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &
                 0xe6 CVTPD2DQ
                 */
                 _ => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::Invalid;
                     Err("Invalid opcode".to_string())
                 }
@@ -886,83 +867,68 @@ fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &
         }
     }
 }
-fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, length: &mut u8) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
             *length += 1;
             match b {
                 0x10 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x11 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSS;
                     Ok(OperandCode::E_G_xmm)
                 },
                 0x12 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSLDUP;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x2a => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTSI2SS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x2c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTTSS2SI;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x2d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTSS2SI;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x51 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::SQRTSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x58 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::ADDSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x59 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MULSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5a => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CVTSS2SD;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::SUBSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MINSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5e => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::DIVSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 0x5f => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MAXSS;
                     Ok(OperandCode::G_E_xmm)
                 },
                 _ => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::Invalid;
                     Err("Invalid opcode".to_string())
                 }
@@ -973,271 +939,218 @@ fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &
         }
     }
 }
-fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, prefixes: Prefixes, length: &mut u8) -> Result<OperandCode, String> {
+fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instruction, length: &mut u8) -> Result<OperandCode, String> {
     match bytes_iter.next() {
         Some(b) => {
             *length += 1;
             match b {
                 0x00 => {
-                    instruction.prefixes = prefixes;
                     Ok(OperandCode::ModRM_0x0f00)
                 }
                 0x01 => {
-                    instruction.prefixes = prefixes;
                     Ok(OperandCode::ModRM_0x0f01)
                 }
                 0x02 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::LAR;
                     Ok(OperandCode::Gv_M)
                 }
                 0x03 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::LSL;
                     Ok(OperandCode::Gv_M)
                 }
                 0x05 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::SYSCALL;
                     Ok(OperandCode::Nothing)
                 }
                 0x06 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CLTS;
                     Ok(OperandCode::Nothing)
                 }
                 0x07 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::SYSRET;
                     Ok(OperandCode::Nothing)
                 }
                 0x08 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::INVD;
                     Ok(OperandCode::Nothing)
                 }
                 0x09 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::WBINVD;
                     Ok(OperandCode::Nothing)
                 }
                 0x0b => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::UD2;
                     Ok(OperandCode::Nothing)
                 }
                 0x0d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::NOP;
                     Ok(OperandCode::Ev)
                 }
                 0x1f => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::NOP;
                     Ok(OperandCode::Ev)
                 },
                 0x20 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOV;
                     Ok(OperandCode::Rq_Cq_0)
                 },
                 0x21 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOV;
                     Ok(OperandCode::Rq_Dq_0)
                 },
                 0x22 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOV;
                     Ok(OperandCode::Cq_Rq_0)
                 },
                 0x23 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOV;
                     Ok(OperandCode::Dq_Rq_0)
                 },
                 0x30 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::WRMSR;
                     Ok(OperandCode::Nothing)
                 },
                 0x31 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::RDTSC;
                     Ok(OperandCode::Nothing)
                 },
                 0x32 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::RDMSR;
                     Ok(OperandCode::Nothing)
                 },
                 0x33 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::RDPMC;
                     Ok(OperandCode::Nothing)
                 },
                 0x40 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVO;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x41 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVNO;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x42 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVB;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x43 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVNB;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x44 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVZ;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x45 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVNZ;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x46 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVNA;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x47 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVA;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x48 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVS;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x49 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVNS;
                    Ok(OperandCode::Gv_Ev)
                 },
                 0x4a => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVP;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x4b => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVNP;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x4c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVL;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x4d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVGE;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x4e => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVLE;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x4f => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMOVG;
                     Ok(OperandCode::Gv_Ev)
                 },
                 0x80 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JO;
                     Ok(OperandCode::Jvds)
                 },
                 0x81 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JNO;
                     Ok(OperandCode::Jvds)
                 },
                 0x82 => {
-                    instruction.prefixes = prefixes;
                    instruction.opcode = Opcode::JB;
                     Ok(OperandCode::Jvds)
                 },
                 0x83 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JNB;
                     Ok(OperandCode::Jvds)
                 },
                 0x84 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JZ;
                     Ok(OperandCode::Jvds)
                 },
                 0x85 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JNZ;
                     Ok(OperandCode::Jvds)
                 },
                 0x86 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JNA;
                     Ok(OperandCode::Jvds)
                 },
                 0x87 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JA;
                     Ok(OperandCode::Jvds)
                 },
                 0x88 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JS;
                     Ok(OperandCode::Jvds)
                 },
                 0x89 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JNS;
                     Ok(OperandCode::Jvds)
                 },
                 0x8a => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JP;
                     Ok(OperandCode::Jvds)
                 },
                 0x8b => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JNP;
                     Ok(OperandCode::Jvds)
                 },
                 0x8c => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JL;
                     Ok(OperandCode::Jvds)
                 },
                 0x8d => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JGE;
                     Ok(OperandCode::Jvds)
                 },
                 0x8e => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JLE;
                     Ok(OperandCode::Jvds)
                 },
                 0x8f => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::JG;
                     Ok(OperandCode::Jvds)
                 },
                 x if x < 0xa0 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = [
                         Opcode::SETO,
                         Opcode::SETNO,
@@ -1259,100 +1172,80 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mu
                     Ok(OperandCode::Eb_R0)
                 }
                 0xa0 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::PUSH;
                     Ok(OperandCode::FS)
                 }
                 0xa1 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::POP;
                     Ok(OperandCode::GS)
                 }
                 0xa2 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CPUID;
                     Ok(OperandCode::Nothing)
                 }
                 0xa3 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::BT;
                     Ok(OperandCode::Gv_Ev)
                 }
                 0xa8 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::PUSH;
                     Ok(OperandCode::Nothing)
                 }
                 0xa9 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::PUSH;
                     Ok(OperandCode::GS)
                 }
                 0xae => {
-                    instruction.prefixes = prefixes;
                     Ok(OperandCode::ModRM_0x0fae)
                 }
                 0xaf => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::IMUL;
                     Ok(OperandCode::Gv_Ev)
                 }
                 0xb0 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMPXCHG;
                     Ok(OperandCode::Eb_Gb)
                 },
                 0xb1 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::CMPXCHG;
                     Ok(OperandCode::Ev_Gv)
                 }
                 0xb6 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVZX_b;
                     Ok(OperandCode::Gv_Eb)
                 },
                 0xb7 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVZX_w;
                     Ok(OperandCode::Gv_Ew)
                 }
                 0xba => {
-                    instruction.prefixes = prefixes;
                     Ok(OperandCode::ModRM_0x0fba)
                 }
                 0xbb => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::BTC;
                     Ok(OperandCode::Gv_Ev)
                 }
                 0xbc => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::BSF;
                     Ok(OperandCode::Gv_Ev)
                 }
                 0xbd => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::BSR;
                     Ok(OperandCode::Gv_Ev)
                 }
                 0xbe => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSX_b;
                     Ok(OperandCode::Gv_Eb)
                 }
                 0xbf => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::MOVSX_w;
                     Ok(OperandCode::Gv_Ew)
                 }
                 0xc0 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::XADD;
                     Ok(OperandCode::Eb_Gb)
                 }
                 0xc1 => {
-                    instruction.prefixes = prefixes;
                     instruction.opcode = Opcode::XADD;
                     Ok(OperandCode::Ev_Gv)
                 }
@@ -1371,7 +1264,7 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
     use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
-    let mut prefixes = Prefixes::new(0);
+    instruction.prefixes = Prefixes::new(0);
     loop {
         match bytes_iter.next() {
             Some(b) => {
@@ -1385,33 +1278,33 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                                 0x0f => {
                                     return match alternate_opcode_map {
                                         Some(OpcodeMap::Map66) => {
-                                            read_opcode_660f_map(bytes_iter, instruction, prefixes, length)
+                                            read_opcode_660f_map(bytes_iter, instruction, length)
                                         },
                                         Some(OpcodeMap::MapF2) => {
-                                            read_opcode_f20f_map(bytes_iter, instruction, prefixes, length)
+                                            read_opcode_f20f_map(bytes_iter, instruction, length)
                                         },
                                         Some(OpcodeMap::MapF3) => {
-                                            read_opcode_f30f_map(bytes_iter, instruction, prefixes, length)
+                                            read_opcode_f30f_map(bytes_iter, instruction, length)
                                         },
                                         None => {
-                                            read_opcode_0f_map(bytes_iter, instruction, prefixes, length)
+                                            read_opcode_0f_map(bytes_iter, instruction, length)
                                         }
                                     };
                                 },
                                 0x26 => {
-                                    prefixes.set_es();
+                                    instruction.prefixes.set_es();
                                     alternate_opcode_map = None;
                                 },
                                 0x2e => {
-                                    prefixes.set_cs();
+                                    instruction.prefixes.set_cs();
                                     alternate_opcode_map = None;
                                 },
                                 0x36 => {
-                                    prefixes.set_ss();
+                                    instruction.prefixes.set_ss();
                                     alternate_opcode_map = None;
                                 },
                                 0x3e => {
-                                    prefixes.set_ds();
+                                    instruction.prefixes.set_ds();
                                     alternate_opcode_map = None;
                                 },
                                 0x06
@@ -1425,7 +1318,6 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                                 | 0x2f
                                 | 0x37
                                 | 0x3f => {
-                                    instruction.prefixes = prefixes;
                                     instruction.opcode = Opcode::Invalid;
                                     return Ok(OperandCode::Nothing);
                                 },
@@ -1443,79 +1335,68 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             OperandCode::AX_Ivd
                         ][(x % 8) as usize].clone();
 
-                        instruction.prefixes = prefixes;
                         instruction.opcode = op;
                         return Ok(operand_code);
                     },
                     x if x < 0x50 => {
                         // x86_32 inc/dec
                         // x86_64 rex
-                        prefixes.rex_mut().from(x);
+                        instruction.prefixes.rex_mut().from(x);
                     },
                     x if x < 0x60 => {
                         let op = if x < 0x58 { Opcode::PUSH } else { Opcode::POP };
-                        instruction.prefixes = prefixes;
                         instruction.opcode = op;
                         return Ok(OperandCode::Zv(x));
                     },
                     0x63 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOVSXD;
                         return Ok(OperandCode::Gv_Ed);
                     },
                     0x64 => {
-                        prefixes.set_fs();
+                        instruction.prefixes.set_fs();
                         alternate_opcode_map = None;
                     },
                     0x65 => {
-                        prefixes.set_gs();
+                        instruction.prefixes.set_gs();
                         alternate_opcode_map = None;
                     },
                     0x66 => {
-                        prefixes.set_operand_size();
+                        instruction.prefixes.set_operand_size();
                         alternate_opcode_map = Some(OpcodeMap::Map66);
                     },
                     0x67 => {
-                        prefixes.set_address_size();
+                        instruction.prefixes.set_address_size();
                         alternate_opcode_map = None;
                     },
                     0x68 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::PUSH;
                         return Ok(OperandCode::Ivs);
                     },
                     0x69 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::IMUL;
                         return Ok(OperandCode::Gv_Ev_Iv);
                     },
                     0x6a => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::PUSH;
                         return Ok(OperandCode::Ibs);
                     },
                     0x6b => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::IMUL;
                         return Ok(OperandCode::Gb_Eb_Ib);
                     },
                     0x6c => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::INS;
                         return Ok(OperandCode::Yb_DX);
                     },
                     0x6d => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::INS;
                         return Ok(OperandCode::Yv_DX);
                     },
                     0x6e => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::OUTS;
                         return Ok(OperandCode::DX_Xb);
                     },
                     0x6f => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::OUTS;
                         return Ok(OperandCode::DX_Xv);
                     },
@@ -1538,7 +1419,6 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             Opcode::JLE,
                             Opcode::JG
                         ][(x & 0xf) as usize].clone();
-                        instruction.prefixes = prefixes;
                         instruction.opcode = op;
                         return Ok(OperandCode::Jbs);
                     }
@@ -1555,194 +1435,156 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             } else {
                                 OperandCode::ModRM_0x83_Ev_Ibs
                             };
-                            instruction.prefixes = prefixes;
                             instruction.opcode = op;
                             return Ok(operand);
                         }
                     },
                     0x84 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::TEST;
                         return Ok(OperandCode::Eb_Gb);
                     },
                     0x85 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::TEST;
                         return Ok(OperandCode::Ev_Gv);
                     },
                     0x86 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::XCHG;
                         return Ok(OperandCode::Gb_Eb);
                     },
                     0x87 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::XCHG;
                         return Ok(OperandCode::Gv_Ev);
                     },
                     0x88 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Eb_Gb);
                     }
                     0x89 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Ev_Gv);
                     }
                     0x8a => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Gb_Eb);
                     }
                     0x8b => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Gv_Ev);
                     }
                     0x8c => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Ew_Sw);
                     }
                     0x8d => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::LEA;
                         return Ok(OperandCode::Gv_M);
                     }
                     0x8e => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Sw_Ew);
                     },
                     0x8f => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0x8f_Ev);
                     },
                     0x90 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::NOP;
                         return Ok(OperandCode::Nothing);
                     },
                     x if x < 0x98 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::XCHG;
                         return Ok(OperandCode::Zv_AX(x));
                     },
                     0x98 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CBW;
                         return Ok(OperandCode::AX_AL);
                     },
                     0x99 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CBW;
                         return Ok(OperandCode::DX_AX);
                     },
                     0x9a => { return Err("invalid opcode".to_owned()); },
                     0x9b => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::WAIT;
                         return Ok(OperandCode::Nothing);
                     }
                     0x9c => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::PUSHF;
                         return Ok(OperandCode::Nothing);
                     },
                     0x9d => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::POPF;
                         return Ok(OperandCode::Nothing);
                     },
                     0x9e => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::SAHF;
                         return Ok(OperandCode::AH);
                     },
                     0x9f => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::LAHF;
                         return Ok(OperandCode::AH);
                     },
                     0xa0 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::AL_Ob);
                     },
                     0xa1 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::AX_Ov);
                     },
                     0xa2 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Ob_AL);
                     },
                     0xa3 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::Ov_AX);
                     },
                     0xa4 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOVS;
                         return Ok(OperandCode::Yb_Xb);
                     },
                     0xa5 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOVS;
                         return Ok(OperandCode::Yv_Xv);
                     },
                     0xa6 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CMPS;
                         return Ok(OperandCode::Yb_Xb);
                     },
                     0xa7 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CMPS;
                         return Ok(OperandCode::Yv_Xv);
                     },
                     0xa8 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::TEST;
                         return Ok(OperandCode::AL_Ib);
                     },
                     0xa9 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::TEST;
                         return Ok(OperandCode::AX_Ivd);
                     },
                     0xaa => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::STOS;
                         return Ok(OperandCode::Yb_AL);
                     },
                     0xab => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::STOS;
                         return Ok(OperandCode::Yv_AX);
                     },
                     0xac => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::LODS;
                         return Ok(OperandCode::AL_Xb);
                     },
                     0xad => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::LODS;
                         return Ok(OperandCode::AX_Xv);
                     },
                     0xae => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::SCAS;
                         return Ok(OperandCode::Yb_AL);
                     },
                     0xaf => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::SCAS;
                         return Ok(OperandCode::Yv_AX);
                     },
@@ -1752,27 +1594,22 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         } else {
                             OperandCode::Zv_Ivq(x)
                         };
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(operand);
                     },
                     0xc0 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xc0_Eb_Ib);
                     },
                     0xc1 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xc1_Ev_Ib);
                     },
                     0xc2 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::RETURN;
                         return Ok(OperandCode::Iw);
                     },
                     0xc3 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::RETURN;
                         return Ok(OperandCode::Nothing);
                     },
@@ -1780,52 +1617,42 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                         return Err("invalid opcode".to_owned());
                     },
                     0xc6 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::ModRM_0xc6_Eb_Ib);
                     },
                     0xc7 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::MOV;
                         return Ok(OperandCode::ModRM_0xc7_Ev_Iv);
                     },
                     0xc8 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::ENTER;
                         return Ok(OperandCode::Iw_Ib);
                     },
                     0xc9 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::LEAVE;
                         return Ok(OperandCode::Nothing);
                     },
                     0xca => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::RETF;
                         return Ok(OperandCode::Iw);
                     }
                     0xcb => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::RETF;
                         return Ok(OperandCode::Nothing);
                     }
                     0xcc => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::INT;
                         return Ok(OperandCode::I_3);
                     },
                     0xcd => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::INT;
                         return Ok(OperandCode::Ib);
                     },
                     0xce => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::INTO;
                         return Ok(OperandCode::Fw);
                     },
                     0xcf => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::IRET;
                         return Ok(OperandCode::Fw);
                     },
@@ -1836,7 +1663,6 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                             OperandCode::ModRM_0xd2_Eb_CL,
                             OperandCode::ModRM_0xd3_Ev_CL
                         ][(x & 0x3) as usize].clone();
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(operand);
                     },
@@ -1856,84 +1682,70 @@ fn read_opcode<T: Iterator<Item=u8>>(bytes_iter: &mut T, instruction: &mut Instr
                     }
                     // TODO: GAP
                     0xe8 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CALL;
                         return Ok(OperandCode::Jvds);
                     },
                     0xe9 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::JMP;
                         return Ok(OperandCode::Jvds);
                     },
                     0xeb => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::JMP;
                         return Ok(OperandCode::Jbs);
                     },
                     0xf0 => {
-                        prefixes.set_lock();
+                        instruction.prefixes.set_lock();
                     },
                     0xf2 => {
-                        prefixes.set_repnz();
+                        instruction.prefixes.set_repnz();
                         alternate_opcode_map = Some(OpcodeMap::MapF2);
                     },
                     0xf3 => {
-                        prefixes.set_rep();
+                        instruction.prefixes.set_rep();
                         alternate_opcode_map = Some(OpcodeMap::MapF3);
                     },
                     0xf4 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::HLT;
                         return Ok(OperandCode::Nothing);
                     },
                     0xf6 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xf6);
                     },
                     0xf7 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xf7);
                     },
                     0xf8 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CLC;
                         return Ok(OperandCode::Nothing);
                     }
                     0xf9 => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::STC;
                         return Ok(OperandCode::Nothing);
                     }
                     0xfa => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CLI;
                         return Ok(OperandCode::Nothing);
                     }
                     0xfb => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::STI;
                         return Ok(OperandCode::Nothing);
                     }
                     0xfc => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::CLD;
                         return Ok(OperandCode::Nothing);
                     }
                     0xfd => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::STD;
                         return Ok(OperandCode::Nothing);
                     }
                     0xfe => {
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xfe_Eb);
                     },
                     0xff => {
                         // TODO: test 0xff /3
-                        instruction.prefixes = prefixes;
                         instruction.opcode = Opcode::Invalid;
                         return Ok(OperandCode::ModRM_0xff_Ev);
                     },
