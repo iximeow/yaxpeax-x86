@@ -175,7 +175,7 @@ pub enum Operand {
     RegScaleDisp(RegSpec, u8, i32),
     RegIndexBaseScale(RegSpec, RegSpec, u8),
     RegIndexBaseScaleDisp(RegSpec, RegSpec, u8, i32),
-    Many(Vec<Operand>),
+    // Many(Vec<Operand>),
     Nothing
 }
 
@@ -203,7 +203,7 @@ impl Operand {
             Operand::ImmediateU64(_) |
             Operand::ImmediateI64(_) |
             Operand::Register(_) |
-            Operand::Many(_) |
+            //Operand::Many(_) |
             Operand::Nothing => {
                 false
             }
