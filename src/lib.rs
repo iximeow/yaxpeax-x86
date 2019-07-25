@@ -1971,7 +1971,8 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                 }
             },
             None => {
-                return None;
+                unsafe { unreachable_unchecked(); }
+//                return None;
             }
         }
     };
@@ -3076,7 +3077,9 @@ fn read_modrm<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Resu
     let modrm = match bytes_iter.next() {
         Some(b) => b,
         // TODO: ...
-        None => return Err("Out of bytes".to_string()),
+        None => {
+            return Err("Out of bytes".to_string());
+        }
     };
     *length += 1;
     Ok(modrm)
