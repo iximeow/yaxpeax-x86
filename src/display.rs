@@ -120,7 +120,7 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
             }
             &Operand::RegDisp(ref spec, ref disp) => {
                 let (sign, disp) = if *disp < 0 {
-                    (true, -*disp)
+                    (true, (-std::num::Wrapping(*disp)).0)
                 } else {
                     (false, *disp)
                 };
