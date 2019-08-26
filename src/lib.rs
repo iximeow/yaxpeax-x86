@@ -154,7 +154,7 @@ enum SizeCode {
     vqp
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Operand {
     ImmediateI8(i8),
     ImmediateU8(u8),
