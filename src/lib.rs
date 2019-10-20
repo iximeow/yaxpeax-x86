@@ -2440,10 +2440,10 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
         match bytes_iter.next() {
             Some(b) => {
                 instruction.length += 1;
-                let record: u16 = (unsafe { std::mem::transmute::<&'static [OpcodeRecord], &'static [u16]>(&OPCODES[..]) })[b as usize];
-                if let Interpretation::Instruction(opcode) = (unsafe { std::mem::transmute::<u16, OpcodeRecord>(record) }).0 {
+                let record = OPCODES[b as usize];
+                if let Interpretation::Instruction(opcode) = record.0 {
                     instruction.opcode = opcode;
-                    break unsafe { std::mem::transmute::<u16, OpcodeRecord>(record) };
+                    break record;
                 } else {
                     match b {
                         x if (x & 0xf0 == 0x40) => {
