@@ -2372,6 +2372,12 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         read_E(&mut bytes_iter, instruction, modrm, 0, opwidth)?;
         instruction.operands[1] =
             Operand::Register(RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
+    } else if operand_code == OperandCode::Jbs {
+        // TODO: arch width (8 in 64, 4 in 32, 2 in 16)
+        instruction.operands = [
+            read_imm_signed(&mut bytes_iter, 1, 8, &mut instruction.length)?,
+            Operand::Nothing
+        ];
     } else if operand_code == OperandCode::Gb_Eb {
         let opwidth = 1;
         let modrm = read_modrm(&mut bytes_iter, &mut instruction.length)?;
@@ -2386,12 +2392,6 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         read_E(&mut bytes_iter, instruction, modrm, 0, opwidth)?;
         instruction.operands[1] =
             Operand::Register(RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
-    } else if operand_code == OperandCode::Jbs {
-        // TODO: arch width (8 in 64, 4 in 32, 2 in 16)
-        instruction.operands = [
-            read_imm_signed(&mut bytes_iter, 1, 8, &mut instruction.length)?,
-            Operand::Nothing
-        ];
     } else {
     match operand_code {
         /*
