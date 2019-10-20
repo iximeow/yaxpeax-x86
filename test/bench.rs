@@ -95,7 +95,7 @@ fn do_decode_swathe() {
                 test::black_box(&result);
             },
             None => {
-                println!("done.");
+                // println!("done.");
                 break;
             }
         }
