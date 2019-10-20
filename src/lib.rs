@@ -2,8 +2,6 @@
 #[macro_use] extern crate serde_derive;
 #[cfg(feature="use-serde")]
 extern crate serde;
-#[cfg(feature="use-serde")]
-use serde::{Serialize, Deserialize};
 
 extern crate yaxpeax_arch;
 extern crate termion;
@@ -2186,7 +2184,6 @@ fn read_E_anybank<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruct
 
 #[inline]
 fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
-    use std::hint::unreachable_unchecked;
     match width {
         1 => return if rex { RegisterBank::rB } else { RegisterBank::B },
         2 => return RegisterBank::W,
@@ -2198,7 +2195,6 @@ fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
 
 pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction) -> Option<()> {
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
-    use std::hint::unreachable_unchecked;
 //    use std::intrinsics::unlikely;
     instruction.prefixes = Prefixes::new(0);
     let record: OpcodeRecord = loop {
@@ -3240,7 +3236,6 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         _ => {
             instruction.operands = [Operand::Nothing, Operand::Nothing];
             instruction.opcode = Opcode::Invalid;
-        //    use std::hint::unreachable_unchecked;
             return None; // Err(format!("unsupported operand code: {:.unwrap()}", operand_code));
         //    unsafe { unreachable_unchecked(); }
         }
