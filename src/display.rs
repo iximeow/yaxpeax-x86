@@ -176,6 +176,12 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
             },
             &Operand::Nothing => { Ok(()) },
             // &Operand::Many(_) => { panic!("many not covered"); }
+            &Operand::Many(ref ops) => {
+                for op in ops.iter() {
+                    write!(f, ", {}", op)?;
+                }
+                Ok(())
+            }
         }
     }
 }

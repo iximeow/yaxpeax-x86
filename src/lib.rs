@@ -173,7 +173,7 @@ pub enum Operand {
     RegScaleDisp(RegSpec, u8, i32),
     RegIndexBaseScale(RegSpec, RegSpec, u8),
     RegIndexBaseScaleDisp(RegSpec, RegSpec, u8, i32),
-    // Many(Vec<Operand>),
+    Many(Vec<Operand>),
     Nothing,
 }
 
@@ -201,8 +201,16 @@ impl Operand {
             Operand::ImmediateU64(_) |
             Operand::ImmediateI64(_) |
             Operand::Register(_) |
-            //Operand::Many(_) |
             Operand::Nothing => {
+                false
+            }
+            Operand::Many(els) => {
+                for el in els {
+                    if el.is_memory() {
+                        return true;
+                    }
+                }
+
                 false
             }
         }
@@ -683,7 +691,9 @@ pub enum OperandCode {
     Eb_Gb,
     Ev_Gv,
     Gb_Eb,
+    Gb_Eb_Ib,
     Gv_Ev,
+    Gv_Ev_Iv,
     AL_Ib,
     AX_Ivd,
     ModRM_0x0f00,
@@ -703,8 +713,6 @@ pub enum OperandCode {
     Eb_R0,
     ModRM_0xf6,
     ModRM_0xf7,
-    Gv_Ev_Iv,
-    Gb_Eb_Ib,
     Yb_DX,
     Yv_DX,
     DX_Xb,
@@ -2616,6 +2624,23 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.operands[0] =
                 Operand::Register(RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
         },
+        OperandCode::Gb_Eb_Ib => {
+            let opwidth = 1;
+            let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
+            let (mod_bits, r, m) = octets_of(modrm);
+
+            let mut ext = vec![Operand::Nothing; 2];
+
+            // TODO
+            panic!("oh no, a mul!");
+//            read_E(&mut bytes_iter, instruction, modrm, opwidth, &mut ext[0]).unwrap();
+            instruction.operands[0] =
+                Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
+            read_imm_signed(&mut bytes_iter, 1, 1, &mut instruction.length).map(|imm| {
+                ext[1] = imm;
+                instruction.operands[1] = Operand::Many(ext);
+            }).unwrap()
+        }
         OperandCode::Gv_Eb => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
             let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
@@ -2691,6 +2716,23 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.operands[0] =
                 Operand::Register(RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
         },
+        OperandCode::Gv_Ev_Iv => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
+            let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
+            let (mod_bits, r, m) = octets_of(modrm);
+
+            let mut ext = vec![Operand::Nothing; 2];
+
+            // TODO
+            panic!("oh no, a mul!");
+//            read_E(&mut bytes_iter, instruction, modrm, opwidth, &mut ext[0]).unwrap();
+            instruction.operands[0] =
+                Operand::Register(RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
+            read_imm_signed(&mut bytes_iter, if opwidth == 8 { 4 } else { opwidth }, opwidth, &mut instruction.length).map(|imm| {
+                ext[1] = imm;
+                instruction.operands[1] = Operand::Many(ext);
+            }).unwrap()
+        }
         OperandCode::E_G_xmm => {
             let opwidth = 8;
             let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
