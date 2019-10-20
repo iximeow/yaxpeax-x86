@@ -230,7 +230,7 @@ impl Operand {
                 false
             }
             Operand::Many(els) => {
-                for el in els {
+                for el in els.iter() {
                     if el.is_memory() {
                         return true;
                     }
@@ -240,6 +240,12 @@ impl Operand {
             }
         }
     }
+}
+
+#[test]
+fn operand_size() {
+    assert_eq!(std::mem::size_of::<RegSpec>(), 2);
+    assert_eq!(std::mem::size_of::<Operand>(), 3);
 }
 
 #[allow(non_camel_case_types)]
@@ -712,7 +718,7 @@ impl PrefixRex {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OperandCode {
     Eb_Gb,
     Ev_Gv,
