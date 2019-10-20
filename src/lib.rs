@@ -55,7 +55,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn RIP() -> RegSpec {
+    pub fn rip() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::RIP
@@ -63,7 +63,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn EIP() -> RegSpec {
+    pub fn eip() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::EIP
@@ -128,6 +128,26 @@ impl RegSpec {
     }
 
     #[inline]
+    pub fn rsi() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 6 }
+    }
+
+    #[inline]
+    pub fn rdi() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 7 }
+    }
+
+    #[inline]
+    pub fn r8() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 8 }
+    }
+
+    #[inline]
+    pub fn r9() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 9 }
+    }
+
+    #[inline]
     pub fn eax() -> RegSpec {
         RegSpec { bank: RegisterBank::D, num: 0 }
     }
@@ -140,6 +160,11 @@ impl RegSpec {
     #[inline]
     pub fn al() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 0 }
+    }
+
+    #[inline]
+    pub fn cl() -> RegSpec {
+        RegSpec { bank: RegisterBank::B, num: 1 }
     }
 }
 
@@ -217,6 +242,7 @@ impl Operand {
     }
 }
 
+#[allow(non_camel_case_types)]
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum RegisterBank {
@@ -2070,7 +2096,7 @@ fn read_E_anybank<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruct
     } else if (modrm & 7) == 5 && modbits == 0b00 {
         let disp = read_num(bytes_iter, 4, &mut instr.length);
         instr.operands[result] = Operand::RegDisp(
-            if addr_width == 8 { RegSpec::RIP() } else { RegSpec::EIP() },
+            if addr_width == 8 { RegSpec::rip() } else { RegSpec::eip() },
             disp as i32
         );
     } else if (modrm & 7) == 4 {
