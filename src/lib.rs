@@ -2315,8 +2315,8 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                 }
             },
             None => {
-                unsafe { unreachable_unchecked(); }
-//                return None;
+//                unsafe { unreachable_unchecked(); }
+                return None;
             }
         }
     };
