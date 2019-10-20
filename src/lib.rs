@@ -90,7 +90,7 @@ impl RegSpec {
     pub fn rbp() -> RegSpec {
         RegSpec {
             num: 5,
-            bank: RegisterBank::RFlags
+            bank: RegisterBank::Q
         }
     }
 
@@ -98,7 +98,7 @@ impl RegSpec {
     pub fn rsp() -> RegSpec {
         RegSpec {
             num: 4,
-            bank: RegisterBank::RFlags
+            bank: RegisterBank::Q
         }
     }
 
