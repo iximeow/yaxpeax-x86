@@ -6,7 +6,7 @@ use std::fmt;
 use yaxpeax_arch::{Colorize, ColorSettings, ShowContextual, YaxColors};
 use yaxpeax_arch::display::*;
 
-use ::{RegSpec, RegisterBank, Opcode, Operand, Instruction, Segment, PrefixRex};
+use ::{RegSpec, RegisterBank, Opcode, Operand, Instruction, Segment, PrefixRex, OperandSpec};
 
 impl fmt::Display for PrefixRex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -690,17 +690,18 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
             Some(s) => { write!(out, " {}", s)?; },
             None => {
                 match self.operands[0] {
-                    Operand::Nothing => {
+                    OperandSpec::Nothing => {
                         return Ok(());
                     },
-                    ref x @ _ => {
+                    _ => {
                         write!(out, " ")?;
                         if let Some(prefix) = self.segment_override_for_op(0) {
                             write!(out, "{}:", prefix)?;
                         }
-                        x.colorize(colors, out)?;
                     }
                 }
+                let x = Operand::from_spec(self, self.operands[0]);
+                x.colorize(colors, out)?;
             }
         };
         match self.opcode {
@@ -710,24 +711,21 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                     Some(s) => { write!(out, ", {}", s) }
                     None => {
                         match &self.operands[1] {
-                            &Operand::Nothing => {
-                                return Ok(());
+                            &OperandSpec::Nothing => {
+                                unreachable!();
                             },
-                            x @ &Operand::Register(_) => {
+                            &OperandSpec::RegMMM => {
                                 write!(out, ", ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
-                                }
-                                x.colorize(colors, out)
                             }
                             x @ _ => {
                                 write!(out, ", byte ")?;
                                 if let Some(prefix) = self.segment_override_for_op(1) {
                                     write!(out, "{}:", prefix)?;
                                 }
-                                x.colorize(colors, out)
                             }
                         }
+                        let x = Operand::from_spec(self, self.operands[1]);
+                        x.colorize(colors, out)
                     }
                 }
             },
@@ -737,24 +735,21 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                     Some(s) => { write!(out, ", {}", s) }
                     None => {
                         match &self.operands[1] {
-                            &Operand::Nothing => {
-                                return Ok(());
+                            &OperandSpec::Nothing => {
+                                unreachable!();
                             },
-                            x @ &Operand::Register(_) => {
+                            &OperandSpec::RegMMM => {
                                 write!(out, ", ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
-                                }
-                                x.colorize(colors, out)
                             }
-                            x @ _ => {
+                            _ => {
                                 write!(out, ", word ")?;
                                 if let Some(prefix) = self.segment_override_for_op(1) {
                                     write!(out, "{}:", prefix)?;
                                 }
-                                x.colorize(colors, out)
                             }
                         }
+                        let x = Operand::from_spec(self, self.operands[1]);
+                        x.colorize(colors, out)
                     }
                 }
             },
@@ -763,14 +758,15 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                     Some(s) => { write!(out, ", {}", s) }
                     None => {
                         match &self.operands[1] {
-                            &Operand::Nothing => {
+                            &OperandSpec::Nothing => {
                                 return Ok(());
                             },
-                            x @ _ => {
+                            _ => {
                                 write!(out, ", ")?;
                                 if let Some(prefix) = self.segment_override_for_op(1) {
                                     write!(out, "{}:", prefix)?;
                                 }
+                                let x = Operand::from_spec(self, self.operands[1]);
                                 x.colorize(colors, out)
                             }
                         }
