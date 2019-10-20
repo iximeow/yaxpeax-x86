@@ -183,6 +183,24 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            &Opcode::POPCNT => write!(f, "{}", "popcnt"),
+            &Opcode::MOVDQU => write!(f, "{}", "movdqu"),
+            &Opcode::MOVQ => write!(f, "{}", "movq"),
+            &Opcode::CMPSS => write!(f, "{}", "cmpss"),
+            &Opcode::CMPSD => write!(f, "{}", "cmpsd"),
+            &Opcode::UNPCKLPS => write!(f, "{}", "unpcklps"),
+            &Opcode::UNPCKHPS => write!(f, "{}", "unpckhps"),
+            &Opcode::MOVUPS => write!(f, "{}", "movups"),
+            &Opcode::MOVQ2DQ => write!(f, "{}", "movq2dq"),
+            &Opcode::MOVDQ2Q => write!(f, "{}", "movdq2q"),
+            &Opcode::RSQRTSS => write!(f, "{}", "rsqrtss"),
+            &Opcode::MOVSHDUP => write!(f, "{}", "movshdup"),
+            &Opcode::CVTTPS2DQ => write!(f, "{}", "cvttps2dq"),
+            &Opcode::CVTPD2DQ => write!(f, "{}", "cvtpd2dq"),
+            &Opcode::RCPSS => write!(f, "{}", "rcpss"),
+            &Opcode::CVTDQ2PD => write!(f, "{}", "cvtdq2pd"),
+            &Opcode::PSHUFHW => write!(f, "{}", "pshufhw"),
+            &Opcode::PSHUFLW => write!(f, "{}", "pshuflw"),
             &Opcode::XADD => write!(f, "{}", "xadd"),
             &Opcode::BT => write!(f, "{}", "bt"),
             &Opcode::BTS => write!(f, "{}", "bts"),
@@ -329,6 +347,7 @@ impl fmt::Display for Opcode {
             &Opcode::SAR => write!(f, "{}", "sar"),
             &Opcode::SAL => write!(f, "{}", "sal"),
             &Opcode::SHR => write!(f, "{}", "shr"),
+            &Opcode::SHRD => write!(f, "{}", "shrd"),
             &Opcode::SHL => write!(f, "{}", "shl"),
             &Opcode::RCR => write!(f, "{}", "rcr"),
             &Opcode::RCL => write!(f, "{}", "rcl"),
@@ -386,6 +405,8 @@ impl fmt::Display for Opcode {
 impl <T: std::fmt::Write> Colorize<T> for Opcode {
     fn colorize(&self, colors: Option<&ColorSettings>, out: &mut T) -> std::fmt::Result {
         match self {
+            Opcode::RCPSS |
+            Opcode::RSQRTSS |
             Opcode::SQRTSD |
             Opcode::ADDSD |
             Opcode::SUBSD |
@@ -408,6 +429,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::SAR |
             Opcode::SAL |
             Opcode::SHR |
+            Opcode::SHRD |
             Opcode::SHL |
             Opcode::RCR |
             Opcode::RCL |
@@ -423,6 +445,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::ADD |
             Opcode::ADC |
             Opcode::SUB |
+            Opcode::POPCNT |
             Opcode::BT |
             Opcode::BTS |
             Opcode::BTR |
@@ -470,6 +493,9 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             /* Data transfer */
             Opcode::MOVSS |
             Opcode::MOVSD |
+            Opcode::CVTDQ2PD |
+            Opcode::CVTPD2DQ |
+            Opcode::CVTTPS2DQ |
             Opcode::CVTSI2SS |
             Opcode::CVTSI2SD |
             Opcode::CVTTSD2SI |
@@ -478,6 +504,10 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CVTTSS2SI |
             Opcode::CVTSS2SI |
             Opcode::CVTSS2SD |
+            Opcode::PSHUFHW |
+            Opcode::PSHUFLW |
+            Opcode::UNPCKHPS |
+            Opcode::UNPCKLPS |
             Opcode::LDDQU |
             Opcode::CLC |
             Opcode::CLI |
@@ -487,6 +517,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::STD |
             Opcode::MOVDDUP |
             Opcode::MOVSLDUP |
+            Opcode::MOVDQ2Q |
+            Opcode::MOVDQU |
+            Opcode::MOVQ |
+            Opcode::MOVQ2DQ |
+            Opcode::MOVSHDUP |
+            Opcode::MOVUPS |
             Opcode::MOV |
             Opcode::CBW |
             Opcode::CDW |
@@ -544,6 +580,8 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
+            Opcode::CMPSD |
+            Opcode::CMPSS |
             Opcode::CMP |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
