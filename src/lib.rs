@@ -772,7 +772,7 @@ pub enum OperandCode {
     Fw,
     Gv_Eb,
     Gv_Ew,
-    Gv_Ed,
+    Gdq_Ed,
     G_E_xmm,
     G_E_xmm_Ib,
     Gv_M,
@@ -1266,7 +1266,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQU), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQU), OperandCode::G_E_xmm),
 // 0x70
     OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFHW), OperandCode::G_E_xmm_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -1885,7 +1885,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVSXD), OperandCode::Gv_Ed),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVSXD), OperandCode::Gdq_Ed),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
@@ -2519,6 +2519,16 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
             instruction.operands[1] = Operand::ImmediateI8(1);
         },
+        OperandCode::ModRM_0xd3_Ev_CL => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, &instruction.prefixes);
+            let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
+            let (mod_bits, r, m) = octets_of(modrm);
+
+            read_E(&mut bytes_iter, instruction, modrm, opwidth, 0).unwrap();
+            let opcode = BITWISE_OPCODE_MAP[r as usize].clone();
+            instruction.opcode = opcode;
+            instruction.operands[1] = Operand::Register(RegSpec::cl());
+        }
         OperandCode::ModRM_0xf6 => {
             let opwidth = 1;
             let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
@@ -2723,13 +2733,12 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 read_E(&mut bytes_iter, instruction, modrm, opwidth, 1).unwrap();
             }
         },
-        // TODO: verify M
-        OperandCode::Gv_Ed => {
-            let opwidth = 4;
+        OperandCode::Gdq_Ed => {
+            let opwidth = 8;
             let modrm = read_modrm(&mut bytes_iter, &mut instruction.length).unwrap();
 
 //                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
-            read_E(&mut bytes_iter, instruction, modrm, opwidth, 1).unwrap();
+            read_E(&mut bytes_iter, instruction, modrm, 4 /* opwidth */, 1).unwrap();
             instruction.operands[0] =
                 Operand::Register(RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present()));
         },

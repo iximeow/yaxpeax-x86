@@ -6,7 +6,22 @@ use std::fmt;
 use yaxpeax_arch::{Colorize, ColorSettings, ShowContextual, YaxColors};
 use yaxpeax_arch::display::*;
 
-use ::{RegSpec, RegisterBank, Opcode, Operand, Instruction, Segment};
+use ::{RegSpec, RegisterBank, Opcode, Operand, Instruction, Segment, PrefixRex};
+
+impl fmt::Display for PrefixRex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.present() {
+            write!(f, "rex:{}{}{}{}",
+                if self.w() { "w" } else { "-" },
+                if self.r() { "r" } else { "-" },
+                if self.x() { "x" } else { "-" },
+                if self.b() { "b" } else { "-" },
+            )
+        } else {
+            write!(f, "rex:none")
+        }
+    }
+}
 
 impl fmt::Display for Segment {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
