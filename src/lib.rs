@@ -2536,11 +2536,11 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         mem_oper = read_E(&mut bytes_iter, instruction, modrm, opwidth)?;
     }
 
-    if operand_code == OperandCode::Gv_Ev {
+    if operand_code == OperandCode::Gv_Ev || operand_code == OperandCode::Gb_Eb {
         instruction.operands[1] = mem_oper;
         instruction.operands[0] = OperandSpec::RegRRR;
         instruction.operand_count = 2;
-    } else if operand_code == OperandCode::Ev_Gv {
+    } else if operand_code == OperandCode::Ev_Gv || operand_code == OperandCode::Eb_Gb {
         instruction.operands[0] = mem_oper;
         instruction.operands[1] = OperandSpec::RegRRR;
         instruction.operand_count = 2;
@@ -2550,14 +2550,6 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             read_imm_signed(&mut bytes_iter, 1)? as u64;
         instruction.operands[0] = OperandSpec::ImmI8;
         instruction.operand_count = 1;
-    } else if operand_code == OperandCode::Gb_Eb {
-        instruction.operands[1] = mem_oper;
-        instruction.operands[0] = OperandSpec::RegRRR;
-        instruction.operand_count = 2;
-    } else if operand_code == OperandCode::Eb_Gb {
-        instruction.operands[0] = mem_oper;
-        instruction.operands[1] = OperandSpec::RegRRR;
-        instruction.operand_count = 2;
     } else {
     match operand_code {
         /*
