@@ -2536,13 +2536,15 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         mem_oper = read_E(&mut bytes_iter, instruction, modrm, opwidth)?;
     }
 
-    if operand_code == OperandCode::Gv_Ev || operand_code == OperandCode::Gb_Eb {
-        instruction.operands[1] = mem_oper;
-        instruction.operands[0] = OperandSpec::RegRRR;
-        instruction.operand_count = 2;
-    } else if operand_code == OperandCode::Ev_Gv || operand_code == OperandCode::Eb_Gb {
-        instruction.operands[0] = mem_oper;
-        instruction.operands[1] = OperandSpec::RegRRR;
+    let numeric_code = operand_code as u8;
+    if numeric_code >= 0x80 && numeric_code < 0x84 {
+        let (mmm, rrr) = if numeric_code & 0x02 == 2 {
+            (1, 0)
+        } else {
+            (0, 1)
+        };
+        instruction.operands[mmm] = mem_oper;
+        instruction.operands[rrr] = OperandSpec::RegRRR;
         instruction.operand_count = 2;
     } else if operand_code == OperandCode::Jbs {
         // TODO: arch width (8 in 64, 4 in 32, 2 in 16)
