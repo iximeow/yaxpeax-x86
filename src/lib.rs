@@ -2378,35 +2378,31 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
         match bytes_iter.next() {
             Some(b) => {
                 let record = OPCODES[b as usize];
-                if let Interpretation::Instruction(_) = record.0 {
+                if (b & 0xf0) == 0x40 {
+                    prefixes.rex_mut().from(b);
+                } else if b == 0x0f {
+                    if let Some(record) = match alternate_opcode_map {
+                        Some(OpcodeMap::Map66) => {
+                            read_opcode_660f_map(&mut bytes_iter, &mut length)
+                        },
+                        Some(OpcodeMap::MapF2) => {
+                            read_opcode_f20f_map(&mut bytes_iter, &mut length)
+                        },
+                        Some(OpcodeMap::MapF3) => {
+                            read_opcode_f30f_map(&mut bytes_iter, &mut length)
+                        },
+                        None => {
+                            read_opcode_0f_map(&mut bytes_iter, &mut length)
+                        }
+                    } {
+                        break record;
+                    } else {
+                        return Err(());
+                    }
+                } else if let Interpretation::Instruction(_) = record.0 {
                     break record;
                 } else {
                     match b {
-                        x if (x & 0xf0 == 0x40) => {
-                            // x86_32 inc/dec
-                            // x86_64 rex
-                            prefixes.rex_mut().from(x);
-                        },
-                        0x0f => {
-                            if let Some(record) = match alternate_opcode_map {
-                                Some(OpcodeMap::Map66) => {
-                                    read_opcode_660f_map(&mut bytes_iter, &mut length)
-                                },
-                                Some(OpcodeMap::MapF2) => {
-                                    read_opcode_f20f_map(&mut bytes_iter, &mut length)
-                                },
-                                Some(OpcodeMap::MapF3) => {
-                                    read_opcode_f30f_map(&mut bytes_iter, &mut length)
-                                },
-                                None => {
-                                    read_opcode_0f_map(&mut bytes_iter, &mut length)
-                                }
-                            } {
-                                break record;
-                            } else {
-                                return Err(());
-                            }
-                        },
                         0x26 => {
                             prefixes.set_es();
                             alternate_opcode_map = None;
