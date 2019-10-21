@@ -2226,7 +2226,7 @@ fn read_modrm_reg<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruct
 #[allow(non_snake_case)]
 fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, ()> {
     let modbits = (modrm >> 6);
-    let addr_width = if instr.prefixes.address_size() { 4 } else { 8 };
+    let addr_width = if instr.prefixes.address_size() { RegisterBank::D } else { RegisterBank::Q };
     let sibbyte = match bytes_iter.next() {
         Some(b) => b,
         None => { unsafe { unreachable_unchecked(); } }
@@ -2247,9 +2247,9 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
             if modbits == 0b00 && !instr.prefixes.rex().x() {
                 instr.disp = disp as u32 as u64;
 
-                OperandSpec::RegDisp
+                OperandSpec::DispU32
             } else {
-                let reg = RegSpec::gp_from_parts(0b100, instr.prefixes.rex().x(), addr_width, instr.prefixes.rex().present());
+                let reg = RegSpec::from_parts(0b100, instr.prefixes.rex().x(), addr_width);
                 instr.modrm_mmm = reg;
 
                 if disp == 0 {
@@ -2260,42 +2260,29 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
                 }
             }
         } else {
-            instr.modrm_mmm = RegSpec::gp_from_parts(5, instr.prefixes.rex().b(), addr_width, instr.prefixes.rex().present());
+            instr.modrm_mmm = RegSpec::from_parts(5, instr.prefixes.rex().b(), addr_width);
 
-            instr.sib_index = RegSpec::gp_from_parts((sibbyte >> 3) & 7, instr.prefixes.rex().x(), addr_width, instr.prefixes.rex().present());
-            instr.disp = disp as i64 as u64;
+            instr.sib_index = RegSpec::from_parts((sibbyte >> 3) & 7, instr.prefixes.rex().x(), addr_width);
             let scale = 1u8 << (sibbyte >> 6);
             instr.scale = scale;
 
-            match (scale, modbits, disp) {
-                (0, 0b00, 0) => {
-                    OperandSpec::Deref
-                },
-                (0, 0b00, _) => {
-                    OperandSpec::RegDisp
-                },
-                (0, _, 0) => {
-                    OperandSpec::RegIndexBase
-                },
-                (0, _, _) => {
-                    OperandSpec::RegIndexBaseDisp
-                },
-                (_, 0b00, 0) => {
-                    OperandSpec::RegScale
-                },
-                (_, 0b00, _) => {
+            if disp == 0 {
+                if modbits == 0 {
                     OperandSpec::RegScaleDisp
-                },
-                (_, _, 0) => {
-                    OperandSpec::RegIndexBaseScale
-                },
-                (_, _, _) => {
+                } else {
                     OperandSpec::RegIndexBaseScaleDisp
+                }
+            } else {
+                instr.disp = disp as i64 as u64;
+                if modbits == 0 {
+                    OperandSpec::RegScale
+                } else {
+                    OperandSpec::RegIndexBaseScale
                 }
             }
         }
     } else {
-        instr.modrm_mmm = RegSpec::gp_from_parts((sibbyte & 7), instr.prefixes.rex().b(), addr_width, instr.prefixes.rex().present());
+        instr.modrm_mmm = RegSpec::from_parts((sibbyte & 7), instr.prefixes.rex().b(), addr_width);
 
         let disp = if modbits == 0b00 {
             0
@@ -2304,30 +2291,23 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
         } else {
             read_num(bytes_iter, 4, &mut instr.length)? as i32
         };
-        instr.disp = disp as i64 as u64;
 
         if ((sibbyte >> 3) & 7) == 0b100 {
             if disp == 0 {
                 OperandSpec::Deref
             } else {
+                instr.disp = disp as i64 as u64;
                 OperandSpec::RegDisp
             }
         } else {
-            instr.sib_index = RegSpec::gp_from_parts((sibbyte >> 3) & 7, instr.prefixes.rex().x(), addr_width, instr.prefixes.rex().present());
+            instr.sib_index = RegSpec::from_parts((sibbyte >> 3) & 7, instr.prefixes.rex().x(), addr_width);
             let scale = 1u8 << (sibbyte >> 6);
             instr.scale = scale;
             if disp == 0 {
-                if scale == 0 {
-                    OperandSpec::RegIndexBase
-                } else {
-                    OperandSpec::RegIndexBaseScale
-                }
+                OperandSpec::RegIndexBaseScale
             } else {
-                if scale == 0 {
-                    OperandSpec::RegIndexBaseDisp
-                } else {
-                    OperandSpec::RegIndexBaseScaleDisp
-                }
+                instr.disp = disp as i64 as u64;
+                OperandSpec::RegIndexBaseScaleDisp
             }
         }
     };
@@ -2337,11 +2317,9 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
 #[allow(non_snake_case)]
 fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, ()> {
     let modbits = (modrm >> 6);
-    let addr_width = if instr.prefixes.address_size() { 4 } else { 8 };
+    let addr_width = if instr.prefixes.address_size() { RegisterBank::D } else { RegisterBank::Q };
     let mmm = modrm & 7;
-    let op_spec = if modbits == 0b11 {
-        unsafe { unreachable_unchecked() }
-    } else if mmm == 4 {
+    let op_spec = if mmm == 4 {
         return read_sib(bytes_iter, instr, modrm);
 //         let (ss, index, base) = octets_of(sibbyte);
 
@@ -2349,11 +2327,15 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
     } else if mmm == 5 && modbits == 0b00 {
         let disp = read_num(bytes_iter, 4, &mut instr.length)? as i32;
         instr.modrm_mmm =
-            if addr_width == 8 { RegSpec::rip() } else { RegSpec::eip() };
-        instr.disp = disp as i64 as u64;
-        OperandSpec::RegDisp
+            if addr_width == RegisterBank::Q { RegSpec::rip() } else { RegSpec::eip() };
+        if disp == 0 {
+            OperandSpec::Deref
+        } else {
+            instr.disp = disp as i64 as u64;
+            OperandSpec::RegDisp
+        }
     } else {
-        instr.modrm_mmm = RegSpec::gp_from_parts(mmm, instr.prefixes.rex().b(), addr_width, instr.prefixes.rex().present());
+        instr.modrm_mmm = RegSpec::from_parts(mmm, instr.prefixes.rex().b(), addr_width);
 
         if modbits == 0b00 {
             OperandSpec::Deref
@@ -2363,8 +2345,12 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
             } else {
                 read_num(bytes_iter, 4, &mut instr.length)? as i32
             };
-            instr.disp = disp as i64 as u64;
-            OperandSpec::RegDisp
+            if disp == 0 {
+                OperandSpec::Deref
+            } else {
+                instr.disp = disp as i64 as u64;
+                OperandSpec::RegDisp
+            }
         }
     };
     Ok(op_spec)
