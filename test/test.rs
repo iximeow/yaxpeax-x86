@@ -3,8 +3,8 @@ extern crate yaxpeax_x86;
 
 use std::fmt::Write;
 
-use yaxpeax_arch::Decodable;
-use yaxpeax_x86::{Instruction, decode_one};
+use yaxpeax_arch::Decoder;
+use yaxpeax_x86::{Instruction, InstDecoder, decode_one};
 
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
@@ -19,7 +19,7 @@ fn test_display(data: &[u8], expected: &'static str) {
     for b in data {
         write!(hex, "{:02x}", b).unwrap();
     }
-    match Instruction::decode(data.into_iter().map(|x| *x)) {
+    match InstDecoder::default().decode(data.into_iter().map(|x| *x)) {
         Some(instr) => {
             let text = format!("{}", instr);
             assert!(
@@ -38,7 +38,37 @@ fn test_display(data: &[u8], expected: &'static str) {
 }
 
 #[test]
+fn test_mmx() {
+    test_display(&[0x4f, 0x0f, 0x7e, 0xcf], "movd r15, mm1");
+    test_display(&[0x4f, 0x0f, 0x7f, 0xcf], "movq mm7, mm1");
+    test_display(&[0x0f, 0xc4, 0xc0, 0x14], "pinsrw mm0, eax, 0x14");
+    test_display(&[0x4f, 0x0f, 0xc4, 0xc0, 0x14], "pinsrw mm0, r8d, 0x14");
+    test_display(&[0x4f, 0x0f, 0xc4, 0x00, 0x14], "pinsrw mm0, word [r8], 0x14");
+    test_display(&[0x4f, 0x0f, 0xd1, 0xcf], "psrlw mm1, mm7");
+    test_display(&[0x4f, 0x0f, 0xd1, 0x00], "psrlw mm0, qword [r8]");
+    test_display(&[0x4f, 0x0f, 0xd7, 0x00], "invalid");
+    test_display(&[0x4f, 0x0f, 0xd7, 0xcf], "pmovmskb r9d, mm7");
+}
+
+#[test]
+fn test_cvt() {
+    test_display(&[0x0f, 0x2c, 0xcf], "cvttps2pi mm1, xmm7");
+    test_display(&[0x48, 0x0f, 0x2c, 0xcf], "cvttps2pi mm1, xmm7");
+    test_display(&[0x4f, 0x0f, 0x2c, 0xcf], "cvttps2pi mm1, xmm15");
+    test_display(&[0x4f, 0x0f, 0x2a, 0xcf], "cvtpi2ps xmm9, mm7");
+    test_display(&[0x4f, 0x66, 0x0f, 0x2a, 0xcf], "cvtpi2pd xmm1, mm7");
+    test_display(&[0x4f, 0xf3, 0x0f, 0x2a, 0xcf], "cvtsi2ss xmm1, edi");
+    test_display(&[0x4f, 0xf2, 0x0f, 0x2a, 0xcf], "cvtsi2sd xmm1, edi");
+    test_display(&[0x4f, 0xf2, 0x0f, 0x2a, 0x00], "cvtsi2sd xmm0, dword [rax]");
+    test_display(&[0x4f, 0xf3, 0x0f, 0x2a, 0x00], "cvtsi2ss xmm0, dword [rax]");
+    test_display(&[0x4f, 0x66, 0x0f, 0x2a, 0x00], "cvtpi2pd xmm0, qword [rax]");
+}
+
+#[test]
 fn test_system() {
+    test_display(&[0x66, 0x4f, 0x0f, 0xb2, 0x00], "lss r8, [r8]");
+    test_display(&[0x67, 0x4f, 0x0f, 0xb2, 0x00], "lss r8, [r8d]");
+    test_display(&[0x4f, 0x0f, 0xb2, 0x00], "lss r8, [r8]");
     test_display(&[0x45, 0x0f, 0x22, 0xc8], "mov cr9, r8");
     test_display(&[0x45, 0x0f, 0x20, 0xc8], "mov r8, cr9");
     test_display(&[0x40, 0x0f, 0x22, 0xc8], "mov cr1, rax");
@@ -69,9 +99,30 @@ fn test_E_decode() {
 
 #[test]
 fn test_sse() {
+    test_display(&[0x4f, 0x0f, 0x28, 0x00], "movaps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x29, 0x00], "movaps xmmword [r8], xmm8");
+    test_display(&[0x4f, 0x0f, 0x2b, 0x00], "movntps xmmword [r8], xmm8");
+    test_display(&[0x4f, 0x0f, 0x2e, 0x00], "ucomiss xmm8, dword [r8]");
+    test_display(&[0x4f, 0x0f, 0x2f, 0x00], "comiss xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x50, 0xc0], "movmskps r8d, xmm8");
     test_display(&[0x0f, 0x28, 0xd0], "movaps xmm2, xmm0");
     test_display(&[0x66, 0x0f, 0x28, 0xd0], "movapd xmm2, xmm0");
     test_display(&[0x66, 0x0f, 0x28, 0x00], "movapd xmm0, [rax]");
+    test_display(&[0x4f, 0x0f, 0x50, 0x00], "invalid");
+    test_display(&[0x4f, 0x0f, 0x50, 0xc0], "movmskps r8d, xmm8");
+    test_display(&[0x4f, 0x0f, 0x51, 0x00], "sqrtps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x52, 0x00], "rsqrtps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x53, 0x00], "rcpps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x54, 0x00], "andps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x55, 0x00], "andnps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x56, 0x00], "orps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x57, 0x00], "xorps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x58, 0x00], "addps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x59, 0x00], "mulps xmm8, xmmword [r8]");
+    test_display(&[0x4f, 0x0f, 0x5a, 0x00], "cvtps2pd xmm8, qword [r8]");
+    test_display(&[0x4f, 0x0f, 0x5b, 0x00], "cvtdq2ps xmm8, xmmword [r8]");
+    test_display(&[0x66, 0x4f, 0x0f, 0x5b, 0x00], "cvtdq2ps xmm8, xmmword [r8]");
+    test_display(&[0x67, 0x4f, 0x0f, 0x5b, 0x00], "cvtdq2ps xmm8, xmmword [r8d]");
     test_display(&[0x4f, 0x66, 0x0f, 0x28, 0x00], "movapd xmm0, [rax]");
     test_display(&[0x66, 0x4f, 0x0f, 0x28, 0x00], "movapd xmm8, [r8]");
     test_display(&[0x66, 0x4f, 0x0f, 0x28, 0x00], "movapd xmm8, [r8]");

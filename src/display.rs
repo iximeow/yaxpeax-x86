@@ -418,7 +418,8 @@ impl fmt::Display for Opcode {
             &Opcode::SETGE => write!(f, "{}", "setge"),
             &Opcode::SETLE => write!(f, "{}", "setle"),
             &Opcode::SETG => write!(f, "{}", "setg"),
-            &Opcode::Invalid => write!(f, "{}", "invalid")
+            &Opcode::Invalid => write!(f, "{}", "invalid"),
+            _ => { unimplemented!("some other instruction"); },
         }
     }
 }
@@ -648,6 +649,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
 
             Opcode::UD2 |
             Opcode::Invalid => { write!(out, "{}", colors.invalid_op(self)) }
+            _ => { unimplemented!("some other instruction"); },
         }
     }
 }
