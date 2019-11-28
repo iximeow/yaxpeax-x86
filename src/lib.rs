@@ -2481,21 +2481,25 @@ fn read_modrm_reg(instr: &mut Instruction, modrm: u8, reg_bank: RegisterBank) ->
 }
 
 #[allow(non_snake_case)]
-fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, ()> {
+fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, ()> {
     let modbits = (modrm >> 6);
     let addr_width = if instr.prefixes.address_size() { RegisterBank::D } else { RegisterBank::Q };
     let sibbyte = match bytes_iter.next() {
         Some(b) => b,
-        None => { unsafe { unreachable_unchecked(); } }
-//        None => { return Err(()); } //Err("Out of bytes".to_string())
+//        None => { unsafe { unreachable_unchecked(); } }
+        None => { return Err(()); } //Err("Out of bytes".to_string())
     };
+    *length += 1;
 
     let op_spec = if (sibbyte & 7) == 0b101 {
         let disp = if modbits == 0b00 {
+            *length += 4;
             read_num(bytes_iter, 4)? as i32
         } else if modbits == 0b01 {
+            *length += 1;
             read_num(bytes_iter, 1)? as i8 as i32
         } else {
+            *length += 4;
             read_num(bytes_iter, 4)? as i32
         };
 
@@ -2543,8 +2547,10 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
         let disp = if modbits == 0b00 {
             0
         } else if modbits == 0b01 {
+            *length += 1;
             read_num(bytes_iter, 1)? as i8 as i32
         } else {
+            *length += 4;
             read_num(bytes_iter, 4)? as i32
         };
 
@@ -2576,11 +2582,12 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
     let addr_width = if instr.prefixes.address_size() { RegisterBank::D } else { RegisterBank::Q };
     let mmm = modrm & 7;
     let op_spec = if mmm == 4 {
-        return read_sib(bytes_iter, instr, modrm);
+        return read_sib(bytes_iter, instr, modrm, length);
 //         let (ss, index, base) = octets_of(sibbyte);
 
 //            println!("scale: {:b}, index: {:b}, base: {:b}", ss, index, base);
     } else if mmm == 5 && modbits == 0b00 {
+        *length += 4;
         let disp = read_num(bytes_iter, 4)? as i32;
         instr.modrm_mmm =
             if addr_width == RegisterBank::Q { RegSpec::rip() } else { RegSpec::eip() };
@@ -2597,8 +2604,10 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
             OperandSpec::Deref
         } else {
             let disp = if modbits == 0b01 {
+                *length += 1;
                 read_num(bytes_iter, 1)? as i8 as i32
             } else {
+                *length += 4;
                 read_num(bytes_iter, 4)? as i32
             };
             if disp == 0 {
@@ -2632,6 +2641,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
 //    let operand_code = loop {
         match bytes_iter.next() {
             Some(b) => {
+                length += 1;
                 let record = OPCODES[b as usize];
                 if (b & 0xf0) == 0x40 {
                     prefixes.rex_mut().from(b);
@@ -3533,6 +3543,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
 }
 
 pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruction) -> Option<()> {
+    instr.operands = [
+        OperandSpec::Nothing,
+        OperandSpec::Nothing,
+        OperandSpec::Nothing,
+        OperandSpec::Nothing,
+    ];
     let mut bytes_iter = bytes.into_iter();
     read_instr(bytes_iter, instr).ok()
 }
