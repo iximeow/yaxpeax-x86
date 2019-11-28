@@ -10,7 +10,7 @@ mod display;
 
 use std::hint::unreachable_unchecked;
 
-use yaxpeax_arch::{Arch, Decodable, LengthedInstruction};
+use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
 
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -757,6 +757,7 @@ pub struct x86_64;
 impl Arch for x86_64 {
     type Address = u64;
     type Instruction = Instruction;
+    type Decoder = InstDecoder;
     type Operand = Operand;
 }
 
@@ -770,16 +771,44 @@ impl LengthedInstruction for Instruction {
     }
 }
 
-impl Decodable for Instruction {
-    fn decode<T: IntoIterator<Item=u8>>(bytes: T) -> Option<Self> {
+pub struct InstDecoder {
+    flags: u64,
+}
+
+impl InstDecoder {
+    /// Instantiates an x86_64 decoder that decodes the bare minimum of x86_64.
+    ///
+    /// Pedantic and only decodes what the spec says is well-defined, rejecting undefined sequences
+    /// and any instructions defined by extensions.
+    fn minimal() -> Self {
+        InstDecoder {
+            flags: 0,
+        }
+    }
+}
+
+impl Default for InstDecoder {
+    /// Instantiates an x86_64 decoder that probably decodes what you want.
+    ///
+    /// Attempts to match real processors in interpretation of undefined sequences, and decodes any
+    /// instruction defined in any extension.
+    fn default() -> Self {
+        Self {
+            flags: 0xffffffff_ffffffff,
+        }
+    }
+}
+
+impl Decoder<Instruction> for InstDecoder {
+    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Option<Instruction> {
         let mut instr = Instruction::invalid();
         match decode_one(bytes, &mut instr) {
             Some(_) => Some(instr),
             None => None
         }
     }
-    fn decode_into<T: IntoIterator<Item=u8>>(&mut self, bytes: T) -> Option<()> {
-        decode_one(bytes, self)
+    fn decode_into<T: IntoIterator<Item=u8>>(&self, instr: &mut Instruction, bytes: T) -> Option<()> {
+        decode_one(bytes, instr)
     }
 }
 
