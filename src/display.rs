@@ -706,75 +706,78 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                 x.colorize(colors, out)?;
             }
         };
-        match self.opcode {
-            Opcode::MOVSX_b |
-            Opcode::MOVZX_b => {
-                match context.and_then(|xs| xs[1].as_ref()) {
-                    Some(s) => { write!(out, ", {}", s) }
-                    None => {
-                        match &self.operands[1] {
-                            &OperandSpec::Nothing => {
-                                unreachable!();
-                            },
-                            &OperandSpec::RegMMM => {
-                                write!(out, ", ")?;
-                            }
-                            x @ _ => {
-                                write!(out, ", byte ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
+        for i in 1..4 {
+            match self.opcode {
+                Opcode::MOVSX_b |
+                Opcode::MOVZX_b => {
+                    match context.and_then(|xs| xs[i].as_ref()) {
+                        Some(s) => { write!(out, ", {}", s)? }
+                        None => {
+                            match &self.operands[i] {
+                                &OperandSpec::Nothing => {
+                                    return Ok(());
+                                },
+                                &OperandSpec::RegMMM => {
+                                    write!(out, ", ")?;
+                                }
+                                x @ _ => {
+                                    write!(out, ", byte ")?;
+                                    if let Some(prefix) = self.segment_override_for_op(1) {
+                                        write!(out, "{}:", prefix)?;
+                                    }
                                 }
                             }
+                            let x = Operand::from_spec(self, self.operands[i]);
+                            x.colorize(colors, out)?
                         }
-                        let x = Operand::from_spec(self, self.operands[1]);
-                        x.colorize(colors, out)
                     }
-                }
-            },
-            Opcode::MOVSX_w |
-            Opcode::MOVZX_w => {
-                match context.and_then(|xs| xs[1].as_ref()) {
-                    Some(s) => { write!(out, ", {}", s) }
-                    None => {
-                        match &self.operands[1] {
-                            &OperandSpec::Nothing => {
-                                unreachable!();
-                            },
-                            &OperandSpec::RegMMM => {
-                                write!(out, ", ")?;
-                            }
-                            _ => {
-                                write!(out, ", word ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
+                },
+                Opcode::MOVSX_w |
+                Opcode::MOVZX_w => {
+                    match context.and_then(|xs| xs[i].as_ref()) {
+                        Some(s) => { write!(out, ", {}", s)? }
+                        None => {
+                            match &self.operands[i] {
+                                &OperandSpec::Nothing => {
+                                    return Ok(());
+                                },
+                                &OperandSpec::RegMMM => {
+                                    write!(out, ", ")?;
+                                }
+                                _ => {
+                                    write!(out, ", word ")?;
+                                    if let Some(prefix) = self.segment_override_for_op(1) {
+                                        write!(out, "{}:", prefix)?;
+                                    }
                                 }
                             }
+                            let x = Operand::from_spec(self, self.operands[i]);
+                            x.colorize(colors, out)?
                         }
-                        let x = Operand::from_spec(self, self.operands[1]);
-                        x.colorize(colors, out)
                     }
-                }
-            },
-            _ => {
-                match context.and_then(|xs| xs[1].as_ref()) {
-                    Some(s) => { write!(out, ", {}", s) }
-                    None => {
-                        match &self.operands[1] {
-                            &OperandSpec::Nothing => {
-                                return Ok(());
-                            },
-                            _ => {
-                                write!(out, ", ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
+                },
+                _ => {
+                    match context.and_then(|xs| xs[i].as_ref()) {
+                        Some(s) => { write!(out, ", {}", s)? }
+                        None => {
+                            match &self.operands[i] {
+                                &OperandSpec::Nothing => {
+                                    return Ok(());
+                                },
+                                _ => {
+                                    write!(out, ", ")?;
+                                    if let Some(prefix) = self.segment_override_for_op(1) {
+                                        write!(out, "{}:", prefix)?;
+                                    }
+                                    let x = Operand::from_spec(self, self.operands[i]);
+                                    x.colorize(colors, out)?
                                 }
-                                let x = Operand::from_spec(self, self.operands[1]);
-                                x.colorize(colors, out)
                             }
                         }
                     }
                 }
             }
         }
+        Ok(())
     }
 }

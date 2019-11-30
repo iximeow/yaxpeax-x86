@@ -1522,7 +1522,6 @@ fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u
             Some(record)
         }
         None => {
-            unsafe { unreachable_unchecked(); }
             None
         }
     }
@@ -1810,7 +1809,6 @@ fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u
             Some(record)
         }
         None => {
-            unsafe { unreachable_unchecked(); }
             None
         }
     }
@@ -2139,7 +2137,6 @@ fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8)
             Some(record)
         }
         None => {
-            unsafe { unreachable_unchecked(); }
             None
         }
     }
@@ -2806,7 +2803,11 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             }
         } else {
             opwidth = 1;
-            bank = RegisterBank::B;
+            if instruction.prefixes.rex().present() {
+                bank = RegisterBank::rB;
+            } else {
+                bank = RegisterBank::B;
+            }
         };
         modrm = read_modrm(&mut bytes_iter, instruction, length)?;
         instruction.modrm_rrr =
@@ -3017,6 +3018,7 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                     instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
                     bytes_read = numwidth;
                     instruction.operands[1] = match opwidth {
+                        1 => OperandSpec::ImmI8,
                         2 => OperandSpec::ImmI16,
                         4 => OperandSpec::ImmI32,
                         8 => OperandSpec::ImmI64,
@@ -3191,6 +3193,29 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.imm = offset;
             instruction.operand_count = 1;
             instruction.operands[0] = OperandSpec::ImmI32;
+        }
+        OperandCode::Gb_Eb_Ib => {
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            instruction.imm =
+                read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+        }
+        OperandCode::Gv_Ev_Iv => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let numwidth = if opwidth == 8 { 4 } else { opwidth };
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            instruction.imm =
+                read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
+            instruction.operands[2] = match opwidth {
+                2 => OperandSpec::ImmI16,
+                4 => OperandSpec::ImmI32,
+                8 => OperandSpec::ImmI64,
+                _ => unsafe { unreachable_unchecked() }
+            };
+            instruction.operand_count = 3;
         }
         OperandCode::Nothing => {
             instruction.operand_count = 0;
