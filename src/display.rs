@@ -418,8 +418,112 @@ impl fmt::Display for Opcode {
             &Opcode::SETGE => write!(f, "{}", "setge"),
             &Opcode::SETLE => write!(f, "{}", "setle"),
             &Opcode::SETG => write!(f, "{}", "setg"),
+            &Opcode::ADDPS => write!(f, "{}", "addps"),
+            &Opcode::ANDNPS => write!(f, "{}", "andnps"),
+            &Opcode::ANDPS => write!(f, "{}", "andps"),
+            &Opcode::BSWAP => write!(f, "{}", "bswap"),
+            &Opcode::CMPPS => write!(f, "{}", "cmpps"),
+            &Opcode::COMISS => write!(f, "{}", "comiss"),
+            &Opcode::CVTDQ2PS => write!(f, "{}", "cvtdq2ps"),
+            &Opcode::CVTPI2PS => write!(f, "{}", "cvtpi2ps"),
+            &Opcode::CVTPS2PD => write!(f, "{}", "cvtps2pd"),
+            &Opcode::CVTPS2PI => write!(f, "{}", "cvtps2pi"),
+            &Opcode::CVTTPS2PI => write!(f, "{}", "cvttps2pi"),
+            &Opcode::DIVPS => write!(f, "{}", "divps"),
+            &Opcode::EMMS => write!(f, "{}", "emms"),
+            &Opcode::GETSEC => write!(f, "{}", "getsec"),
+            &Opcode::LFS => write!(f, "{}", "lfs"),
+            &Opcode::LGS => write!(f, "{}", "lgs"),
+            &Opcode::LSS => write!(f, "{}", "lss"),
+            &Opcode::MASKMOVQ => write!(f, "{}", "maskmovq"),
+            &Opcode::MAXPS => write!(f, "{}", "maxps"),
+            &Opcode::MINPS => write!(f, "{}", "minps"),
+            &Opcode::MOVAPS => write!(f, "{}", "movaps"),
+            &Opcode::MOVD => write!(f, "{}", "movd"),
+            &Opcode::MOVLPS => write!(f, "{}", "movlps"),
+            &Opcode::MOVHPS => write!(f, "{}", "movhps"),
+            &Opcode::MOVUPD => write!(f, "{}", "movupd"),
+            &Opcode::MOVMSKPS => write!(f, "{}", "movmskps"),
+            &Opcode::MOVNTI => write!(f, "{}", "movnti"),
+            &Opcode::MOVNTPS => write!(f, "{}", "movntps"),
+            &Opcode::MOVNTQ => write!(f, "{}", "movntq"),
+            &Opcode::MULPS => write!(f, "{}", "mulps"),
+            &Opcode::ORPS => write!(f, "{}", "orps"),
+            &Opcode::PACKSSDW => write!(f, "{}", "packssdw"),
+            &Opcode::PACKSSWB => write!(f, "{}", "packsswb"),
+            &Opcode::PACKUSWB => write!(f, "{}", "packuswb"),
+            &Opcode::PADDB => write!(f, "{}", "paddb"),
+            &Opcode::PADDD => write!(f, "{}", "paddd"),
+            &Opcode::PADDQ => write!(f, "{}", "paddq"),
+            &Opcode::PADDSB => write!(f, "{}", "paddsb"),
+            &Opcode::PADDSW => write!(f, "{}", "paddsw"),
+            &Opcode::PADDUSB => write!(f, "{}", "paddusb"),
+            &Opcode::PADDUSW => write!(f, "{}", "paddusw"),
+            &Opcode::PADDW => write!(f, "{}", "paddw"),
+            &Opcode::PAND => write!(f, "{}", "pand"),
+            &Opcode::PANDN => write!(f, "{}", "pandn"),
+            &Opcode::PAVGB => write!(f, "{}", "pavgb"),
+            &Opcode::PAVGW => write!(f, "{}", "pavgw"),
+            &Opcode::PCMPEQB => write!(f, "{}", "pcmpeqb"),
+            &Opcode::PCMPEQD => write!(f, "{}", "pcmpeqd"),
+            &Opcode::PCMPEQW => write!(f, "{}", "pcmpeqw"),
+            &Opcode::PCMPGTB => write!(f, "{}", "pcmpgtb"),
+            &Opcode::PCMPGTD => write!(f, "{}", "pcmpgtd"),
+            &Opcode::PCMPGTW => write!(f, "{}", "pcmpgtw"),
+            &Opcode::PEXTRW => write!(f, "{}", "pextrw"),
+            &Opcode::PINSRW => write!(f, "{}", "pinsrw"),
+            &Opcode::PMADDWD => write!(f, "{}", "pmaddwd"),
+            &Opcode::PMAXSW => write!(f, "{}", "pmaxsw"),
+            &Opcode::PMAXUB => write!(f, "{}", "pmaxub"),
+            &Opcode::PMINSW => write!(f, "{}", "pminsw"),
+            &Opcode::PMINUB => write!(f, "{}", "pminub"),
+            &Opcode::PMOVMSKB => write!(f, "{}", "pmovmskb"),
+            &Opcode::PMULHUW => write!(f, "{}", "pmulhuw"),
+            &Opcode::PMULHW => write!(f, "{}", "pmulhw"),
+            &Opcode::PMULLW => write!(f, "{}", "pmullw"),
+            &Opcode::PMULUDQ => write!(f, "{}", "pmuludq"),
+            &Opcode::POR => write!(f, "{}", "por"),
+            &Opcode::PSADBW => write!(f, "{}", "psadbw"),
+            &Opcode::PSHUFW => write!(f, "{}", "pshufw"),
+            &Opcode::PSLLD => write!(f, "{}", "pslld"),
+            &Opcode::PSLLQ => write!(f, "{}", "psllq"),
+            &Opcode::PSLLW => write!(f, "{}", "psllw"),
+            &Opcode::PSRAD => write!(f, "{}", "psrad"),
+            &Opcode::PSRAW => write!(f, "{}", "psraw"),
+            &Opcode::PSRLD => write!(f, "{}", "psrld"),
+            &Opcode::PSRLQ => write!(f, "{}", "psrlq"),
+            &Opcode::PSRLW => write!(f, "{}", "psrlw"),
+            &Opcode::PSUBB => write!(f, "{}", "psubb"),
+            &Opcode::PSUBD => write!(f, "{}", "psubd"),
+            &Opcode::PSUBQ => write!(f, "{}", "psubq"),
+            &Opcode::PSUBSB => write!(f, "{}", "psubsb"),
+            &Opcode::PSUBSW => write!(f, "{}", "psubsw"),
+            &Opcode::PSUBUSB => write!(f, "{}", "psubusb"),
+            &Opcode::PSUBUSW => write!(f, "{}", "psubusw"),
+            &Opcode::PSUBW => write!(f, "{}", "psubw"),
+            &Opcode::PUNPCKHBW => write!(f, "{}", "punpckhbw"),
+            &Opcode::PUNPCKHDQ => write!(f, "{}", "punpckhdq"),
+            &Opcode::PUNPCKHWD => write!(f, "{}", "punpckhwd"),
+            &Opcode::PUNPCKLBW => write!(f, "{}", "punpcklbw"),
+            &Opcode::PUNPCKLDQ => write!(f, "{}", "punpckldq"),
+            &Opcode::PUNPCKLWD => write!(f, "{}", "punpcklwd"),
+            &Opcode::PXOR => write!(f, "{}", "pxor"),
+            &Opcode::RCPPS => write!(f, "{}", "rcpps"),
+            &Opcode::RSM => write!(f, "{}", "rsm"),
+            &Opcode::RSQRTPS => write!(f, "{}", "rsqrtps"),
+            &Opcode::SHLD => write!(f, "{}", "shld"),
+            &Opcode::SHUFPS => write!(f, "{}", "shufps"),
+            &Opcode::SLHD => write!(f, "{}", "slhd"),
+            &Opcode::SQRTPS => write!(f, "{}", "sqrtps"),
+            &Opcode::SUBPS => write!(f, "{}", "subps"),
+            &Opcode::SYSENTER => write!(f, "{}", "sysenter"),
+            &Opcode::SYSEXIT => write!(f, "{}", "sysexit"),
+            &Opcode::UCOMISS => write!(f, "{}", "ucomiss"),
+            &Opcode::UD2E => write!(f, "{}", "ud2e"),
+            &Opcode::VMREAD => write!(f, "{}", "vmread"),
+            &Opcode::VMWRITE => write!(f, "{}", "vmwrite"),
+            &Opcode::XORPS => write!(f, "{}", "xorps"),
             &Opcode::Invalid => write!(f, "{}", "invalid"),
-            _ => { unimplemented!("some other instruction"); },
         }
     }
 }
@@ -474,6 +578,58 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::BTC |
             Opcode::BSF |
             Opcode::BSR |
+            Opcode::ADDPS |
+            Opcode::ANDNPS |
+            Opcode::ANDPS |
+            Opcode::COMISS |
+            Opcode::DIVPS |
+            Opcode::MULPS |
+            Opcode::ORPS |
+            Opcode::PADDB |
+            Opcode::PADDD |
+            Opcode::PADDQ |
+            Opcode::PADDSB |
+            Opcode::PADDSW |
+            Opcode::PADDUSB |
+            Opcode::PADDUSW |
+            Opcode::PADDW |
+            Opcode::PAND |
+            Opcode::PANDN |
+            Opcode::PAVGB |
+            Opcode::PAVGW |
+            Opcode::PMADDWD |
+            Opcode::PMULHUW |
+            Opcode::PMULHW |
+            Opcode::PMULLW |
+            Opcode::PMULUDQ |
+            Opcode::POR |
+            Opcode::PSADBW |
+            Opcode::PSHUFW |
+            Opcode::PSLLD |
+            Opcode::PSLLQ |
+            Opcode::PSLLW |
+            Opcode::PSRAD |
+            Opcode::PSRAW |
+            Opcode::PSRLD |
+            Opcode::PSRLQ |
+            Opcode::PSRLW |
+            Opcode::PSUBB |
+            Opcode::PSUBD |
+            Opcode::PSUBQ |
+            Opcode::PSUBSB |
+            Opcode::PSUBSW |
+            Opcode::PSUBUSB |
+            Opcode::PSUBUSW |
+            Opcode::PSUBW |
+            Opcode::PXOR |
+            Opcode::RSQRTPS |
+            Opcode::SQRTPS |
+            Opcode::SUBPS |
+            Opcode::XORPS |
+            Opcode::RCPPS |
+            Opcode::SHLD |
+            Opcode::SLHD |
+            Opcode::UCOMISS |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
             Opcode::PUSHF |
@@ -513,23 +669,50 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::JG => { write!(out, "{}", colors.control_flow_op(self)) }
 
             /* Data transfer */
-            Opcode::MOVSS |
-            Opcode::MOVSD |
+            Opcode::BSWAP |
             Opcode::CVTDQ2PD |
+            Opcode::CVTDQ2PS |
             Opcode::CVTPD2DQ |
-            Opcode::CVTTPS2DQ |
-            Opcode::CVTSI2SS |
-            Opcode::CVTSI2SD |
-            Opcode::CVTTSD2SI |
+            Opcode::CVTPI2PS |
+            Opcode::CVTPS2PD |
+            Opcode::CVTPS2PI |
             Opcode::CVTSD2SI |
             Opcode::CVTSD2SS |
-            Opcode::CVTTSS2SI |
-            Opcode::CVTSS2SI |
+            Opcode::CVTSI2SD |
+            Opcode::CVTSI2SS |
             Opcode::CVTSS2SD |
+            Opcode::CVTSS2SI |
+            Opcode::CVTTPS2DQ |
+            Opcode::CVTTPS2PI |
+            Opcode::CVTTSD2SI |
+            Opcode::CVTTSS2SI |
+            Opcode::MASKMOVQ |
+            Opcode::MOVAPS |
+            Opcode::MOVD |
+            Opcode::MOVHPS |
+            Opcode::MOVLPS |
+            Opcode::MOVMSKPS |
+            Opcode::MOVNTI |
+            Opcode::MOVNTPS |
+            Opcode::MOVNTQ |
+            Opcode::MOVSD |
+            Opcode::MOVSS |
+            Opcode::MOVUPD |
             Opcode::PSHUFHW |
             Opcode::PSHUFLW |
+            Opcode::PUNPCKHBW |
+            Opcode::PUNPCKHDQ |
+            Opcode::PUNPCKHWD |
+            Opcode::PUNPCKLBW |
+            Opcode::PUNPCKLDQ |
+            Opcode::PUNPCKLWD |
+            Opcode::PACKSSDW |
+            Opcode::PACKSSWB |
+            Opcode::PACKUSWB |
             Opcode::UNPCKHPS |
             Opcode::UNPCKLPS |
+            Opcode::SHUFPS |
+            Opcode::PMOVMSKB |
             Opcode::LDDQU |
             Opcode::CLC |
             Opcode::CLI |
@@ -545,6 +728,8 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::MOVQ2DQ |
             Opcode::MOVSHDUP |
             Opcode::MOVUPS |
+            Opcode::PEXTRW |
+            Opcode::PINSRW |
             Opcode::MOV |
             Opcode::CBW |
             Opcode::CDW |
@@ -595,16 +780,29 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::SETLE |
             Opcode::SETG => { write!(out, "{}", colors.data_op(self)) }
 
-            Opcode::MINSD |
+            Opcode::PCMPEQB |
+            Opcode::PCMPEQD |
+            Opcode::PCMPEQW |
+            Opcode::PCMPGTB |
+            Opcode::PCMPGTD |
+            Opcode::PCMPGTW |
+            Opcode::MAXPS |
             Opcode::MAXSD |
-            Opcode::MINSS |
             Opcode::MAXSS |
+            Opcode::MINPS |
+            Opcode::MINSD |
+            Opcode::MINSS |
+            Opcode::PMAXSW |
+            Opcode::PMAXUB |
+            Opcode::PMINSW |
+            Opcode::PMINUB |
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
             Opcode::CMPSD |
             Opcode::CMPSS |
             Opcode::CMP |
+            Opcode::CMPPS |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
             Opcode::WRMSR |
@@ -645,11 +843,21 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VERR |
             Opcode::VERW |
             Opcode::JMPE |
+            Opcode::EMMS |
+            Opcode::GETSEC |
+            Opcode::LFS |
+            Opcode::LGS |
+            Opcode::LSS |
+            Opcode::RSM |
+            Opcode::SYSENTER |
+            Opcode::SYSEXIT |
+            Opcode::UD2E |
+            Opcode::VMREAD |
+            Opcode::VMWRITE |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::UD2 |
             Opcode::Invalid => { write!(out, "{}", colors.invalid_op(self)) }
-            _ => { unimplemented!("some other instruction"); },
         }
     }
 }
