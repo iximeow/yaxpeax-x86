@@ -331,8 +331,6 @@ impl fmt::Display for Opcode {
             &Opcode::RETURN => write!(f, "{}", "ret"),
             &Opcode::PUSHF => write!(f, "{}", "pushf"),
             &Opcode::WAIT => write!(f, "{}", "wait"),
-            &Opcode::CBW => write!(f, "{}", "cbw"),
-            &Opcode::CDW => write!(f, "{}", "cdw"),
             &Opcode::LODS => write!(f, "{}", "lods"),
             &Opcode::STOS => write!(f, "{}", "stos"),
             &Opcode::LAHF => write!(f, "{}", "lahf"),
@@ -523,6 +521,12 @@ impl fmt::Display for Opcode {
             &Opcode::VMREAD => write!(f, "{}", "vmread"),
             &Opcode::VMWRITE => write!(f, "{}", "vmwrite"),
             &Opcode::XORPS => write!(f, "{}", "xorps"),
+            &Opcode::CBW => write!(f, "{}", "cbw"),
+            &Opcode::CWDE => write!(f, "{}", "cwde"),
+            &Opcode::CDQE => write!(f, "{}", "cdqe"),
+            &Opcode::CBD => write!(f, "{}", "cbd"),
+            &Opcode::CDQ => write!(f, "{}", "cdq"),
+            &Opcode::CQO => write!(f, "{}", "cqo"),
             &Opcode::Invalid => write!(f, "{}", "invalid"),
         }
     }
@@ -720,6 +724,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::STC |
             Opcode::STI |
             Opcode::STD |
+            Opcode::CBW |
+            Opcode::CWDE |
+            Opcode::CDQE |
+            Opcode::CBD |
+            Opcode::CDQ |
+            Opcode::CQO |
             Opcode::MOVDDUP |
             Opcode::MOVSLDUP |
             Opcode::MOVDQ2Q |
@@ -731,8 +741,6 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::PEXTRW |
             Opcode::PINSRW |
             Opcode::MOV |
-            Opcode::CBW |
-            Opcode::CDW |
             Opcode::LODS |
             Opcode::STOS |
             Opcode::LAHF |

@@ -466,7 +466,11 @@ pub enum Opcode {
     PUSHF,
     WAIT,
     CBW,
-    CDW,
+    CWDE,
+    CDQE,
+    CBD,
+    CDQ,
+    CQO,
     LODS,
     STOS,
     LAHF,
@@ -1088,6 +1092,8 @@ pub enum OperandCode {
     ModRM_0x0fba,
     ModRM_0xf238,
     ModRM_0xf30fc7,
+    CVT_AA,
+    CVT_DA,
     Rq_Cq_0,
     Rq_Dq_0,
     Cq_Rq_0,
@@ -2310,10 +2316,10 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
 // 0xb0
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPXCHG), OperandCode::Eb_Gb),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPXCHG), OperandCode::Ev_Gv),
-    OpcodeRecord(Interpretation::Instruction(Opcode::LSS), OperandCode::G_M_q),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LSS), OperandCode::Gv_M),
     OpcodeRecord(Interpretation::Instruction(Opcode::BTR), OperandCode::E_G_q),
-    OpcodeRecord(Interpretation::Instruction(Opcode::LFS), OperandCode::G_M_q),
-    OpcodeRecord(Interpretation::Instruction(Opcode::LGS), OperandCode::G_M_q),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LFS), OperandCode::Gv_M),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LGS), OperandCode::Gv_M),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVZX_b), OperandCode::Gv_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVZX_w), OperandCode::Gv_Ew),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing), // JMPE, ITANIUM
@@ -2578,8 +2584,8 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R5),
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R6),
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R7),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CBW), OperandCode::AX_AL),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CBW), OperandCode::DX_AX),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::CVT_AA),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::CVT_DA),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::PUSHF), OperandCode::Nothing),
@@ -3511,23 +3517,6 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
 fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), ()> {
     let mut bytes_read = 0;
     match operand_code {
-        OperandCode::Gb_Eb_Ib => {
-            let mut ext = vec![Operand::Nothing; 2];
-
-            // TODO
-            panic!("oh no, a mul!");
-//            read_E(&mut bytes_iter, instruction, modrm, opwidth, &mut ext[0])?;
-            /*
-            instruction.operands[0] =
-                RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
-            read_imm_signed(&mut bytes_iter, 1, 1).map(|imm| {
-                ext[1] = imm;
-                instruction.operands[1] = Operand::Many(ext);
-            })?
-
-            instruction.operand_count = 3;
-            */
-        }
         OperandCode::Ew_Sw => {
             let opwidth = 2;
             let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
@@ -3575,20 +3564,23 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
             }
         },
-        OperandCode::Gv_Ev_Iv => {
-            let mut ext = vec![Operand::Nothing; 2];
-
-            // TODO
-            panic!("oh no, a mul!");
-//            read_E(&mut bytes_iter, instruction, modrm, opwidth, &mut ext[0])?;
-            /*
-            instruction.operands[0] =
-                RegSpec::gp_from_parts(r, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
-            read_imm_signed(&mut bytes_iter, if opwidth == 8 { 4 } else { opwidth }, opwidth).map(|imm| {
-                ext[1] = imm;
-                instruction.operands[1] = Operand::Many(ext);
-            })?
-            */
+        OperandCode::CVT_AA => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.opcode = match opwidth {
+                2 => { Opcode::CBW },
+                4 => { Opcode::CWDE },
+                8 => { Opcode::CDQE },
+                _ => { unreachable!("invalid operation width"); },
+            }
+        }
+        OperandCode::CVT_DA => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.opcode = match opwidth {
+                2 => { Opcode::CBD },
+                4 => { Opcode::CDQ },
+                8 => { Opcode::CQO },
+                _ => { unreachable!("invalid operation width"); },
+            }
         }
         OperandCode::Iw => {
             instruction.imm =
