@@ -14,6 +14,12 @@ fn decode(bytes: &[u8]) -> Option<Instruction> {
     }
 }
 
+fn test_invalid(data: &[u8]) {
+    assert!(
+        InstDecoder::default().decode(data.into_iter().cloned()).is_none()
+    );
+}
+
 fn test_display(data: &[u8], expected: &'static str) {
     let mut hex = String::new();
     for b in data {
@@ -46,7 +52,7 @@ fn test_mmx() {
     test_display(&[0x4f, 0x0f, 0xc4, 0x00, 0x14], "pinsrw mm0, word [r8], 0x14");
     test_display(&[0x4f, 0x0f, 0xd1, 0xcf], "psrlw mm1, mm7");
     test_display(&[0x4f, 0x0f, 0xd1, 0x00], "psrlw mm0, qword [r8]");
-    test_display(&[0x4f, 0x0f, 0xd7, 0x00], "invalid");
+    test_invalid(&[0x4f, 0x0f, 0xd7, 0x00]);
     test_display(&[0x4f, 0x0f, 0xd7, 0xcf], "pmovmskb r9d, mm7");
 }
 
@@ -112,7 +118,7 @@ fn test_sse() {
     test_display(&[0x0f, 0x28, 0xd0], "movaps xmm2, xmm0");
     test_display(&[0x66, 0x0f, 0x28, 0xd0], "movapd xmm2, xmm0");
     test_display(&[0x66, 0x0f, 0x28, 0x00], "movapd xmm0, [rax]");
-    test_display(&[0x4f, 0x0f, 0x50, 0x00], "invalid");
+    test_invalid(&[0x4f, 0x0f, 0x50, 0x00]);
     test_display(&[0x4f, 0x0f, 0x50, 0xc0], "movmskps r8d, xmm8");
     test_display(&[0x4f, 0x0f, 0x51, 0x00], "sqrtps xmm8, xmmword [r8]");
     test_display(&[0x4f, 0x0f, 0x52, 0x00], "rsqrtps xmm8, xmmword [r8]");
@@ -165,7 +171,7 @@ fn test_mov() {
     test_display(&[0x46, 0x63, 0xc1], "movsxd r8, ecx");
     test_display(&[0x48, 0x63, 0x04, 0xba], "movsxd rax, [rdx + rdi * 4]");
     test_display(&[0xf3, 0x0f, 0x6f, 0x07], "movdqu xmm0, [rdi]");
-    test_display(&[0xf3, 0x0f, 0x7f, 0x45, 0x00], "movdqu [rbp + 0x0], xmm0");
+    test_display(&[0xf3, 0x0f, 0x7f, 0x45, 0x00], "movdqu [rbp], xmm0");
 }
 
 #[test]
@@ -258,17 +264,19 @@ fn prefixed_0f() {
     test_display(&[0x0f, 0x05], "syscall");
     test_display(&[0x48, 0x0f, 0x05], "syscall");
     test_display(&[0x66, 0x0f, 0x05], "syscall");
-    test_display(&[0x0f, 0x05], "sysret");
-    test_display(&[0xf2, 0x0f, 0x05], "sysret");
-    test_display(&[0x0f, 0x12, 0x0f], "movlps xmm1, qword [rdi]");
-    test_display(&[0x0f, 0x12, 0xc0], "movhlps xmm0, xmm0");
-    test_display(&[0x0f, 0x13, 0xc0], "invalid");
-    test_display(&[0x0f, 0x14, 0x00], "unpcklps xmm1, [rax]");
-    test_display(&[0x0f, 0x15, 0x00], "unpckhps xmm1, [rax]");
+    test_display(&[0x0f, 0x06], "clts");
+    test_display(&[0xf2, 0x0f, 0x06], "clts");
+    test_display(&[0x0f, 0x07], "sysret");
+    test_display(&[0xf2, 0x0f, 0x07], "sysret");
+//    test_display(&[0x0f, 0x12, 0x0f], "movlps xmm1, qword [rdi]");
+//    test_display(&[0x0f, 0x12, 0xc0], "movhlps xmm0, xmm0");
+    test_invalid(&[0x0f, 0x13, 0xc0]);
+    test_display(&[0x0f, 0x14, 0x08], "unpcklps xmm1, [rax]");
+    test_display(&[0x0f, 0x15, 0x08], "unpckhps xmm1, [rax]");
     test_display(&[0x0f, 0x16, 0x0f], "movhps xmm1, qword [rdi]");
     test_display(&[0x0f, 0x16, 0xc0], "movlhps xmm0, xmm0");
-    test_display(&[0x0f, 0x17, 0xc0], "invalid");
-    test_display(&[0x0f, 0x18, 0xc0], "invalid");
+    test_invalid(&[0x0f, 0x17, 0xc0]);
+    test_invalid(&[0x0f, 0x18, 0xc0]);
     test_display(&[0x0f, 0x18, 0x00], "prefetchnta byte [rax]");
     test_display(&[0x0f, 0x18, 0x08], "prefetch1 byte [rax]");
     test_display(&[0x0f, 0x18, 0x10], "prefetch2 byte [rax]");
@@ -301,8 +309,8 @@ fn prefixed_0f() {
     test_display(&[0x0f, 0x32], "rdmsr");
     test_display(&[0x0f, 0x33], "rdpmc");
     test_display(&[0x0f, 0x34], "sysenter");
-    test_display(&[0x0f, 0x35], "sysret");
-    test_display(&[0x0f, 0x36], "invalid");
+    test_display(&[0x0f, 0x35], "sysexit");
+    test_invalid(&[0x0f, 0x36]);
     test_display(&[0x0f, 0x37], "getsec");
     test_display(&[0x0f, 0x60, 0x00], "punpcklbw mm0, qword [rax]");
     test_display(&[0x0f, 0x61, 0x00], "punpcklwd mm0, qword [rax]");
@@ -316,8 +324,8 @@ fn prefixed_0f() {
     test_display(&[0x0f, 0x69, 0x00], "punpckhbd mm0, qword [rax]");
     test_display(&[0x0f, 0x6a, 0x00], "punpckhdq mm0, qword [rax]");
     test_display(&[0x0f, 0x6b, 0x00], "packssdw mm0, qword [rax]");
-    test_display(&[0x0f, 0x6c], "invalid");
-    test_display(&[0x0f, 0x6d], "invalid");
+    test_invalid(&[0x0f, 0x6c]);
+    test_invalid(&[0x0f, 0x6d]);
     test_display(&[0x0f, 0x6e], "movd mm0, dword [rax]");
     test_display(&[0x0f, 0x6f], "movd mm0, qword [rax]");
     test_display(&[0x0f, 0x70, 0x00, 0x7f], "pshufw mm0, qword [rax], 0x7f");
