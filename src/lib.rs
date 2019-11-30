@@ -1237,7 +1237,8 @@ const BITWISE_OPCODE_MAP: [Opcode; 8] = [
     Opcode::SAR
 ];
 fn read_opcode_660f_map<T: Iterator<Item=u8>>(_bytes_iter: &mut T, _length: &mut u8) -> Option<OpcodeRecord> {
-    panic!("660f opcode map unsupported".to_string());
+    None
+//    panic!("660f opcode map unsupported".to_string());
 }
 
 const OPCODE_F20F_MAP: [OpcodeRecord; 256] = [
@@ -2645,7 +2646,10 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                 } else if b == 0x0f {
                     if let Some(record) = match alternate_opcode_map {
                         Some(OpcodeMap::Map66) => {
-                            read_opcode_660f_map(&mut bytes_iter, &mut length)
+                            // read_opcode_660f_map(&mut bytes_iter, &mut length)
+                            prefixes.set_operand_size();
+                            length += 1;
+                            Some(OPCODES[bytes_iter.next().unwrap() as usize])
                         },
                         Some(OpcodeMap::MapF2) => {
                             read_opcode_f20f_map(&mut bytes_iter, &mut length)
