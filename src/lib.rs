@@ -1192,7 +1192,6 @@ pub enum OperandCode {
     AL_Xb = 0x68,
     AX_AL = 0x69,
     AX_Ov = 0x6a,
-    G_E_mm = 0x6b,
 
     Eb_Gb = 0x80,
     Ev_Gv = 0x81,
@@ -1228,6 +1227,14 @@ pub enum OperandCode {
     ModRM_0x0f18 = 0x9b,
     // gap, 0x9a
     Gv_M = 0xdb,
+    G_mm_Edq = 0xdd,
+    G_mm_E = 0xdf,
+    G_xmm_Ed = 0xe1,
+    G_xmm_Eq = 0xe3,
+    G_mm_E_xmm = 0xe5,
+    G_E_mm = 0xe7,
+    Edq_G_mm = 0xe9,
+    E_G_mm = 0xeb,
 }
 
 fn base_opcode_map(v: u8) -> Opcode {
@@ -2174,8 +2181,8 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVAPS), OperandCode::E_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTPI2PS), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTPS), OperandCode::M_G_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTTPS2PI), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTPS2PI), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTTPS2PI), OperandCode::G_mm_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTPS2PI), OperandCode::G_mm_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::UCOMISS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::COMISS), OperandCode::G_E_xmm),
 
@@ -2248,8 +2255,8 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PACKSSDW), OperandCode::Unsupported),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVD), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVD), OperandCode::G_mm_Edq),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::G_mm_E),
 
 // 0x70
     OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFW), OperandCode::Unsupported),
@@ -2266,8 +2273,8 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVD), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVD), OperandCode::Edq_G_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::E_G_mm),
 
 // 0x80
     OpcodeRecord(Interpretation::Instruction(Opcode::JO), OperandCode::Jvds),
@@ -3545,6 +3552,72 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
 fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), ()> {
     let mut bytes_read = 0;
     match operand_code {
+        OperandCode::G_mm_Edq => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.modrm_rrr.num &= 0b111;
+            if mem_oper == OperandSpec::RegMMM {
+                if instruction.prefixes.rex().w() {
+                    instruction.modrm_mmm.bank = RegisterBank::Q;
+                } else {
+                    instruction.modrm_mmm.bank = RegisterBank::D;
+                }
+            }
+        }
+        OperandCode::G_mm_E => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.modrm_rrr.num &= 0b111;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::MM;
+                instruction.modrm_mmm.num &= 0b111;
+            }
+        }
+        OperandCode::Edq_G_mm => {
+            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[0] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.modrm_rrr.num &= 0b111;
+            if mem_oper == OperandSpec::RegMMM {
+                if instruction.prefixes.rex().w() {
+                    instruction.modrm_mmm.bank = RegisterBank::Q;
+                } else {
+                    instruction.modrm_mmm.bank = RegisterBank::D;
+                }
+            }
+        }
+        OperandCode::E_G_mm => {
+            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[0] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.modrm_rrr.num &= 0b111;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::MM;
+                instruction.modrm_mmm.num &= 0b111;
+            }
+        }
+        OperandCode::G_xmm_Ed => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::X;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::D;
+            }
+        },
+        OperandCode::G_xmm_Eq => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::X;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::Q;
+            }
+        },
+        OperandCode::G_mm_E_xmm => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.modrm_rrr.num &= 0b111;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::X;
+            }
+        },
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
             instruction.modrm_rrr = RegSpec::al();
