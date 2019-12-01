@@ -1134,7 +1134,6 @@ pub enum OperandCode {
     Yv_AX,
     Yv_Xv,
     G_E_q,
-    G_U_mm,
     G_M_q,
     E_G_q,
     Rv_Gmm_Ib,
@@ -1238,6 +1237,7 @@ pub enum OperandCode {
     E_G_mm = 0xeb,
     G_xmm_E_mm = 0xed,
     G_xmm_Edq = 0xef,
+    G_U_mm = 0xf1,
 }
 
 fn base_opcode_map(v: u8) -> Opcode {
@@ -2247,22 +2247,22 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLBW), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLWD), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLDQ), OperandCode::G_E_mm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PACKSSWB), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTB), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTW), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTD), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PACKUSWB), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKHBW), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKHWD), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKHDQ), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PACKSSDW), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PACKSSWB), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTB), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTW), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTD), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PACKUSWB), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKHBW), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKHWD), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKHDQ), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PACKSSDW), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVD), OperandCode::G_mm_Edq),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::G_mm_E),
 
 // 0x70
-    OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFW), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFW), OperandCode::G_E_xmm_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f71),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f72),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f73),
@@ -3444,14 +3444,23 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.operand_count = 2;
         },
         OperandCode::G_E_mm => {
-            let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
-            bytes_read = 1;
-
-//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
-            instruction.modrm_rrr =
-                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::MM);
-            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.modrm_rrr.num &= 0b111;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::MM;
+                instruction.modrm_mmm.num &= 0b111;
+            }
+            instruction.operand_count = 2;
+        },
+        OperandCode::G_U_mm => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::D;
+            if mem_oper != OperandSpec::RegMMM {
+                return Err(());
+            }
+            instruction.modrm_mmm.bank = RegisterBank::MM;
+            instruction.modrm_mmm.num &= 0b111;
             instruction.operand_count = 2;
         },
         OperandCode::G_E_xmm => {
@@ -3465,6 +3474,24 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         },
+        OperandCode::G_mm_Ew_Ib => {
+            let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
+            bytes_read = 1;
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, false, RegisterBank::MM);
+            instruction.operands[0] = OperandSpec::RegRRR;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::D;
+            }
+            instruction.imm =
+                read_num(&mut bytes_iter, 1)? as u8 as u64;
+            *length += 1;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+        }
         OperandCode::AL_Ib => {
             instruction.modrm_rrr =
                 RegSpec::al();
