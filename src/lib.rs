@@ -228,6 +228,8 @@ impl OperandSpec {
             OperandSpec::DispU32 |
             OperandSpec::DispU64 |
             OperandSpec::Deref |
+            OperandSpec::Deref_rsi |
+            OperandSpec::Deref_rdi |
             OperandSpec::RegDisp |
             OperandSpec::RegScale |
             OperandSpec::RegIndexBase |
@@ -247,6 +249,7 @@ impl OperandSpec {
             OperandSpec::ImmU64 |
             OperandSpec::RegRRR |
             OperandSpec::RegMMM |
+            OperandSpec::AL |
             OperandSpec::CL |
             OperandSpec::Nothing => {
                 false
@@ -268,6 +271,9 @@ impl Operand {
             OperandSpec::RegMMM => {
                 Operand::Register(inst.modrm_mmm)
             }
+            OperandSpec::AL => {
+                Operand::Register(RegSpec::al())
+            }
             OperandSpec::CL => {
                 Operand::Register(RegSpec::cl())
             }
@@ -283,6 +289,12 @@ impl Operand {
             OperandSpec::DispU64 => Operand::DisplacementU64(inst.disp as u64),
             OperandSpec::Deref => {
                 Operand::RegDeref(inst.modrm_mmm)
+            }
+            OperandSpec::Deref_rsi => {
+                Operand::RegDeref(RegSpec::rsi())
+            }
+            OperandSpec::Deref_rdi => {
+                Operand::RegDeref(RegSpec::rdi())
             }
             OperandSpec::RegDisp => {
                 Operand::RegDisp(inst.modrm_mmm, inst.disp as i32)
@@ -737,6 +749,8 @@ enum OperandSpec {
     RegRRR,
     // the register in modrm_mmm (eg modrm mod bits were 11)
     RegMMM,
+    // the register `al`. Used for MOVS.
+    AL,
     // the register `cl`. Used for SHLD and SHRD.
     CL,
     ImmI8,
@@ -750,6 +764,8 @@ enum OperandSpec {
     DispU32,
     DispU64,
     Deref,
+    Deref_rsi,
+    Deref_rdi,
     RegDisp,
     RegScale,
     RegIndexBase,
@@ -3793,23 +3809,17 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         },
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
-            instruction.modrm_rrr = RegSpec::al();
-            instruction.modrm_mmm = RegSpec::rsi();
-            instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = OperandSpec::Deref;
+            instruction.operands[0] = OperandSpec::AL;
+            instruction.operands[1] = OperandSpec::Deref_rsi;
         }
         // TODO: two memory operands! this is wrong!!!
         OperandCode::Yb_Xb => {
-            instruction.modrm_rrr = RegSpec::rdi();
-            instruction.modrm_mmm = RegSpec::rsi();
-            instruction.operands[0] = OperandSpec::Deref;
-            instruction.operands[1] = OperandSpec::Deref;
+            instruction.operands[0] = OperandSpec::Deref_rdi;
+            instruction.operands[1] = OperandSpec::Deref_rsi;
         }
         OperandCode::Yb_AL => {
-            instruction.modrm_rrr = RegSpec::al();
-            instruction.modrm_mmm = RegSpec::rdi();
-            instruction.operands[0] = OperandSpec::Deref;
-            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operands[0] = OperandSpec::Deref_rdi;
+            instruction.operands[1] = OperandSpec::AL;
         }
         OperandCode::AX_Xv => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
