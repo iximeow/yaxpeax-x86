@@ -3056,7 +3056,6 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
             }
         }
     };
-    println!("loaded record {:?}", record);
     if let Interpretation::Instruction(opcode) = record.0 {
         instruction.opcode = opcode;
     } else {
