@@ -441,6 +441,7 @@ impl fmt::Display for Opcode {
             &Opcode::MAXPS => write!(f, "{}", "maxps"),
             &Opcode::MINPS => write!(f, "{}", "minps"),
             &Opcode::MOVAPS => write!(f, "{}", "movaps"),
+            &Opcode::MOVAPD => write!(f, "{}", "movapd"),
             &Opcode::MOVD => write!(f, "{}", "movd"),
             &Opcode::MOVLPS => write!(f, "{}", "movlps"),
             &Opcode::MOVLHPS => write!(f, "{}", "movlhps"),
@@ -702,6 +703,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CVTTSS2SI |
             Opcode::MASKMOVQ |
             Opcode::MOVAPS |
+            Opcode::MOVAPD |
             Opcode::MOVD |
             Opcode::MOVHPS |
             Opcode::MOVHLPS |

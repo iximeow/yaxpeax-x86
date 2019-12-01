@@ -622,6 +622,7 @@ pub enum Opcode {
     MAXPS,
     MINPS,
     MOVAPS,
+    MOVAPD,
     MOVD,
     MOVLPS,
     MOVHPS,
@@ -1200,7 +1201,7 @@ pub enum OperandCode {
     Gb_Eb_Ib = 0xc4,
     Gv_Ev_Iv = 0xc5,
     // gap: 0xc6
-    G_U_xmm = 0xc7,
+    Gd_U_xmm = 0xc7,
     M_G_xmm = 0xc9,
     ModRM_0x0f12 = 0xcb,
     ModRM_0x0f16 = 0xce,
@@ -1297,8 +1298,8 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVAPD), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVAPD), OperandCode::E_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -2175,8 +2176,8 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTPS), OperandCode::M_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTTPS2PI), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTPS2PI), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::UCOMISS), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::COMISS), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::UCOMISS), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::COMISS), OperandCode::G_E_xmm),
 
 // 0x30
     OpcodeRecord(Interpretation::Instruction(Opcode::WRMSR), OperandCode::Nothing),
@@ -2215,7 +2216,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::CMOVG), OperandCode::Gv_Ev),
 
 // 0x50
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVMSKPS), OperandCode::G_U_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVMSKPS), OperandCode::Gd_U_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::SQRTPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::RSQRTPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::RCPPS), OperandCode::G_E_xmm),
@@ -2225,8 +2226,8 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::XORPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADDPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::MULPS), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTPS2PD), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTDQ2PS), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTPS2PD), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTDQ2PS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::SUBPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::MINPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::DIVPS), OperandCode::G_E_xmm),
@@ -3619,11 +3620,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 _ => Opcode::NOP,
             };
         }
-        OperandCode::G_U_xmm => {
+        OperandCode::Gd_U_xmm => {
+            instruction.operands[1] = mem_oper;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.opcode = Opcode::Invalid;
                 return Err(());
             }
+            instruction.modrm_rrr.bank = RegisterBank::D;
             instruction.modrm_mmm.bank = RegisterBank::X;
         }
         OperandCode::M_G_xmm => {
