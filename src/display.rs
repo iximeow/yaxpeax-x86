@@ -316,6 +316,10 @@ impl fmt::Display for Opcode {
             &Opcode::POP => write!(f, "{}", "pop"),
             &Opcode::LEA => write!(f, "{}", "lea"),
             &Opcode::NOP => write!(f, "{}", "nop"),
+            &Opcode::PREFETCHNTA => write!(f, "{}", "prefetchnta"),
+            &Opcode::PREFETCH0 => write!(f, "{}", "prefetch0"),
+            &Opcode::PREFETCH1 => write!(f, "{}", "prefetch1"),
+            &Opcode::PREFETCH2 => write!(f, "{}", "prefetch2"),
             &Opcode::XCHG => write!(f, "{}", "xchg"),
             &Opcode::POPF => write!(f, "{}", "popf"),
             &Opcode::ADD => write!(f, "{}", "add"),
@@ -439,7 +443,9 @@ impl fmt::Display for Opcode {
             &Opcode::MOVAPS => write!(f, "{}", "movaps"),
             &Opcode::MOVD => write!(f, "{}", "movd"),
             &Opcode::MOVLPS => write!(f, "{}", "movlps"),
+            &Opcode::MOVLHPS => write!(f, "{}", "movlhps"),
             &Opcode::MOVHPS => write!(f, "{}", "movhps"),
+            &Opcode::MOVHLPS => write!(f, "{}", "movhlps"),
             &Opcode::MOVUPD => write!(f, "{}", "movupd"),
             &Opcode::MOVMSKPS => write!(f, "{}", "movmskps"),
             &Opcode::MOVNTI => write!(f, "{}", "movnti"),
@@ -642,6 +648,10 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::PUSH |
             Opcode::POP => { write!(out, "{}", colors.stack_op(self)) }
             Opcode::WAIT |
+            Opcode::PREFETCHNTA |
+            Opcode::PREFETCH0 |
+            Opcode::PREFETCH1 |
+            Opcode::PREFETCH2 |
             Opcode::NOP => { write!(out, "{}", colors.nop_op(self)) }
 
             /* Control flow */
@@ -694,7 +704,9 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::MOVAPS |
             Opcode::MOVD |
             Opcode::MOVHPS |
+            Opcode::MOVHLPS |
             Opcode::MOVLPS |
+            Opcode::MOVLHPS |
             Opcode::MOVMSKPS |
             Opcode::MOVNTI |
             Opcode::MOVNTPS |
@@ -902,6 +914,18 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
         if self.prefixes.lock() {
             write!(out, "lock ")?;
         }
+
+        if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
+            // only a few of you actually use the prefix...
+            if self.prefixes.rep() {
+                write!(out, "rep ")?;
+            } else if self.prefixes.repz() {
+                write!(out, "repz ")?;
+            } else if self.prefixes.repnz() {
+                write!(out, "repnz ")?;
+            }
+        }
+
         self.opcode.colorize(colors, out)?;
 
         match context.and_then(|xs| xs[0].as_ref()) {

@@ -453,6 +453,10 @@ pub enum Opcode {
     POP,
     LEA,
     NOP,
+    PREFETCHNTA,
+    PREFETCH0,
+    PREFETCH1,
+    PREFETCH2,
     XCHG,
     POPF,
     INT,
@@ -621,6 +625,8 @@ pub enum Opcode {
     MOVD,
     MOVLPS,
     MOVHPS,
+    MOVLHPS,
+    MOVHLPS,
     MOVUPD,
     MOVMSKPS,
     MOVNTI,
@@ -718,7 +724,7 @@ pub struct Instruction {
     pub opcode: Opcode,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum OperandSpec {
     Nothing,
     // the register in modrm_rrr
@@ -1086,7 +1092,6 @@ impl PrefixRex {
 pub enum OperandCode {
     ModRM_0x0f00,
     ModRM_0x0f01,
-    ModRM_0x0f12,
     ModRM_0x0f13,
     ModRM_0x0fae,
     ModRM_0x0fba,
@@ -1129,14 +1134,12 @@ pub enum OperandCode {
     G_E_q,
     G_E_mm,
     G_U_mm,
-    G_U_xmm,
     G_M_q,
     E_G_q,
     Rv_Gmm_Ib,
     G_mm_Ew_Ib,
     Mq_Dq,
     eAX,
-    ModRM_0x0f18,
     ModRM_0x0f38,
     ModRM_0x0f3a,
     ModRM_0x0f71,
@@ -1196,6 +1199,11 @@ pub enum OperandCode {
     Gv_Ev = 0xc3,
     Gb_Eb_Ib = 0xc4,
     Gv_Ev_Iv = 0xc5,
+    // gap: 0xc6
+    G_U_xmm = 0xc7,
+    M_G_xmm = 0xc9,
+    ModRM_0x0f12 = 0xcb,
+    ModRM_0x0f16 = 0xce,
     ModRM_0xc0_Eb_Ib = 0x86,
     ModRM_0xc1_Ev_Ib = 0x87,
     ModRM_0xd0_Eb_1 = 0x88,
@@ -1216,6 +1224,7 @@ pub enum OperandCode {
     ModRM_0xf7 = 0x97,
     Eb_R0 = 0x98,
     Ev = 0x99,
+    ModRM_0x0f18 = 0x9b,
     // gap, 0x9a
     Gv_M = 0xdb,
 }
@@ -2138,11 +2147,11 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVUPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVUPS), OperandCode::E_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f12),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVLPS), OperandCode::G_U_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVLPS), OperandCode::M_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::UNPCKLPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::UNPCKHPS), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVHPS), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVHPS), OperandCode::E_G_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f16),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVHPS), OperandCode::M_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f18),
     OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
     OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
@@ -2163,7 +2172,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVAPS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVAPS), OperandCode::E_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTPI2PS), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTPS), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTPS), OperandCode::M_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTTPS2PI), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTPS2PI), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::UCOMISS), OperandCode::Nothing),
@@ -2177,7 +2186,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::SYSENTER), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::SYSEXIT), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::GETSEC), OperandCode::eAX),
+    OpcodeRecord(Interpretation::Instruction(Opcode::GETSEC), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f38),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f3a),
@@ -2948,6 +2957,18 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
 
                     break record;
                 } else if let Interpretation::Instruction(_) = record.0 {
+                    match alternate_opcode_map {
+                        Some(OpcodeMap::Map66) => {
+                            prefixes.set_operand_size();
+                        },
+                        Some(OpcodeMap::MapF2) => {
+                            prefixes.set_repnz();
+                        },
+                        Some(OpcodeMap::MapF3) => {
+                            prefixes.set_rep();
+                        },
+                        None => {}
+                    }
                     break record;
                 } else {
                     match b {
@@ -2976,7 +2997,6 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                             alternate_opcode_map = None;
                         },
                         0x66 => {
-                            prefixes.set_operand_size();
                             alternate_opcode_map = Some(OpcodeMap::Map66);
                         },
                         0x67 => {
@@ -2987,11 +3007,9 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                             prefixes.set_lock();
                         },
                         0xf2 => {
-                            prefixes.set_repnz();
                             alternate_opcode_map = Some(OpcodeMap::MapF2);
                         },
                         0xf3 => {
-                            prefixes.set_rep();
                             alternate_opcode_map = Some(OpcodeMap::MapF3);
                         },
                         _ => { unsafe { unreachable_unchecked(); } }
@@ -3507,16 +3525,118 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.operand_count = 0;
         }
         _ => {
-            unlikely_operands(bytes_iter, instruction, operand_code, length)?;
+            unlikely_operands(bytes_iter, instruction, operand_code, mem_oper, length)?;
         }
     };
     }
 
     Ok(())
 }
-fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), ()> {
+fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), ()> {
     let mut bytes_read = 0;
     match operand_code {
+        // sure hope these aren't backwards huh
+        OperandCode::AL_Xb => {
+            instruction.modrm_rrr = RegSpec::al();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::Deref;
+        }
+        // TODO: two memory operands! this is wrong!!!
+        OperandCode::Yb_Xb => {
+            instruction.modrm_rrr = RegSpec::rdi();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::Deref;
+        }
+        OperandCode::Yb_AL => {
+            instruction.modrm_rrr = RegSpec::al();
+            instruction.modrm_mmm = RegSpec::rdi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::RegRRR;
+        }
+        OperandCode::AX_Xv => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.modrm_rrr = match opwidth {
+                2 => RegSpec::ax(),
+                4 => RegSpec::eax(),
+                8 => RegSpec::rax(),
+                _ => { unreachable!(); }
+            };
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::Deref;
+        }
+        OperandCode::Yv_AX => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.modrm_rrr = match opwidth {
+                2 => RegSpec::ax(),
+                4 => RegSpec::eax(),
+                8 => RegSpec::rax(),
+                _ => { unreachable!(); }
+            };
+            instruction.modrm_mmm = RegSpec::rdi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::RegRRR;
+        }
+        OperandCode::Yv_Xv => {
+            // TODO: repsect prefixes
+            // TODO: two memory operands! this is wrong!!!
+            instruction.modrm_rrr = RegSpec::rdi();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::Deref;
+        }
+        OperandCode::ModRM_0x0f12 => {
+            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.operands[1] = mem_oper;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.opcode = Opcode::MOVHLPS;
+            } else {
+                instruction.opcode = Opcode::MOVLPS;
+            }
+        }
+        OperandCode::ModRM_0x0f16 => {
+            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.operands[1] = mem_oper;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.opcode = Opcode::MOVLHPS;
+            } else {
+                instruction.opcode = Opcode::MOVHPS;
+            }
+        }
+        OperandCode::ModRM_0x0f18 => {
+            if mem_oper == OperandSpec::RegMMM {
+                return Err(());
+            }
+            let rrr = instruction.modrm_rrr.num & 0b111;
+            instruction.operands[0] = mem_oper;
+            instruction.opcode = match rrr {
+                0 => Opcode::PREFETCHNTA,
+                1 => Opcode::PREFETCH0,
+                2 => Opcode::PREFETCH1,
+                3 => Opcode::PREFETCH2,
+                _ => Opcode::NOP,
+            };
+        }
+        OperandCode::G_U_xmm => {
+            if instruction.operands[1] != OperandSpec::RegMMM {
+                instruction.opcode = Opcode::Invalid;
+                return Err(());
+            }
+            instruction.modrm_mmm.bank = RegisterBank::X;
+        }
+        OperandCode::M_G_xmm => {
+            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[0] = mem_oper;
+            if instruction.operands[0] == OperandSpec::RegMMM {
+                instruction.opcode = Opcode::Invalid;
+                return Err(());
+            }
+            instruction.modrm_rrr.bank = RegisterBank::X;
+        }
         OperandCode::Ew_Sw => {
             let opwidth = 2;
             let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
