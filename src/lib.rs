@@ -2911,6 +2911,23 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
 //    use std::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
+
+    fn escapes_are_prefixes_actually(prefixes: &mut Prefixes, opc_map: &mut Option<OpcodeMap>) {
+        match opc_map {
+            Some(OpcodeMap::Map66) => {
+                prefixes.set_operand_size();
+            },
+            Some(OpcodeMap::MapF2) => {
+                prefixes.set_repnz();
+            },
+            Some(OpcodeMap::MapF3) => {
+                prefixes.set_rep();
+            },
+            None => {}
+        }
+        *opc_map = None;
+    }
+
     let record: OpcodeRecord = loop {
 //    let operand_code = loop {
         match bytes_iter.next() {
@@ -2934,17 +2951,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                                 },
                             };
                             if rec.0 == Interpretation::Instruction(Opcode::Invalid) {
-                                match opcode_map {
-                                    OpcodeMap::Map66 => {
-                                        prefixes.set_operand_size();
-                                    },
-                                    OpcodeMap::MapF2 => {
-                                        prefixes.set_repnz();
-                                    },
-                                    OpcodeMap::MapF3 => {
-                                        prefixes.set_rep();
-                                    },
-                                }
+                                escapes_are_prefixes_actually(&mut prefixes, &mut Some(opcode_map));
                                 OPCODE_0F_MAP[opcode_byte as usize]
                             } else {
                                 rec
@@ -2957,51 +2964,42 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
 
                     break record;
                 } else if let Interpretation::Instruction(_) = record.0 {
-                    match alternate_opcode_map {
-                        Some(OpcodeMap::Map66) => {
-                            prefixes.set_operand_size();
-                        },
-                        Some(OpcodeMap::MapF2) => {
-                            prefixes.set_repnz();
-                        },
-                        Some(OpcodeMap::MapF3) => {
-                            prefixes.set_rep();
-                        },
-                        None => {}
-                    }
+                    escapes_are_prefixes_actually(&mut prefixes, &mut alternate_opcode_map);
                     break record;
                 } else {
+                    // some prefix seen after we saw rex, but before the 0f escape or an actual
+                    // opcode. so we must forget the rex prefix!
+                    // this is to handle sequences like 41660f21cf
+                    // where if 660f21 were a valid opcode, 41 would apply a rex.b
+                    // prefix, but since 660f21 is not valid, the opcode is interpreted
+                    // as 0f21, where 66 is a prefix, which makes 41 not the last
+                    // prefix before the opcode, and it's discarded.
+                    prefixes.rex_mut().from(0);
+                    escapes_are_prefixes_actually(&mut prefixes, &mut alternate_opcode_map);
                     match b {
                         0x26 => {
                             prefixes.set_es();
-                            alternate_opcode_map = None;
                         },
                         0x2e => {
                             prefixes.set_cs();
-                            alternate_opcode_map = None;
                         },
                         0x36 => {
                             prefixes.set_ss();
-                            alternate_opcode_map = None;
                         },
                         0x3e => {
                             prefixes.set_ds();
-                            alternate_opcode_map = None;
                         },
                         0x64 => {
                             prefixes.set_fs();
-                            alternate_opcode_map = None;
                         },
                         0x65 => {
                             prefixes.set_gs();
-                            alternate_opcode_map = None;
                         },
                         0x66 => {
                             alternate_opcode_map = Some(OpcodeMap::Map66);
                         },
                         0x67 => {
                             prefixes.set_address_size();
-                            alternate_opcode_map = None;
                         },
                         0xf0 => {
                             prefixes.set_lock();
