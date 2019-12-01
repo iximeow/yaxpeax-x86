@@ -428,6 +428,7 @@ impl fmt::Display for Opcode {
             &Opcode::COMISS => write!(f, "{}", "comiss"),
             &Opcode::CVTDQ2PS => write!(f, "{}", "cvtdq2ps"),
             &Opcode::CVTPI2PS => write!(f, "{}", "cvtpi2ps"),
+            &Opcode::CVTPI2PD => write!(f, "{}", "cvtpi2pd"),
             &Opcode::CVTPS2PD => write!(f, "{}", "cvtps2pd"),
             &Opcode::CVTPS2PI => write!(f, "{}", "cvtps2pi"),
             &Opcode::CVTTPS2PI => write!(f, "{}", "cvttps2pi"),
@@ -689,6 +690,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CVTDQ2PS |
             Opcode::CVTPD2DQ |
             Opcode::CVTPI2PS |
+            Opcode::CVTPI2PD |
             Opcode::CVTPS2PD |
             Opcode::CVTPS2PI |
             Opcode::CVTSD2SI |
