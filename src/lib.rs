@@ -1133,7 +1133,6 @@ pub enum OperandCode {
     Yv_AX,
     Yv_Xv,
     G_E_q,
-    G_E_mm,
     G_U_mm,
     G_M_q,
     E_G_q,
@@ -1193,6 +1192,7 @@ pub enum OperandCode {
     AL_Xb = 0x68,
     AX_AL = 0x69,
     AX_Ov = 0x6a,
+    G_E_mm = 0x6b,
 
     Eb_Gb = 0x80,
     Ev_Gv = 0x81,
@@ -1509,7 +1509,7 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PXOR), OperandCode::G_E_xmm),
 // 0xf0
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -2234,9 +2234,9 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MAXPS), OperandCode::G_E_xmm),
 
 // 0x60
-    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLBW), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLWD), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLDQ), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLBW), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLWD), OperandCode::G_E_mm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PUNPCKLDQ), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PACKSSWB), OperandCode::Unsupported),
     OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTB), OperandCode::Unsupported),
     OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTW), OperandCode::Unsupported),
@@ -2394,7 +2394,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PADDSB), OperandCode::Unsupported),
     OpcodeRecord(Interpretation::Instruction(Opcode::PADDSW), OperandCode::Unsupported),
     OpcodeRecord(Interpretation::Instruction(Opcode::PMAXSW), OperandCode::Unsupported),
-    OpcodeRecord(Interpretation::Instruction(Opcode::PXOR), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PXOR), OperandCode::G_E_mm),
 // 0xf0
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSLLW), OperandCode::Unsupported),
@@ -3431,6 +3431,17 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        },
+        OperandCode::G_E_mm => {
+            let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
+            bytes_read = 1;
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::MM);
+            instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         },
         OperandCode::G_E_xmm => {
