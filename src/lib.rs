@@ -3846,11 +3846,8 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
         }
         OperandCode::Yv_Xv => {
             // TODO: repsect prefixes
-            // TODO: two memory operands! this is wrong!!!
-            instruction.modrm_rrr = RegSpec::rdi();
-            instruction.modrm_mmm = RegSpec::rsi();
-            instruction.operands[0] = OperandSpec::Deref;
-            instruction.operands[1] = OperandSpec::Deref;
+            instruction.operands[0] = OperandSpec::Deref_rdi;
+            instruction.operands[1] = OperandSpec::Deref_rsi;
         }
         OperandCode::ModRM_0x0f12 => {
             instruction.modrm_rrr.bank = RegisterBank::X;
