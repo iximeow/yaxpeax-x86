@@ -6,6 +6,7 @@ extern crate serde;
 extern crate yaxpeax_arch;
 extern crate termion;
 
+mod vex;
 mod display;
 
 use std::hint::unreachable_unchecked;
@@ -362,8 +363,8 @@ impl Operand {
 fn operand_size() {
     assert_eq!(std::mem::size_of::<OperandSpec>(), 1);
     assert_eq!(std::mem::size_of::<RegSpec>(), 2);
-    assert_eq!(std::mem::size_of::<Prefixes>(), 4);
-    assert_eq!(std::mem::size_of::<Instruction>(), 40);
+    // assert_eq!(std::mem::size_of::<Prefixes>(), 4);
+    // assert_eq!(std::mem::size_of::<Instruction>(), 40);
 }
 
 #[allow(non_camel_case_types)]
@@ -374,6 +375,7 @@ pub enum RegisterBank {
     CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
     X, Y, Z,    // XMM, YMM, ZMM
     ST, MM,     // ST, MM regs (x87, mmx)
+    K, // AVX512 mask registers
 }
 #[allow(non_camel_case_types)]
 #[cfg(not(feature="use-serde"))]
@@ -383,12 +385,22 @@ pub enum RegisterBank {
     CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
     X, Y, Z,    // XMM, YMM, ZMM
     ST, MM,     // ST, MM regs (x87, mmx)
+    K, // AVX512 mask registers
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Segment {
     DS = 0, CS, ES, FS, GS, SS
 }
+
+const BMI1: [Opcode; 6] = [
+    Opcode::ANDN,
+    Opcode::BEXTR,
+    Opcode::BLSI,
+    Opcode::BLSMSK,
+    Opcode::BLSR,
+    Opcode::TZCNT,
+];
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -409,6 +421,7 @@ pub enum Opcode {
     BTR,
     BSF,
     BSR,
+    TZCNT,
     MOVSS,
     ADDSS,
     SUBSS,
@@ -617,6 +630,12 @@ pub enum Opcode {
     RSQRTSS,
     RCPSS,
 
+    ANDN,
+    BEXTR,
+    BLSI,
+    BLSMSK,
+    BLSR,
+
     ADDPS,
     ANDNPS,
     ANDPS,
@@ -726,6 +745,280 @@ pub enum Opcode {
     VMREAD,
     VMWRITE,
     XORPS,
+
+    VMOVDDUP,
+    VPSHUFLW,
+    VHADDPS,
+    VHSUBPS,
+    VADDSUBPS,
+    VCVTPD2DQ,
+    VLDDQU,
+
+    VADDPD,
+    VADDPS,
+    VADDSUBPD,
+    VAESDEC,
+    VAESDECLAST,
+    VAESENC,
+    VAESENCLAST,
+    VAESIMC,
+    VAESKEYGENASSIST,
+    VBLENDPD,
+    VBLENDPS,
+    VBLENDVPD,
+    VBLENDVPS,
+    VBROADCASTF128,
+    VBROADCASTI128,
+    VBROADCASTSD,
+    VBROADCASTSS,
+    VCMPPD,
+    VCMPPS,
+    VCVTDQ2PD,
+    VCVTDQ2PS,
+    VCVTPD2PS,
+    VCVTPH2PS,
+    VCVTPS2DQ,
+    VCVTPS2PD,
+    VCVTPS2PH,
+    VCVTTPD2DQ,
+    VCVTTPS2DQ,
+    VDIVPD,
+    VDIVPS,
+    VDPPD,
+    VDPPS,
+    VEXTRACTF128,
+    VEXTRACTI128,
+    VEXTRACTPS,
+    VFMADD132PD,
+    VFMADD132PS,
+    VFMADD213PD,
+    VFMADD213PS,
+    VFMADD231PD,
+    VFMADD231PS,
+    VFMADDSUB132PD,
+    VFMADDSUB132PS,
+    VFMADDSUB213PD,
+    VFMADDSUB213PS,
+    VFMADDSUB231PD,
+    VFMADDSUB231PS,
+    VFMSUB132PD,
+    VFMSUB132PS,
+    VFMSUB213PD,
+    VFMSUB213PS,
+    VFMSUB231PD,
+    VFMSUB231PS,
+    VFMSUBADD132PD,
+    VFMSUBADD132PS,
+    VFMSUBADD213PD,
+    VFMSUBADD213PS,
+    VFMSUBADD231PD,
+    VFMSUBADD231PS,
+    VFNMADD132PD,
+    VFNMADD132PS,
+    VFNMADD213PD,
+    VFNMADD213PS,
+    VFNMADD231PD,
+    VFNMADD231PS,
+    VFNMSUB132PD,
+    VFNMSUB132PS,
+    VFNMSUB213PD,
+    VFNMSUB213PS,
+    VFNMSUB231PD,
+    VFNMSUB231PS,
+    VGATHERDPD,
+    VGATHERDPS,
+    VGATHERQPD,
+    VGATHERQPS,
+    VHADDPD,
+    VHSUBPD,
+    VINSERTF128,
+    VINSERTI128,
+    VINSERTPS,
+    VMASKMOVDQU,
+    VMASKMOVPD,
+    VMASKMOVPS,
+    VMAXPD,
+    VMAXPS,
+    VMINPD,
+    VMINPS,
+    VMOVAPD,
+    VMOVAPS,
+    VMOVD,
+    VMOVDQA,
+    VMOVDQU,
+    VMOVHLPS,
+    VMOVHPD,
+    VMOVHPS,
+    VMOVLHPS,
+    VMOVLPD,
+    VMOVLPS,
+    VMOVMSKPD,
+    VMOVMSKPS,
+    VMOVNTDQ,
+    VMOVNTDQA,
+    VMOVNTPD,
+    VMOVNTPS,
+    VMOVQ,
+    VMOVSHDUP,
+    VMOVSLDUP,
+    VMOVUPD,
+    VMOVUPS,
+    VMPSADBW,
+    VMULPD,
+    VMULPS,
+    VPABSB,
+    VPABSD,
+    VPABSW,
+    VPACKSSDW,
+    VPACKSSWB,
+    VPACKUSWB,
+    VPADDB,
+    VPADDD,
+    VPADDQ,
+    VPADDSB,
+    VPADDSW,
+    VPADDUSB,
+    VPADDUSW,
+    VPADDW,
+    VPALIGNR,
+    VPAND,
+    VPANDN,
+    VPAVGB,
+    VPAVGW,
+    VPBLENDD,
+    VPBLENDVB,
+    VPBLENDW,
+    VPBROADCASTB,
+    VPBROADCASTD,
+    VPBROADCASTQ,
+    VPBROADCASTW,
+    VPCLMULQDQ,
+    VPCMPEQB,
+    VPCMPEQD,
+    VPCMPEQQ,
+    VPCMPEQW,
+    VPCMPGTB,
+    VPCMPGTD,
+    VPCMPGTQ,
+    VPCMPGTW,
+    VPCMPISTRI,
+    VPCMPISTRM,
+    VPERM2F128,
+    VPERM2I128,
+    VPERMD,
+    VPERMILPD,
+    VPERMILPS,
+    VPERMPD,
+    VPERMPS,
+    VPERMQ,
+    VPEXTRB,
+    VPEXTRD,
+    VPEXTRQ,
+    VPEXTRW,
+    VPGATHERDD,
+    VPGATHERDQ,
+    VPGATHERQD,
+    VPGATHERQQ,
+    VPHADDD,
+    VPHADDSW,
+    VPHADDW,
+    VPHMINPOSUW,
+    VPHSUBD,
+    VPHSUBSW,
+    VPHSUBW,
+    VPINSRB,
+    VPINSRD,
+    VPINSRQ,
+    VPINSRW,
+    VPMADDUBSW,
+    VPMADDWD,
+    VPMASKMOVD,
+    VPMASKMOVQ,
+    VPMAXSB,
+    VPMAXSD,
+    VPMAXSW,
+    VPMAXUD,
+    VPMINSD,
+    VPMINUD,
+    VPMOVMSKB,
+    VPMOVSXBD,
+    VPMOVSXBQ,
+    VPMOVSXBW,
+    VPMOVSXDQ,
+    VPMOVSXWD,
+    VPMOVSXWQ,
+    VPMOVZXBD,
+    VPMOVZXBQ,
+    VPMOVZXBW,
+    VPMOVZXDQ,
+    VPMOVZXWD,
+    VPMOVZXWQ,
+    VPMULDQ,
+    VPMULHRSW,
+    VPMULHUW,
+    VPMULHW,
+    VPMULLD,
+    VPMULLW,
+    VPMULUDQ,
+    VPOR,
+    VPSADBW,
+    VPSHUFB,
+    VPSHUFD,
+    VPSIGNB,
+    VPSIGND,
+    VPSIGNW,
+    VPSLLD,
+    VPSLLDQ,
+    VPSLLQ,
+    VPSLLVD,
+    VPSLLVQ,
+    VPSLLW,
+    VPSRAD,
+    VPSRAVD,
+    VPSRAW,
+    VPSRLD,
+    VPSRLDQ,
+    VPSRLQ,
+    VPSRLVD,
+    VPSRLVQ,
+    VPSRLW,
+    VPSUBB,
+    VPSUBD,
+    VPSUBQ,
+    VPSUBSB,
+    VPSUBSW,
+    VPSUBUSB,
+    VPSUBUSW,
+    VPSUBW,
+    VPTEST,
+    VPUNPCKHBW,
+    VPUNPCKHDQ,
+    VPUNPCKHQDQ,
+    VPUNPCKHWD,
+    VPUNPCKLBW,
+    VPUNPCKLDQ,
+    VPUNPCKLQDQ,
+    VPUNPCKLWD,
+    VPXOR,
+    VRCPPS,
+    VROUNDPD,
+    VROUNDPS,
+    VRSQRTPS,
+    VSHUFPD,
+    VSHUFPS,
+    VSQRTPD,
+    VSQRTPS,
+    VSUBPD,
+    VSUBPS,
+    VTESTPD,
+    VTESTPS,
+    VUNPCKHPD,
+    VUNPCKHPS,
+    VUNPCKLPD,
+    VUNPCKLPS,
+    VXORPD,
+    VXORPS,
+    VZEROUPPER,
 }
 #[derive(Debug)]
 pub struct Instruction {
@@ -733,6 +1026,7 @@ pub struct Instruction {
     modrm_rrr: RegSpec,
     modrm_mmm: RegSpec, // doubles as sib_base
     sib_index: RegSpec,
+    vex_reg: RegSpec,
     scale: u8,
     length: u8,
     operand_count: u8,
@@ -807,7 +1101,63 @@ impl LengthedInstruction for Instruction {
     }
 }
 
+#[derive(PartialEq)]
 pub struct InstDecoder {
+    // extensions tracked here:
+    //  0. SSE3
+    //  1. SSSE3
+    //  2. monitor (intel-only?)
+    //  3. vmx (some atom chips still lack it)
+    //  4. fma3 (intel haswell/broadwell+, amd piledriver+)
+    //  5. cmpxchg16b (some amd are missingt this one)
+    //  6. sse4.1
+    //  7. sse4.2
+    //  8. movbe
+    //  9. popcnt (independent of BMI)
+    // 10. aesni
+    // 11. xsave (xsave, xrestor, xsetbv, xgetbv)
+    // 12. rdrand (intel ivybridge+, amd ..??)
+    // 13. sgx (eadd, eblock, ecreate, edbgrd, edbgwr, einit, eldb, eldu, epa, eremove, etrace,
+    //     ewb, eenter, eexit, egetkey, ereport, eresume)
+    // 14. bmi1 (intel haswell+, amd jaguar+)
+    // 15. avx2 (intel haswell+, amd excavator+)
+    // 16. bmi2 (intel ?, amd ?)
+    // 17. invpcid
+    // 18. mpx
+    // 19. avx512_f
+    // 20. avx512_dq
+    // 21. rdseed
+    // 22. adx
+    // 23. avx512_fma
+    // 24. pcommit
+    // 25. clflushopt
+    // 26. clwb
+    // 27. avx512_pf
+    // 28. avx512_er
+    // 29. avx512_cd
+    // 30. sha
+    // 31. avx512_bw
+    // 32. avx512_vl
+    // 33. prefetchwt1
+    // 34. avx512_vbmi
+    // 35. avx512_vbmi2
+    // 36. gfni (galois field instructions)
+    // 37. vaes
+    // 38. vpclmulqdq
+    // 39. avx_vnni
+    // 40. avx512_bitalg
+    // 41. avx512_vpopcntdq
+    // 42. avx512_4vnniw
+    // 43. avx512_4fmaps
+    // 44. cx8 // cmpxchg8 - is this actually optional in x86_64?
+    // 45. syscall // syscall/sysret - actually optional in x86_64?
+    // 46. rdtscp // actually optional in x86_64?
+    // 47. abm (lzcnt, popcnt)
+    // 48. sse4a
+    // 49. 3dnowprefetch // actually optional?
+    // 50. xop
+    // 51. skinit
+    // 52. tbm
     flags: u64,
 }
 
@@ -816,10 +1166,33 @@ impl InstDecoder {
     ///
     /// Pedantic and only decodes what the spec says is well-defined, rejecting undefined sequences
     /// and any instructions defined by extensions.
-    fn minimal() -> Self {
+    pub fn minimal() -> Self {
         InstDecoder {
             flags: 0,
         }
+    }
+
+    fn bmi1(&self) -> bool {
+        self.flags & (1 << 13) != 0
+    }
+
+    pub fn without_bmi1(mut self) -> Self {
+        self.flags &= (!(1 << 13));
+        self
+    }
+
+    fn revise_instruction(&self, inst: &mut Instruction) -> Result<(), ()> {
+        match inst.opcode {
+            Opcode::TZCNT => {
+                if !self.bmi1() {
+                    // tzcnt is only supported if bmi1 is enabled. without bmi1, this decodes as
+                    // bsf.
+                    inst.opcode = Opcode::BSF;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 }
 
@@ -838,13 +1211,13 @@ impl Default for InstDecoder {
 impl Decoder<Instruction> for InstDecoder {
     fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Option<Instruction> {
         let mut instr = Instruction::invalid();
-        match decode_one(bytes, &mut instr) {
+        match decode_one(self, bytes, &mut instr) {
             Some(_) => Some(instr),
             None => None
         }
     }
     fn decode_into<T: IntoIterator<Item=u8>>(&self, instr: &mut Instruction, bytes: T) -> Option<()> {
-        decode_one(bytes, instr)
+        decode_one(self, bytes, instr)
     }
 }
 
@@ -938,6 +1311,7 @@ impl Instruction {
             modrm_rrr: RegSpec::rax(),
             modrm_mmm: RegSpec::rax(), // doubles as sib_base
             sib_index: RegSpec::rax(),
+            vex_reg: RegSpec::rax(),
             scale: 0,
             length: 0,
             disp: 0,
@@ -1002,16 +1376,26 @@ impl Instruction {
 #[derive(Debug, Copy, Clone)]
 pub struct Prefixes {
     bits: u8,
-    rep_prefix: RepPrefix,
     rex: PrefixRex,
     segment: Segment,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum RepPrefix {
-    None = 0,
-    E = 1,
-    NE = 2,
+#[derive(Debug, Copy, Clone)]
+pub struct PrefixVex {
+    bits: u8,
+}
+
+impl PrefixVex {
+    #[inline]
+    fn b(&self) -> bool { (self.bits & 0x01) == 0x01 }
+    #[inline]
+    fn x(&self) -> bool { (self.bits & 0x02) == 0x02 }
+    #[inline]
+    fn r(&self) -> bool { (self.bits & 0x04) == 0x04 }
+    #[inline]
+    fn w(&self) -> bool { (self.bits & 0x08) == 0x08 }
+    #[inline]
+    fn l(&self) -> bool { (self.bits & 0x10) == 0x10 }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1024,7 +1408,6 @@ impl Prefixes {
     fn new(bits: u8) -> Prefixes {
         Prefixes {
             bits: bits,
-            rep_prefix: RepPrefix::None,
             rex: PrefixRex { bits: 0 },
             segment: Segment::DS,
         }
@@ -1034,11 +1417,11 @@ impl Prefixes {
     #[inline]
     fn set_rep(&mut self) { self.bits = (self.bits & 0xcf) | 0x10 }
     #[inline]
-    fn repz(&self) -> bool { self.bits & 0x30 == 0x20 }
+    pub fn repz(&self) -> bool { self.bits & 0x30 == 0x20 }
     #[inline]
     fn set_repz(&mut self) { self.bits = (self.bits & 0xcf) | 0x20 }
     #[inline]
-    fn repnz(&self) -> bool { self.bits & 0x30 == 0x30 }
+    pub fn repnz(&self) -> bool { self.bits & 0x30 == 0x30 }
     #[inline]
     fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30 }
     #[inline]
@@ -1049,14 +1432,6 @@ impl Prefixes {
     fn address_size(&self) -> bool { self.bits & 0x2 == 2 }
     #[inline]
     fn set_address_size(&mut self) { self.bits = self.bits | 0x2 }
-    #[inline]
-    pub fn repne(&self) -> bool { self.rep_prefix == RepPrefix::NE }
-    #[inline]
-    fn set_repne(&mut self) { self.rep_prefix = RepPrefix::NE; }
-    #[inline]
-    pub fn repe(&self) -> bool { self.rep_prefix == RepPrefix::E }
-    #[inline]
-    fn set_repe(&mut self) { self.rep_prefix = RepPrefix::E; }
     #[inline]
     pub fn set_lock(&mut self) { self.bits |= 0x4 }
     #[inline]
@@ -1088,14 +1463,37 @@ impl Prefixes {
     #[inline]
     fn rex(&self) -> &PrefixRex { &self.rex }
     #[inline]
-    fn rex_mut(&mut self) -> &mut PrefixRex { &mut self.rex }
+    fn vex(&self) -> PrefixVex { PrefixVex { bits: self.rex.bits } }
+
+    #[inline]
+    fn rex_from(&mut self, bits: u8) {
+        self.rex.bits = bits;
+    }
+
+    #[inline]
+    fn vex_from_c5(&mut self, bits: u8) {
+        // collect rex bits
+        let r = bits & 0x80;
+        let wrxb = (r >> 5) ^ 0x04;
+        let l = (bits & 0x04) << 2;
+        let synthetic_rex = wrxb | l | 0x80;
+        self.rex.from(synthetic_rex);
+    }
+
+    #[inline]
+    fn vex_from_c4(&mut self, high: u8, low: u8) {
+        let w = low & 0x80;
+        let rxb = (high >> 5) ^ 0x07;
+        let wrxb = rxb | w >> 4;
+        let l = (low & 0x04) << 2;
+        let synthetic_rex = wrxb | l | 0x80;
+        self.rex.from(synthetic_rex);
+    }
 }
 
 impl PrefixRex {
     #[inline]
-    fn present(&self) -> bool { (self.bits & 0x10) == 0x10 }
-    #[inline]
-    fn set_present(&mut self) { self.bits |= 0x10; }
+    fn present(&self) -> bool { (self.bits & 0xc0) == 0x40 }
     #[inline]
     fn b(&self) -> bool { (self.bits & 0x01) == 0x01 }
     #[inline]
@@ -1106,8 +1504,7 @@ impl PrefixRex {
     fn w(&self) -> bool { (self.bits & 0x08) == 0x08 }
     #[inline]
     fn from(&mut self, prefix: u8) {
-        self.bits = prefix & 0x0f;
-        self.set_present();
+        self.bits = prefix;
     }
 }
 
@@ -1138,6 +1535,10 @@ pub enum OperandCode {
     AX_Xv,
     DX_AX,
     E_G_xmm,
+    E_G_ymm,
+    E_G_zmm,
+    G_E_ymm,
+    G_E_zmm,
     Ev_Ivs,
     Ew_Sw,
     Fw,
@@ -2371,7 +2772,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::UD2E), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0fba),
     OpcodeRecord(Interpretation::Instruction(Opcode::BTC), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::BSF), OperandCode::Gv_Ev),
+    OpcodeRecord(Interpretation::Instruction(Opcode::TZCNT), OperandCode::Gv_Ev),
     OpcodeRecord(Interpretation::Instruction(Opcode::BSR), OperandCode::Gv_Ev),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVSX_b), OperandCode::Gv_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVSX_w), OperandCode::Gv_Ew),
@@ -2675,8 +3076,8 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xc1_Ev_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::RETURN), OperandCode::Iw),
     OpcodeRecord(Interpretation::Instruction(Opcode::RETURN), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOV), OperandCode::ModRM_0xc6_Eb_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOV), OperandCode::ModRM_0xc7_Ev_Iv),
     OpcodeRecord(Interpretation::Instruction(Opcode::ENTER), OperandCode::Iw_Ib),
@@ -2767,7 +3168,7 @@ const OPCODES: [OpcodeRecord; 256] = [
 ];
 
 #[allow(non_snake_case)]
-fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, width: u8, length: &mut u8) -> Result<OperandSpec, ()> {
+pub(crate) fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, width: u8, length: &mut u8) -> Result<OperandSpec, ()> {
     let bank = width_to_gp_reg_bank(width, instr.prefixes.rex().present());
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
@@ -2776,9 +3177,17 @@ fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
     }
 }
 #[allow(non_snake_case)]
-fn read_E_xmm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, ()> {
+pub(crate) fn read_E_xmm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, ()> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, RegisterBank::X)
+    } else {
+        read_M(bytes_iter, instr, modrm, length)
+    }
+}
+#[allow(non_snake_case)]
+pub(crate) fn read_E_ymm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, ()> {
+    if modrm >= 0b11000000 {
+        read_modrm_reg(instr, modrm, RegisterBank::Y)
     } else {
         read_M(bytes_iter, instr, modrm, length)
     }
@@ -2942,7 +3351,7 @@ fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
     }
 }
 
-pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction) -> Result<(), ()> {
+pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction) -> Result<(), ()> {
     let mut length = 0u8;
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
 //    use std::intrinsics::unlikely;
@@ -2971,7 +3380,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                 length += 1;
                 let record = OPCODES[b as usize];
                 if (b & 0xf0) == 0x40 {
-                    prefixes.rex_mut().from(b);
+                    prefixes.rex_from(b);
                 } else if b == 0x0f {
                     let record = match alternate_opcode_map {
                         Some(opcode_map) => {
@@ -3010,7 +3419,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                     // prefix, but since 660f21 is not valid, the opcode is interpreted
                     // as 0f21, where 66 is a prefix, which makes 41 not the last
                     // prefix before the opcode, and it's discarded.
-                    prefixes.rex_mut().from(0);
+                    prefixes.rex_from(0);
                     escapes_are_prefixes_actually(&mut prefixes, &mut alternate_opcode_map);
                     match b {
                         0x26 => {
@@ -3037,6 +3446,14 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
                         0x67 => {
                             prefixes.set_address_size();
                         },
+                        0xc4 => {
+                            instruction.prefixes = prefixes;
+                            return vex::three_byte_vex(&mut bytes_iter, instruction, length);
+                        }
+                        0xc5 => {
+                            instruction.prefixes = prefixes;
+                            return vex::two_byte_vex(&mut bytes_iter, instruction, length);
+                        }
                         0xf0 => {
                             prefixes.set_lock();
                         },
@@ -3064,6 +3481,12 @@ pub fn read_instr<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Ins
     instruction.prefixes = prefixes;
     read_operands(bytes_iter, instruction, record.1, &mut length)?;
     instruction.length = length;
+
+    if decoder != &InstDecoder::default() {
+        // we might have to fix up or reject this instruction under whatever cpu features we need to
+        // pretend to have.
+        decoder.revise_instruction(instruction)?;
+    }
     Ok(())
 }
 pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), ()> {
@@ -4223,7 +4646,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
     Ok(())
 }
 
-pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruction) -> Option<()> {
+pub fn decode_one<'b, T: IntoIterator<Item=u8>>(decoder: &InstDecoder, bytes: T, instr: &'b mut Instruction) -> Option<()> {
     instr.operands = [
         OperandSpec::Nothing,
         OperandSpec::Nothing,
@@ -4231,7 +4654,7 @@ pub fn decode_one<'b, T: IntoIterator<Item=u8>>(bytes: T, instr: &'b mut Instruc
         OperandSpec::Nothing,
     ];
     let mut bytes_iter = bytes.into_iter();
-    read_instr(bytes_iter, instr).ok()
+    read_instr(decoder, bytes_iter, instr).ok()
 }
 /*
     match read_opcode(&mut bytes_iter, instr) {
