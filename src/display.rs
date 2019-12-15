@@ -281,11 +281,11 @@ impl fmt::Display for Opcode {
             &Opcode::RDTSC => write!(f, "{}", "rdtsc"),
             &Opcode::RDPMC => write!(f, "{}", "rdpmc"),
             &Opcode::FXSAVE => write!(f, "{}", "fxsave"),
-            &Opcode::FXRSTOR => write!(f, "{}", "fxstor"),
+            &Opcode::FXRSTOR => write!(f, "{}", "fxrstor"),
             &Opcode::LDMXCSR => write!(f, "{}", "ldmxcsr"),
             &Opcode::STMXCSR => write!(f, "{}", "stmxcsr"),
             &Opcode::XSAVE => write!(f, "{}", "xsave"),
-            &Opcode::XSTOR => write!(f, "{}", "xstor"),
+            &Opcode::XRSTOR => write!(f, "{}", "xrstor"),
             &Opcode::XSAVEOPT => write!(f, "{}", "xsaveopt"),
             &Opcode::LFENCE => write!(f, "{}", "lfence"),
             &Opcode::MFENCE => write!(f, "{}", "mfence"),
@@ -544,6 +544,23 @@ impl fmt::Display for Opcode {
             &Opcode::BLSI => write!(f, "{}", "blsi"),
             &Opcode::BLSMSK => write!(f, "{}", "blsmsk"),
             &Opcode::BLSR => write!(f, "{}", "blsr"),
+            &Opcode::VMCALL => write!(f, "{}", "vmcall"),
+            &Opcode::VMLAUNCH => write!(f, "{}", "vmlaunch"),
+            &Opcode::VMRESUME => write!(f, "{}", "vmresume"),
+            &Opcode::VMXOFF => write!(f, "{}", "vmxoff"),
+            &Opcode::MONITOR => write!(f, "{}", "monitor"),
+            &Opcode::MWAIT => write!(f, "{}", "mwait"),
+            &Opcode::CLAC => write!(f, "{}", "clac"),
+            &Opcode::STAC => write!(f, "{}", "stac"),
+            &Opcode::ENCLS => write!(f, "{}", "encls"),
+            &Opcode::XGETBV => write!(f, "{}", "xgetbv"),
+            &Opcode::XSETBV => write!(f, "{}", "xsetbv"),
+            &Opcode::VMFUNC => write!(f, "{}", "vmfunc"),
+            &Opcode::XEND => write!(f, "{}", "xend"),
+            &Opcode::XTEST => write!(f, "{}", "xtest"),
+            &Opcode::ENCLU => write!(f, "{}", "enclu"),
+            &Opcode::RDPKRU => write!(f, "{}", "rdpkru"),
+            &Opcode::WRPKRU => write!(f, "{}", "wrpkru"),
             &Opcode::VMOVUPS => write!(f, "{}", "vmovups"),
             &Opcode::VADDPD => write!(f, "{}", "vaddpd"),
             &Opcode::VADDPS => write!(f, "{}", "vaddps"),
@@ -1510,7 +1527,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::LDMXCSR |
             Opcode::STMXCSR |
             Opcode::XSAVE |
-            Opcode::XSTOR |
+            Opcode::XRSTOR |
             Opcode::XSAVEOPT |
             Opcode::LFENCE |
             Opcode::MFENCE |
@@ -1550,6 +1567,23 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::UD2E |
             Opcode::VMREAD |
             Opcode::VMWRITE |
+            Opcode::VMCALL |
+            Opcode::VMLAUNCH |
+            Opcode::VMRESUME |
+            Opcode::VMXOFF |
+            Opcode::MONITOR |
+            Opcode::MWAIT |
+            Opcode::CLAC |
+            Opcode::STAC |
+            Opcode::ENCLS |
+            Opcode::XGETBV |
+            Opcode::XSETBV |
+            Opcode::VMFUNC |
+            Opcode::XEND |
+            Opcode::XTEST |
+            Opcode::ENCLU |
+            Opcode::RDPKRU |
+            Opcode::WRPKRU |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::VAESDEC |

@@ -406,6 +406,17 @@ const BMI1: [Opcode; 6] = [
     Opcode::TZCNT,
 ];
 
+// TODO:
+// PTWRITE
+// RDFSBASE
+// RDGSBASE
+// WRFSBASE
+// WRGSBASE
+// TPAUSE
+// UMONITOR
+// UMWAIT
+// CLFLUSHOPT
+// CLWB
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
@@ -596,7 +607,7 @@ pub enum Opcode {
     LDMXCSR,
     STMXCSR,
     XSAVE,
-    XSTOR,
+    XRSTOR,
     XSAVEOPT,
     LFENCE,
     MFENCE,
@@ -639,6 +650,23 @@ pub enum Opcode {
     BLSI,
     BLSMSK,
     BLSR,
+    VMCALL,
+    VMLAUNCH,
+    VMRESUME,
+    VMXOFF,
+    MONITOR,
+    MWAIT,
+    CLAC,
+    STAC,
+    ENCLS,
+    XGETBV,
+    XSETBV,
+    VMFUNC,
+    XEND,
+    XTEST,
+    ENCLU,
+    RDPKRU,
+    WRPKRU,
 
     ADDPS,
     ANDNPS,
@@ -1082,6 +1110,7 @@ pub enum Opcode {
     VXORPS,
     VZEROUPPER,
 }
+
 #[derive(Debug)]
 pub struct Instruction {
     pub prefixes: Prefixes,
@@ -1222,6 +1251,8 @@ pub struct InstDecoder {
     // 50. xop
     // 51. skinit
     // 52. tbm
+    // 53. intel quirks
+    // 54. amd quirks
     flags: u64,
 }
 
@@ -1236,15 +1267,503 @@ impl InstDecoder {
         }
     }
 
-    fn bmi1(&self) -> bool {
-        self.flags & (1 << 13) != 0
+    pub fn sse3(&self) -> bool {
+        self.flags & (1 << 0) != 0
     }
 
-    pub fn without_bmi1(mut self) -> Self {
-        self.flags &= (!(1 << 13));
+    pub fn with_sse3(mut self) -> Self {
+        self.flags |= 1 << 0;
         self
     }
 
+    pub fn ssse3(&self) -> bool {
+        self.flags & (1 << 1) != 0
+    }
+
+    pub fn with_ssse3(mut self) -> Self {
+        self.flags |= 1 << 1;
+        self
+    }
+
+    pub fn monitor(&self) -> bool {
+        self.flags & (1 << 2) != 0
+    }
+
+    pub fn with_monitor(mut self) -> Self {
+        self.flags |= 1 << 2;
+        self
+    }
+
+    pub fn vmx(&self) -> bool {
+        self.flags & (1 << 3) != 0
+    }
+
+    pub fn with_vmx(mut self) -> Self {
+        self.flags |= 1 << 3;
+        self
+    }
+
+    pub fn fma3(&self) -> bool {
+        self.flags & (1 << 4) != 0
+    }
+
+    pub fn with_fma3(mut self) -> Self {
+        self.flags |= 1 << 4;
+        self
+    }
+
+    pub fn cmpxchg16b(&self) -> bool {
+        self.flags & (1 << 5) != 0
+    }
+
+    pub fn with_cmpxchg16b(mut self) -> Self {
+        self.flags |= 1 << 5;
+        self
+    }
+
+    pub fn sse4_1(&self) -> bool {
+        self.flags & (1 << 6) != 0
+    }
+
+    pub fn with_sse4_1(mut self) -> Self {
+        self.flags |= 1 << 6;
+        self
+    }
+
+    pub fn sse4_2(&self) -> bool {
+        self.flags & (1 << 7) != 0
+    }
+
+    pub fn with_sse4_2(mut self) -> Self {
+        self.flags |= 1 << 7;
+        self
+    }
+
+    pub fn movbe(&self) -> bool {
+        self.flags & (1 << 8) != 0
+    }
+
+    pub fn with_movbe(mut self) -> Self {
+        self.flags |= 1 << 8;
+        self
+    }
+
+    pub fn popcnt(&self) -> bool {
+        self.flags & (1 << 9) != 0
+    }
+
+    pub fn with_popcnt(mut self) -> Self {
+        self.flags |= 1 << 9;
+        self
+    }
+
+    pub fn aesni(&self) -> bool {
+        self.flags & (1 << 10) != 0
+    }
+
+    pub fn with_aesni(mut self) -> Self {
+        self.flags |= 1 << 10;
+        self
+    }
+
+    pub fn xsave(&self) -> bool {
+        self.flags & (1 << 11) != 0
+    }
+
+    pub fn with_xsave(mut self) -> Self {
+        self.flags |= 1 << 11;
+        self
+    }
+
+    pub fn rdrand(&self) -> bool {
+        self.flags & (1 << 12) != 0
+    }
+
+    pub fn with_rdrand(mut self) -> Self {
+        self.flags |= 1 << 12;
+        self
+    }
+
+    pub fn sgx(&self) -> bool {
+        self.flags & (1 << 13) != 0
+    }
+
+    pub fn with_sgx(mut self) -> Self {
+        self.flags |= 1 << 13;
+        self
+    }
+
+    pub fn bmi1(&self) -> bool {
+        self.flags & (1 << 14) != 0
+    }
+
+    pub fn with_bmi1(mut self) -> Self {
+        self.flags |= 1 << 14;
+        self
+    }
+
+    pub fn avx2(&self) -> bool {
+        self.flags & (1 << 15) != 0
+    }
+
+    pub fn with_avx2(mut self) -> Self {
+        self.flags |= 1 << 15;
+        self
+    }
+
+    pub fn bmi2(&self) -> bool {
+        self.flags & (1 << 16) != 0
+    }
+
+    pub fn with_bmi2(mut self) -> Self {
+        self.flags |= 1 << 16;
+        self
+    }
+
+    pub fn invpcid(&self) -> bool {
+        self.flags & (1 << 17) != 0
+    }
+
+    pub fn with_invpcid(mut self) -> Self {
+        self.flags |= 1 << 17;
+        self
+    }
+
+    pub fn mpx(&self) -> bool {
+        self.flags & (1 << 18) != 0
+    }
+
+    pub fn with_mpx(mut self) -> Self {
+        self.flags |= 1 << 18;
+        self
+    }
+
+    pub fn avx512_f(&self) -> bool {
+        self.flags & (1 << 19) != 0
+    }
+
+    pub fn with_avx512_f(mut self) -> Self {
+        self.flags |= 1 << 19;
+        self
+    }
+
+    pub fn avx512_dq(&self) -> bool {
+        self.flags & (1 << 20) != 0
+    }
+
+    pub fn with_avx512_dq(mut self) -> Self {
+        self.flags |= 1 << 20;
+        self
+    }
+
+    pub fn rdseed(&self) -> bool {
+        self.flags & (1 << 21) != 0
+    }
+
+    pub fn with_rdseed(mut self) -> Self {
+        self.flags |= 1 << 21;
+        self
+    }
+
+    pub fn adx(&self) -> bool {
+        self.flags & (1 << 22) != 0
+    }
+
+    pub fn with_adx(mut self) -> Self {
+        self.flags |= 1 << 22;
+        self
+    }
+
+    pub fn avx512_fma(&self) -> bool {
+        self.flags & (1 << 23) != 0
+    }
+
+    pub fn with_avx512_fma(mut self) -> Self {
+        self.flags |= 1 << 23;
+        self
+    }
+
+    pub fn pcommit(&self) -> bool {
+        self.flags & (1 << 24) != 0
+    }
+
+    pub fn with_pcommit(mut self) -> Self {
+        self.flags |= 1 << 24;
+        self
+    }
+
+    pub fn clflushopt(&self) -> bool {
+        self.flags & (1 << 25) != 0
+    }
+
+    pub fn with_clflushopt(mut self) -> Self {
+        self.flags |= 1 << 25;
+        self
+    }
+
+    pub fn clwb(&self) -> bool {
+        self.flags & (1 << 26) != 0
+    }
+
+    pub fn with_clwb(mut self) -> Self {
+        self.flags |= 1 << 26;
+        self
+    }
+
+    pub fn avx512_pf(&self) -> bool {
+        self.flags & (1 << 27) != 0
+    }
+
+    pub fn with_avx512_pf(mut self) -> Self {
+        self.flags |= 1 << 27;
+        self
+    }
+
+    pub fn avx512_er(&self) -> bool {
+        self.flags & (1 << 28) != 0
+    }
+
+    pub fn with_avx512_er(mut self) -> Self {
+        self.flags |= 1 << 28;
+        self
+    }
+
+    pub fn avx512_cd(&self) -> bool {
+        self.flags & (1 << 29) != 0
+    }
+
+    pub fn with_avx512_cd(mut self) -> Self {
+        self.flags |= 1 << 29;
+        self
+    }
+
+    pub fn sha(&self) -> bool {
+        self.flags & (1 << 30) != 0
+    }
+
+    pub fn with_sha(mut self) -> Self {
+        self.flags |= 1 << 30;
+        self
+    }
+
+    pub fn avx512_bw(&self) -> bool {
+        self.flags & (1 << 31) != 0
+    }
+
+    pub fn with_avx512_bw(mut self) -> Self {
+        self.flags |= 1 << 31;
+        self
+    }
+
+    pub fn avx512_vl(&self) -> bool {
+        self.flags & (1 << 32) != 0
+    }
+
+    pub fn with_avx512_vl(mut self) -> Self {
+        self.flags |= 1 << 32;
+        self
+    }
+
+    pub fn prefetchwt1(&self) -> bool {
+        self.flags & (1 << 33) != 0
+    }
+
+    pub fn with_prefetchwt1(mut self) -> Self {
+        self.flags |= 1 << 33;
+        self
+    }
+
+    pub fn avx512_vbmi(&self) -> bool {
+        self.flags & (1 << 34) != 0
+    }
+
+    pub fn with_avx512_vbmi(mut self) -> Self {
+        self.flags |= 1 << 34;
+        self
+    }
+
+    pub fn avx512_vbmi2(&self) -> bool {
+        self.flags & (1 << 35) != 0
+    }
+
+    pub fn with_avx512_vbmi2(mut self) -> Self {
+        self.flags |= 1 << 35;
+        self
+    }
+
+    pub fn gfni(&self) -> bool {
+        self.flags & (1 << 36) != 0
+    }
+
+    pub fn with_gfni(mut self) -> Self {
+        self.flags |= 1 << 36;
+        self
+    }
+
+    pub fn vaes(&self) -> bool {
+        self.flags & (1 << 37) != 0
+    }
+
+    pub fn with_vaes(mut self) -> Self {
+        self.flags |= 1 << 37;
+        self
+    }
+
+    pub fn vpclmulqdq(&self) -> bool {
+        self.flags & (1 << 38) != 0
+    }
+
+    pub fn with_vpclmulqdq(mut self) -> Self {
+        self.flags |= 1 << 38;
+        self
+    }
+
+    pub fn avx_vnni(&self) -> bool {
+        self.flags & (1 << 39) != 0
+    }
+
+    pub fn with_avx_vnni(mut self) -> Self {
+        self.flags |= 1 << 39;
+        self
+    }
+
+    pub fn avx512_bitalg(&self) -> bool {
+        self.flags & (1 << 40) != 0
+    }
+
+    pub fn with_avx512_bitalg(mut self) -> Self {
+        self.flags |= 1 << 40;
+        self
+    }
+
+    pub fn avx512_vpopcntdq(&self) -> bool {
+        self.flags & (1 << 41) != 0
+    }
+
+    pub fn with_avx512_vpopcntdq(mut self) -> Self {
+        self.flags |= 1 << 41;
+        self
+    }
+
+    pub fn avx512_4vnniw(&self) -> bool {
+        self.flags & (1 << 42) != 0
+    }
+
+    pub fn with_avx512_4vnniw(mut self) -> Self {
+        self.flags |= 1 << 42;
+        self
+    }
+
+    pub fn avx512_4fmaps(&self) -> bool {
+        self.flags & (1 << 43) != 0
+    }
+
+    pub fn with_avx512_4fmaps(mut self) -> Self {
+        self.flags |= 1 << 43;
+        self
+    }
+
+    pub fn cx8(&self) -> bool {
+        self.flags & (1 << 44) != 0
+    }
+
+    pub fn with_cx8(mut self) -> Self {
+        self.flags |= 1 << 44;
+        self
+    }
+
+    pub fn syscall(&self) -> bool {
+        self.flags & (1 << 45) != 0
+    }
+
+    pub fn with_syscall(mut self) -> Self {
+        self.flags |= 1 << 45;
+        self
+    }
+
+    pub fn rdtscp(&self) -> bool {
+        self.flags & (1 << 46) != 0
+    }
+
+    pub fn with_rdtscp(mut self) -> Self {
+        self.flags |= 1 << 46;
+        self
+    }
+
+    pub fn abm(&self) -> bool {
+        self.flags & (1 << 47) != 0
+    }
+
+    pub fn with_abm(mut self) -> Self {
+        self.flags |= 1 << 47;
+        self
+    }
+
+    pub fn sse4a(&self) -> bool {
+        self.flags & (1 << 48) != 0
+    }
+
+    pub fn with_sse4a(mut self) -> Self {
+        self.flags |= 1 << 48;
+        self
+    }
+
+    pub fn _3dnowprefetch(&self) -> bool {
+        self.flags & (1 << 49) != 0
+    }
+
+    pub fn with_3dnowprefetch(mut self) -> Self {
+        self.flags |= 1 << 49;
+        self
+    }
+
+    pub fn xop(&self) -> bool {
+        self.flags & (1 << 50) != 0
+    }
+
+    pub fn with_xop(mut self) -> Self {
+        self.flags |= 1 << 50;
+        self
+    }
+
+    pub fn skinit(&self) -> bool {
+        self.flags & (1 << 51) != 0
+    }
+
+    pub fn with_skinit(mut self) -> Self {
+        self.flags |= 1 << 51;
+        self
+    }
+
+    pub fn tbm(&self) -> bool {
+        self.flags & (1 << 52) != 0
+    }
+
+    pub fn with_tbm(mut self) -> Self {
+        self.flags |= 1 << 52;
+        self
+    }
+
+    pub fn intel_quirks(&self) -> bool {
+        self.flags & (1 << 53) != 0
+    }
+
+    pub fn with_intel_quirks(mut self) -> Self {
+        self.flags |= 1 << 53;
+        self
+    }
+
+    pub fn amd_quirks(&self) -> bool {
+        self.flags & (1 << 54) != 0
+    }
+
+    pub fn with_amd_quirks(mut self) -> Self {
+        self.flags |= 1 << 54;
+        self
+    }
+
+    /// Optionally reject or reinterpret instruction according to the decoder's
+    /// declared extensions.
     fn revise_instruction(&self, inst: &mut Instruction) -> Result<(), ()> {
         match inst.opcode {
             Opcode::TZCNT => {
@@ -3564,7 +4083,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
         unsafe { unreachable_unchecked(); }
     }
     instruction.prefixes = prefixes;
-    read_operands(bytes_iter, instruction, record.1, &mut length)?;
+    read_operands(decoder, bytes_iter, instruction, record.1, &mut length)?;
     instruction.length = length;
 
     if decoder != &InstDecoder::default() {
@@ -3574,7 +4093,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
     }
     Ok(())
 }
-pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), ()> {
+pub fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), ()> {
     let mut bytes_read = 0;
     if (operand_code as u8) & 0x40 == 0x40 {
         instruction.operands[0] = OperandSpec::RegRRR;
@@ -4135,14 +4654,14 @@ pub fn read_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             instruction.operand_count = 0;
         }
         _ => {
-            unlikely_operands(bytes_iter, instruction, operand_code, mem_oper, length)?;
+            unlikely_operands(decoder, bytes_iter, instruction, operand_code, mem_oper, length)?;
         }
     };
     }
 
     Ok(())
 }
-fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), ()> {
+fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), ()> {
     let mut bytes_read = 0;
     match operand_code {
         OperandCode::ModRM_0x0f71 => {
@@ -4504,7 +5023,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             } else if r == 7 {
                 instruction.opcode = Opcode::Invalid;
                 instruction.operand_count = 0;
-                return Ok(());
+                return Err(());
             } else {
                 unreachable!("r <= 8");
             }
@@ -4518,7 +5037,25 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    panic!("Unsupported instruction: 0x0f01 with modrm: 11 000 ___");
+                    instruction.operand_count = 0;
+                    match m {
+                        0b001 => {
+                            instruction.opcode = Opcode::VMCALL;
+                        },
+                        0b010 => {
+                            instruction.opcode = Opcode::VMLAUNCH;
+                        },
+                        0b011 => {
+                            instruction.opcode = Opcode::VMRESUME;
+                        },
+                        0b100 => {
+                            instruction.opcode = Opcode::VMXOFF;
+                        },
+                        _ => {
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(());
+                        }
+                    }
                 } else {
                     instruction.opcode = Opcode::SGDT;
                     instruction.operand_count = 1;
@@ -4528,9 +5065,28 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    // TOOD: MONITOR
-                    instruction.opcode = Opcode::NOP;
                     instruction.operand_count = 0;
+                    match m {
+                        0b000 => {
+                            instruction.opcode = Opcode::MONITOR;
+                        }
+                        0b001 => {
+                            instruction.opcode = Opcode::MWAIT;
+                        },
+                        0b010 => {
+                            instruction.opcode = Opcode::CLAC;
+                        }
+                        0b011 => {
+                            instruction.opcode = Opcode::STAC;
+                        }
+                        0b111 => {
+                            instruction.opcode = Opcode::ENCLS;
+                        }
+                        _ => {
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(());
+                        }
+                    }
                 } else {
                     instruction.opcode = Opcode::SIDT;
                     instruction.operand_count = 1;
@@ -4540,9 +5096,31 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    // TOOD: XGETBV
-                    instruction.opcode = Opcode::NOP;
                     instruction.operand_count = 0;
+                    match m {
+                        0b000 => {
+                            instruction.opcode = Opcode::XGETBV;
+                        }
+                        0b001 => {
+                            instruction.opcode = Opcode::XSETBV;
+                        }
+                        0b100 => {
+                            instruction.opcode = Opcode::VMFUNC;
+                        }
+                        0b101 => {
+                            instruction.opcode = Opcode::XEND;
+                        }
+                        0b110 => {
+                            instruction.opcode = Opcode::XTEST;
+                        }
+                        0b111 => {
+                            instruction.opcode = Opcode::ENCLU;
+                        }
+                        _ => {
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(());
+                        }
+                    }
                 } else {
                     instruction.opcode = Opcode::LGDT;
                     instruction.operand_count = 1;
@@ -4552,9 +5130,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    // TOOD: VMRUN
-                    instruction.opcode = Opcode::NOP;
+                    instruction.opcode = Opcode::Invalid;
                     instruction.operand_count = 0;
+                    return Err(());
                 } else {
                     instruction.opcode = Opcode::LIDT;
                     instruction.operand_count = 1;
@@ -4567,7 +5145,22 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                 instruction.operand_count = 1;
                 instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
             } else if r == 5 {
-                panic!("Unsupported instruction: 0x0f01 with modrm: __ 101 ___");
+                let m = modrm & 7;
+                match m {
+                    0b110 => {
+                        instruction.opcode = Opcode::RDPKRU;
+                        instruction.operand_count = 1;
+                    }
+                    0b111 => {
+                        instruction.opcode = Opcode::WRPKRU;
+                        instruction.operand_count = 1;
+                    }
+                    _ => {
+                        instruction.opcode = Opcode::Invalid;
+                        instruction.operand_count = 0;
+                        return Err(());
+                    }
+                }
             } else if r == 6 {
                 instruction.opcode = Opcode::LMSW;
                 instruction.operand_count = 1;
@@ -4583,8 +5176,8 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                         instruction.opcode = Opcode::RDTSCP;
                         instruction.operand_count = 0;
                     } else {
-                    //    panic!("Unsupported instruction: 0x0f01 with modrm: 11 110 r >= 2");
-                        return Err(()); // Err("unsupported 0x0f01 variant".to_string())
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(());
                     }
                 } else {
                     instruction.opcode = Opcode::INVLPG;
@@ -4603,19 +5196,44 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
             // all the 0b11 instructions are err or no-operands
             if mod_bits == 0b11 {
                 instruction.operand_count = 0;
+                let m = modrm & 7;
                 match r {
                     // invalid rrr for 0x0fae, mod: 11
                     0 | 1 | 2 | 3 | 4 => {
                         return Err(());
                     },
                     5 => {
-                        instruction.opcode = Opcode::LFENCE
+                        instruction.opcode = Opcode::LFENCE;
+                        // TODO: verify on real hardware
+                        // AMD's manual suggests their chips reject *FENCE with non-zero r/m
+                        if decoder.amd_quirks() && !decoder.intel_quirks() {
+                            if m != 0 {
+                                instruction.opcode = Opcode::Invalid;
+                                return Err(());
+                            }
+                        }
                     },
                     6 => {
-                        instruction.opcode = Opcode::MFENCE
+                        instruction.opcode = Opcode::MFENCE;
+                        // TODO: verify on real hardware
+                        // AMD's manual suggests their chips reject *FENCE with non-zero r/m
+                        if decoder.amd_quirks() && !decoder.intel_quirks() {
+                            if m != 0 {
+                                instruction.opcode = Opcode::Invalid;
+                                return Err(());
+                            }
+                        }
                     },
                     7 => {
-                        instruction.opcode = Opcode::SFENCE
+                        instruction.opcode = Opcode::SFENCE;
+                        // TODO: verify on real hardware
+                        // AMD's manual suggests their chips reject *FENCE with non-zero r/m
+                        if decoder.amd_quirks() && !decoder.intel_quirks() {
+                            if m != 0 {
+                                instruction.opcode = Opcode::Invalid;
+                                return Err(());
+                            }
+                        }
                     },
                     _ => { unsafe { unreachable_unchecked() } /* r <=7 */ }
                 }
@@ -4627,12 +5245,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(mut bytes_iter: T, instruction: &mut 
                     Opcode::LDMXCSR,
                     Opcode::STMXCSR,
                     Opcode::XSAVE,
-                    Opcode::XSTOR,
-                    // TODO: radare reports this, but i'm not sure?
+                    Opcode::XRSTOR,
                     Opcode::XSAVEOPT,
-                    // TODO: radare reports this, but i'm not sure?
                     Opcode::CLFLUSH,
-                    Opcode::Invalid,
                 ][r as usize];
                 instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
             }

@@ -97,6 +97,90 @@ fn test_cvt() {
 }
 
 #[test]
+fn test_0f01() {
+    // drawn heavily from "Table A-6.  Opcode Extensions for One- and Two-byte Opcodes by Group
+    // Number"
+    test_display(&[0x0f, 0x01, 0x38], "invlpg [rax]");
+    test_display(&[0x0f, 0x01, 0x3f], "invlpg [rdi]");
+    test_display(&[0x0f, 0x01, 0x40, 0xff], "sgdt [rax - 0x1]");
+    test_display(&[0x0f, 0x01, 0x41, 0xff], "sgdt [rcx - 0x1]");
+    test_display(&[0x0f, 0x01, 0x49, 0xff], "sidt [rcx - 0x1]");
+    test_display(&[0x0f, 0x01, 0x51, 0xff], "lgdt [rcx - 0x1]");
+    test_display(&[0x0f, 0x01, 0x59, 0xff], "lidt [rcx - 0x1]");
+    test_display(&[0x0f, 0x01, 0x61, 0xff], "smsw [rcx - 0x1]");
+    test_display(&[0x0f, 0x01, 0xc0], "enclv");
+    test_display(&[0x0f, 0x01, 0xc1], "vmcall");
+    test_display(&[0x0f, 0x01, 0xc2], "vmlaunch");
+    test_display(&[0x0f, 0x01, 0xc3], "vmresume");
+    test_display(&[0x0f, 0x01, 0xc4], "vmxoff");
+    test_invalid(&[0x0f, 0x01, 0xc5]);
+    test_invalid(&[0x0f, 0x01, 0xc6]);
+    test_invalid(&[0x0f, 0x01, 0xc7]);
+    test_display(&[0x0f, 0x01, 0xc8], "monitor");
+    test_display(&[0x0f, 0x01, 0xc9], "mwait");
+    test_display(&[0x0f, 0x01, 0xca], "clac");
+    test_display(&[0x0f, 0x01, 0xcb], "stac");
+    test_display(&[0x0f, 0x01, 0xcf], "encls");
+    test_display(&[0x0f, 0x01, 0xd0], "xgetbv");
+    test_display(&[0x0f, 0x01, 0xd1], "xsetbv");
+    test_invalid(&[0x0f, 0x01, 0xd2]);
+    test_invalid(&[0x0f, 0x01, 0xd3]);
+    test_display(&[0x0f, 0x01, 0xd4], "vmfunc");
+    test_display(&[0x0f, 0x01, 0xd5], "xend");
+    test_display(&[0x0f, 0x01, 0xd6], "xtest");
+    test_display(&[0x0f, 0x01, 0xd7], "enclu");
+    test_invalid(&[0x0f, 0x01, 0xd8]);
+    test_invalid(&[0x0f, 0x01, 0xd9]);
+    test_invalid(&[0x0f, 0x01, 0xda]);
+    test_invalid(&[0x0f, 0x01, 0xdb]);
+    test_invalid(&[0x0f, 0x01, 0xdc]);
+    test_invalid(&[0x0f, 0x01, 0xdd]);
+    test_invalid(&[0x0f, 0x01, 0xde]);
+    test_invalid(&[0x0f, 0x01, 0xdf]);
+    test_display(&[0x0f, 0x01, 0xee], "rdpkru");
+    test_display(&[0x0f, 0x01, 0xef], "wrpkru");
+    test_display(&[0x0f, 0x01, 0xf8], "swapgs");
+    test_display(&[0x0f, 0x01, 0xf9], "rdtscp");
+}
+
+#[test]
+fn test_0fae() {
+    let intel = InstDecoder::minimal().with_intel_quirks();
+    let amd = InstDecoder::minimal().with_amd_quirks();
+    let default = InstDecoder::default();
+    // drawn heavily from "Table A-6.  Opcode Extensions for One- and Two-byte Opcodes by Group
+    // Number"
+    test_display(&[0x0f, 0xae, 0x04, 0x4f], "fxsave [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x0c, 0x4f], "fxrstor [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x14, 0x4f], "ldmxcsr [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x1c, 0x4f], "stmxcsr [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x24, 0x4f], "xsave [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x2c, 0x4f], "xrstor [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x34, 0x4f], "xsaveopt [rdi + rcx * 2]");
+    test_display(&[0x0f, 0xae, 0x3c, 0x4f], "clflush [rdi + rcx * 2]");
+
+    for (modrm, text) in &[(0xe8u8, "lfence"), (0xf0u8, "mfence"), (0xf8u8, "sfence")] {
+        test_display_under(&intel, &[0x0f, 0xae, *modrm], text);
+        test_display_under(&amd, &[0x0f, 0xae, *modrm], text);
+        test_display_under(&default, &[0x0f, 0xae, *modrm], text);
+        // it turns out intel accepts m != 0 for {l,m,s}fence, but amd does not:
+        // from intel:
+        // ```
+        // Specification of the instruction's opcode above indicates a ModR/M byte of F0. For this
+        // instruction, the processor ignores the r/m field of the ModR/M byte. Thus, MFENCE is encoded
+        // by any opcode of the form 0F AE Fx, where x is in the range 0-7.
+        // ```
+        // whereas amd does not discuss the r/m field at all. it is TBD if amd also ignores the r/m
+        // field, but for now assumed to be rejected.
+        for m in 1u8..8u8 {
+            test_display_under(&intel, &[0x0f, 0xae, modrm | m], text);
+            test_invalid_under(&amd, &[0x0f, 0xae, modrm | m]);
+            test_display_under(&default, &[0x0f, 0xae, modrm | m], text);
+        }
+    }
+}
+
+#[test]
 fn test_system() {
     test_display(&[0x66, 0x4f, 0x0f, 0xb2, 0x00], "lss r8, [r8]");
     test_display(&[0x67, 0x4f, 0x0f, 0xb2, 0x00], "lss r8, [r8d]");
@@ -248,8 +332,8 @@ fn test_push_pop() {
 
 #[test]
 fn test_bmi1() {
-    let bmi1 = InstDecoder::default();
-    let no_bmi1 = InstDecoder::default().without_bmi1();
+    let bmi1 = InstDecoder::minimal().with_bmi1();
+    let no_bmi1 = InstDecoder::minimal();
     test_display_under(&bmi1, &[0x41, 0x0f, 0xbc, 0xd3], "tzcnt edx, r11d");
     test_display_under(&no_bmi1, &[0x41, 0x0f, 0xbc, 0xd3], "bsf edx, r11d");
 }
