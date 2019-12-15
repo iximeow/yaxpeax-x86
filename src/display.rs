@@ -712,6 +712,7 @@ impl fmt::Display for Opcode {
             &Opcode::VPGATHERQQ => write!(f, "{}", "vpgatherqq"),
             &Opcode::VPHADDD => write!(f, "{}", "vphaddd"),
             &Opcode::VPHADDSW => write!(f, "{}", "vphaddsw"),
+            &Opcode::VPHADDUBSW => write!(f, "{}", "vphaddubsw"),
             &Opcode::VPHADDW => write!(f, "{}", "vphaddw"),
             &Opcode::VPHMINPOSUW => write!(f, "{}", "vphminposuw"),
             &Opcode::VPHSUBD => write!(f, "{}", "vphsubd"),
@@ -721,7 +722,6 @@ impl fmt::Display for Opcode {
             &Opcode::VPINSRD => write!(f, "{}", "vpinsrd"),
             &Opcode::VPINSRQ => write!(f, "{}", "vpinsrq"),
             &Opcode::VPINSRW => write!(f, "{}", "vpinsrw"),
-            &Opcode::VPMADDUBSW => write!(f, "{}", "vpmaddubsw"),
             &Opcode::VPMADDWD => write!(f, "{}", "vpmaddwd"),
             &Opcode::VPMASKMOVD => write!(f, "{}", "vpmaskmovd"),
             &Opcode::VPMASKMOVQ => write!(f, "{}", "vpmaskmovq"),
@@ -817,6 +817,64 @@ impl fmt::Display for Opcode {
             &Opcode::VADDSUBPS => write!(f, "{}", "vaddsubps"),
             &Opcode::VCVTPD2DQ => write!(f, "{}", "vcvtpd2dq"),
             &Opcode::VLDDQU => write!(f, "{}", "vlddqu"),
+            &Opcode::VADDSD => write!(f, "{}", "vaddsd"),
+            &Opcode::VADDSS => write!(f, "{}", "vaddss"),
+            &Opcode::VCMPSD => write!(f, "{}", "vcmpsd"),
+            &Opcode::VCMPSS => write!(f, "{}", "vcmpss"),
+            &Opcode::VCOMISD => write!(f, "{}", "vcomisd"),
+            &Opcode::VCOMISS => write!(f, "{}", "vcomiss"),
+            &Opcode::VCVTSD2SI => write!(f, "{}", "vcvtsd2si"),
+            &Opcode::VCVTSD2SS => write!(f, "{}", "vcvtsd2ss"),
+            &Opcode::VCVTSI2SD => write!(f, "{}", "vcvtsi2sd"),
+            &Opcode::VCVTSI2SS => write!(f, "{}", "vcvtsi2ss"),
+            &Opcode::VCVTSS2SD => write!(f, "{}", "vcvtss2sd"),
+            &Opcode::VCVTSS2SI => write!(f, "{}", "vcvtss2si"),
+            &Opcode::VCVTTSD2SI => write!(f, "{}", "vcvttsd2si"),
+            &Opcode::VCVTTSS2SI => write!(f, "{}", "vcvttss2si"),
+            &Opcode::VDIVSD => write!(f, "{}", "vdivsd"),
+            &Opcode::VDIVSS => write!(f, "{}", "vdivss"),
+            &Opcode::VFMADD132SD => write!(f, "{}", "vfmadd132sd"),
+            &Opcode::VFMADD132SS => write!(f, "{}", "vfmadd132ss"),
+            &Opcode::VFMADD213SD => write!(f, "{}", "vfmadd213sd"),
+            &Opcode::VFMADD213SS => write!(f, "{}", "vfmadd213ss"),
+            &Opcode::VFMADD231SD => write!(f, "{}", "vfmadd231sd"),
+            &Opcode::VFMADD231SS => write!(f, "{}", "vfmadd231ss"),
+            &Opcode::VFMSUB132SD => write!(f, "{}", "vfmsub132sd"),
+            &Opcode::VFMSUB132SS => write!(f, "{}", "vfmsub132ss"),
+            &Opcode::VFMSUB213SD => write!(f, "{}", "vfmsub213sd"),
+            &Opcode::VFMSUB213SS => write!(f, "{}", "vfmsub213ss"),
+            &Opcode::VFMSUB231SD => write!(f, "{}", "vfmsub231sd"),
+            &Opcode::VFMSUB231SS => write!(f, "{}", "vfmsub231ss"),
+            &Opcode::VFNMADD132SD => write!(f, "{}", "vfnmadd132sd"),
+            &Opcode::VFNMADD132SS => write!(f, "{}", "vfnmadd132ss"),
+            &Opcode::VFNMADD213SD => write!(f, "{}", "vfnmadd213sd"),
+            &Opcode::VFNMADD213SS => write!(f, "{}", "vfnmadd213ss"),
+            &Opcode::VFNMADD231SD => write!(f, "{}", "vfnmadd231sd"),
+            &Opcode::VFNMADD231SS => write!(f, "{}", "vfnmadd231ss"),
+            &Opcode::VFNMSUB132SD => write!(f, "{}", "vfnmsub132sd"),
+            &Opcode::VFNMSUB132SS => write!(f, "{}", "vfnmsub132ss"),
+            &Opcode::VFNMSUB213SD => write!(f, "{}", "vfnmsub213sd"),
+            &Opcode::VFNMSUB213SS => write!(f, "{}", "vfnmsub213ss"),
+            &Opcode::VFNMSUB231SD => write!(f, "{}", "vfnmsub231sd"),
+            &Opcode::VFNMSUB231SS => write!(f, "{}", "vfnmsub231ss"),
+            &Opcode::VMAXSD => write!(f, "{}", "vmaxsd"),
+            &Opcode::VMAXSS => write!(f, "{}", "vmaxss"),
+            &Opcode::VMINSD => write!(f, "{}", "vminsd"),
+            &Opcode::VMINSS => write!(f, "{}", "vminss"),
+            &Opcode::VMOVSD => write!(f, "{}", "vmovsd"),
+            &Opcode::VMOVSS => write!(f, "{}", "vmovss"),
+            &Opcode::VMULSD => write!(f, "{}", "vmulsd"),
+            &Opcode::VMULSS => write!(f, "{}", "vmulss"),
+            &Opcode::VRCPSS => write!(f, "{}", "vrcpss"),
+            &Opcode::VROUNDSD => write!(f, "{}", "vroundsd"),
+            &Opcode::VROUNDSS => write!(f, "{}", "vroundss"),
+            &Opcode::VRSQRTSS => write!(f, "{}", "vrsqrtss"),
+            &Opcode::VSQRTSD => write!(f, "{}", "vsqrtsd"),
+            &Opcode::VSQRTSS => write!(f, "{}", "vsqrtss"),
+            &Opcode::VSUBSD => write!(f, "{}", "vsubsd"),
+            &Opcode::VSUBSS => write!(f, "{}", "vsubss"),
+            &Opcode::VUCOMISD => write!(f, "{}", "vucomisd"),
+            &Opcode::VUCOMISS => write!(f, "{}", "vucomiss"),
             &Opcode::Invalid => write!(f, "{}", "invalid"),
         }
     }
@@ -830,13 +888,21 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VADDSUBPS |
             Opcode::VADDPD |
             Opcode::VADDPS |
+            Opcode::VADDSD |
+            Opcode::VADDSS |
             Opcode::VADDSUBPD |
             Opcode::VFMADD132PD |
             Opcode::VFMADD132PS |
+            Opcode::VFMADD132SD |
+            Opcode::VFMADD132SS |
             Opcode::VFMADD213PD |
             Opcode::VFMADD213PS |
+            Opcode::VFMADD213SD |
+            Opcode::VFMADD213SS |
             Opcode::VFMADD231PD |
             Opcode::VFMADD231PS |
+            Opcode::VFMADD231SD |
+            Opcode::VFMADD231SS |
             Opcode::VFMADDSUB132PD |
             Opcode::VFMADDSUB132PS |
             Opcode::VFMADDSUB213PD |
@@ -845,10 +911,16 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VFMADDSUB231PS |
             Opcode::VFMSUB132PD |
             Opcode::VFMSUB132PS |
+            Opcode::VFMSUB132SD |
+            Opcode::VFMSUB132SS |
             Opcode::VFMSUB213PD |
             Opcode::VFMSUB213PS |
+            Opcode::VFMSUB213SD |
+            Opcode::VFMSUB213SS |
             Opcode::VFMSUB231PD |
             Opcode::VFMSUB231PS |
+            Opcode::VFMSUB231SD |
+            Opcode::VFMSUB231SS |
             Opcode::VFMSUBADD132PD |
             Opcode::VFMSUBADD132PS |
             Opcode::VFMSUBADD213PD |
@@ -857,22 +929,38 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VFMSUBADD231PS |
             Opcode::VFNMADD132PD |
             Opcode::VFNMADD132PS |
+            Opcode::VFNMADD132SD |
+            Opcode::VFNMADD132SS |
             Opcode::VFNMADD213PD |
             Opcode::VFNMADD213PS |
+            Opcode::VFNMADD213SD |
+            Opcode::VFNMADD213SS |
             Opcode::VFNMADD231PD |
             Opcode::VFNMADD231PS |
+            Opcode::VFNMADD231SD |
+            Opcode::VFNMADD231SS |
             Opcode::VFNMSUB132PD |
             Opcode::VFNMSUB132PS |
+            Opcode::VFNMSUB132SD |
+            Opcode::VFNMSUB132SS |
             Opcode::VFNMSUB213PD |
             Opcode::VFNMSUB213PS |
+            Opcode::VFNMSUB213SD |
+            Opcode::VFNMSUB213SS |
             Opcode::VFNMSUB231PD |
             Opcode::VFNMSUB231PS |
+            Opcode::VFNMSUB231SD |
+            Opcode::VFNMSUB231SS |
             Opcode::VDIVPD |
             Opcode::VDIVPS |
+            Opcode::VDIVSD |
+            Opcode::VDIVSS |
             Opcode::VHADDPD |
             Opcode::VHSUBPD |
             Opcode::VMULPD |
             Opcode::VMULPS |
+            Opcode::VMULSD |
+            Opcode::VMULSS |
             Opcode::VPABSB |
             Opcode::VPABSD |
             Opcode::VPABSW |
@@ -911,6 +999,14 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VSQRTPS |
             Opcode::VSUBPD |
             Opcode::VSUBPS |
+            Opcode::VSUBSD |
+            Opcode::VSUBSS |
+            Opcode::VRCPSS |
+            Opcode::VROUNDSD |
+            Opcode::VROUNDSS |
+            Opcode::VRSQRTSS |
+            Opcode::VSQRTSD |
+            Opcode::VSQRTSS |
             Opcode::VPSADBW |
             Opcode::VMPSADBW |
             Opcode::VPHADDD |
@@ -919,7 +1015,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPHSUBD |
             Opcode::VPHSUBSW |
             Opcode::VPHSUBW |
-            Opcode::VPMADDUBSW |
+            Opcode::VPHADDUBSW |
             Opcode::VPMADDWD |
             Opcode::VDPPD |
             Opcode::VDPPS |
@@ -1103,6 +1199,14 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VCVTPS2PH |
             Opcode::VCVTTPD2DQ |
             Opcode::VCVTTPS2DQ |
+            Opcode::VCVTSD2SI |
+            Opcode::VCVTSD2SS |
+            Opcode::VCVTSI2SD |
+            Opcode::VCVTSI2SS |
+            Opcode::VCVTSS2SD |
+            Opcode::VCVTSS2SI |
+            Opcode::VCVTTSD2SI |
+            Opcode::VCVTTSS2SI |
             Opcode::VMOVDDUP |
             Opcode::VPSHUFLW |
             Opcode::VBLENDPD |
@@ -1148,6 +1252,9 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VMOVSLDUP |
             Opcode::VMOVUPD |
             Opcode::VMOVUPS |
+            Opcode::VMOVSD |
+            Opcode::VMOVSS |
+
             Opcode::VPBLENDD |
             Opcode::VPBLENDVB |
             Opcode::VPBLENDW |
@@ -1334,12 +1441,22 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::SETLE |
             Opcode::SETG => { write!(out, "{}", colors.data_op(self)) }
 
+            Opcode::VCOMISD |
+            Opcode::VCOMISS |
+            Opcode::VUCOMISD |
+            Opcode::VUCOMISS |
             Opcode::VCMPPD |
             Opcode::VCMPPS |
+            Opcode::VCMPSD |
+            Opcode::VCMPSS |
             Opcode::VMAXPD |
             Opcode::VMAXPS |
+            Opcode::VMAXSD |
+            Opcode::VMAXSS |
             Opcode::VMINPD |
             Opcode::VMINPS |
+            Opcode::VMINSD |
+            Opcode::VMINSS |
             Opcode::VPCMPEQB |
             Opcode::VPCMPEQD |
             Opcode::VPCMPEQQ |

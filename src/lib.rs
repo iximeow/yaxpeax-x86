@@ -250,6 +250,7 @@ impl OperandSpec {
             OperandSpec::ImmU64 |
             OperandSpec::RegRRR |
             OperandSpec::RegMMM |
+            OperandSpec::RegVex |
             OperandSpec::AL |
             OperandSpec::CL |
             OperandSpec::Nothing => {
@@ -271,6 +272,9 @@ impl Operand {
             // the register in modrm_mmm (eg modrm mod bits were 11)
             OperandSpec::RegMMM => {
                 Operand::Register(inst.modrm_mmm)
+            }
+            OperandSpec::RegVex => {
+                Operand::Register(inst.vex_reg)
             }
             OperandSpec::AL => {
                 Operand::Register(RegSpec::al())
@@ -754,8 +758,14 @@ pub enum Opcode {
     VCVTPD2DQ,
     VLDDQU,
 
+    VCOMISD,
+    VCOMISS,
+    VUCOMISD,
+    VUCOMISS,
     VADDPD,
     VADDPS,
+    VADDSD,
+    VADDSS,
     VADDSUBPD,
     VAESDEC,
     VAESDECLAST,
@@ -771,6 +781,8 @@ pub enum Opcode {
     VBROADCASTI128,
     VBROADCASTSD,
     VBROADCASTSS,
+    VCMPSD,
+    VCMPSS,
     VCMPPD,
     VCMPPS,
     VCVTDQ2PD,
@@ -779,11 +791,21 @@ pub enum Opcode {
     VCVTPH2PS,
     VCVTPS2DQ,
     VCVTPS2PD,
+    VCVTSS2SD,
+    VCVTSI2SS,
+    VCVTSI2SD,
+    VCVTSD2SI,
+    VCVTSD2SS,
     VCVTPS2PH,
+    VCVTSS2SI,
     VCVTTPD2DQ,
     VCVTTPS2DQ,
+    VCVTTSS2SI,
+    VCVTTSD2SI,
     VDIVPD,
     VDIVPS,
+    VDIVSD,
+    VDIVSS,
     VDPPD,
     VDPPS,
     VEXTRACTF128,
@@ -791,10 +813,16 @@ pub enum Opcode {
     VEXTRACTPS,
     VFMADD132PD,
     VFMADD132PS,
+    VFMADD132SD,
+    VFMADD132SS,
     VFMADD213PD,
     VFMADD213PS,
+    VFMADD213SD,
+    VFMADD213SS,
     VFMADD231PD,
     VFMADD231PS,
+    VFMADD231SD,
+    VFMADD231SS,
     VFMADDSUB132PD,
     VFMADDSUB132PS,
     VFMADDSUB213PD,
@@ -803,10 +831,16 @@ pub enum Opcode {
     VFMADDSUB231PS,
     VFMSUB132PD,
     VFMSUB132PS,
+    VFMSUB132SD,
+    VFMSUB132SS,
     VFMSUB213PD,
     VFMSUB213PS,
+    VFMSUB213SD,
+    VFMSUB213SS,
     VFMSUB231PD,
     VFMSUB231PS,
+    VFMSUB231SD,
+    VFMSUB231SS,
     VFMSUBADD132PD,
     VFMSUBADD132PS,
     VFMSUBADD213PD,
@@ -815,16 +849,28 @@ pub enum Opcode {
     VFMSUBADD231PS,
     VFNMADD132PD,
     VFNMADD132PS,
+    VFNMADD132SD,
+    VFNMADD132SS,
     VFNMADD213PD,
     VFNMADD213PS,
+    VFNMADD213SD,
+    VFNMADD213SS,
     VFNMADD231PD,
     VFNMADD231PS,
+    VFNMADD231SD,
+    VFNMADD231SS,
     VFNMSUB132PD,
     VFNMSUB132PS,
+    VFNMSUB132SD,
+    VFNMSUB132SS,
     VFNMSUB213PD,
     VFNMSUB213PS,
+    VFNMSUB213SD,
+    VFNMSUB213SS,
     VFNMSUB231PD,
     VFNMSUB231PS,
+    VFNMSUB231SD,
+    VFNMSUB231SS,
     VGATHERDPD,
     VGATHERDPS,
     VGATHERQPD,
@@ -839,8 +885,12 @@ pub enum Opcode {
     VMASKMOVPS,
     VMAXPD,
     VMAXPS,
+    VMAXSD,
+    VMAXSS,
     VMINPD,
     VMINPS,
+    VMINSD,
+    VMINSS,
     VMOVAPD,
     VMOVAPS,
     VMOVD,
@@ -859,6 +909,8 @@ pub enum Opcode {
     VMOVNTPD,
     VMOVNTPS,
     VMOVQ,
+    VMOVSS,
+    VMOVSD,
     VMOVSHDUP,
     VMOVSLDUP,
     VMOVUPD,
@@ -866,6 +918,8 @@ pub enum Opcode {
     VMPSADBW,
     VMULPD,
     VMULPS,
+    VMULSD,
+    VMULSS,
     VPABSB,
     VPABSD,
     VPABSW,
@@ -922,6 +976,7 @@ pub enum Opcode {
     VPHADDD,
     VPHADDSW,
     VPHADDW,
+    VPHADDUBSW,
     VPHMINPOSUW,
     VPHSUBD,
     VPHSUBSW,
@@ -930,7 +985,6 @@ pub enum Opcode {
     VPINSRD,
     VPINSRQ,
     VPINSRW,
-    VPMADDUBSW,
     VPMADDWD,
     VPMASKMOVD,
     VPMASKMOVQ,
@@ -1003,13 +1057,21 @@ pub enum Opcode {
     VRCPPS,
     VROUNDPD,
     VROUNDPS,
+    VROUNDSD,
+    VROUNDSS,
     VRSQRTPS,
+    VRSQRTSS,
+    VRCPSS,
     VSHUFPD,
     VSHUFPS,
     VSQRTPD,
     VSQRTPS,
+    VSQRTSS,
+    VSQRTSD,
     VSUBPD,
     VSUBPS,
+    VSUBSD,
+    VSUBSS,
     VTESTPD,
     VTESTPS,
     VUNPCKHPD,
@@ -1043,6 +1105,8 @@ enum OperandSpec {
     RegRRR,
     // the register in modrm_mmm (eg modrm mod bits were 11)
     RegMMM,
+    // the register selected by vex-vvvv bits
+    RegVex,
     // the register `al`. Used for MOVS.
     AL,
     // the register `cl`. Used for SHLD and SHRD.
@@ -3412,6 +3476,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
                     escapes_are_prefixes_actually(&mut prefixes, &mut alternate_opcode_map);
                     break record;
                 } else {
+                    println!("prefix: {:02x}, extant prefixes: {:?}", b, prefixes);
                     // some prefix seen after we saw rex, but before the 0f escape or an actual
                     // opcode. so we must forget the rex prefix!
                     // this is to handle sequences like 41660f21cf
@@ -3419,6 +3484,34 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
                     // prefix, but since 660f21 is not valid, the opcode is interpreted
                     // as 0f21, where 66 is a prefix, which makes 41 not the last
                     // prefix before the opcode, and it's discarded.
+
+                    // 2.3.2
+                    // Any VEX-encoded instruction with a LOCK prefix preceding VEX will #UD.
+                    // 2.3.3
+                    // Any VEX-encoded instruction with a 66H, F2H, or F3H prefix preceding VEX
+                    // will #UD.
+                    // 2.3.4
+                    // Any VEX-encoded instruction with a REX prefix proceeding VEX will #UD. 
+                    if b == 0xc5 {
+                        if prefixes.rex().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
+                            // rex and then vex is invalid! reject it.
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(());
+                        } else {
+                            instruction.prefixes = prefixes;
+                            return vex::two_byte_vex(&mut bytes_iter, instruction, length);
+                        }
+                    } else if b == 0xc4 {
+                        if prefixes.rex().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
+                            // rex and then vex is invalid! reject it.
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(());
+                        } else {
+                            instruction.prefixes = prefixes;
+                            return vex::three_byte_vex(&mut bytes_iter, instruction, length);
+                        }
+                    }
+
                     prefixes.rex_from(0);
                     escapes_are_prefixes_actually(&mut prefixes, &mut alternate_opcode_map);
                     match b {
@@ -3446,14 +3539,6 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
                         0x67 => {
                             prefixes.set_address_size();
                         },
-                        0xc4 => {
-                            instruction.prefixes = prefixes;
-                            return vex::three_byte_vex(&mut bytes_iter, instruction, length);
-                        }
-                        0xc5 => {
-                            instruction.prefixes = prefixes;
-                            return vex::two_byte_vex(&mut bytes_iter, instruction, length);
-                        }
                         0xf0 => {
                             prefixes.set_lock();
                         },
