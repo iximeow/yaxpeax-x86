@@ -1236,7 +1236,7 @@ pub struct InstDecoder {
     // 35. avx512_vbmi2
     // 36. gfni (galois field instructions)
     // 37. vaes
-    // 38. vpclmulqdq
+    // 38. pclmulqdq
     // 39. avx_vnni
     // 40. avx512_bitalg
     // 41. avx512_vpopcntdq
@@ -1609,11 +1609,11 @@ impl InstDecoder {
         self
     }
 
-    pub fn vpclmulqdq(&self) -> bool {
+    pub fn pclmulqdq(&self) -> bool {
         self.flags & (1 << 38) != 0
     }
 
-    pub fn with_vpclmulqdq(mut self) -> Self {
+    pub fn with_pclmulqdq(mut self) -> Self {
         self.flags |= 1 << 38;
         self
     }
@@ -1771,6 +1771,161 @@ impl InstDecoder {
                     // tzcnt is only supported if bmi1 is enabled. without bmi1, this decodes as
                     // bsf.
                     inst.opcode = Opcode::BSF;
+                }
+            }
+            Opcode::LDDQU |
+            Opcode::ADDSUBPS |
+            Opcode::ADDSUBPD |
+            Opcode::HADDPS |
+            Opcode::HSUBPS |
+            Opcode::HADDPD |
+            Opcode::HSUBPD |
+            Opcode::MOVSHDUP |
+            Opcode::MOVSLDUP |
+            Opcode::MOVDDUP |
+            Opcode::MONITOR |
+            Opcode::MWAIT => {
+                // via Intel section 5.7, SSE3 Instructions
+                if !self.sse3() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            Opcode::PHADDW |
+            Opcode::PHADDSW |
+            Opcode::PHADDD |
+            Opcode::PHSUBW |
+            Opcode::PHSUBSW |
+            Opcode::PHSUBD |
+            Opcode::PABSB |
+            Opcode::PABSW |
+            Opcode::PABSD |
+            Opcode::PMADDUBSW |
+            Opcode::PMULHRSU |
+            Opcode::PSHUFB |
+            Opcode::PSIGNB |
+            Opcode::PSIGNW |
+            Opcode::PSIGND |
+            Opcode::PALIGNR => {
+                // via Intel section 5.8, SSSE3 Instructions
+                if !self.ssse3() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            Opcode::PMULLD |
+            Opcode::PMULDQ |
+            Opcode::MOVNTDQA |
+            Opcode::BLENDPD |
+            Opcode::BLENDPS |
+            Opcode::BLENDVPD |
+            Opcode::BLENDVPS |
+            Opcode::BLENDDVB |
+            Opcode::BLENDW |
+            Opcode::PMINUW |
+            Opcode::PMINUD |
+            Opcode::PMINSB |
+            Opcode::PMINSD |
+            Opcode::PMAXUW |
+            Opcode::PMAXUD |
+            Opcode::PMAXSB |
+            Opcode::ROUNDPS |
+            Opcode::ROUNDPD |
+            Opcode::ROUNDSS |
+            Opcode::ROUNDSD |
+            Opcode::EXTRACTPS |
+            Opcode::INSERTPS |
+            Opcode::PINSRB |
+            Opcode::PINSRD |
+            Opcode::PINSRQ |
+            Opcode::PEXTRB |
+            Opcode::PEXTRW |
+            Opcode::PEXTRQ |
+            Opcode::PMOVSXBW |
+            Opcode::PMOVZXBW |
+            Opcode::PMOVSXBD |
+            Opcode::PMOVZXBD |
+            Opcode::PMOVSXWD |
+            Opcode::PMOVZXWD |
+            Opcode::PMOVSXBQ |
+            Opcode::PMOVZXBQ |
+            Opcode::PMOVSXWQ |
+            Opcode::PMOVZXWQ |
+            Opcode::PMOVSXDQ |
+            Opcode::PMOVZXDQ |
+            Opcode::MPSADBW |
+            Opcode::PHMINPOSUW |
+            Opcode::PTEST |
+            Opcode::PCMPEQQ |
+            Opcode::PACKUSDW => {
+                // via Intel section 5.10, SSE4.1 Instructions
+                if !self.sse4_1() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            Opcode::PCMPESTRI |
+            Opcode::PCMPESTRM |
+            Opcode::PCMPISTRI |
+            Opcode::PCMPISTRM |
+            Opcode::PCMPGTQ => {
+                // via Intel section 5.11, SSE4.2 Instructions
+                if !self.sse4_2() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            Opcode::AESDEC |
+            Opcode::AESDECLAST |
+            Opcode::AESENC |
+            Opcode::AESENCLAST |
+            Opcode::AESIMC |
+            Opcode::AESKEYGENASSIST => {
+                // via Intel section 5.12. AESNI AND PCLMULQDQ
+                if !self.aesni() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            Opcode::PCLMULQDQ => {
+                // via Intel section 5.12. AESNI AND PCLMULQDQ
+                if !self.pclmulqdq() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            // AVX...
+            /* // TODO
+            Opcode::XABORT |
+            Opcode::XACQUIRE |
+            Opcode::XRELEASE |
+            Opcode::XBEGIN |
+            Opcode::XEND |
+            Opcode::XTEST => {
+                if !self.tsx() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            */
+            /* // TODO
+            Opcode::SHA1MSG1 |
+            Opcode::SHA1MSG2 |
+            Opcode::SHA1NEXTE |
+            Opcode::SHA1RNDS4 |
+            Opcode::SHA256MSG1 |
+            Opcode::SHA256MSG2 |
+            Opcode::SHA256RNDS2 => {
+                if !self.sha() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }*/
+            Opcode::ENCLS |
+            Opcode::ENCLU => {
+                if !self.sgx() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
                 }
             }
             _ => {}
