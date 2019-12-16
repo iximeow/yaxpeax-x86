@@ -2016,6 +2016,348 @@ impl InstDecoder {
                     return Err(());
                 }
             }
+            Opcode::VMOVDDUP |
+            Opcode::VPSHUFLW |
+            Opcode::VHADDPS |
+            Opcode::VHSUBPS |
+            Opcode::VADDSUBPS |
+            Opcode::VCVTPD2DQ |
+            Opcode::VLDDQU |
+            Opcode::VCOMISD |
+            Opcode::VCOMISS |
+            Opcode::VUCOMISD |
+            Opcode::VUCOMISS |
+            Opcode::VADDPD |
+            Opcode::VADDPS |
+            Opcode::VADDSD |
+            Opcode::VADDSS |
+            Opcode::VADDSUBPD |
+            Opcode::VBLENDPD |
+            Opcode::VBLENDPS |
+            Opcode::VBLENDVPD |
+            Opcode::VBLENDVPS |
+            Opcode::VBROADCASTF128 |
+            Opcode::VBROADCASTI128 |
+            Opcode::VBROADCASTSD |
+            Opcode::VBROADCASTSS |
+            Opcode::VCMPSD |
+            Opcode::VCMPSS |
+            Opcode::VCMPPD |
+            Opcode::VCMPPS |
+            Opcode::VCVTDQ2PD |
+            Opcode::VCVTDQ2PS |
+            Opcode::VCVTPD2PS |
+            Opcode::VCVTPH2PS |
+            Opcode::VCVTPS2DQ |
+            Opcode::VCVTPS2PD |
+            Opcode::VCVTSS2SD |
+            Opcode::VCVTSI2SS |
+            Opcode::VCVTSI2SD |
+            Opcode::VCVTSD2SI |
+            Opcode::VCVTSD2SS |
+            Opcode::VCVTPS2PH |
+            Opcode::VCVTSS2SI |
+            Opcode::VCVTTPD2DQ |
+            Opcode::VCVTTPS2DQ |
+            Opcode::VCVTTSS2SI |
+            Opcode::VCVTTSD2SI |
+            Opcode::VDIVPD |
+            Opcode::VDIVPS |
+            Opcode::VDIVSD |
+            Opcode::VDIVSS |
+            Opcode::VDPPD |
+            Opcode::VDPPS |
+            Opcode::VEXTRACTF128 |
+            Opcode::VEXTRACTI128 |
+            Opcode::VEXTRACTPS |
+            Opcode::VFMADD132PD |
+            Opcode::VFMADD132PS |
+            Opcode::VFMADD132SD |
+            Opcode::VFMADD132SS |
+            Opcode::VFMADD213PD |
+            Opcode::VFMADD213PS |
+            Opcode::VFMADD213SD |
+            Opcode::VFMADD213SS |
+            Opcode::VFMADD231PD |
+            Opcode::VFMADD231PS |
+            Opcode::VFMADD231SD |
+            Opcode::VFMADD231SS |
+            Opcode::VFMADDSUB132PD |
+            Opcode::VFMADDSUB132PS |
+            Opcode::VFMADDSUB213PD |
+            Opcode::VFMADDSUB213PS |
+            Opcode::VFMADDSUB231PD |
+            Opcode::VFMADDSUB231PS |
+            Opcode::VFMSUB132PD |
+            Opcode::VFMSUB132PS |
+            Opcode::VFMSUB132SD |
+            Opcode::VFMSUB132SS |
+            Opcode::VFMSUB213PD |
+            Opcode::VFMSUB213PS |
+            Opcode::VFMSUB213SD |
+            Opcode::VFMSUB213SS |
+            Opcode::VFMSUB231PD |
+            Opcode::VFMSUB231PS |
+            Opcode::VFMSUB231SD |
+            Opcode::VFMSUB231SS |
+            Opcode::VFMSUBADD132PD |
+            Opcode::VFMSUBADD132PS |
+            Opcode::VFMSUBADD213PD |
+            Opcode::VFMSUBADD213PS |
+            Opcode::VFMSUBADD231PD |
+            Opcode::VFMSUBADD231PS |
+            Opcode::VFNMADD132PD |
+            Opcode::VFNMADD132PS |
+            Opcode::VFNMADD132SD |
+            Opcode::VFNMADD132SS |
+            Opcode::VFNMADD213PD |
+            Opcode::VFNMADD213PS |
+            Opcode::VFNMADD213SD |
+            Opcode::VFNMADD213SS |
+            Opcode::VFNMADD231PD |
+            Opcode::VFNMADD231PS |
+            Opcode::VFNMADD231SD |
+            Opcode::VFNMADD231SS |
+            Opcode::VFNMSUB132PD |
+            Opcode::VFNMSUB132PS |
+            Opcode::VFNMSUB132SD |
+            Opcode::VFNMSUB132SS |
+            Opcode::VFNMSUB213PD |
+            Opcode::VFNMSUB213PS |
+            Opcode::VFNMSUB213SD |
+            Opcode::VFNMSUB213SS |
+            Opcode::VFNMSUB231PD |
+            Opcode::VFNMSUB231PS |
+            Opcode::VFNMSUB231SD |
+            Opcode::VFNMSUB231SS |
+            Opcode::VGATHERDPD |
+            Opcode::VGATHERDPS |
+            Opcode::VGATHERQPD |
+            Opcode::VGATHERQPS |
+            Opcode::VHADDPD |
+            Opcode::VHSUBPD |
+            Opcode::VINSERTF128 |
+            Opcode::VINSERTI128 |
+            Opcode::VINSERTPS |
+            Opcode::VMASKMOVDQU |
+            Opcode::VMASKMOVPD |
+            Opcode::VMASKMOVPS |
+            Opcode::VMAXPD |
+            Opcode::VMAXPS |
+            Opcode::VMAXSD |
+            Opcode::VMAXSS |
+            Opcode::VMINPD |
+            Opcode::VMINPS |
+            Opcode::VMINSD |
+            Opcode::VMINSS |
+            Opcode::VMOVAPD |
+            Opcode::VMOVAPS |
+            Opcode::VMOVD |
+            Opcode::VMOVDQA |
+            Opcode::VMOVDQU |
+            Opcode::VMOVHLPS |
+            Opcode::VMOVHPD |
+            Opcode::VMOVHPS |
+            Opcode::VMOVLHPS |
+            Opcode::VMOVLPD |
+            Opcode::VMOVLPS |
+            Opcode::VMOVMSKPD |
+            Opcode::VMOVMSKPS |
+            Opcode::VMOVNTDQ |
+            Opcode::VMOVNTDQA |
+            Opcode::VMOVNTPD |
+            Opcode::VMOVNTPS |
+            Opcode::VMOVQ |
+            Opcode::VMOVSS |
+            Opcode::VMOVSD |
+            Opcode::VMOVSHDUP |
+            Opcode::VMOVSLDUP |
+            Opcode::VMOVUPD |
+            Opcode::VMOVUPS |
+            Opcode::VMPSADBW |
+            Opcode::VMULPD |
+            Opcode::VMULPS |
+            Opcode::VMULSD |
+            Opcode::VMULSS |
+            Opcode::VPABSB |
+            Opcode::VPABSD |
+            Opcode::VPABSW |
+            Opcode::VPACKSSDW |
+            Opcode::VPACKSSWB |
+            Opcode::VPACKUSWB |
+            Opcode::VPADDB |
+            Opcode::VPADDD |
+            Opcode::VPADDQ |
+            Opcode::VPADDSB |
+            Opcode::VPADDSW |
+            Opcode::VPADDUSB |
+            Opcode::VPADDUSW |
+            Opcode::VPADDW |
+            Opcode::VPALIGNR |
+            Opcode::VPAND |
+            Opcode::VPANDN |
+            Opcode::VPAVGB |
+            Opcode::VPAVGW |
+            Opcode::VPBLENDD |
+            Opcode::VPBLENDVB |
+            Opcode::VPBLENDW |
+            Opcode::VPBROADCASTB |
+            Opcode::VPBROADCASTD |
+            Opcode::VPBROADCASTQ |
+            Opcode::VPBROADCASTW |
+            Opcode::VPCLMULQDQ |
+            Opcode::VPCMPEQB |
+            Opcode::VPCMPEQD |
+            Opcode::VPCMPEQQ |
+            Opcode::VPCMPEQW |
+            Opcode::VPCMPGTB |
+            Opcode::VPCMPGTD |
+            Opcode::VPCMPGTQ |
+            Opcode::VPCMPGTW |
+            Opcode::VPCMPISTRI |
+            Opcode::VPCMPISTRM |
+            Opcode::VPERM2F128 |
+            Opcode::VPERM2I128 |
+            Opcode::VPERMD |
+            Opcode::VPERMILPD |
+            Opcode::VPERMILPS |
+            Opcode::VPERMPD |
+            Opcode::VPERMPS |
+            Opcode::VPERMQ |
+            Opcode::VPEXTRB |
+            Opcode::VPEXTRD |
+            Opcode::VPEXTRQ |
+            Opcode::VPEXTRW |
+            Opcode::VPGATHERDD |
+            Opcode::VPGATHERDQ |
+            Opcode::VPGATHERQD |
+            Opcode::VPGATHERQQ |
+            Opcode::VPHADDD |
+            Opcode::VPHADDSW |
+            Opcode::VPHADDW |
+            Opcode::VPHADDUBSW |
+            Opcode::VPHMINPOSUW |
+            Opcode::VPHSUBD |
+            Opcode::VPHSUBSW |
+            Opcode::VPHSUBW |
+            Opcode::VPINSRB |
+            Opcode::VPINSRD |
+            Opcode::VPINSRQ |
+            Opcode::VPINSRW |
+            Opcode::VPMADDWD |
+            Opcode::VPMASKMOVD |
+            Opcode::VPMASKMOVQ |
+            Opcode::VPMAXSB |
+            Opcode::VPMAXSD |
+            Opcode::VPMAXSW |
+            Opcode::VPMAXUD |
+            Opcode::VPMINSD |
+            Opcode::VPMINUD |
+            Opcode::VPMOVMSKB |
+            Opcode::VPMOVSXBD |
+            Opcode::VPMOVSXBQ |
+            Opcode::VPMOVSXBW |
+            Opcode::VPMOVSXDQ |
+            Opcode::VPMOVSXWD |
+            Opcode::VPMOVSXWQ |
+            Opcode::VPMOVZXBD |
+            Opcode::VPMOVZXBQ |
+            Opcode::VPMOVZXBW |
+            Opcode::VPMOVZXDQ |
+            Opcode::VPMOVZXWD |
+            Opcode::VPMOVZXWQ |
+            Opcode::VPMULDQ |
+            Opcode::VPMULHRSW |
+            Opcode::VPMULHUW |
+            Opcode::VPMULHW |
+            Opcode::VPMULLD |
+            Opcode::VPMULLW |
+            Opcode::VPMULUDQ |
+            Opcode::VPOR |
+            Opcode::VPSADBW |
+            Opcode::VPSHUFB |
+            Opcode::VPSHUFD |
+            Opcode::VPSIGNB |
+            Opcode::VPSIGND |
+            Opcode::VPSIGNW |
+            Opcode::VPSLLD |
+            Opcode::VPSLLDQ |
+            Opcode::VPSLLQ |
+            Opcode::VPSLLVD |
+            Opcode::VPSLLVQ |
+            Opcode::VPSLLW |
+            Opcode::VPSRAD |
+            Opcode::VPSRAVD |
+            Opcode::VPSRAW |
+            Opcode::VPSRLD |
+            Opcode::VPSRLDQ |
+            Opcode::VPSRLQ |
+            Opcode::VPSRLVD |
+            Opcode::VPSRLVQ |
+            Opcode::VPSRLW |
+            Opcode::VPSUBB |
+            Opcode::VPSUBD |
+            Opcode::VPSUBQ |
+            Opcode::VPSUBSB |
+            Opcode::VPSUBSW |
+            Opcode::VPSUBUSB |
+            Opcode::VPSUBUSW |
+            Opcode::VPSUBW |
+            Opcode::VPTEST |
+            Opcode::VPUNPCKHBW |
+            Opcode::VPUNPCKHDQ |
+            Opcode::VPUNPCKHQDQ |
+            Opcode::VPUNPCKHWD |
+            Opcode::VPUNPCKLBW |
+            Opcode::VPUNPCKLDQ |
+            Opcode::VPUNPCKLQDQ |
+            Opcode::VPUNPCKLWD |
+            Opcode::VPXOR |
+            Opcode::VRCPPS |
+            Opcode::VROUNDPD |
+            Opcode::VROUNDPS |
+            Opcode::VROUNDSD |
+            Opcode::VROUNDSS |
+            Opcode::VRSQRTPS |
+            Opcode::VRSQRTSS |
+            Opcode::VRCPSS |
+            Opcode::VSHUFPD |
+            Opcode::VSHUFPS |
+            Opcode::VSQRTPD |
+            Opcode::VSQRTPS |
+            Opcode::VSQRTSS |
+            Opcode::VSQRTSD |
+            Opcode::VSUBPD |
+            Opcode::VSUBPS |
+            Opcode::VSUBSD |
+            Opcode::VSUBSS |
+            Opcode::VTESTPD |
+            Opcode::VTESTPS |
+            Opcode::VUNPCKHPD |
+            Opcode::VUNPCKHPS |
+            Opcode::VUNPCKLPD |
+            Opcode::VUNPCKLPS |
+            Opcode::VXORPD |
+            Opcode::VXORPS |
+            Opcode::VZEROUPPER => {
+                // TODO: check a table for these
+                if !self.avx() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
+            Opcode::VAESDEC |
+            Opcode::VAESDECLAST |
+            Opcode::VAESENC |
+            Opcode::VAESENCLAST |
+            Opcode::VAESIMC |
+            Opcode::VAESKEYGENASSIST => {
+                // TODO: check a table for these
+                if !self.avx() || !self.aesni() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -4264,7 +4606,12 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
                             return Err(());
                         } else {
                             instruction.prefixes = prefixes;
-                            return vex::two_byte_vex(&mut bytes_iter, instruction, length);
+                            vex::two_byte_vex(&mut bytes_iter, instruction, length)?;
+
+                            if decoder != &InstDecoder::default() {
+                                decoder.revise_instruction(instruction)?;
+                            }
+                            return Ok(());
                         }
                     } else if b == 0xc4 {
                         if prefixes.rex().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
@@ -4273,7 +4620,11 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
                             return Err(());
                         } else {
                             instruction.prefixes = prefixes;
-                            return vex::three_byte_vex(&mut bytes_iter, instruction, length);
+                            vex::three_byte_vex(&mut bytes_iter, instruction, length)?;
+                            if decoder != &InstDecoder::default() {
+                                decoder.revise_instruction(instruction)?;
+                            }
+                            return Ok(());
                         }
                     }
 
