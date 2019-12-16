@@ -2344,6 +2344,8 @@ pub enum OperandCode {
     ModRM_0x0fba,
     ModRM_0xf238,
     ModRM_0xf30fc7,
+    ModRM_0x660f38,
+    ModRM_0x660f3a,
     CVT_AA,
     CVT_DA,
     Rq_Cq_0,
@@ -2578,9 +2580,9 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660f38),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660f3a),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3689,7 +3691,7 @@ enum Interpretation {
     Prefix,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 // this should be a 32-byte struct..
 struct OpcodeRecord(Interpretation, OperandCode);
 
@@ -4222,7 +4224,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
                                     read_opcode_f30f_map(&mut bytes_iter, &mut length)?
                                 },
                             };
-                            if rec.0 == Interpretation::Instruction(Opcode::Invalid) {
+                            if rec == OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing) {
                                 escapes_are_prefixes_actually(&mut prefixes, &mut Some(opcode_map));
                                 OPCODE_0F_MAP[opcode_byte as usize]
                             } else {
@@ -4997,6 +4999,54 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
             instruction.operands[1] = OperandSpec::ImmI8;
         },
+        OperandCode::ModRM_0x660f38 => {
+            let op = bytes_iter.next().map(|b| { *length += 1; b }).ok_or(())?;
+            match op {
+                0xdb => { instruction.opcode = Opcode::AESIMC; }
+                0xdc => { instruction.opcode = Opcode::AESENC; }
+                0xdd => { instruction.opcode = Opcode::AESENCLAST; }
+                0xde => { instruction.opcode = Opcode::AESDEC; }
+                0xdf => { instruction.opcode = Opcode::AESDECLAST; }
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            };
+            // all these SO FAR are G_E_xmm
+            let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
+
+
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operand_count = 2;
+        }
+        OperandCode::ModRM_0x660f3a => {
+            let op = bytes_iter.next().map(|b| { *length += 1; b }).ok_or(())?;
+            match op {
+                0xdf => {
+                    instruction.opcode = Opcode::AESKEYGENASSIST;
+                    // read operands right here right now
+
+                    let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
+                    instruction.modrm_rrr =
+                        RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
+
+
+                    instruction.operands[0] = OperandSpec::RegRRR;
+                    instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+                    instruction.imm =
+                        read_imm_unsigned(&mut bytes_iter, 1)?;
+                    instruction.operands[2] = OperandSpec::ImmU8;
+                    instruction.operand_count = 3;
+                }
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(());
+                }
+            };
+        }
         OperandCode::G_mm_Edq => {
             instruction.operands[1] = mem_oper;
             instruction.modrm_rrr.bank = RegisterBank::MM;

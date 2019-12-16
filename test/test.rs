@@ -98,6 +98,38 @@ fn test_cvt() {
 }
 
 #[test]
+fn test_aesni() {
+    fn test_instr(bytes: &[u8], text: &'static str) {
+        test_display_under(&InstDecoder::minimal().with_aesni(), bytes, text);
+        test_display_under(&InstDecoder::default(), bytes, text);
+        test_invalid_under(&InstDecoder::minimal(), bytes);
+    }
+
+    fn test_instr_invalid(bytes: &[u8]) {
+        test_invalid_under(&InstDecoder::minimal().with_aesni(), bytes);
+        test_invalid_under(&InstDecoder::default(), bytes);
+    }
+
+    test_instr(&[0x66, 0x0f, 0x38, 0xdb, 0x0f], "aesimc xmm1, [rdi]");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x38, 0xdb, 0xcf], "aesimc xmm9, xmm15");
+
+    test_instr(&[0x66, 0x0f, 0x38, 0xdc, 0x0f], "aesenc xmm1, [rdi]");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x38, 0xdc, 0xcf], "aesenc xmm9, xmm15");
+
+    test_instr(&[0x66, 0x0f, 0x38, 0xdd, 0x0f], "aesenclast xmm1, [rdi]");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x38, 0xdd, 0xcf], "aesenclast xmm9, xmm15");
+
+    test_instr(&[0x66, 0x0f, 0x38, 0xde, 0x0f], "aesdec xmm1, [rdi]");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x38, 0xde, 0xcf], "aesdec xmm9, xmm15");
+
+    test_instr(&[0x66, 0x0f, 0x38, 0xdf, 0x0f], "aesdeclast xmm1, [rdi]");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x38, 0xdf, 0xcf], "aesdeclast xmm9, xmm15");
+
+    test_instr(&[0x66, 0x0f, 0x3a, 0xdf, 0x0f, 0xaa], "aeskeygenassist xmm1, [rdi], 0xaa");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x3a, 0xdf, 0xcf, 0xaa], "aeskeygenassist xmm9, xmm15, 0xaa");
+}
+
+#[test]
 fn test_sse3() {
     fn test_instr(bytes: &[u8], text: &'static str) {
         test_display_under(&InstDecoder::minimal().with_sse3(), bytes, text);
