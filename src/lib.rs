@@ -1841,11 +1841,11 @@ impl InstDecoder {
     }
 
     pub fn avx(&self) -> bool {
-        self.flags & (1 << 54) != 0
+        self.flags & (1 << 55) != 0
     }
 
     pub fn with_avx(mut self) -> Self {
-        self.flags |= 1 << 54;
+        self.flags |= 1 << 55;
         self
     }
 
