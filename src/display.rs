@@ -6,7 +6,74 @@ use std::fmt;
 use yaxpeax_arch::{Colorize, ColorSettings, ShowContextual, YaxColors};
 use yaxpeax_arch::display::*;
 
-use ::{RegSpec, RegisterBank, Opcode, Operand, Instruction, Segment, PrefixRex, OperandSpec};
+use ::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
+
+impl fmt::Display for InstDecoder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self == &InstDecoder::default() {
+            return write!(f, "<all features>");
+        } else if self == &InstDecoder::minimal() {
+            return write!(f, "<no features>");
+        }
+        if self.sse3() { write!(f, "sse3 ")? }
+        if self.ssse3() { write!(f, "ssse3 ")? }
+        if self.monitor() { write!(f, "monitor ")? }
+        if self.vmx() { write!(f, "vmx ")? }
+        if self.fma3() { write!(f, "fma3 ")? }
+        if self.cmpxchg16b() { write!(f, "cmpxchg16b ")? }
+        if self.sse4_1() { write!(f, "sse4_1 ")? }
+        if self.sse4_2() { write!(f, "sse4_2 ")? }
+        if self.movbe() { write!(f, "movbe ")? }
+        if self.popcnt() { write!(f, "popcnt ")? }
+        if self.aesni() { write!(f, "aesni ")? }
+        if self.xsave() { write!(f, "xsave ")? }
+        if self.rdrand() { write!(f, "rdrand ")? }
+        if self.sgx() { write!(f, "sgx ")? }
+        if self.bmi1() { write!(f, "bmi1 ")? }
+        if self.avx2() { write!(f, "avx2 ")? }
+        if self.bmi2() { write!(f, "bmi2 ")? }
+        if self.invpcid() { write!(f, "invpcid ")? }
+        if self.mpx() { write!(f, "mpx ")? }
+        if self.avx512_f() { write!(f, "avx512_f ")? }
+        if self.avx512_dq() { write!(f, "avx512_dq ")? }
+        if self.rdseed() { write!(f, "rdseed ")? }
+        if self.adx() { write!(f, "adx ")? }
+        if self.avx512_fma() { write!(f, "avx512_fma ")? }
+        if self.pcommit() { write!(f, "pcommit ")? }
+        if self.clflushopt() { write!(f, "clflushopt ")? }
+        if self.clwb() { write!(f, "clwb ")? }
+        if self.avx512_pf() { write!(f, "avx512_pf ")? }
+        if self.avx512_er() { write!(f, "avx512_er ")? }
+        if self.avx512_cd() { write!(f, "avx512_cd ")? }
+        if self.sha() { write!(f, "sha ")? }
+        if self.avx512_bw() { write!(f, "avx512_bw ")? }
+        if self.avx512_vl() { write!(f, "avx512_vl ")? }
+        if self.prefetchwt1() { write!(f, "prefetchwt1 ")? }
+        if self.avx512_vbmi() { write!(f, "avx512_vbmi ")? }
+        if self.avx512_vbmi2() { write!(f, "avx512_vbmi2 ")? }
+        if self.gfni() { write!(f, "gfni ")? }
+        if self.vaes() { write!(f, "vaes ")? }
+        if self.pclmulqdq() { write!(f, "pclmulqdq ")? }
+        if self.avx_vnni() { write!(f, "avx_vnni ")? }
+        if self.avx512_bitalg() { write!(f, "avx512_bitalg ")? }
+        if self.avx512_vpopcntdq() { write!(f, "avx512_vpopcntdq ")? }
+        if self.avx512_4vnniw() { write!(f, "avx512_4vnniw ")? }
+        if self.avx512_4fmaps() { write!(f, "avx512_4fmaps ")? }
+        if self.cx8() { write!(f, "cx8 ")? }
+        if self.syscall() { write!(f, "syscall ")? }
+        if self.rdtscp() { write!(f, "rdtscp ")? }
+        if self.abm() { write!(f, "abm ")? }
+        if self.sse4a() { write!(f, "sse4a ")? }
+        if self._3dnowprefetch() { write!(f, "_3dnowprefetch ")? }
+        if self.xop() { write!(f, "xop ")? }
+        if self.skinit() { write!(f, "skinit ")? }
+        if self.tbm() { write!(f, "tbm ")? }
+        if self.intel_quirks() { write!(f, "intel_quirks ")? }
+        if self.amd_quirks() { write!(f, "amd_quirks ")? }
+        if self.avx() { write!(f, "avx ")? }
+        Ok(())
+    }
+}
 
 impl fmt::Display for PrefixRex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

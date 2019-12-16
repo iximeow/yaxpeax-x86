@@ -1330,6 +1330,7 @@ pub struct InstDecoder {
     // 52. tbm
     // 53. intel quirks
     // 54. amd quirks
+    // 55. avx (intel ?, amd ?)
     flags: u64,
 }
 
@@ -1835,6 +1836,15 @@ impl InstDecoder {
     }
 
     pub fn with_amd_quirks(mut self) -> Self {
+        self.flags |= 1 << 54;
+        self
+    }
+
+    pub fn avx(&self) -> bool {
+        self.flags & (1 << 54) != 0
+    }
+
+    pub fn with_avx(mut self) -> Self {
         self.flags |= 1 << 54;
         self
     }
