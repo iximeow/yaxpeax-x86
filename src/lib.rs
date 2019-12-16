@@ -659,6 +659,7 @@ pub enum Opcode {
     CLAC,
     STAC,
     ENCLS,
+    ENCLV,
     XGETBV,
     XSETBV,
     VMFUNC,
@@ -1109,6 +1110,82 @@ pub enum Opcode {
     VXORPD,
     VXORPS,
     VZEROUPPER,
+
+    PCLMULQDQ,
+    AESKEYGENASSIST,
+    AESIMC,
+    AESENC,
+    AESENCLAST,
+    AESDEC,
+    AESDECLAST,
+    PCMPGTQ,
+    PCMPISTRM,
+    PCMPISTRI,
+    PCMPESTRI,
+    PACKUSDW,
+    PCMPESTRM,
+    PCMPEQQ,
+    PTEST,
+    PHMINPOSUW,
+    MPSADBW,
+    PMOVZXDQ,
+    PMOVSXDQ,
+    PMOVZXBD,
+    PMOVSXBD,
+    PMOVZXWQ,
+    PMOVSXWQ,
+    PMOVZXBQ,
+    PMOVSXBQ,
+    PMOVSXWD,
+    PMOVZXWD,
+    PEXTRQ,
+    PEXTRB,
+    PMOVSXBW,
+    PMOVZXBW,
+    PINSRQ,
+    PINSRD,
+    PINSRB,
+    EXTRACTPS,
+    INSERTPS,
+    ROUNDSS,
+    ROUNDSD,
+    ROUNDPS,
+    ROUNDPD,
+    PMAXSB,
+    PMAXUW,
+    PMAXUD,
+    PMINSD,
+    PMINSB,
+    PMINUD,
+    PMINUW,
+    BLENDW,
+    BLENDDVB,
+    BLENDVPS,
+    BLENDVPD,
+    BLENDPS,
+    BLENDPD,
+    PMULDQ,
+    MOVNTDQA,
+    PMULLD,
+    PALIGNR,
+    PSIGNW,
+    PSIGND,
+    PSIGNB,
+    PSHUFB,
+    PMULHRSU,
+    PMADDUBSW,
+    PABSD,
+    PABSW,
+    PABSB,
+    PHSUBSW,
+    PHSUBW,
+    PHSUBD,
+    PHADDD,
+    PHADDSW,
+    PHADDW,
+    HSUBPD,
+    HADDPD,
+    ADDSUBPD,
 }
 
 #[derive(Debug)]
@@ -1921,6 +1998,7 @@ impl InstDecoder {
                     return Err(());
                 }
             }*/
+            Opcode::ENCLV |
             Opcode::ENCLS |
             Opcode::ENCLU => {
                 if !self.sgx() {
@@ -5194,6 +5272,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 if mod_bits == 0b11 {
                     instruction.operand_count = 0;
                     match m {
+                        0b000 => {
+                            instruction.opcode = Opcode::ENCLV;
+                        },
                         0b001 => {
                             instruction.opcode = Opcode::VMCALL;
                         },
@@ -5324,10 +5405,10 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    if m == 1 {
+                    if m == 0 {
                         instruction.opcode = Opcode::SWAPGS;
                         instruction.operand_count = 0;
-                    } else if m == 2 {
+                    } else if m == 1 {
                         instruction.opcode = Opcode::RDTSCP;
                         instruction.operand_count = 0;
                     } else {
@@ -5359,9 +5440,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     },
                     5 => {
                         instruction.opcode = Opcode::LFENCE;
-                        // TODO: verify on real hardware
-                        // AMD's manual suggests their chips reject *FENCE with non-zero r/m
-                        if decoder.amd_quirks() && !decoder.intel_quirks() {
+                        // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
+                        // doesn't say (tested on threadripper)
+                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
                             if m != 0 {
                                 instruction.opcode = Opcode::Invalid;
                                 return Err(());
@@ -5370,9 +5451,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     },
                     6 => {
                         instruction.opcode = Opcode::MFENCE;
-                        // TODO: verify on real hardware
-                        // AMD's manual suggests their chips reject *FENCE with non-zero r/m
-                        if decoder.amd_quirks() && !decoder.intel_quirks() {
+                        // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
+                        // doesn't say (tested on threadripper)
+                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
                             if m != 0 {
                                 instruction.opcode = Opcode::Invalid;
                                 return Err(());
@@ -5381,9 +5462,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     },
                     7 => {
                         instruction.opcode = Opcode::SFENCE;
-                        // TODO: verify on real hardware
-                        // AMD's manual suggests their chips reject *FENCE with non-zero r/m
-                        if decoder.amd_quirks() && !decoder.intel_quirks() {
+                        // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
+                        // doesn't say (tested on threadripper)
+                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
                             if m != 0 {
                                 instruction.opcode = Opcode::Invalid;
                                 return Err(());

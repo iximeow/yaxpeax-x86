@@ -553,6 +553,7 @@ impl fmt::Display for Opcode {
             &Opcode::CLAC => write!(f, "{}", "clac"),
             &Opcode::STAC => write!(f, "{}", "stac"),
             &Opcode::ENCLS => write!(f, "{}", "encls"),
+            &Opcode::ENCLV => write!(f, "{}", "enclv"),
             &Opcode::XGETBV => write!(f, "{}", "xgetbv"),
             &Opcode::XSETBV => write!(f, "{}", "xsetbv"),
             &Opcode::VMFUNC => write!(f, "{}", "vmfunc"),
@@ -892,6 +893,81 @@ impl fmt::Display for Opcode {
             &Opcode::VSUBSS => write!(f, "{}", "vsubss"),
             &Opcode::VUCOMISD => write!(f, "{}", "vucomisd"),
             &Opcode::VUCOMISS => write!(f, "{}", "vucomiss"),
+            &Opcode::PCLMULQDQ => write!(f, "{}", "pclmulqdq"),
+            &Opcode::AESKEYGENASSIST => write!(f, "{}", "aeskeygenassist"),
+            &Opcode::AESIMC => write!(f, "{}", "aesimc"),
+            &Opcode::AESENC => write!(f, "{}", "aesenc"),
+            &Opcode::AESENCLAST => write!(f, "{}", "aesenclast"),
+            &Opcode::AESDEC => write!(f, "{}", "aesdec"),
+            &Opcode::AESDECLAST => write!(f, "{}", "aesdeclast"),
+            &Opcode::PCMPGTQ => write!(f, "{}", "pcmpgtq"),
+            &Opcode::PCMPISTRM => write!(f, "{}", "pcmpistrm"),
+            &Opcode::PCMPISTRI => write!(f, "{}", "pcmpistri"),
+            &Opcode::PCMPESTRI => write!(f, "{}", "pcmpestri"),
+            &Opcode::PACKUSDW => write!(f, "{}", "packusdw"),
+            &Opcode::PCMPESTRM => write!(f, "{}", "pcmpestrm"),
+            &Opcode::PCMPEQQ => write!(f, "{}", "pcmpeqq"),
+            &Opcode::PTEST => write!(f, "{}", "ptest"),
+            &Opcode::PHMINPOSUW => write!(f, "{}", "phminposuw"),
+            &Opcode::MPSADBW => write!(f, "{}", "mpsadbw"),
+            &Opcode::PMOVZXDQ => write!(f, "{}", "pmovzxdq"),
+            &Opcode::PMOVSXDQ => write!(f, "{}", "pmovsxdq"),
+            &Opcode::PMOVZXBD => write!(f, "{}", "pmovzxbd"),
+            &Opcode::PMOVSXBD => write!(f, "{}", "pmovsxbd"),
+            &Opcode::PMOVZXWQ => write!(f, "{}", "pmovzxwq"),
+            &Opcode::PMOVSXWQ => write!(f, "{}", "pmovsxwq"),
+            &Opcode::PMOVZXBQ => write!(f, "{}", "pmovzxbq"),
+            &Opcode::PMOVSXBQ => write!(f, "{}", "pmovsxbq"),
+            &Opcode::PMOVSXWD => write!(f, "{}", "pmovsxwd"),
+            &Opcode::PMOVZXWD => write!(f, "{}", "pmovzxwd"),
+            &Opcode::PEXTRQ => write!(f, "{}", "pextrq"),
+            &Opcode::PEXTRB => write!(f, "{}", "pextrb"),
+            &Opcode::PMOVSXBW => write!(f, "{}", "pmovsxbw"),
+            &Opcode::PMOVZXBW => write!(f, "{}", "pmovzxbw"),
+            &Opcode::PINSRQ => write!(f, "{}", "pinsrq"),
+            &Opcode::PINSRD => write!(f, "{}", "pinsrd"),
+            &Opcode::PINSRB => write!(f, "{}", "pinsrb"),
+            &Opcode::EXTRACTPS => write!(f, "{}", "extractps"),
+            &Opcode::INSERTPS => write!(f, "{}", "insertps"),
+            &Opcode::ROUNDSS => write!(f, "{}", "roundss"),
+            &Opcode::ROUNDSD => write!(f, "{}", "roundsd"),
+            &Opcode::ROUNDPS => write!(f, "{}", "roundps"),
+            &Opcode::ROUNDPD => write!(f, "{}", "roundpd"),
+            &Opcode::PMAXSB => write!(f, "{}", "pmaxsb"),
+            &Opcode::PMAXUW => write!(f, "{}", "pmaxuw"),
+            &Opcode::PMAXUD => write!(f, "{}", "pmaxud"),
+            &Opcode::PMINSD => write!(f, "{}", "pminsd"),
+            &Opcode::PMINSB => write!(f, "{}", "pminsb"),
+            &Opcode::PMINUD => write!(f, "{}", "pminud"),
+            &Opcode::PMINUW => write!(f, "{}", "pminuw"),
+            &Opcode::BLENDW => write!(f, "{}", "blendw"),
+            &Opcode::BLENDDVB => write!(f, "{}", "blenddvb"),
+            &Opcode::BLENDVPS => write!(f, "{}", "blendvps"),
+            &Opcode::BLENDVPD => write!(f, "{}", "blendvpd"),
+            &Opcode::BLENDPS => write!(f, "{}", "blendps"),
+            &Opcode::BLENDPD => write!(f, "{}", "blendpd"),
+            &Opcode::PMULDQ => write!(f, "{}", "pmuldq"),
+            &Opcode::MOVNTDQA => write!(f, "{}", "movntdqa"),
+            &Opcode::PMULLD => write!(f, "{}", "pmulld"),
+            &Opcode::PALIGNR => write!(f, "{}", "palignr"),
+            &Opcode::PSIGNW => write!(f, "{}", "psignw"),
+            &Opcode::PSIGND => write!(f, "{}", "psignd"),
+            &Opcode::PSIGNB => write!(f, "{}", "psignb"),
+            &Opcode::PSHUFB => write!(f, "{}", "pshufb"),
+            &Opcode::PMULHRSU => write!(f, "{}", "pmulhrsu"),
+            &Opcode::PMADDUBSW => write!(f, "{}", "pmaddubsw"),
+            &Opcode::PABSD => write!(f, "{}", "pabsd"),
+            &Opcode::PABSW => write!(f, "{}", "pabsw"),
+            &Opcode::PABSB => write!(f, "{}", "pabsb"),
+            &Opcode::PHSUBSW => write!(f, "{}", "phsubsw"),
+            &Opcode::PHSUBW => write!(f, "{}", "phsubw"),
+            &Opcode::PHSUBD => write!(f, "{}", "phsubd"),
+            &Opcode::PHADDD => write!(f, "{}", "phaddd"),
+            &Opcode::PHADDSW => write!(f, "{}", "phaddsw"),
+            &Opcode::PHADDW => write!(f, "{}", "phaddw"),
+            &Opcode::HSUBPD => write!(f, "{}", "hsubpd"),
+            &Opcode::HADDPD => write!(f, "{}", "haddpd"),
+            &Opcode::ADDSUBPD => write!(f, "{}", "addsubpd"),
             &Opcode::Invalid => write!(f, "{}", "invalid"),
         }
     }
@@ -974,6 +1050,8 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VDIVSS |
             Opcode::VHADDPD |
             Opcode::VHSUBPD |
+            Opcode::HADDPD |
+            Opcode::HSUBPD |
             Opcode::VMULPD |
             Opcode::VMULPS |
             Opcode::VMULSD |
@@ -981,9 +1059,15 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPABSB |
             Opcode::VPABSD |
             Opcode::VPABSW |
+            Opcode::PABSB |
+            Opcode::PABSD |
+            Opcode::PABSW |
             Opcode::VPSIGNB |
             Opcode::VPSIGND |
             Opcode::VPSIGNW |
+            Opcode::PSIGNB |
+            Opcode::PSIGND |
+            Opcode::PSIGNW |
             Opcode::VPADDB |
             Opcode::VPADDD |
             Opcode::VPADDQ |
@@ -1001,6 +1085,10 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPMULLD |
             Opcode::VPMULLW |
             Opcode::VPMULUDQ |
+            Opcode::PCLMULQDQ |
+            Opcode::PMULDQ |
+            Opcode::PMULHRSU |
+            Opcode::PMULLD |
             Opcode::VPSUBB |
             Opcode::VPSUBD |
             Opcode::VPSUBQ |
@@ -1021,6 +1109,10 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VRCPSS |
             Opcode::VROUNDSD |
             Opcode::VROUNDSS |
+            Opcode::ROUNDPD |
+            Opcode::ROUNDPS |
+            Opcode::ROUNDSD |
+            Opcode::ROUNDSS |
             Opcode::VRSQRTSS |
             Opcode::VSQRTSD |
             Opcode::VSQRTSS |
@@ -1058,6 +1150,15 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPSRLVD |
             Opcode::VPSRLVQ |
             Opcode::VPSRLW |
+            Opcode::PHADDD |
+            Opcode::PHADDSW |
+            Opcode::PHADDW |
+            Opcode::PHSUBD |
+            Opcode::PHSUBSW |
+            Opcode::PHSUBW |
+            Opcode::PMADDUBSW |
+            Opcode::ADDSUBPD |
+            Opcode::MPSADBW |
             Opcode::RCPSS |
             Opcode::RSQRTSS |
             Opcode::SQRTSD |
@@ -1138,6 +1239,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::POR |
             Opcode::PSADBW |
             Opcode::PSHUFW |
+            Opcode::PSHUFB |
             Opcode::PSLLD |
             Opcode::PSLLQ |
             Opcode::PSLLW |
@@ -1230,6 +1332,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VBLENDPS |
             Opcode::VBLENDVPD |
             Opcode::VBLENDVPS |
+            Opcode::BLENDDVB |
+            Opcode::BLENDPD |
+            Opcode::BLENDPS |
+            Opcode::BLENDVPD |
+            Opcode::BLENDVPS |
+            Opcode::BLENDW |
             Opcode::VBROADCASTF128 |
             Opcode::VBROADCASTI128 |
             Opcode::VBROADCASTSD |
@@ -1237,6 +1345,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VEXTRACTF128 |
             Opcode::VEXTRACTI128 |
             Opcode::VEXTRACTPS |
+            Opcode::EXTRACTPS |
             Opcode::VGATHERDPD |
             Opcode::VGATHERDPS |
             Opcode::VGATHERQPD |
@@ -1244,6 +1353,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VINSERTF128 |
             Opcode::VINSERTI128 |
             Opcode::VINSERTPS |
+            Opcode::INSERTPS |
             Opcode::VMASKMOVDQU |
             Opcode::VMASKMOVPD |
             Opcode::VMASKMOVPS |
@@ -1264,6 +1374,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VMOVNTDQA |
             Opcode::VMOVNTPD |
             Opcode::VMOVNTPS |
+            Opcode::MOVNTDQA |
             Opcode::VMOVQ |
             Opcode::VMOVSHDUP |
             Opcode::VMOVSLDUP |
@@ -1297,6 +1408,18 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPMOVZXDQ |
             Opcode::VPMOVZXWD |
             Opcode::VPMOVZXWQ |
+            Opcode::PMOVSXBD |
+            Opcode::PMOVSXBQ |
+            Opcode::PMOVSXBW |
+            Opcode::PMOVSXDQ |
+            Opcode::PMOVSXWD |
+            Opcode::PMOVSXWQ |
+            Opcode::PMOVZXBD |
+            Opcode::PMOVZXBQ |
+            Opcode::PMOVZXBW |
+            Opcode::PMOVZXDQ |
+            Opcode::PMOVZXWD |
+            Opcode::PMOVZXWQ |
             Opcode::VUNPCKHPD |
             Opcode::VUNPCKHPS |
             Opcode::VUNPCKLPD |
@@ -1312,9 +1435,11 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VSHUFPD |
             Opcode::VSHUFPS |
             Opcode::VPACKSSDW |
+            Opcode::PACKUSDW |
             Opcode::VPACKSSWB |
             Opcode::VPACKUSWB |
             Opcode::VPALIGNR |
+            Opcode::PALIGNR |
             Opcode::VPERM2F128 |
             Opcode::VPERM2I128 |
             Opcode::VPERMD |
@@ -1327,6 +1452,11 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPEXTRD |
             Opcode::VPEXTRQ |
             Opcode::VPEXTRW |
+            Opcode::PEXTRB |
+            Opcode::PEXTRQ |
+            Opcode::PINSRB |
+            Opcode::PINSRD |
+            Opcode::PINSRQ |
             Opcode::VPINSRB |
             Opcode::VPINSRD |
             Opcode::VPINSRQ |
@@ -1336,6 +1466,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VPSHUFB |
             Opcode::VPSHUFD |
             Opcode::VPHMINPOSUW |
+            Opcode::PHMINPOSUW |
             Opcode::VZEROUPPER |
             Opcode::VLDDQU |
             Opcode::BSWAP |
@@ -1495,20 +1626,34 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::VTESTPS |
             Opcode::PCMPEQB |
             Opcode::PCMPEQD |
+            Opcode::PCMPEQQ |
             Opcode::PCMPEQW |
+            Opcode::PCMPESTRI |
+            Opcode::PCMPESTRM |
             Opcode::PCMPGTB |
             Opcode::PCMPGTD |
+            Opcode::PCMPGTQ |
             Opcode::PCMPGTW |
+            Opcode::PCMPISTRI |
+            Opcode::PCMPISTRM |
+            Opcode::PTEST |
             Opcode::MAXPS |
             Opcode::MAXSD |
             Opcode::MAXSS |
             Opcode::MINPS |
             Opcode::MINSD |
             Opcode::MINSS |
+            Opcode::PMAXSB |
             Opcode::PMAXSW |
             Opcode::PMAXUB |
+            Opcode::PMAXUD |
+            Opcode::PMAXUW |
+            Opcode::PMINSB |
+            Opcode::PMINSD |
             Opcode::PMINSW |
             Opcode::PMINUB |
+            Opcode::PMINUD |
+            Opcode::PMINUW |
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
@@ -1576,6 +1721,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::CLAC |
             Opcode::STAC |
             Opcode::ENCLS |
+            Opcode::ENCLV |
             Opcode::XGETBV |
             Opcode::XSETBV |
             Opcode::VMFUNC |
@@ -1586,6 +1732,12 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::WRPKRU |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
+            Opcode::AESDEC |
+            Opcode::AESDECLAST |
+            Opcode::AESENC |
+            Opcode::AESENCLAST |
+            Opcode::AESIMC |
+            Opcode::AESKEYGENASSIST |
             Opcode::VAESDEC |
             Opcode::VAESDECLAST |
             Opcode::VAESENC |

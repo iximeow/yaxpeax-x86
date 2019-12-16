@@ -148,6 +148,7 @@ fn test_0fae() {
     let intel = InstDecoder::minimal().with_intel_quirks();
     let amd = InstDecoder::minimal().with_amd_quirks();
     let default = InstDecoder::default();
+    let minimal = InstDecoder::minimal();
     // drawn heavily from "Table A-6.  Opcode Extensions for One- and Two-byte Opcodes by Group
     // Number"
     test_display(&[0x0f, 0xae, 0x04, 0x4f], "fxsave [rdi + rcx * 2]");
@@ -163,19 +164,21 @@ fn test_0fae() {
         test_display_under(&intel, &[0x0f, 0xae, *modrm], text);
         test_display_under(&amd, &[0x0f, 0xae, *modrm], text);
         test_display_under(&default, &[0x0f, 0xae, *modrm], text);
-        // it turns out intel accepts m != 0 for {l,m,s}fence, but amd does not:
+        test_display_under(&minimal, &[0x0f, 0xae, *modrm], text);
+        // it turns out intel and amd accept m != 0 for {l,m,s}fence:
         // from intel:
         // ```
         // Specification of the instruction's opcode above indicates a ModR/M byte of F0. For this
         // instruction, the processor ignores the r/m field of the ModR/M byte. Thus, MFENCE is encoded
         // by any opcode of the form 0F AE Fx, where x is in the range 0-7.
         // ```
-        // whereas amd does not discuss the r/m field at all. it is TBD if amd also ignores the r/m
-        // field, but for now assumed to be rejected.
+        // whereas amd does not discuss the r/m field at all. at least as of zen, amd also accepts
+        // these encodings.
         for m in 1u8..8u8 {
             test_display_under(&intel, &[0x0f, 0xae, modrm | m], text);
-            test_invalid_under(&amd, &[0x0f, 0xae, modrm | m]);
+            test_display_under(&amd, &[0x0f, 0xae, modrm | m], text);
             test_display_under(&default, &[0x0f, 0xae, modrm | m], text);
+            test_invalid_under(&minimal, &[0x0f, 0xae, modrm | m]);
         }
     }
 }
