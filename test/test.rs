@@ -28,7 +28,7 @@ fn test_invalid(data: &[u8]) {
 
 fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     if let Some(inst) = decoder.decode(data.into_iter().cloned()) {
-        assert_eq!(inst.opcode, yaxpeax_x86::Opcode::Invalid);
+        assert_eq!(inst.opcode, yaxpeax_x86::Opcode::Invalid, "decoded {:?} from {:02x?} under decoder {}", inst.opcode, data, decoder);
     } else {
         // this is fine
     }
@@ -48,15 +48,16 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
             let text = format!("{}", instr);
             assert!(
                 text == expected,
-                "display error for {}:\n  decoded: {:?}\n displayed: {}\n expected: {}\n",
+                "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
                 hex,
                 instr,
+                decoder,
                 text,
                 expected
             );
         },
         None => {
-            assert!(false, "decode error for {}:\n  expected: {}\n", hex, expected);
+            assert!(false, "decode error for {} under decoder {}:\n  expected: {}\n", hex, decoder, expected);
         }
     }
 }
@@ -94,6 +95,66 @@ fn test_cvt() {
     test_display(&[0xf3, 0x4f, 0x0f, 0x2a, 0x00], "cvtsi2ss xmm8, [r8]");
     test_display(&[0x4f, 0x66, 0x0f, 0x2a, 0x00], "cvtpi2pd xmm0, [rax]");
     test_display(&[0x66, 0x4f, 0x0f, 0x2a, 0x00], "cvtpi2pd xmm8, [r8]");
+}
+
+#[test]
+fn test_sse3() {
+    fn test_instr(bytes: &[u8], text: &'static str) {
+        test_display_under(&InstDecoder::minimal().with_sse3(), bytes, text);
+        test_invalid_under(&InstDecoder::minimal(), bytes);
+        // avx doesn't imply older instructions are necessarily valid
+        test_invalid_under(&InstDecoder::minimal().with_avx(), bytes);
+        // sse4 doesn't imply older instructions are necessarily valid
+        test_invalid_under(&InstDecoder::minimal().with_sse4_1(), bytes);
+        test_invalid_under(&InstDecoder::minimal().with_sse4_2(), bytes);
+    }
+
+    fn test_instr_invalid(bytes: &[u8]) {
+        test_invalid_under(&InstDecoder::minimal().with_sse3(), bytes);
+        test_invalid_under(&InstDecoder::default(), bytes);
+    }
+
+    test_instr(&[0xf2, 0x0f, 0xf0, 0x0f], "lddqu xmm1, [rdi]");
+    test_instr_invalid(&[0xf2, 0x0f, 0xf0, 0xcf]);
+    test_instr(&[0xf2, 0x0f, 0xd0, 0x0f], "addsubps xmm1, [rdi]");
+    test_instr(&[0xf2, 0x0f, 0xd0, 0xcf], "addsubps xmm1, xmm7");
+    test_instr(&[0xf2, 0x4f, 0x0f, 0xd0, 0xcf], "addsubps xmm9, xmm15");
+    test_instr(&[0x66, 0x0f, 0xd0, 0x0f], "addsubpd xmm1, [rdi]");
+    test_instr(&[0x66, 0x0f, 0xd0, 0xcf], "addsubpd xmm1, xmm7");
+    test_instr(&[0x66, 0x4f, 0x0f, 0xd0, 0xcf], "addsubpd xmm9, xmm15");
+
+    test_instr(&[0xf2, 0x0f, 0x7c, 0x0f], "haddps xmm1, [rdi]");
+    test_instr(&[0xf2, 0x0f, 0x7c, 0xcf], "haddps xmm1, xmm7");
+    test_instr(&[0xf2, 0x4f, 0x0f, 0x7c, 0xcf], "haddps xmm9, xmm15");
+    test_instr(&[0x66, 0x0f, 0x7c, 0x0f], "haddpd xmm1, [rdi]");
+    test_instr(&[0x66, 0x0f, 0x7c, 0xcf], "haddpd xmm1, xmm7");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x7c, 0xcf], "haddpd xmm9, xmm15");
+
+    test_instr(&[0xf2, 0x0f, 0x7d, 0x0f], "hsubps xmm1, [rdi]");
+    test_instr(&[0xf2, 0x0f, 0x7d, 0xcf], "hsubps xmm1, xmm7");
+    test_instr(&[0xf2, 0x4f, 0x0f, 0x7d, 0xcf], "hsubps xmm9, xmm15");
+    test_instr(&[0x66, 0x0f, 0x7d, 0x0f], "hsubpd xmm1, [rdi]");
+    test_instr(&[0x66, 0x0f, 0x7d, 0xcf], "hsubpd xmm1, xmm7");
+    test_instr(&[0x66, 0x4f, 0x0f, 0x7d, 0xcf], "hsubpd xmm9, xmm15");
+
+    test_instr(&[0xf3, 0x0f, 0x12, 0x0f], "movsldup xmm1, [rdi]");
+    test_instr(&[0xf3, 0x0f, 0x12, 0xcf], "movsldup xmm1, xmm7");
+    test_instr(&[0xf3, 0x4f, 0x0f, 0x12, 0xcf], "movsldup xmm9, xmm15");
+    test_instr(&[0xf3, 0x0f, 0x16, 0x0f], "movshdup xmm1, [rdi]");
+    test_instr(&[0xf3, 0x0f, 0x16, 0xcf], "movshdup xmm1, xmm7");
+    test_instr(&[0xf3, 0x4f, 0x0f, 0x16, 0xcf], "movshdup xmm9, xmm15");
+
+    test_instr(&[0xf2, 0x0f, 0x12, 0x0f], "movddup xmm1, [rdi]");
+    test_instr(&[0xf2, 0x0f, 0x12, 0xcf], "movddup xmm1, xmm7");
+    test_instr(&[0xf2, 0x4f, 0x0f, 0x12, 0xcf], "movddup xmm9, xmm15");
+
+    test_instr(&[0x66, 0x0f, 0x01, 0xc8], "monitor");
+    test_instr(&[0xf2, 0x0f, 0x01, 0xc8], "monitor");
+    test_instr(&[0xf3, 0x0f, 0x01, 0xc8], "monitor");
+
+    test_instr(&[0x66, 0x0f, 0x01, 0xc9], "mwait");
+    test_instr(&[0xf2, 0x0f, 0x01, 0xc9], "mwait");
+    test_instr(&[0xf3, 0x0f, 0x01, 0xc9], "mwait");
 }
 
 #[test]

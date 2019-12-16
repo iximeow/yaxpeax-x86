@@ -2433,7 +2433,6 @@ pub enum OperandCode {
     Gv_Eb = 0x60,
     Gv_Ew = 0x61,
     Gdq_Ed = 0x62,
-    G_E_xmm = 0x63,
     G_E_mm_Ib = 0x64,
     G_E_xmm_Ib = 0x65,
     AL_Ib = 0x66,
@@ -2490,6 +2489,8 @@ pub enum OperandCode {
     G_U_mm = 0xf1,
     Ev_Gv_Ib = 0xf3,
     Ev_Gv_CL = 0xf5,
+    G_M_xmm = 0xf7,
+    G_E_xmm = 0xf9,
 }
 
 fn base_opcode_map(v: u8) -> Opcode {
@@ -2649,8 +2650,8 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::HADDPD), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::HSUBPD), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0x80
@@ -2739,7 +2740,7 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0xd0
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::ADDSUBPD), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3054,7 +3055,7 @@ const OPCODE_F20F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0xf0
-    OpcodeRecord(Interpretation::Instruction(Opcode::LDDQU), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LDDQU), OperandCode::G_M_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4758,16 +4759,21 @@ pub fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm.num &= 0b111;
             instruction.operand_count = 2;
         },
-        OperandCode::G_E_xmm => {
-            let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
-            bytes_read = 1;
-
-//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
-            instruction.modrm_rrr =
-                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
+        op @ OperandCode::G_M_xmm |
+        op @ OperandCode::G_E_xmm => {
+            instruction.modrm_rrr.bank = RegisterBank::X;
             instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
             instruction.operand_count = 2;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                if op == OperandCode::G_M_xmm {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(());
+                } else {
+                    // fix the register to XMM
+                    instruction.modrm_mmm.bank = RegisterBank::X;
+                }
+            }
         },
         OperandCode::G_E_mm_Ib => {
             let modrm = read_modrm(&mut bytes_iter, instruction, length)?;
