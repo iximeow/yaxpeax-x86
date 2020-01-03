@@ -14,16 +14,25 @@ use std::hint::unreachable_unchecked;
 use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
 
 #[cfg(feature="use-serde")]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RegSpec {
     pub num: u8,
     pub bank: RegisterBank
 }
 #[cfg(not(feature="use-serde"))]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct RegSpec {
     pub num: u8,
     pub bank: RegisterBank
+}
+
+use std::hash::Hash;
+use std::hash::Hasher;
+impl Hash for RegSpec {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let code = ((self.bank as u16) << 8) | (self.num as u16);
+        code.hash(state);
+    }
 }
 
 // This is only to select alternate opcode maps for the 0f escape byte.
