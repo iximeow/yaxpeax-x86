@@ -6,7 +6,19 @@ use std::fmt;
 use yaxpeax_arch::{Colorize, ColorSettings, ShowContextual, YaxColors};
 use yaxpeax_arch::display::*;
 
-use ::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
+use ::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec, DecodeError};
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DecodeError::ExhaustedInput => { write!(f, "exhausted input") },
+            DecodeError::InvalidOpcode => { write!(f, "invalid opcode") },
+            DecodeError::InvalidOperand => { write!(f, "invalid operand") },
+            DecodeError::InvalidPrefixes => { write!(f, "invalid prefixes") },
+            DecodeError::TooLong => { write!(f, "too long") },
+        }
+    }
+}
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

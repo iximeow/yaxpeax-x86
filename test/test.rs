@@ -9,16 +9,16 @@ use yaxpeax_x86::{Instruction, InstDecoder, decode_one};
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
     match decode_one(&InstDecoder::default(), bytes.iter().map(|x| *x).take(16).collect::<Vec<u8>>(), &mut instr) {
-        Some(()) => Some(instr),
-        None => None
+        Ok(()) => Some(instr),
+        _ => None
     }
 }
 
 fn decode_as(decoder: &InstDecoder, bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
     match decode_one(decoder, bytes.iter().map(|x| *x).take(16).collect::<Vec<u8>>(), &mut instr) {
-        Some(()) => Some(instr),
-        None => None
+        Ok(()) => Some(instr),
+        _ => None
     }
 }
 
@@ -27,7 +27,7 @@ fn test_invalid(data: &[u8]) {
 }
 
 fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
-    if let Some(inst) = decoder.decode(data.into_iter().cloned()) {
+    if let Ok(inst) = decoder.decode(data.into_iter().cloned()) {
         assert_eq!(inst.opcode, yaxpeax_x86::Opcode::Invalid, "decoded {:?} from {:02x?} under decoder {}", inst.opcode, data, decoder);
     } else {
         // this is fine
@@ -44,7 +44,7 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
         write!(hex, "{:02x}", b).unwrap();
     }
     match decoder.decode(data.into_iter().map(|x| *x)) {
-        Some(instr) => {
+        Ok(instr) => {
             let text = format!("{}", instr);
             assert!(
                 text == expected,
@@ -56,8 +56,8 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
                 expected
             );
         },
-        None => {
-            assert!(false, "decode error for {} under decoder {}:\n  expected: {}\n", hex, decoder, expected);
+        Err(e) => {
+            assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);
         }
     }
 }
