@@ -16,6 +16,7 @@ impl fmt::Display for DecodeError {
             DecodeError::InvalidOperand => { write!(f, "invalid operand") },
             DecodeError::InvalidPrefixes => { write!(f, "invalid prefixes") },
             DecodeError::TooLong => { write!(f, "too long") },
+            DecodeError::IncompleteDecoder => { write!(f, "the decoder is incomplete") },
         }
     }
 }
@@ -641,7 +642,6 @@ impl fmt::Display for Opcode {
             &Opcode::ENCLU => write!(f, "enclu"),
             &Opcode::RDPKRU => write!(f, "rdpkru"),
             &Opcode::WRPKRU => write!(f, "wrpkru"),
-            &Opcode::VMOVUPS => write!(f, "vmovups"),
             &Opcode::VADDPD => write!(f, "vaddpd"),
             &Opcode::VADDPS => write!(f, "vaddps"),
             &Opcode::VADDSUBPD => write!(f, "vaddsubpd"),
@@ -1617,7 +1617,6 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
             Opcode::MOVQ2DQ |
             Opcode::MOVSHDUP |
             Opcode::MOVUPS |
-            Opcode::VMOVUPS |
             Opcode::PEXTRW |
             Opcode::PINSRW |
             Opcode::MOV |
@@ -1908,7 +1907,7 @@ impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instructi
                                 &OperandSpec::RegMMM => {
                                     write!(out, ", ")?;
                                 }
-                                x @ _ => {
+                                _ => {
                                     write!(out, ", byte ")?;
                                     if let Some(prefix) = self.segment_override_for_op(1) {
                                         write!(out, "{}:", prefix)?;

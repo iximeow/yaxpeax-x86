@@ -6,6 +6,7 @@ use std::fmt::Write;
 use yaxpeax_arch::Decoder;
 use yaxpeax_x86::{Instruction, InstDecoder, decode_one};
 
+#[allow(dead_code)]
 fn decode(bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
     match decode_one(&InstDecoder::default(), bytes.iter().map(|x| *x).take(16).collect::<Vec<u8>>(), &mut instr) {
@@ -14,6 +15,7 @@ fn decode(bytes: &[u8]) -> Option<Instruction> {
     }
 }
 
+#[allow(dead_code)]
 fn decode_as(decoder: &InstDecoder, bytes: &[u8]) -> Option<Instruction> {
     let mut instr = Instruction::invalid();
     match decode_one(decoder, bytes.iter().map(|x| *x).take(16).collect::<Vec<u8>>(), &mut instr) {
@@ -103,11 +105,6 @@ fn test_aesni() {
         test_display_under(&InstDecoder::minimal().with_aesni(), bytes, text);
         test_display_under(&InstDecoder::default(), bytes, text);
         test_invalid_under(&InstDecoder::minimal(), bytes);
-    }
-
-    fn test_instr_invalid(bytes: &[u8]) {
-        test_invalid_under(&InstDecoder::minimal().with_aesni(), bytes);
-        test_invalid_under(&InstDecoder::default(), bytes);
     }
 
     test_instr(&[0x66, 0x0f, 0x38, 0xdb, 0x0f], "aesimc xmm1, [rdi]");
