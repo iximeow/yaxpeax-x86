@@ -1,0 +1,19 @@
+[package]
+name = "yaxpeax_x86_ffi"
+version = "0.0.1"
+authors = ["iximeow <me@iximeow.net>"]
+edition = "2018"
+
+[dependencies]
+yaxpeax-x86 = { path = "../" }
+yaxpeax-arch = { path = "../../../yaxpeax-arch" }
+
+[lib]
+name = "yaxpeax_x86_ffi"
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+
