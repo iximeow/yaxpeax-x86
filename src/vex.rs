@@ -98,7 +98,7 @@ pub(crate) fn three_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &
         _ => { unreachable!("p is two bits"); }
     };
     let m = vex_byte_one & 0b11111;
-    println!("m: {:05b}", m);
+//    println!("m: {:05b}", m);
     let m = match m {
         0b00001 => VEXOpcodeMap::Map0F,
         0b00010 => VEXOpcodeMap::Map0F38,
@@ -141,7 +141,7 @@ pub(crate) fn two_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mu
 }
 
 fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, length: &mut u8, operand_code: VEXOperandCode) -> Result<(), DecodeError> {
-    println!("operand code: {:?}", operand_code);
+//    println!("operand code: {:?}", operand_code);
     match operand_code {
         VEXOperandCode::VPS_71 => {
             let modrm = read_modrm(bytes, length)?;
@@ -558,8 +558,8 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
     #[allow(non_snake_case)]
     let L = instruction.prefixes.vex().l();
 
-    println!("reading vex instruction from opcode prefix {:?}, L: {}, opc: {:#x}, map:{:?}", p, L, opc, opcode_map);
-    println!("w? {}", instruction.prefixes.vex().w());
+//    println!("reading vex instruction from opcode prefix {:?}, L: {}, opc: {:#x}, map:{:?}", p, L, opc, opcode_map);
+//    println!("w? {}", instruction.prefixes.vex().w());
 
     // several combinations simply have no instructions. check for those first.
     let (opcode, operand_code) = match opcode_map {
