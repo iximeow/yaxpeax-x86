@@ -5,7 +5,7 @@ version = "0.0.1"
 authors = [ "iximeow <me@iximeow.net>" ]
 license = "0BSD"
 repository = "http://git.iximeow.net/yaxpeax-x86/"
-description = "rust x86-64 decoder"
+description = "x86 decoders for the yaxpeax project"
 
 [dependencies]
 yaxpeax-arch = { path = "../../yaxpeax-arch" }
