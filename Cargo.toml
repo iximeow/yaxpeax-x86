@@ -3,10 +3,9 @@
 name = "yaxpeax-x86"
 version = "0.0.1"
 authors = [ "iximeow <me@iximeow.net>" ]
+license = "0BSD"
 repository = "x86-rs"
-description = """
-A rust x86-64 decoder
-"""
+description = "rust x86-64 decoder"
 
 [dependencies]
 yaxpeax-arch = { path = "../../yaxpeax-arch" }
