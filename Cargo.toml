@@ -4,16 +4,16 @@ name = "yaxpeax-x86"
 version = "0.0.1"
 authors = [ "iximeow <me@iximeow.net>" ]
 license = "0BSD"
-repository = "x86-rs"
+repository = "http://git.iximeow.net/yaxpeax-x86/"
 description = "rust x86-64 decoder"
 
 [dependencies]
 yaxpeax-arch = { path = "../../yaxpeax-arch" }
 "num-traits" = "0.2"
 "termion" = "1.4.0"
-"serde" = "*"
-"serde_json" = "*"
-"serde_derive" = "*"
+"serde" = "1.0"
+"serde_json" = "1.0"
+"serde_derive" = "1.0"
 
 [[test]]
 name = "test"
