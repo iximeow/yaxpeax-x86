@@ -2485,6 +2485,12 @@ impl Opcode {
     }
 }
 
+impl Default for Instruction {
+    fn default() -> Self {
+        Instruction::invalid()
+    }
+}
+
 impl Instruction {
     pub fn operand(&self, i: u8) -> Operand {
         assert!(i < 4);
@@ -2528,12 +2534,14 @@ impl Instruction {
             operands: [OperandSpec::Nothing; 4],
         }
     }
+
     pub fn is_invalid(&self) -> bool {
         match self.opcode {
             Opcode::Invalid => true,
             _ => false
         }
     }
+
     pub fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
         match self.opcode {
             Opcode::STOS => {

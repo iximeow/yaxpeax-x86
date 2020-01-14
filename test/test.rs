@@ -3,26 +3,8 @@ extern crate yaxpeax_x86;
 
 use std::fmt::Write;
 
-use yaxpeax_arch::Decoder;
-use yaxpeax_x86::{Instruction, InstDecoder, decode_one};
-
-#[allow(dead_code)]
-fn decode(bytes: &[u8]) -> Option<Instruction> {
-    let mut instr = Instruction::invalid();
-    match decode_one(&InstDecoder::default(), bytes.iter().map(|x| *x).take(16).collect::<Vec<u8>>(), &mut instr) {
-        Ok(()) => Some(instr),
-        _ => None
-    }
-}
-
-#[allow(dead_code)]
-fn decode_as(decoder: &InstDecoder, bytes: &[u8]) -> Option<Instruction> {
-    let mut instr = Instruction::invalid();
-    match decode_one(decoder, bytes.iter().map(|x| *x).take(16).collect::<Vec<u8>>(), &mut instr) {
-        Ok(()) => Some(instr),
-        _ => None
-    }
-}
+use yaxpeax_arch::{Decoder, LengthedInstruction};
+use yaxpeax_x86::{Instruction, InstDecoder};
 
 fn test_invalid(data: &[u8]) {
     test_invalid_under(&InstDecoder::default(), data);
