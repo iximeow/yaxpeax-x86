@@ -2642,7 +2642,7 @@ impl Prefixes {
     #[inline]
     fn set_address_size(&mut self) { self.bits = self.bits | 0x2 }
     #[inline]
-    pub fn set_lock(&mut self) { self.bits |= 0x4 }
+    fn set_lock(&mut self) { self.bits |= 0x4 }
     #[inline]
     pub fn lock(&self) -> bool { self.bits & 0x4 == 4 }
     #[inline]
@@ -4556,7 +4556,7 @@ fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
     }
 }
 
-pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction) -> Result<(), DecodeError> {
+fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction) -> Result<(), DecodeError> {
     let mut length = 0u8;
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
 //    use std::intrinsics::unlikely;
@@ -4722,7 +4722,7 @@ pub fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T
     }
     Ok(())
 }
-pub fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
+fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
     if (operand_code as u8) & 0x40 == 0x40 {
         instruction.operands[0] = OperandSpec::RegRRR;
     }
@@ -6010,7 +6010,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
     Ok(())
 }
 
-pub fn decode_one<'b, T: IntoIterator<Item=u8>>(decoder: &InstDecoder, bytes: T, instr: &'b mut Instruction) -> Result<(), DecodeError> {
+fn decode_one<'b, T: IntoIterator<Item=u8>>(decoder: &InstDecoder, bytes: T, instr: &'b mut Instruction) -> Result<(), DecodeError> {
     instr.operands = [
         OperandSpec::Nothing,
         OperandSpec::Nothing,
