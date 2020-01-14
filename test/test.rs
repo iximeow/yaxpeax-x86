@@ -39,6 +39,9 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
                 text,
                 expected
             );
+            // while we're at it, test that the instruction is as long, and no longer, than its
+            // input
+            assert_eq!(instr.len() as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
         },
         Err(e) => {
             assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);
@@ -341,6 +344,7 @@ fn test_mov() {
     // test_display(&[0xa1, 0x93, 0x62, 0xc4, 0x00, 0x12, 0x34, 0x12, 0x34], "mov eax, [0x3412341200c46293]");
     // RCT.exe 32bit version, TODO: FIX
     test_display(&[0xa1, 0x93, 0x62, 0xc4, 0x00], "mov eax, [0xc46293]");
+    test_display(&[0xba, 0x01, 0x00, 0x00, 0x00], "mov edx, 0x1");
     test_display(&[0x48, 0xc7, 0x04, 0x24, 0x00, 0x00, 0x00, 0x00], "mov [rsp], 0x0");
     test_display(&[0x48, 0x89, 0x44, 0x24, 0x08], "mov [rsp + 0x8], rax");
     test_display(&[0x48, 0x89, 0x43, 0x18], "mov [rbx + 0x18], rax");
@@ -348,7 +352,7 @@ fn test_mov() {
     test_display(&[0x49, 0x89, 0x4e, 0x08], "mov [r14 + 0x8], rcx");
     test_display(&[0x48, 0x8b, 0x32], "mov rsi, [rdx]");
     test_display(&[0x49, 0x89, 0x46, 0x10], "mov [r14 + 0x10], rax");
-    test_display(&[0x4d, 0x0f, 0x43, 0xec, 0x49], "cmovnb r13, r12");
+    test_display(&[0x4d, 0x0f, 0x43, 0xec], "cmovnb r13, r12");
     test_display(&[0x0f, 0xb6, 0x06], "movzx eax, byte [rsi]");
     test_display(&[0x0f, 0xb7, 0x06], "movzx eax, word [rsi]");
     test_display(&[0x89, 0x55, 0x94], "mov [rbp - 0x6c], edx");

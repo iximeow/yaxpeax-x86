@@ -89,6 +89,7 @@ enum VEXOperandCode {
 pub(crate) fn three_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, mut length: u8) -> Result<(), DecodeError> {
     let vex_byte_one = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
     let vex_byte_two = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
+    length += 2;
     let p = vex_byte_two & 0x03;
     let p = match p {
         0x00 => VEXOpcodePrefix::None,
@@ -121,6 +122,7 @@ pub(crate) fn three_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &
 
 pub(crate) fn two_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, mut length: u8) -> Result<(), DecodeError> {
     let vex_byte = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
+    length += 1;
     let p = vex_byte & 0x03;
     let p = match p {
         0x00 => VEXOpcodePrefix::None,
@@ -553,6 +555,7 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
 
 fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &mut T, instruction: &mut Instruction, length: &mut u8, p: VEXOpcodePrefix) -> Result<(), DecodeError> {
     let opc = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
+    *length += 1;
 
     // the name of this bit is `L` in the documentation, so use the same name here.
     #[allow(non_snake_case)]

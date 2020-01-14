@@ -4757,7 +4757,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 RegSpec::gp_from_parts(reg, instruction.prefixes.rex().b(), 1, instruction.prefixes.rex().present());
             instruction.imm =
                 read_imm_unsigned(&mut bytes_iter, 1, length)?;
-            *length += 1;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
         } else {
@@ -4774,7 +4773,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 RegSpec::from_parts(reg, instruction.prefixes.rex().b(), bank);
             instruction.imm =
                 read_imm_ivq(&mut bytes_iter, opwidth, length)?;
-            *length += opwidth;
             instruction.operands[1] = match opwidth {
                 1 => OperandSpec::ImmI8,
                 2 => OperandSpec::ImmI16,
@@ -4947,7 +4945,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[0] = mem_oper;
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
-            *length = numwidth;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
             instruction.operands[1] = match opwidth {
                 1 => OperandSpec::ImmI8,
