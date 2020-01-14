@@ -4696,6 +4696,10 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                         0x67 => {
                             prefixes.set_address_size();
                         },
+                        0x9b => {
+                            // TODO: WAIT prefix
+                            return Err(DecodeError::IncompleteDecoder);
+                        },
                         0xf0 => {
                             prefixes.set_lock();
                         },

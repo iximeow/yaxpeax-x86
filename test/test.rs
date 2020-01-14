@@ -4,7 +4,7 @@ extern crate yaxpeax_x86;
 use std::fmt::Write;
 
 use yaxpeax_arch::{Decoder, LengthedInstruction};
-use yaxpeax_x86::{Instruction, InstDecoder};
+use yaxpeax_x86::{DecodeError, Instruction, InstDecoder};
 
 fn test_invalid(data: &[u8]) {
     test_invalid_under(&InstDecoder::default(), data);
@@ -374,6 +374,9 @@ fn test_prefixes() {
     test_display(&[0x66, 0x41, 0x31, 0xc0], "xor r8w, ax");
     test_display(&[0x66, 0x41, 0x32, 0xc0], "xor al, r8b");
     test_display(&[0x40, 0x32, 0xc5], "xor al, bpl");
+
+    // test that WAIT doesn't blow up, at least...
+    assert_eq!(InstDecoder::default().decode([0x9b, 0xf8].iter().cloned()).err(), Some(DecodeError::IncompleteDecoder));
 }
 
 #[test]
