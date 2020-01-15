@@ -567,11 +567,13 @@ impl fmt::Display for Opcode {
             &Opcode::PSHUFW => write!(f, "pshufw"),
             &Opcode::PSHUFD => write!(f, "pshufd"),
             &Opcode::PSLLD => write!(f, "pslld"),
+            &Opcode::PSLLDQ => write!(f, "pslldq"),
             &Opcode::PSLLQ => write!(f, "psllq"),
             &Opcode::PSLLW => write!(f, "psllw"),
             &Opcode::PSRAD => write!(f, "psrad"),
             &Opcode::PSRAW => write!(f, "psraw"),
             &Opcode::PSRLD => write!(f, "psrld"),
+            &Opcode::PSRLDQ => write!(f, "psrldq"),
             &Opcode::PSRLQ => write!(f, "psrlq"),
             &Opcode::PSRLW => write!(f, "psrlw"),
             &Opcode::PSUBB => write!(f, "psubb"),
@@ -1314,11 +1316,13 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PSHUFW |
             Opcode::PSHUFB |
             Opcode::PSLLD |
+            Opcode::PSLLDQ |
             Opcode::PSLLQ |
             Opcode::PSLLW |
             Opcode::PSRAD |
             Opcode::PSRAW |
             Opcode::PSRLD |
+            Opcode::PSRLDQ |
             Opcode::PSRLQ |
             Opcode::PSRLW |
             Opcode::PSUBB |

@@ -747,11 +747,13 @@ pub enum Opcode {
     PSHUFW,
     PSHUFD,
     PSLLD,
+    PSLLDQ,
     PSLLQ,
     PSLLW,
     PSRAD,
     PSRAW,
     PSRLD,
+    PSRLDQ,
     PSRLQ,
     PSRLW,
     PSUBB,
@@ -2753,10 +2755,6 @@ pub enum OperandCode {
     AX_Xv,
     DX_AX,
     E_G_xmm,
-    E_G_ymm,
-    E_G_zmm,
-    G_E_ymm,
-    G_E_zmm,
     Ev_Ivs,
     Ew_Sw,
     Fw,
@@ -2786,6 +2784,9 @@ pub enum OperandCode {
     ModRM_0x0f71,
     ModRM_0x0f72,
     ModRM_0x0f73,
+    ModRM_0x660f71,
+    ModRM_0x660f72,
+    ModRM_0x660f73,
     ModRM_0x0fc7,
     Nothing,
     Implied,
@@ -3031,12 +3032,12 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQA), OperandCode::G_E_xmm),
 // 0x70
     OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFD), OperandCode::G_E_xmm_Ib),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660f71),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660f72),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660f73),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPEQB), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPEQW), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::PCMPEQD), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5327,7 +5328,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
-            instruction.operands[1] = OperandSpec::ImmI8;
+            instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0x0f72 => {
             instruction.operand_count = 2;
@@ -5356,7 +5357,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
-            instruction.operands[1] = OperandSpec::ImmI8;
+            instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0x0f73 => {
             instruction.operand_count = 2;
@@ -5382,7 +5383,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
-            instruction.operands[1] = OperandSpec::ImmI8;
+            instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0x660f38 => {
             let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
@@ -5432,6 +5433,96 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             };
         }
+        OperandCode::ModRM_0x660f71 => {
+            instruction.operand_count = 2;
+
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            if modrm & 0xc0 != 0xc0 {
+                return Err(DecodeError::InvalidOperand);
+            }
+
+            let r = (modrm >> 3) & 7;
+            match r {
+                2 => {
+                    instruction.opcode = Opcode::PSRLW;
+                }
+                4 => {
+                    instruction.opcode = Opcode::PSRAW;
+                }
+                6 => {
+                    instruction.opcode = Opcode::PSLLW;
+                }
+                _ => {
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+
+            instruction.modrm_mmm = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.operands[1] = OperandSpec::ImmU8;
+        },
+        OperandCode::ModRM_0x660f72 => {
+            instruction.operand_count = 2;
+
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            if modrm & 0xc0 != 0xc0 {
+                return Err(DecodeError::InvalidOperand);
+            }
+
+            let r = (modrm >> 3) & 7;
+            match r {
+                2 => {
+                    instruction.opcode = Opcode::PSRLD;
+                }
+                4 => {
+                    instruction.opcode = Opcode::PSRAD;
+                }
+                6 => {
+                    instruction.opcode = Opcode::PSLLD;
+                }
+                _ => {
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+
+            instruction.modrm_mmm = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.operands[1] = OperandSpec::ImmU8;
+        },
+        OperandCode::ModRM_0x660f73 => {
+            instruction.operand_count = 2;
+
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            if modrm & 0xc0 != 0xc0 {
+                return Err(DecodeError::InvalidOperand);
+            }
+
+            let r = (modrm >> 3) & 7;
+            match r {
+                2 => {
+                    instruction.opcode = Opcode::PSRLQ;
+                }
+                3 => {
+                    instruction.opcode = Opcode::PSRLDQ;
+                }
+                6 => {
+                    instruction.opcode = Opcode::PSLLQ;
+                }
+                7 => {
+                    instruction.opcode = Opcode::PSLLDQ;
+                }
+                _ => {
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+
+            instruction.modrm_mmm = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.operands[1] = OperandSpec::ImmU8;
+        },
         OperandCode::G_mm_Edq => {
             instruction.operands[1] = mem_oper;
             instruction.modrm_rrr.bank = RegisterBank::MM;
