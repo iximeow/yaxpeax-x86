@@ -278,6 +278,7 @@ impl fmt::Display for Opcode {
         match self {
             &Opcode::POPCNT => write!(f, "popcnt"),
             &Opcode::MOVDQU => write!(f, "movdqu"),
+            &Opcode::MOVDQA => write!(f, "movdqa"),
             &Opcode::MOVQ => write!(f, "movq"),
             &Opcode::CMPSS => write!(f, "cmpss"),
             &Opcode::CMPSD => write!(f, "cmpsd"),
@@ -564,6 +565,7 @@ impl fmt::Display for Opcode {
             &Opcode::POR => write!(f, "por"),
             &Opcode::PSADBW => write!(f, "psadbw"),
             &Opcode::PSHUFW => write!(f, "pshufw"),
+            &Opcode::PSHUFD => write!(f, "pshufd"),
             &Opcode::PSLLD => write!(f, "pslld"),
             &Opcode::PSLLQ => write!(f, "psllq"),
             &Opcode::PSLLW => write!(f, "psllw"),
@@ -586,6 +588,8 @@ impl fmt::Display for Opcode {
             &Opcode::PUNPCKLBW => write!(f, "punpcklbw"),
             &Opcode::PUNPCKLDQ => write!(f, "punpckldq"),
             &Opcode::PUNPCKLWD => write!(f, "punpcklwd"),
+            &Opcode::PUNPCKLQDQ => write!(f, "punpcklqdq"),
+            &Opcode::PUNPCKHQDQ => write!(f, "punpckhqdq"),
             &Opcode::PXOR => write!(f, "pxor"),
             &Opcode::RCPPS => write!(f, "rcpps"),
             &Opcode::RSM => write!(f, "rsm"),
@@ -1306,6 +1310,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PMULUDQ |
             Opcode::POR |
             Opcode::PSADBW |
+            Opcode::PSHUFD |
             Opcode::PSHUFW |
             Opcode::PSHUFB |
             Opcode::PSLLD |
@@ -1578,6 +1583,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PUNPCKLBW |
             Opcode::PUNPCKLDQ |
             Opcode::PUNPCKLWD |
+            Opcode::PUNPCKLQDQ |
+            Opcode::PUNPCKHQDQ |
             Opcode::PACKSSDW |
             Opcode::PACKSSWB |
             Opcode::PACKUSWB |
@@ -1602,6 +1609,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MOVSLDUP |
             Opcode::MOVDQ2Q |
             Opcode::MOVDQU |
+            Opcode::MOVDQA |
             Opcode::MOVQ |
             Opcode::MOVQ2DQ |
             Opcode::MOVSHDUP |
