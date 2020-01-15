@@ -1,9 +1,9 @@
 extern crate yaxpeax_arch;
 extern crate termion;
 
-use std::fmt;
+use core::fmt;
 
-use yaxpeax_arch::{Colorize, ColorSettings, ShowContextual, YaxColors};
+use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
 use ::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec, DecodeError};
@@ -172,36 +172,36 @@ impl fmt::Display for RegSpec {
 
 impl fmt::Display for Operand {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        self.colorize(None, fmt)
+        self.colorize(&NoColors, fmt)
     }
 }
 
-impl <T: std::fmt::Write> Colorize<T> for Operand {
-    fn colorize(&self, colors: Option<&ColorSettings>, f: &mut T) -> std::fmt::Result {
+impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for Operand {
+    fn colorize(&self, colors: &Y, f: &mut T) -> fmt::Result {
         match self {
             &Operand::ImmediateU8(imm) => {
-                write!(f, "{}", colors.number(format!("{:#x}", imm)))
+                write!(f, "{}", colors.number(u8_hex(imm)))
             }
             &Operand::ImmediateI8(imm) => {
                 write!(f, "{}",
                     colors.number(signed_i8_hex(imm)))
             },
             &Operand::ImmediateU16(imm) => {
-                write!(f, "{}", colors.number(format!("{:#x}", imm)))
+                write!(f, "{}", colors.number(u16_hex(imm)))
             }
             &Operand::ImmediateI16(imm) => {
                 write!(f, "{}",
                     colors.number(signed_i16_hex(imm)))
             },
             &Operand::ImmediateU32(imm) => {
-                write!(f, "{}", colors.number(format!("{:#x}", imm)))
+                write!(f, "{}", colors.number(u32_hex(imm)))
             }
             &Operand::ImmediateI32(imm) => {
                 write!(f, "{}",
                     colors.number(signed_i32_hex(imm)))
             },
             &Operand::ImmediateU64(imm) => {
-                write!(f, "{}", colors.number(format!("{:#x}", imm)))
+                write!(f, "{}", colors.number(u64_hex(imm)))
             }
             &Operand::ImmediateI64(imm) => {
                 write!(f, "{}",
@@ -211,22 +211,15 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
                 write!(f, "{}", colors.register(spec))
             }
             &Operand::DisplacementU32(imm) => {
-                write!(f, "[{}]", colors.address(format!("{:#x}", imm)))
+                write!(f, "[{}]", colors.address(u32_hex(imm)))
             }
             &Operand::DisplacementU64(imm) => {
-                write!(f, "[{}]", colors.address(format!("{:#x}", imm)))
+                write!(f, "[{}]", colors.address(u64_hex(imm)))
             }
-            &Operand::RegDisp(ref spec, ref disp) => {
-                let (sign, disp) = if *disp < 0 {
-                    (true, (-std::num::Wrapping(*disp)).0)
-                } else {
-                    (false, *disp)
-                };
-                write!(f, "[{} {} {}]",
-                    colors.register(spec),
-                    if sign { "-" } else { "+" },
-                    colors.number(format!("{:#x}", disp))
-                )
+            &Operand::RegDisp(ref spec, disp) => {
+                write!(f, "[{} ", colors.register(spec))?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")
             },
             &Operand::RegDeref(ref spec) => {
                 write!(f, "[{}]", colors.register(spec))
@@ -238,11 +231,12 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
                 )
             },
             &Operand::RegScaleDisp(ref spec, scale, disp) => {
-                write!(f, "[{} * {} + {}]",
+                write!(f, "[{} * {} ",
                     colors.register(spec),
                     colors.number(scale),
-                    colors.number(format!("{:#x}", disp))
-                )
+                )?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")
             },
             &Operand::RegIndexBase(ref base, ref index) => {
                 write!(f, "[{} + {}]",
@@ -251,11 +245,12 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
                 )
             }
             &Operand::RegIndexBaseDisp(ref base, ref index, disp) => {
-                write!(f, "[{} + {} + {}]",
+                write!(f, "[{} + {} ",
                     colors.register(base),
                     colors.register(index),
-                    colors.register(format!("{:#x}", disp))
-                )
+                )?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")
             },
             &Operand::RegIndexBaseScale(ref base, ref index, scale) => {
                 write!(f, "[{} + {} * {}]",
@@ -265,21 +260,15 @@ impl <T: std::fmt::Write> Colorize<T> for Operand {
                 )
             }
             &Operand::RegIndexBaseScaleDisp(ref base, ref index, scale, disp) => {
-                write!(f, "[{} + {} * {} + {}]",
+                write!(f, "[{} + {} * {} ",
                     colors.register(base),
                     colors.register(index),
                     colors.number(scale),
-                    colors.number(format!("{:#x}", disp))
-                )
+                )?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")
             },
             &Operand::Nothing => { Ok(()) },
-            // &Operand::Many(_) => { panic!("many not covered"); }
-            &Operand::Many(ref ops) => {
-                for op in ops.iter() {
-                    write!(f, ", {}", op)?;
-                }
-                Ok(())
-            }
         }
     }
 }
@@ -1052,8 +1041,8 @@ impl fmt::Display for Opcode {
     }
 }
 
-impl <T: std::fmt::Write> Colorize<T> for Opcode {
-    fn colorize(&self, colors: Option<&ColorSettings>, out: &mut T) -> std::fmt::Result {
+impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for Opcode {
+    fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         match self {
             Opcode::VHADDPS |
             Opcode::VHSUBPS |
@@ -1831,7 +1820,7 @@ impl <T: std::fmt::Write> Colorize<T> for Opcode {
 
 impl fmt::Display for Instruction {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        self.colorize(None, fmt)
+        self.colorize(&NoColors, fmt)
     }
 }
 
@@ -1848,16 +1837,114 @@ impl fmt::Display for Instruction {
  * so write to some Write thing i guess. bite me. i really just want to
  * stop thinking about how to support printing instructions...
  */
-impl <T: std::fmt::Write> Colorize<T> for Instruction {
-    fn colorize(&self, colors: Option<&ColorSettings>, out: &mut T) -> std::fmt::Result {
+impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for Instruction {
+    fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         // TODO: I DONT LIKE THIS, there is no address i can give contextualize here,
         // the address operand maybe should be optional..
-        self.contextualize(colors, 0, None, out)
+        self.contextualize(colors, 0, Some(&NoContext), out)
     }
 }
 
-impl <T: std::fmt::Write> ShowContextual<u64, [Option<String>], T> for Instruction {
-    fn contextualize(&self, colors: Option<&ColorSettings>, _address: u64, context: Option<&[Option<String>]>, out: &mut T) -> std::fmt::Result {
+/// No per-operand context when contextualizing an instruction!
+struct NoContext;
+
+impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u64, NoContext, Color, T, Y> for Instruction {
+    fn contextualize(&self, colors: &Y, _address: u64, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+        if self.prefixes.lock() {
+            write!(out, "lock ")?;
+        }
+
+        if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
+            // only a few of you actually use the prefix...
+            if self.prefixes.rep() {
+                write!(out, "rep ")?;
+            } else if self.prefixes.repz() {
+                write!(out, "repz ")?;
+            } else if self.prefixes.repnz() {
+                write!(out, "repnz ")?;
+            }
+        }
+
+        self.opcode.colorize(colors, out)?;
+
+        match self.operands[0] {
+            OperandSpec::Nothing => {
+                return Ok(());
+            },
+            _ => {
+                write!(out, " ")?;
+                if let Some(prefix) = self.segment_override_for_op(0) {
+                    write!(out, "{}:", prefix)?;
+                }
+            }
+        }
+        let x = Operand::from_spec(self, self.operands[0]);
+        x.colorize(colors, out)?;
+
+        for i in 1..4 {
+            match self.opcode {
+                Opcode::MOVSX_b |
+                Opcode::MOVZX_b => {
+                    match &self.operands[i] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        &OperandSpec::RegMMM => {
+                            write!(out, ", ")?;
+                        }
+                        _ => {
+                            write!(out, ", byte ")?;
+                            if let Some(prefix) = self.segment_override_for_op(1) {
+                                write!(out, "{}:", prefix)?;
+                            }
+                        }
+                    }
+                    let x = Operand::from_spec(self, self.operands[i]);
+                    x.colorize(colors, out)?
+                },
+                Opcode::MOVSX_w |
+                Opcode::MOVZX_w => {
+                    match &self.operands[i] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        &OperandSpec::RegMMM => {
+                            write!(out, ", ")?;
+                        }
+                        _ => {
+                            write!(out, ", word ")?;
+                            if let Some(prefix) = self.segment_override_for_op(1) {
+                                write!(out, "{}:", prefix)?;
+                            }
+                        }
+                    }
+                    let x = Operand::from_spec(self, self.operands[i]);
+                    x.colorize(colors, out)?
+                },
+                _ => {
+                    match &self.operands[i] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        _ => {
+                            write!(out, ", ")?;
+                            if let Some(prefix) = self.segment_override_for_op(1) {
+                                write!(out, "{}:", prefix)?;
+                            }
+                            let x = Operand::from_spec(self, self.operands[i]);
+                            x.colorize(colors, out)?
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature="std")]
+impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u64, [Option<alloc::string::String>], Color, T, Y> for Instruction {
+    fn contextualize(&self, colors: &Y, _address: u64, context: Option<&[Option<alloc::string::String>]>, out: &mut T) -> fmt::Result {
         if self.prefixes.lock() {
             write!(out, "lock ")?;
         }

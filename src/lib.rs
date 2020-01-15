@@ -1,7 +1,12 @@
+#![no_std]
+
 #[cfg(feature="use-serde")]
 #[macro_use] extern crate serde_derive;
 #[cfg(feature="use-serde")]
 extern crate serde;
+
+#[cfg(feature="std")]
+extern crate alloc;
 
 extern crate yaxpeax_arch;
 extern crate termion;
@@ -9,7 +14,7 @@ extern crate termion;
 mod vex;
 mod display;
 
-use std::hint::unreachable_unchecked;
+use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{Arch, Decoder, LengthedInstruction};
 
@@ -26,8 +31,8 @@ pub struct RegSpec {
     pub bank: RegisterBank
 }
 
-use std::hash::Hash;
-use std::hash::Hasher;
+use core::hash::Hash;
+use core::hash::Hasher;
 impl Hash for RegSpec {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let code = ((self.bank as u16) << 8) | (self.num as u16);
@@ -228,7 +233,6 @@ pub enum Operand {
     RegScaleDisp(RegSpec, u8, i32),
     RegIndexBaseScale(RegSpec, RegSpec, u8),
     RegIndexBaseScaleDisp(RegSpec, RegSpec, u8, i32),
-    Many(Vec<Operand>),
     Nothing,
 }
 
@@ -359,25 +363,16 @@ impl Operand {
             Operand::Nothing => {
                 false
             }
-            Operand::Many(els) => {
-                for el in els.iter() {
-                    if el.is_memory() {
-                        return true;
-                    }
-                }
-
-                false
-            }
         }
     }
 }
 
 #[test]
 fn operand_size() {
-    assert_eq!(std::mem::size_of::<OperandSpec>(), 1);
-    assert_eq!(std::mem::size_of::<RegSpec>(), 2);
-    // assert_eq!(std::mem::size_of::<Prefixes>(), 4);
-    // assert_eq!(std::mem::size_of::<Instruction>(), 40);
+    assert_eq!(core::mem::size_of::<OperandSpec>(), 1);
+    assert_eq!(core::mem::size_of::<RegSpec>(), 2);
+    // assert_eq!(core::mem::size_of::<Prefixes>(), 4);
+    // assert_eq!(core::mem::size_of::<Instruction>(), 40);
 }
 
 #[allow(non_camel_case_types)]
@@ -4089,7 +4084,7 @@ struct OpcodeRecord(Interpretation, OperandCode);
 #[test]
 fn opcode_record_size() {
     // there are more than 256 opcodes...
-    assert_eq!(std::mem::size_of::<OpcodeRecord>(), 4);
+    assert_eq!(core::mem::size_of::<OpcodeRecord>(), 4);
 }
 
 const OPCODES: [OpcodeRecord; 256] = [
@@ -4567,7 +4562,7 @@ fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
 fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction) -> Result<(), DecodeError> {
     let mut length = 0u8;
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
-//    use std::intrinsics::unlikely;
+//    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
 
     fn escapes_are_prefixes_actually(prefixes: &mut Prefixes, opc_map: &mut Option<OpcodeMap>) {

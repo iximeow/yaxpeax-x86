@@ -8,7 +8,7 @@ repository = "http://git.iximeow.net/yaxpeax-x86/"
 description = "x86 decoders for the yaxpeax project"
 
 [dependencies]
-yaxpeax-arch = { path = "../../yaxpeax-arch" }
+yaxpeax-arch = { path = "../../yaxpeax-arch", default-features = false, features = []}
 "num-traits" = "0.2"
 "termion" = "1.4.0"
 "serde" = "1.0"
@@ -32,10 +32,15 @@ opt-level = 3
 lto = true
 
 [features]
-default = []
+default = ["std", "colors", "use-serde"]
+
+# opt-in for some apis that are really much nicer with String
+std = []
+
+use-serde = ["yaxpeax-arch/use-serde"]
+
+colors = ["yaxpeax-arch/colors"]
 
 # This enables some capstone benchmarks over the same
 # instruction bytes used to bench this code.
 capstone_bench = []
-
-use-serde = []
