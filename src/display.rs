@@ -1,5 +1,4 @@
 extern crate yaxpeax_arch;
-extern crate termion;
 
 use core::fmt;
 

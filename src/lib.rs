@@ -9,7 +9,6 @@ extern crate serde;
 extern crate alloc;
 
 extern crate yaxpeax_arch;
-extern crate termion;
 
 mod vex;
 mod display;

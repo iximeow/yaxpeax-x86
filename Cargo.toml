@@ -9,11 +9,11 @@ description = "x86 decoders for the yaxpeax project"
 
 [dependencies]
 yaxpeax-arch = { path = "../../yaxpeax-arch", default-features = false, features = []}
-"num-traits" = "0.2"
-"termion" = "1.4.0"
-"serde" = "1.0"
-"serde_json" = "1.0"
-"serde_derive" = "1.0"
+"num-traits" = { version = "0.2", default-features = false }
+"termion" = { version = "1.4.0", optional = true }
+"serde" = { version = "1.0", optional = true }
+"serde_json" = { version = "1.0", optional = true }
+"serde_derive" = { version = "1.0", optional = true }
 
 [[test]]
 name = "test"

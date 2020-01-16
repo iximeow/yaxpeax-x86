@@ -5,8 +5,8 @@ authors = ["iximeow <me@iximeow.net>"]
 edition = "2018"
 
 [dependencies]
-yaxpeax-x86 = { path = "../" }
-yaxpeax-arch = { path = "../../../yaxpeax-arch" }
+yaxpeax-x86 = { path = "../", default-features = false }
+yaxpeax-arch = { path = "../../../yaxpeax-arch", default-features = false }
 
 [lib]
 name = "yaxpeax_x86_ffi"
