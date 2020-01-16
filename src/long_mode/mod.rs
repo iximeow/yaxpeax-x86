@@ -5753,6 +5753,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 _ => { unreachable!("invalid operation width"); },
             }
         }
+        OperandCode::Ib => {
+            instruction.imm =
+                read_imm_unsigned(&mut bytes_iter, 1, length)?;
+            instruction.operands[0] = OperandSpec::ImmU8;
+            instruction.operand_count = 1;
+        }
         OperandCode::Iw => {
             instruction.imm =
                 read_imm_unsigned(&mut bytes_iter, 2, length)?;
