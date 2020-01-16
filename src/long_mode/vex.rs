@@ -1,14 +1,14 @@
-use OperandSpec;
-use DecodeError;
-use RegSpec;
-use RegisterBank;
-use Instruction;
-use Opcode;
-use read_modrm;
-use read_E;
-use read_E_xmm;
-use read_E_ymm;
-use read_imm_unsigned;
+use crate::long_mode::OperandSpec;
+use crate::long_mode::DecodeError;
+use crate::long_mode::RegSpec;
+use crate::long_mode::RegisterBank;
+use crate::long_mode::Instruction;
+use crate::long_mode::Opcode;
+use crate::long_mode::read_modrm;
+use crate::long_mode::read_E;
+use crate::long_mode::read_E_xmm;
+use crate::long_mode::read_E_ymm;
+use crate::long_mode::read_imm_unsigned;
 
 #[derive(Debug)]
 enum VEXOpcodeMap {

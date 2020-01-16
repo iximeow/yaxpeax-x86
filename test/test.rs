@@ -4,7 +4,7 @@ extern crate yaxpeax_x86;
 use std::fmt::Write;
 
 use yaxpeax_arch::{Decoder, LengthedInstruction};
-use yaxpeax_x86::{DecodeError, InstDecoder};
+use yaxpeax_x86::long_mode::{DecodeError, InstDecoder, Opcode};
 
 fn test_invalid(data: &[u8]) {
     test_invalid_under(&InstDecoder::default(), data);
@@ -12,7 +12,7 @@ fn test_invalid(data: &[u8]) {
 
 fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     if let Ok(inst) = decoder.decode(data.into_iter().cloned()) {
-        assert_eq!(inst.opcode, yaxpeax_x86::Opcode::Invalid, "decoded {:?} from {:02x?} under decoder {}", inst.opcode, data, decoder);
+        assert_eq!(inst.opcode, Opcode::Invalid, "decoded {:?} from {:02x?} under decoder {}", inst.opcode, data, decoder);
     } else {
         // this is fine
     }

@@ -5,7 +5,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use ::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec, DecodeError};
+use crate::long_mode::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec, DecodeError};
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
