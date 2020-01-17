@@ -1,11 +1,12 @@
 #![no_std]
 
-#[cfg(feature="use-serde")]
-#[macro_use] extern crate serde_derive;
-#[cfg(feature="use-serde")]
+#[cfg(feature = "use-serde")]
+#[macro_use]
+extern crate serde_derive;
+#[cfg(feature = "use-serde")]
 extern crate serde;
 
-#[cfg(feature="std")]
+#[cfg(feature = "std")]
 extern crate alloc;
 
 extern crate yaxpeax_arch;
