@@ -512,7 +512,16 @@ fn test_bitwise() {
 
 #[test]
 fn test_misc() {
-    test_display(&[0xcc], "int 0x3");
+    test_display(&[0xe4, 0x99], "in al, 0x99");
+    test_display(&[0xe5, 0x99], "in eax, 0x99");
+    test_display(&[0x67, 0xe5, 0x99], "in eax, 0x99");
+    test_display(&[0x4f, 0xe5, 0x99], "in eax, 0x99");
+    test_display(&[0xe6, 0x99], "out 0x99, al");
+    test_display(&[0x4f, 0xe7, 0x99], "out 0x99, eax");
+    test_display(&[0xec], "in al, dx");
+    test_display(&[0xed], "in eax, dx");
+    test_display(&[0xee], "out dx, al");
+    test_display(&[0xef], "out dx, eax");
     test_display(&[0xcd, 0x00], "int 0x0");
     test_display(&[0xcd, 0xff], "int 0xff");
     test_display(&[0x9c], "pushf");

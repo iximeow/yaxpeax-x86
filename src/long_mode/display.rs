@@ -421,7 +421,9 @@ impl fmt::Display for Opcode {
             &Opcode::TEST => write!(f, "test"),
             &Opcode::CMP => write!(f, "cmp"),
             &Opcode::INS => write!(f, "ins"),
+            &Opcode::IN => write!(f, "in"),
             &Opcode::OUTS => write!(f, "outs"),
+            &Opcode::OUT => write!(f, "out"),
             &Opcode::IMUL => write!(f, "imul"),
             &Opcode::JO => write!(f, "jo"),
             &Opcode::JNO => write!(f, "jno"),
@@ -1629,7 +1631,9 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SAHF |
             Opcode::MOVS |
             Opcode::INS |
+            Opcode::IN |
             Opcode::OUTS |
+            Opcode::OUT |
             Opcode::MOVSX_b |
             Opcode::MOVSX_w |
             Opcode::MOVZX_b |

@@ -184,6 +184,11 @@ impl RegSpec {
     }
 
     #[inline]
+    pub fn dx() -> RegSpec {
+        RegSpec { bank: RegisterBank::W, num: 2 }
+    }
+
+    #[inline]
     pub fn al() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 0 }
     }
@@ -523,7 +528,9 @@ pub enum Opcode {
     MOVS,
     TEST,
     INS,
+    IN,
     OUTS,
+    OUT,
     IMUL,
     JO,
     JNO,
@@ -2778,6 +2785,14 @@ pub enum OperandCode {
     Nothing,
     // Implied,
     Unsupported,
+    AL_Ib,
+    AX_Ib,
+    Ib_AL,
+    Ib_AX,
+    AX_DX,
+    AL_DX,
+    DX_AX,
+    DX_AL,
     Zv_R0 = 0x40,
     Zv_R1 = 0x41,
     Zv_R2 = 0x42,
@@ -2815,11 +2830,11 @@ pub enum OperandCode {
     Gdq_Ed = 0x62,
     G_E_mm_Ib = 0x64,
     G_E_xmm_Ib = 0x65,
-    AL_Ib = 0x66,
+    AL_Ibs = 0x66,
     AX_Ivd = 0x67,
     AL_Ob = 0x68,
     AL_Xb = 0x69,
-    // AX_AL = 0x6a,
+    AX_AL = 0x6a,
     AX_Ov = 0x6b,
 
     Eb_Gb = 0x80,
@@ -4084,7 +4099,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::ADD), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADD), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADD), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::ADD), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::ADD), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADD), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4092,7 +4107,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::OR), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::OR), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::OR), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::OR), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::OR), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::OR), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
@@ -4100,7 +4115,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::ADC), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADC), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADC), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::ADC), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::ADC), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADC), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4108,7 +4123,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::SBB), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::SBB), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::SBB), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::SBB), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::SBB), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::SBB), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4116,7 +4131,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::AND), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::AND), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::AND), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::AND), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::AND), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::AND), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4124,7 +4139,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::SUB), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::SUB), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::SUB), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::SUB), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::SUB), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::SUB), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4132,7 +4147,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::XOR), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::XOR), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::XOR), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::XOR), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::XOR), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::XOR), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4140,7 +4155,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::CMP), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMP), OperandCode::Gb_Eb),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMP), OperandCode::Gv_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CMP), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CMP), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMP), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4253,7 +4268,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVS), OperandCode::Yv_Xv),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPS), OperandCode::Yb_Xb),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPS), OperandCode::Yv_Xv),
-    OpcodeRecord(Interpretation::Instruction(Opcode::TEST), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::TEST), OperandCode::AL_Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::TEST), OperandCode::AX_Ivd),
     OpcodeRecord(Interpretation::Instruction(Opcode::STOS), OperandCode::Yb_AL),
     OpcodeRecord(Interpretation::Instruction(Opcode::STOS), OperandCode::Yv_AX),
@@ -4330,27 +4345,19 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     // JECXZ
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // IN
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // IN
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // OUT
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // OUT
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AL_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AX_Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::OUT), OperandCode::Ib_AL),
+    OpcodeRecord(Interpretation::Instruction(Opcode::OUT), OperandCode::Ib_AX),
 // 0xe8
     OpcodeRecord(Interpretation::Instruction(Opcode::CALL), OperandCode::Jvds),
     OpcodeRecord(Interpretation::Instruction(Opcode::JMP), OperandCode::Jvds),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::JMP), OperandCode::Ibs),
-    // IN
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // IN
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // OUT
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // OUT
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AL_DX),
+    OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AX_DX),
+    OpcodeRecord(Interpretation::Instruction(Opcode::OUT), OperandCode::DX_AL),
+    OpcodeRecord(Interpretation::Instruction(Opcode::OUT), OperandCode::DX_AX),
 // 0xf0
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     // ICEBP?
@@ -5189,7 +5196,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         }
-        OperandCode::AL_Ib => {
+        OperandCode::AL_Ibs => {
             instruction.modrm_rrr =
                 RegSpec::al();
             instruction.imm =
@@ -6105,6 +6112,92 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.imm = 3;
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
+        }
+        OperandCode::AL_Ib => {
+            instruction.modrm_rrr =
+                RegSpec::al();
+            instruction.imm =
+                read_num(&mut bytes_iter, 1)? as u64;
+            *length += 1;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::ImmU8;
+            instruction.operand_count = 2;
+        }
+        OperandCode::AX_Ib => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
+            instruction.modrm_rrr = if opwidth == 4 {
+               RegSpec::eax()
+            } else {
+               RegSpec::ax()
+            };
+            instruction.imm =
+                read_num(&mut bytes_iter, 1)? as u64;
+            *length += 1;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::ImmU8;
+            instruction.operand_count = 2;
+        }
+        OperandCode::Ib_AL => {
+            instruction.modrm_rrr =
+                RegSpec::al();
+            instruction.imm =
+                read_num(&mut bytes_iter, 1)? as u64;
+            *length += 1;
+            instruction.operands[0] = OperandSpec::ImmU8;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
+        OperandCode::Ib_AX => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
+            instruction.modrm_rrr = if opwidth == 4 {
+                RegSpec::eax()
+            } else {
+                RegSpec::ax()
+            };
+            instruction.imm =
+                read_num(&mut bytes_iter, 1)? as u64;
+            *length += 1;
+            instruction.operands[0] = OperandSpec::ImmU8;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
+        OperandCode::AX_DX => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
+            instruction.modrm_rrr = if opwidth == 4 {
+                RegSpec::eax()
+            } else {
+                RegSpec::ax()
+            };
+            instruction.modrm_mmm = RegSpec::dx();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::RegMMM;
+            instruction.operand_count = 2;
+        }
+        OperandCode::AL_DX => {
+            instruction.modrm_rrr = RegSpec::al();
+            instruction.modrm_mmm = RegSpec::dx();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::RegMMM;
+            instruction.operand_count = 2;
+        }
+        OperandCode::DX_AX => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
+            instruction.modrm_rrr = if opwidth == 4 {
+                RegSpec::eax()
+            } else {
+                RegSpec::ax()
+            };
+            instruction.modrm_mmm = RegSpec::dx();
+            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
+        OperandCode::DX_AL => {
+            instruction.modrm_rrr = RegSpec::al();
+            instruction.modrm_mmm = RegSpec::dx();
+            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
         }
         _ => {
             instruction.operand_count = 0;
