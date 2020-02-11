@@ -59,6 +59,10 @@ pub enum ConditionCode {
 
 #[allow(non_snake_case)]
 impl RegSpec {
+    pub fn name(&self) -> &'static str {
+        display::regspec_label(self)
+    }
+
     #[inline]
     fn from_parts(num: u8, extended: bool, bank: RegisterBank) -> RegSpec {
         RegSpec {

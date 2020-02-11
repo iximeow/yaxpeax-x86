@@ -1,6 +1,8 @@
 extern crate yaxpeax_arch;
 extern crate yaxpeax_x86;
 
+mod regspec;
+
 use std::fmt::Write;
 
 use yaxpeax_arch::{Decoder, LengthedInstruction};
