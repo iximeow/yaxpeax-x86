@@ -6,13 +6,13 @@ use core::hint::unreachable_unchecked;
 use yaxpeax_arch::{Decoder, LengthedInstruction};
 
 #[cfg(feature="use-serde")]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RegSpec {
     pub num: u8,
     pub bank: RegisterBank
 }
 #[cfg(not(feature="use-serde"))]
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub struct RegSpec {
     pub num: u8,
     pub bank: RegisterBank
@@ -364,7 +364,7 @@ fn operand_size() {
 
 #[allow(non_camel_case_types)]
 #[cfg(feature="use-serde")]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum RegisterBank {
     Q, D, W, B, rB, // Quadword, Dword, Word, Byte
     CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
@@ -374,7 +374,7 @@ pub enum RegisterBank {
 }
 #[allow(non_camel_case_types)]
 #[cfg(not(feature="use-serde"))]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum RegisterBank {
     Q, D, W, B, rB, // Quadword, Dword, Word, Byte
     CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
