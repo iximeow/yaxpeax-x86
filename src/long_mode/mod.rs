@@ -4457,16 +4457,16 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
 
             if disp == 0 {
                 if modbits == 0 {
-                    OperandSpec::RegScaleDisp
+                    OperandSpec::RegScale
                 } else {
-                    OperandSpec::RegIndexBaseScaleDisp
+                    OperandSpec::RegIndexBaseScale
                 }
             } else {
                 instr.disp = disp as i64 as u64;
                 if modbits == 0 {
-                    OperandSpec::RegScale
+                    OperandSpec::RegScaleDisp
                 } else {
-                    OperandSpec::RegIndexBaseScale
+                    OperandSpec::RegIndexBaseScaleDisp
                 }
             }
         }
