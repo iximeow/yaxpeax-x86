@@ -285,7 +285,9 @@ impl fmt::Display for Opcode {
             &Opcode::CMPSS => write!(f, "cmpss"),
             &Opcode::CMPSD => write!(f, "cmpsd"),
             &Opcode::UNPCKLPS => write!(f, "unpcklps"),
+            &Opcode::UNPCKLPD => write!(f, "unpcklpd"),
             &Opcode::UNPCKHPS => write!(f, "unpckhps"),
+            &Opcode::UNPCKHPD => write!(f, "unpckhpd"),
             &Opcode::MOVUPS => write!(f, "movups"),
             &Opcode::MOVQ2DQ => write!(f, "movq2dq"),
             &Opcode::MOVDQ2Q => write!(f, "movdq2q"),
@@ -499,40 +501,61 @@ impl fmt::Display for Opcode {
             &Opcode::SETLE => write!(f, "setle"),
             &Opcode::SETG => write!(f, "setg"),
             &Opcode::ADDPS => write!(f, "addps"),
+            &Opcode::ADDPD => write!(f, "addpd"),
             &Opcode::ANDNPS => write!(f, "andnps"),
+            &Opcode::ANDNPD => write!(f, "andnpd"),
             &Opcode::ANDPS => write!(f, "andps"),
+            &Opcode::ANDPD => write!(f, "andpd"),
             &Opcode::BSWAP => write!(f, "bswap"),
             &Opcode::CMPPS => write!(f, "cmpps"),
+            &Opcode::CMPPD => write!(f, "cmppd"),
+            &Opcode::COMISD => write!(f, "comisd"),
             &Opcode::COMISS => write!(f, "comiss"),
             &Opcode::CVTDQ2PS => write!(f, "cvtdq2ps"),
+            &Opcode::CVTPS2DQ => write!(f, "cvtps2dq"),
             &Opcode::CVTPI2PS => write!(f, "cvtpi2ps"),
             &Opcode::CVTPI2PD => write!(f, "cvtpi2pd"),
             &Opcode::CVTPS2PD => write!(f, "cvtps2pd"),
+            &Opcode::CVTPD2PS => write!(f, "cvtpd2ps"),
             &Opcode::CVTPS2PI => write!(f, "cvtps2pi"),
+            &Opcode::CVTPD2PI => write!(f, "cvtpd2pi"),
             &Opcode::CVTTPS2PI => write!(f, "cvttps2pi"),
+            &Opcode::CVTTPD2PI => write!(f, "cvttpd2pi"),
+            &Opcode::CVTTPD2DQ => write!(f, "cvttpd2dq"),
             &Opcode::DIVPS => write!(f, "divps"),
+            &Opcode::DIVPD => write!(f, "divpd"),
             &Opcode::EMMS => write!(f, "emms"),
             &Opcode::GETSEC => write!(f, "getsec"),
             &Opcode::LFS => write!(f, "lfs"),
             &Opcode::LGS => write!(f, "lgs"),
             &Opcode::LSS => write!(f, "lss"),
             &Opcode::MASKMOVQ => write!(f, "maskmovq"),
+            &Opcode::MASKMOVDQU => write!(f, "maskmovdqu"),
             &Opcode::MAXPS => write!(f, "maxps"),
+            &Opcode::MAXPD => write!(f, "maxpd"),
             &Opcode::MINPS => write!(f, "minps"),
+            &Opcode::MINPD => write!(f, "minpd"),
             &Opcode::MOVAPS => write!(f, "movaps"),
             &Opcode::MOVAPD => write!(f, "movapd"),
             &Opcode::MOVD => write!(f, "movd"),
             &Opcode::MOVLPS => write!(f, "movlps"),
+            &Opcode::MOVLPD => write!(f, "movlpd"),
             &Opcode::MOVLHPS => write!(f, "movlhps"),
             &Opcode::MOVHPS => write!(f, "movhps"),
+            &Opcode::MOVHPD => write!(f, "movhpd"),
             &Opcode::MOVHLPS => write!(f, "movhlps"),
             &Opcode::MOVUPD => write!(f, "movupd"),
             &Opcode::MOVMSKPS => write!(f, "movmskps"),
+            &Opcode::MOVMSKPD => write!(f, "movmskpd"),
             &Opcode::MOVNTI => write!(f, "movnti"),
             &Opcode::MOVNTPS => write!(f, "movntps"),
+            &Opcode::MOVNTPD => write!(f, "movntpd"),
             &Opcode::MOVNTQ => write!(f, "movntq"),
+            &Opcode::MOVNTDQ => write!(f, "movntdq"),
             &Opcode::MULPS => write!(f, "mulps"),
+            &Opcode::MULPD => write!(f, "mulpd"),
             &Opcode::ORPS => write!(f, "orps"),
+            &Opcode::ORPD => write!(f, "orpd"),
             &Opcode::PACKSSDW => write!(f, "packssdw"),
             &Opcode::PACKSSWB => write!(f, "packsswb"),
             &Opcode::PACKUSWB => write!(f, "packuswb"),
@@ -601,17 +624,22 @@ impl fmt::Display for Opcode {
             &Opcode::RSM => write!(f, "rsm"),
             &Opcode::RSQRTPS => write!(f, "rsqrtps"),
             &Opcode::SHLD => write!(f, "shld"),
+            &Opcode::SHUFPD => write!(f, "shufpd"),
             &Opcode::SHUFPS => write!(f, "shufps"),
             &Opcode::SLHD => write!(f, "slhd"),
             &Opcode::SQRTPS => write!(f, "sqrtps"),
+            &Opcode::SQRTPD => write!(f, "sqrtpd"),
             &Opcode::SUBPS => write!(f, "subps"),
+            &Opcode::SUBPD => write!(f, "subpd"),
             &Opcode::SYSENTER => write!(f, "sysenter"),
             &Opcode::SYSEXIT => write!(f, "sysexit"),
+            &Opcode::UCOMISD => write!(f, "ucomisd"),
             &Opcode::UCOMISS => write!(f, "ucomiss"),
             &Opcode::UD2E => write!(f, "ud2e"),
             &Opcode::VMREAD => write!(f, "vmread"),
             &Opcode::VMWRITE => write!(f, "vmwrite"),
             &Opcode::XORPS => write!(f, "xorps"),
+            &Opcode::XORPD => write!(f, "xorpd"),
             &Opcode::CBW => write!(f, "cbw"),
             &Opcode::CWDE => write!(f, "cwde"),
             &Opcode::CDQE => write!(f, "cdqe"),
@@ -623,6 +651,7 @@ impl fmt::Display for Opcode {
             &Opcode::BLSI => write!(f, "blsi"),
             &Opcode::BLSMSK => write!(f, "blsmsk"),
             &Opcode::BLSR => write!(f, "blsr"),
+            &Opcode::VMCLEAR => write!(f, "vmclear"),
             &Opcode::VMCALL => write!(f, "vmcall"),
             &Opcode::VMLAUNCH => write!(f, "vmlaunch"),
             &Opcode::VMRESUME => write!(f, "vmresume"),
@@ -1291,12 +1320,19 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::BLSMSK |
             Opcode::BLSR |
             Opcode::ADDPS |
+            Opcode::ADDPD |
             Opcode::ANDNPS |
+            Opcode::ANDNPD |
             Opcode::ANDPS |
+            Opcode::ANDPD |
+            Opcode::COMISD |
             Opcode::COMISS |
             Opcode::DIVPS |
+            Opcode::DIVPD |
             Opcode::MULPS |
+            Opcode::MULPD |
             Opcode::ORPS |
+            Opcode::ORPD |
             Opcode::PADDB |
             Opcode::PADDD |
             Opcode::PADDQ |
@@ -1340,11 +1376,15 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PXOR |
             Opcode::RSQRTPS |
             Opcode::SQRTPS |
+            Opcode::SQRTPD |
             Opcode::SUBPS |
+            Opcode::SUBPD |
             Opcode::XORPS |
+            Opcode::XORPD |
             Opcode::RCPPS |
             Opcode::SHLD |
             Opcode::SLHD |
+            Opcode::UCOMISD |
             Opcode::UCOMISS |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
@@ -1553,33 +1593,44 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::BSWAP |
             Opcode::CVTDQ2PD |
             Opcode::CVTDQ2PS |
+            Opcode::CVTPS2DQ |
             Opcode::CVTPD2DQ |
             Opcode::CVTPI2PS |
             Opcode::CVTPI2PD |
             Opcode::CVTPS2PD |
+            Opcode::CVTPD2PS |
             Opcode::CVTPS2PI |
+            Opcode::CVTPD2PI |
             Opcode::CVTSD2SI |
             Opcode::CVTSD2SS |
             Opcode::CVTSI2SD |
             Opcode::CVTSI2SS |
             Opcode::CVTSS2SD |
             Opcode::CVTSS2SI |
+            Opcode::CVTTPD2DQ |
             Opcode::CVTTPS2DQ |
             Opcode::CVTTPS2PI |
+            Opcode::CVTTPD2PI |
             Opcode::CVTTSD2SI |
             Opcode::CVTTSS2SI |
             Opcode::MASKMOVQ |
+            Opcode::MASKMOVDQU |
             Opcode::MOVAPS |
             Opcode::MOVAPD |
             Opcode::MOVD |
             Opcode::MOVHPS |
+            Opcode::MOVHPD |
             Opcode::MOVHLPS |
             Opcode::MOVLPS |
+            Opcode::MOVLPD |
             Opcode::MOVLHPS |
             Opcode::MOVMSKPS |
+            Opcode::MOVMSKPD |
             Opcode::MOVNTI |
             Opcode::MOVNTPS |
+            Opcode::MOVNTPD |
             Opcode::MOVNTQ |
+            Opcode::MOVNTDQ |
             Opcode::MOVSD |
             Opcode::MOVSS |
             Opcode::MOVUPD |
@@ -1597,7 +1648,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PACKSSWB |
             Opcode::PACKUSWB |
             Opcode::UNPCKHPS |
+            Opcode::UNPCKHPD |
             Opcode::UNPCKLPS |
+            Opcode::UNPCKLPD |
+            Opcode::SHUFPD |
             Opcode::SHUFPS |
             Opcode::PMOVMSKB |
             Opcode::LDDQU |
@@ -1722,9 +1776,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PCMPISTRI |
             Opcode::PCMPISTRM |
             Opcode::PTEST |
+            Opcode::MAXPD |
             Opcode::MAXPS |
             Opcode::MAXSD |
             Opcode::MAXSS |
+            Opcode::MINPD |
             Opcode::MINPS |
             Opcode::MINSD |
             Opcode::MINSS |
@@ -1746,6 +1802,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CMPSS |
             Opcode::CMP |
             Opcode::CMPPS |
+            Opcode::CMPPD |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
             Opcode::WRMSR |
@@ -1797,6 +1854,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::UD2E |
             Opcode::VMREAD |
             Opcode::VMWRITE |
+            Opcode::VMCLEAR |
             Opcode::VMCALL |
             Opcode::VMLAUNCH |
             Opcode::VMRESUME |
