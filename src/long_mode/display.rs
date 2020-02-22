@@ -652,6 +652,7 @@ impl fmt::Display for Opcode {
             &Opcode::BLSMSK => write!(f, "blsmsk"),
             &Opcode::BLSR => write!(f, "blsr"),
             &Opcode::VMCLEAR => write!(f, "vmclear"),
+            &Opcode::VMXON => write!(f, "vmxon"),
             &Opcode::VMCALL => write!(f, "vmcall"),
             &Opcode::VMLAUNCH => write!(f, "vmlaunch"),
             &Opcode::VMRESUME => write!(f, "vmresume"),
@@ -1855,6 +1856,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMREAD |
             Opcode::VMWRITE |
             Opcode::VMCLEAR |
+            Opcode::VMXON |
             Opcode::VMCALL |
             Opcode::VMLAUNCH |
             Opcode::VMRESUME |

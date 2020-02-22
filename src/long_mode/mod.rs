@@ -659,6 +659,7 @@ pub enum Opcode {
     BLSMSK,
     BLSR,
     VMCLEAR,
+    VMXON,
     VMCALL,
     VMLAUNCH,
     VMRESUME,
@@ -5111,6 +5112,13 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 Opcode::PUSH,
                 Opcode::Invalid
             ][((modrm >> 3) & 7) as usize];
+            if instruction.operands[0] == OperandSpec::RegMMM {
+                if opcode == Opcode::CALL || opcode == Opcode::JMP {
+                    instruction.modrm_mmm.bank = RegisterBank::Q;
+                } else if opcode == Opcode::CALLF || opcode == Opcode::JMPF {
+                    return Err(DecodeError::InvalidOperand);
+                }
+            }
             instruction.opcode = opcode;
             instruction.operand_count = 1;
         }
@@ -5632,6 +5640,24 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             match r {
                 6 => {
                     instruction.opcode = Opcode::VMCLEAR;
+                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 1 /* doesn't matter, something using this width is invalid */, length)?;
+                    if instruction.operands[0] == OperandSpec::RegMMM {
+                        return Err(DecodeError::InvalidOperand);
+                    }
+                    instruction.operand_count = 1;
+                }
+                _ => {
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+        },
+        OperandCode::ModRM_0xf30fc7 => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+            let r = (modrm >> 3) & 7;
+            match r {
+                6 => {
+                    instruction.opcode = Opcode::VMXON;
                     instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 1 /* doesn't matter, something using this width is invalid */, length)?;
                     if instruction.operands[0] == OperandSpec::RegMMM {
                         return Err(DecodeError::InvalidOperand);

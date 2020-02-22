@@ -747,6 +747,11 @@ fn test_control_flow() {
     test_display(&[0x74, 0x47], "jz 0x47");
     test_display(&[0xff, 0x15, 0x7e, 0x72, 0x24, 0x00], "call [rip + 0x24727e]");
     test_display(&[0xff, 0x24, 0xcd, 0x70, 0xa0, 0xbc, 0x01], "jmp [rcx * 8 + 0x1bca070]");
+    test_display(&[0xff, 0xe0], "jmp rax");
+    test_display(&[0x66, 0xff, 0xe0], "jmp rax");
+    test_display(&[0x67, 0xff, 0xe0], "jmp rax");
+    test_invalid(&[0xff, 0xd8]);
+    test_display(&[0xff, 0x18], "callf [rax]");
     test_display(&[0xc3], "ret");
 }
 
@@ -772,6 +777,9 @@ fn test_bmi1() {
     let no_bmi1 = InstDecoder::minimal();
     test_display_under(&bmi1, &[0x41, 0x0f, 0xbc, 0xd3], "tzcnt edx, r11d");
     test_display_under(&no_bmi1, &[0x41, 0x0f, 0xbc, 0xd3], "bsf edx, r11d");
+
+    test_display_under(&bmi1, &[0xf3, 0x0f, 0xb8, 0xc1], "popcnt eax, ecx");
+    test_display_under(&bmi1, &[0xf3, 0x4f, 0x0f, 0xb8, 0xc1], "popcnt r8, r9");
 }
 
 #[test]
@@ -783,6 +791,13 @@ fn test_bitwise() {
 
 #[test]
 fn test_misc() {
+    // TODO
+//    test_display(&[0xf2, 0x0f, 0x38, 0xf0, 0xc1], "crc32 eax, cl");
+//    test_display(&[0xf2, 0x0f, 0x38, 0xf1, 0xc1], "crc32 eax, ecx");
+    test_display(&[0xfe, 0x00], "inc [rax]"); // TODO: inc byte [rax]
+    test_display(&[0xfe, 0x08], "dec [rax]"); // TODO: dec byte [rax]
+    test_display(&[0xff, 0x00], "inc [rax]"); // TODO: inc dword [rax]
+    test_display(&[0x48, 0xff, 0x00], "inc [rax]"); // TODO: inc qword [rax]
     test_display(&[0xe4, 0x99], "in al, 0x99");
     test_display(&[0xe5, 0x99], "in eax, 0x99");
     test_display(&[0x67, 0xe5, 0x99], "in eax, 0x99");
@@ -815,6 +830,8 @@ fn test_misc() {
     // test_invalid(&[0x66, 0x0f, 0xc7, 0x03]);
     test_display(&[0x66, 0x4f, 0x0f, 0xc7, 0x33], "vmclear [r11]");
     test_display(&[0x66, 0x0f, 0xc7, 0x33], "vmclear [rbx]");
+    test_display(&[0xf3, 0x4f, 0x0f, 0xc7, 0x33], "vmxon [r11]");
+    test_display(&[0xf3, 0x0f, 0xc7, 0x33], "vmxon [rbx]");
 }
 
 #[test]
