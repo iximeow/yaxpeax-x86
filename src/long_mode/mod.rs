@@ -2831,6 +2831,7 @@ pub enum OperandCode {
     AL_DX = 0x105,
     DX_AX = 0x106,
     DX_AL = 0x107,
+    MOVQ_f30f = 0x108,
     G_xmm_Ed_Ib = 0x1ef, // mirror G_xmm_Edq, but also read an immediate
     Zv_R0 = 0x40,
     Zv_R1 = 0x41,
@@ -2884,6 +2885,7 @@ pub enum OperandCode {
     Gv_Ev_Iv = 0xc5,
     // gap: 0xc6
     Gd_U_xmm = 0xc7,
+    Gv_E_xmm = 0x1c7,
     M_G_xmm = 0xc9,
     ModRM_0x0f12 = 0xcb,
     ModRM_0x0f16 = 0xce,
@@ -2917,8 +2919,11 @@ pub enum OperandCode {
     G_mm_E_xmm = 0xe5,
     G_E_mm = 0xe7,
     Edq_G_mm = 0xe9,
+    Edq_G_xmm = 0x1e9,
     E_G_mm = 0xeb,
     G_xmm_E_mm = 0xed,
+    G_xmm_U_mm = 0x1ed,
+    U_mm_G_xmm = 0x2ed,
     G_xmm_Edq = 0xef,
     G_U_mm = 0xf1,
     Ev_Gv_Ib = 0xf3,
@@ -3086,8 +3091,8 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::HADDPD), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::HSUBPD), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVD), OperandCode::Edq_G_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQA), OperandCode::E_G_xmm),
 // 0x80
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3461,7 +3466,7 @@ const OPCODE_F20F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQ2Q), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQ2Q), OperandCode::U_mm_G_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3561,8 +3566,8 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTSI2SS), OperandCode::G_xmm_Edq),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTTSS2SI), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTSS2SI), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTTSS2SI), OperandCode::Gv_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTSS2SI), OperandCode::Gv_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0x30
@@ -3603,7 +3608,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::SQRTSS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::RSQRTSS), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::RCPSS), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::RCPSS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3611,7 +3616,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::ADDSS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::MULSS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::CVTSS2SD), OperandCode::G_E_xmm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::CVTTPS2DQ), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CVTTPS2DQ), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::SUBSS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::MINSS), OperandCode::G_E_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::DIVSS), OperandCode::G_E_xmm),
@@ -3648,7 +3653,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::G_E_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ), OperandCode::MOVQ_f30f),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQU), OperandCode::E_G_xmm),
 // 0x80
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3742,7 +3747,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ2DQ), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVQ2DQ), OperandCode::G_xmm_U_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5344,6 +5349,30 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
 }
 fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), DecodeError> {
     match operand_code {
+        OperandCode::MOVQ_f30f => {
+            // if rex.w is set, the f3 prefix no longer applies and this becomes an 0f7e movq,
+            // rather than f30f7e movq.
+            //
+            // the difference here is that 0f7e movq has reversed operand order from f30f7e movq,
+            // in addition to the selected register banks being different.
+            //
+            // anyway, there are two operands, and the primary concern here is "what are they?".
+            instruction.operand_count = 2;
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            if instruction.prefixes.rex().w() {
+                let op = instruction.operands[0];
+                instruction.operands[0] = instruction.operands[1];
+                instruction.operands[1] = op;
+                instruction.modrm_mmm.bank = RegisterBank::Q;
+                instruction.modrm_rrr.bank = RegisterBank::MM;
+                instruction.modrm_rrr.num &= 0b111;
+                instruction.opcode = Opcode::MOVD;
+            }
+        }
         OperandCode::ModRM_0x0f71 => {
             instruction.operand_count = 2;
 
@@ -5648,6 +5677,20 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             }
         }
+        OperandCode::Edq_G_xmm => {
+            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[0] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::X;
+            if mem_oper == OperandSpec::RegMMM {
+                if instruction.prefixes.rex().w() {
+                    instruction.modrm_mmm.bank = RegisterBank::Q;
+                    // movd/q is so weird
+                    instruction.opcode = Opcode::MOVQ;
+                } else {
+                    instruction.modrm_mmm.bank = RegisterBank::D;
+                }
+            }
+        }
         OperandCode::E_G_mm => {
             instruction.operands[1] = instruction.operands[0];
             instruction.operands[0] = mem_oper;
@@ -5704,14 +5747,29 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_mmm.bank = RegisterBank::X;
             }
         },
-        OperandCode::G_xmm_E_mm => {
+        op @ OperandCode::G_xmm_U_mm |
+        op @ OperandCode::G_xmm_E_mm => {
             instruction.operands[1] = mem_oper;
             instruction.modrm_rrr.bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
                 instruction.modrm_mmm.bank = RegisterBank::MM;
                 instruction.modrm_mmm.num &= 0b111;
+            } else {
+                if op == OperandCode::G_xmm_U_mm {
+                    return Err(DecodeError::InvalidOperand);
+                }
             }
         },
+        OperandCode::U_mm_G_xmm => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_mmm.bank = RegisterBank::X;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_rrr.bank = RegisterBank::MM;
+                instruction.modrm_rrr.num &= 0b111;
+            } else {
+                return Err(DecodeError::InvalidOperand);
+            }
+        }
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
             instruction.operands[0] = OperandSpec::AL;
@@ -5797,6 +5855,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
             instruction.modrm_rrr.bank = RegisterBank::D;
             instruction.modrm_mmm.bank = RegisterBank::X;
+        }
+        OperandCode::Gv_E_xmm => {
+            instruction.operands[1] = mem_oper;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::X;
+            }
         }
         OperandCode::M_G_xmm => {
             instruction.operands[1] = instruction.operands[0];
