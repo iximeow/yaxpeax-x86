@@ -1,0 +1,25 @@
+## 0.0.7
+
+`sse` and `sse2` support are mostly complete.
+`jmp reg` erroneously decoded to 32-bit registers without `rex.w`.
+`callf` could erroneously decode as having a register operand.
+more comprehensive, if yet insufficiently tested, avx decoding.
+support `vmclear` and `vmxon`, vmx still incomplete.
+
+## 0.0.6
+
+addressing modes using a sib byte with displacement != 0 were wrongly reported as having no displacement.
+
+## 0.0.5
+
+history basically starts here.
+
+* impl Ord and PartialOrd on RegSpec and RegisterBank
+* `RegSpec::name` to get `&'static str` labels for registers
+* support `in` and `out` instructions
+
+## 0.0.4 - 0.0.2
+
+seriously stop, just don't use these versions
+
+just bumps to use newer `yaxpeax-arch` since this is all wildly unstable
