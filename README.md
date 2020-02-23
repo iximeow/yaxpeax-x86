@@ -41,6 +41,9 @@ the canonical copy of `yaxpeax-x86` is at [https://git.iximeow.net/yaxpeax-x86/]
 * ring-0 instructions have questionable support. user beware!
 * the only unsafe code in `yaxpeax_x86` is instances of `unsafe { unreachable_unchecked(); }`. while these are, currently, all unreachable, this code should default to a fail-safe assertion fail, with `unreachable_unchecked` being an opt-in feature. user beware!
 
+### changelog
+a changelog across crate versions is maintained in the `CHANGELOG` file located in the repo, as well as [online](https://git.iximeow.net/yaxpeax-x86/tree/CHANGELOG).
+
 ### see also
 
 [`iced`](https://github.com/0xd4d/iced) looks to be another very good `x86_64` decoder, with an in-progress [translation to rust](https://github.com/0xd4d/iced/tree/rust)

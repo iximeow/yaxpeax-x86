@@ -1,11 +1,12 @@
 [package]
 
 name = "yaxpeax-x86"
-version = "0.0.7"
+version = "0.0.8"
 authors = [ "iximeow <me@iximeow.net>" ]
 license = "0BSD"
 repository = "http://git.iximeow.net/yaxpeax-x86/"
 description = "x86 decoders for the yaxpeax project"
+readme = "README.md"
 
 [dependencies]
 yaxpeax-arch = { version = "0.0.3", default-features = false, features = [] }
