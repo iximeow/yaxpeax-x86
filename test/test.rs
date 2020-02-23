@@ -122,11 +122,6 @@ fn test_sse2() {
         test_display_under(&InstDecoder::minimal(), bytes, text);
     }
 
-    fn test_instr_invalid(bytes: &[u8]) {
-        test_invalid_under(&InstDecoder::minimal(), bytes);
-        test_invalid_under(&InstDecoder::default(), bytes);
-    }
-
     test_instr(&[0xf2, 0x0f, 0x10, 0x0c, 0xc7], "movsd xmm1, [rdi + rax * 8]");
     test_instr(&[0xf2, 0x0f, 0x11, 0x0c, 0xc7], "movsd [rdi + rax * 8], xmm1");
     test_instr(&[0x66, 0x0f, 0x11, 0x0c, 0xc7], "movupd [rdi + rax * 8], xmm1");
