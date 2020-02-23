@@ -391,6 +391,58 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.imm = read_imm_unsigned(bytes, 1, length)?;
             Ok(())
         },
+        VEXOperandCode::G_xmm_Eq => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E(bytes, instruction, modrm, 8, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            Ok(())
+        }
+        VEXOperandCode::G_xmm_Ed => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E(bytes, instruction, modrm, 4, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            Ok(())
+        }
+        VEXOperandCode::Eq_G_xmm => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E(bytes, instruction, modrm, 8, length)?;
+            instruction.operands[0] = mem_oper;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            Ok(())
+        }
+        VEXOperandCode::Ed_G_xmm => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E(bytes, instruction, modrm, 4, length)?;
+            instruction.operands[0] = mem_oper;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            Ok(())
+        }
         _op @ VEXOperandCode::E_G_xmm |
         _op @ VEXOperandCode::U_G_xmm |
         _op @ VEXOperandCode::M_G_xmm |
@@ -403,6 +455,19 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             let modrm = read_modrm(bytes, length)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = mem_oper;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            Ok(())
+        }
+        _op @ VEXOperandCode::E_xmm_G_ymm_imm8 => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
@@ -421,6 +486,58 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            Ok(())
+        }
+        _op @ VEXOperandCode::G_xmm_E_xmm => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            Ok(())
+        }
+        _op @ VEXOperandCode::G_xmm_E_ymm => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E_ymm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            Ok(())
+        }
+        _op @ VEXOperandCode::G_ymm_E_xmm => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            Ok(())
+        }
+        _op @ VEXOperandCode::G_ymm_E_ymm => {
+            if instruction.vex_reg.num != 0 {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOperand);
+            }
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            let mem_oper = read_E_ymm(bytes, instruction, modrm, length)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             Ok(())
@@ -469,6 +586,19 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operands[2] = mem_oper;
             Ok(())
         }
+        _op @ VEXOperandCode::G_V_E_ymm_imm8 => {
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            instruction.vex_reg.bank = RegisterBank::Y;
+            let mem_oper = read_E_ymm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::RegVex;
+            instruction.operands[2] = mem_oper;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[3] = OperandSpec::ImmU8;
+            Ok(())
+        }
         _op @ VEXOperandCode::E_V_G_ymm |
         _op @ VEXOperandCode::M_V_G_ymm => {
             let modrm = read_modrm(bytes, length)?;
@@ -492,7 +622,43 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operands[2] = mem_oper;
             Ok(())
         }
-
+        _op @ VEXOperandCode::G_V_E_xmm_imm8 => {
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::RegVex;
+            instruction.operands[2] = mem_oper;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[3] = OperandSpec::ImmU8;
+            Ok(())
+        }
+        _op @ VEXOperandCode::V_ymm_G_ymm_E_xmm_imm8 => {
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            instruction.vex_reg.bank = RegisterBank::Y;
+            let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operands[2] = mem_oper;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[3] = OperandSpec::ImmU8;
+            Ok(())
+        }
+        _op @ VEXOperandCode::V_xmm_G_ymm_E_ymm_imm8 => {
+            let modrm = read_modrm(bytes, length)?;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            let mem_oper = read_E_ymm(bytes, instruction, modrm, length)?;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operands[2] = mem_oper;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[3] = OperandSpec::ImmU8;
+            Ok(())
+        }
         _op @ VEXOperandCode::E_V_G_xmm |
         _op @ VEXOperandCode::M_V_G_xmm => {
             let modrm = read_modrm(bytes, length)?;
@@ -529,22 +695,9 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             Ok(())
         }
 
-        VEXOperandCode::E_xmm_G_ymm_imm8 |
         VEXOperandCode::G_E_ymm_imm8 |
-        VEXOperandCode::G_xmm_E_xmm |
-        VEXOperandCode::G_xmm_E_ymm |
-        VEXOperandCode::G_ymm_E_xmm |
-        VEXOperandCode::G_ymm_E_ymm |
-        VEXOperandCode::G_V_E_xmm_imm8 |
         VEXOperandCode::G_V_E_xmm_xmm4 |
-        VEXOperandCode::G_V_E_ymm_imm8 |
         VEXOperandCode::G_V_E_ymm_ymm4 |
-        VEXOperandCode::V_xmm_G_ymm_E_ymm_imm8 |
-        VEXOperandCode::V_ymm_G_ymm_E_xmm_imm8 |
-        VEXOperandCode::Eq_G_xmm |
-        VEXOperandCode::Ed_G_xmm |
-        VEXOperandCode::G_xmm_Ed |
-        VEXOperandCode::G_xmm_Eq |
         VEXOperandCode::G_V_ymm_E_xmm |
         VEXOperandCode::G_V_xmm_Ew_imm8 => {
             Err(DecodeError::IncompleteDecoder) // :)
