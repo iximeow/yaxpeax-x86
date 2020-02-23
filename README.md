@@ -37,6 +37,7 @@ the canonical copy of `yaxpeax-x86` is at [https://git.iximeow.net/yaxpeax-x86/]
 * `yaxpeax-x86` will, but does not yet, have decoders for protected-mode and real-mode `x86`. currently, `yaxpeax-x86` assumes that it is decoding long mode `x86_64` instructions. it is strongly recommended to use `<yaxpeax_x86::x86_64 as Arch>::Instruction` and similar type aliases, rather than using struct and operand types directly. user beware!
 * avx512 is not yet supported. user beware!
 * avx256 support is questionable. user beware!
+* x87 is not yet supported. user beware!
 * ring-0 instructions have questionable support. user beware!
 * the only unsafe code in `yaxpeax_x86` is instances of `unsafe { unreachable_unchecked(); }`. while these are, currently, all unreachable, this code should default to a fail-safe assertion fail, with `unreachable_unchecked` being an opt-in feature. user beware!
 
