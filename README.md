@@ -23,7 +23,7 @@ by the in-repo benchmark, `yaxpeax_x86::long_mode` decodes `x86_64` instructions
 ### pretty small?
 `yaxpeax_x86::long_mode` is expected to be around 20kb of code and data. currently a stripped static build of `ffi/` takes a bit more space - around 130kb. instruction rendering is currently non-optional, and is a significant amount of `.text` size. data tables are larger than anticipated, and it's currently an open question if they can be reduced down, or the size target of `yaxpeax_x86::long_mode` should be raised.
 
-this, however, does not by any means make this library the smallest `x86_64` decoder; [`zydis`](https://github.com/zyantific/zydis) handily beats this out taking only 10kb in an -O3 build for benchmarking.
+this, however, does not by any means make this library the smallest `x86_64` decoder; [`zydis`](https://github.com/zyantific/zydis) handily beats `yaxpeax-x86` out, taking only 10kb in an -O3 build for benchmarking.
 
 ### mirrors
 
