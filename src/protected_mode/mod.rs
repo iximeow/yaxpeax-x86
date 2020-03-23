@@ -1289,7 +1289,7 @@ enum OperandSpec {
 
 // the Hash, Eq, and PartialEq impls here are possibly misleading.
 // They exist because downstream some structs are spelled like
-// Foo<T> for T == x86_64. This is only to access associated types
+// Foo<T> for T == x86 This is only to access associated types
 // which themselves are bounded, but their #[derive] require T to
 // implement these traits.
 #[cfg(feature="use-serde")]
@@ -1368,9 +1368,9 @@ pub struct InstDecoder {
     // 41. avx512_vpopcntdq
     // 42. avx512_4vnniw
     // 43. avx512_4fmaps
-    // 44. cx8 // cmpxchg8 - is this actually optional in x86_64?
-    // 45. syscall // syscall/sysret - actually optional in x86_64?
-    // 46. rdtscp // actually optional in x86_64?
+    // 44. cx8 // cmpxchg8 - is this actually optional in x86?
+    // 45. syscall // syscall/sysret - actually optional in x86?
+    // 46. rdtscp // actually optional in x86?
     // 47. abm (lzcnt, popcnt)
     // 48. sse4a
     // 49. 3dnowprefetch // actually optional?
@@ -1384,7 +1384,7 @@ pub struct InstDecoder {
 }
 
 impl InstDecoder {
-    /// Instantiates an x86_64 decoder that decodes the bare minimum of x86_64.
+    /// Instantiates an x86 decoder that decodes the bare minimum of protected-mode x86.
     ///
     /// Pedantic and only decodes what the spec says is well-defined, rejecting undefined sequences
     /// and any instructions defined by extensions.
@@ -2420,7 +2420,7 @@ impl InstDecoder {
 }
 
 impl Default for InstDecoder {
-    /// Instantiates an x86_64 decoder that probably decodes what you want.
+    /// Instantiates an x86 decoder that probably decodes what you want.
     ///
     /// Attempts to match real processors in interpretation of undefined sequences, and decodes any
     /// instruction defined in any extension.

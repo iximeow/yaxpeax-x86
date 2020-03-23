@@ -15,7 +15,7 @@ x86 decoders implemented as part of the yaxpeax project.
 the decoders provided by `yaxpeax-x86` are designed to be usable in a `no_std` setting, and does so by default. to build `yaxpeax_x86` decoders in `no_std` you'll want to set `default-features = false` as with many other `no_std` Rust crates. serde currently (though it doesn't seem _necessarily_?) relies on `std`, as well as the `colors` feature to render instructions with default (eg terminal-friendly) syntax highlighting.
 
 ### instruction set extensions
-`yaxpeax-x86` decoders provide the option to specify what [instruction set extensions](http://git.iximeow.net/yaxpeax-x86/tree/src/long_mode/mod.rs#n1297) are eligible when decoding, to support decoding x86 instructions as understood by a particular microarchitecture. the default `yaxpeax_x86::InstDecoder` takes an optimistsic approach to decoding and assumes all feature sets are available, as well as accepting both intel-specific and amd-specific quirks around undefined encodings.
+`yaxpeax-x86` decoders provide the option to specify what [instruction set extensions](http://git.iximeow.net/yaxpeax-x86/tree/src/long_mode/mod.rs#n1297) are eligible when decoding, to support decoding x86 instructions as understood by a particular microarchitecture. the default impls of decoders in `yaxpeax_x86` take an optimistsic approach to decoding and assumes all feature sets are available, as well as accepting both intel-specific and amd-specific quirks around undefined encodings.
 
 ### pretty fast
 by the in-repo benchmark, `yaxpeax_x86::long_mode` decodes `x86_64` instructions at anywhere between 60 million instructions per second to just shy of 100 million instructions per second, depending on hardware and distribution of instructions being decoded. when hooked up to `disasm-bench`, `yaxpeax_x86::long_mode` has shown roughly 150mb/s decode throughput.
@@ -34,7 +34,7 @@ the canonical copy of `yaxpeax-x86` is at [https://git.iximeow.net/yaxpeax-x86/]
 ### ! user beware !
 * while the decoder has the option to select instruction set extensions, it is entirely likely that some extensions are not yet properly rejected when the corresponding flag is disabled. user beware!
 * `yaxpeax-x86` likely has many corners where it does not reject instructions it should. particularly likely is accepting a register operand where the corresponding instruction specifically only allows memory encodings - `lea` is a good example of this. user beware!
-* `yaxpeax-x86` will, but does not yet, have decoders for protected-mode and real-mode `x86`. currently, `yaxpeax-x86` assumes that it is decoding long mode `x86_64` instructions. it is strongly recommended to use `<yaxpeax_x86::x86_64 as Arch>::Instruction` and similar type aliases, rather than using struct and operand types directly. user beware!
+* `yaxpeax-x86` will, but does not yet, have a decoder for real-mode `x86`. it is strongly recommended to use `<yaxpeax_x86::protected_mode::Arch as Arch>::Instruction` and similar type aliases, rather than using struct and operand types directly. user beware!
 * avx512 is not yet supported. user beware!
 * avx256 support is questionable. user beware!
 * x87 is not yet supported. user beware!
