@@ -4808,8 +4808,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 1 => OperandSpec::ImmI8,
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
-                o => unsafe { unreachable!("impossibe op width {}", o) }
-//                _ => unsafe { unreachable_unchecked() }
+                o => { unreachable!("impossibe op width {}", o) }
             };
             instruction.operand_count = 2;
         }
