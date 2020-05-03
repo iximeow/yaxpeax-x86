@@ -2726,7 +2726,7 @@ impl Prefixes {
         };
     }
     #[inline]
-    fn rep(&self) -> bool { self.bits & 0x30 == 0x10 }
+    pub fn rep(&self) -> bool { self.bits & 0x30 == 0x10 }
     #[inline]
     fn set_rep(&mut self) { self.bits = (self.bits & 0xcf) | 0x10 }
     #[inline]
