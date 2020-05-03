@@ -519,7 +519,7 @@ pub enum Opcode {
     CBW,
     CWDE,
     CDQE,
-    CBD,
+    CWD,
     CDQ,
     CQO,
     LODS,
@@ -5959,7 +5959,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::CVT_DA => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             instruction.opcode = match opwidth {
-                2 => { Opcode::CBD },
+                2 => { Opcode::CWD },
                 4 => { Opcode::CDQ },
                 8 => { Opcode::CQO },
                 _ => { unreachable!("invalid operation width"); },

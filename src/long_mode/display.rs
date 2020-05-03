@@ -643,7 +643,7 @@ impl fmt::Display for Opcode {
             &Opcode::CBW => write!(f, "cbw"),
             &Opcode::CWDE => write!(f, "cwde"),
             &Opcode::CDQE => write!(f, "cdqe"),
-            &Opcode::CBD => write!(f, "cbd"),
+            &Opcode::CWD => write!(f, "cwd"),
             &Opcode::CDQ => write!(f, "cdq"),
             &Opcode::CQO => write!(f, "cqo"),
             &Opcode::ANDN => write!(f, "andn"),
@@ -1665,7 +1665,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CBW |
             Opcode::CWDE |
             Opcode::CDQE |
-            Opcode::CBD |
+            Opcode::CWD |
             Opcode::CDQ |
             Opcode::CQO |
             Opcode::MOVDDUP |
