@@ -1,3 +1,11 @@
+## 0.0.11
+
+* fix mis-named 'cbd' instruction, which should be 'cwd'
+* add `Operand::width` to query the width of an x86 access
+  - this is wrong for many memory operands, which require deeper changes
+* bump `yaxpeax-arch` to 0.0.4, which yields a breaking change in `Self::Unit` of `LengthedInstruction
+* `Prefixes::rep` is now public, allowing users to query if a decoded instruction has a rep prefix
+
 ## 0.0.10
 
 same as 0.0.9, but with a warning fixed.
