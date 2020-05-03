@@ -145,13 +145,13 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn bx() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 3 }
+    pub fn ebx() -> RegSpec {
+        RegSpec { bank: RegisterBank::D, num: 3 }
     }
 
     #[inline]
-    pub fn ebx() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 3 }
+    pub fn bx() -> RegSpec {
+        RegSpec { bank: RegisterBank::W, num: 3 }
     }
 
     #[inline]
@@ -192,6 +192,56 @@ impl RegSpec {
     #[inline]
     pub fn cl() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 1 }
+    }
+
+    #[inline]
+    pub fn ah() -> RegSpec {
+        RegSpec { bank: RegisterBank::B, num: 4 }
+    }
+
+    #[inline]
+    pub fn ch() -> RegSpec {
+        RegSpec { bank: RegisterBank::B, num: 5 }
+    }
+
+    #[inline]
+    pub fn width(&self) -> u8 {
+        match self.bank {
+            RegisterBank::D => 4,
+            RegisterBank::W => 2,
+            RegisterBank::B => 1,
+            RegisterBank::CR |
+            RegisterBank::DR => {
+                4
+            },
+            RegisterBank::S => {
+                2
+            },
+            RegisterBank::EIP => {
+                4
+            }
+            RegisterBank::EFlags => {
+                4
+            }
+            RegisterBank::X => {
+                16
+            }
+            RegisterBank::Y => {
+                32
+            }
+            RegisterBank::Z => {
+                64
+            }
+            RegisterBank::ST => {
+                10
+            }
+            RegisterBank::MM => {
+                8
+            }
+            RegisterBank::K => {
+                8
+            }
+        }
     }
 }
 
@@ -344,6 +394,33 @@ impl Operand {
             Operand::Register(_) |
             Operand::Nothing => {
                 false
+            }
+        }
+    }
+
+    pub fn width(&self) -> u8 {
+        match self {
+            Operand::Nothing => {
+                panic!("non-operand does not have a size");
+            }
+            Operand::Register(reg) => {
+                reg.width()
+            }
+            Operand::ImmediateI8(_) |
+            Operand::ImmediateU8(_) => {
+                1
+            }
+            Operand::ImmediateI16(_) |
+            Operand::ImmediateU16(_) => {
+                2
+            }
+            Operand::ImmediateI32(_) |
+            Operand::ImmediateU32(_) => {
+                4
+            }
+            // memory operands
+            _ => {
+                4
             }
         }
     }

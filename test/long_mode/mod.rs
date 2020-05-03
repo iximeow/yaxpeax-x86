@@ -1,4 +1,5 @@
 mod regspec;
+mod operand;
 
 use std::fmt::Write;
 
