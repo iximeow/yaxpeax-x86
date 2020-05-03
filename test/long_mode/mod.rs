@@ -2,7 +2,7 @@ mod regspec;
 
 use std::fmt::Write;
 
-use yaxpeax_arch::{Decoder, LengthedInstruction};
+use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
 use yaxpeax_x86::long_mode::{DecodeError, InstDecoder, Opcode};
 
 fn test_invalid(data: &[u8]) {
@@ -40,7 +40,7 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
             );
             // while we're at it, test that the instruction is as long, and no longer, than its
             // input
-            assert_eq!(instr.len() as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
+            assert_eq!((0u64.wrapping_offset(instr.len()).to_linear()) as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
         },
         Err(e) => {
             assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);

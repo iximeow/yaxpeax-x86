@@ -3,7 +3,7 @@ mod display;
 
 use core::hint::unreachable_unchecked;
 
-use yaxpeax_arch::{Decoder, LengthedInstruction};
+use yaxpeax_arch::{AddressDiff, Decoder, LengthedInstruction};
 
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Serialize, Deserialize)]
@@ -1325,12 +1325,12 @@ impl yaxpeax_arch::Arch for Arch {
 }
 
 impl LengthedInstruction for Instruction {
-    type Unit = u64;
-    fn len(&self) -> u64 {
-        self.length.into()
+    type Unit = AddressDiff<u64>;
+    fn len(&self) -> Self::Unit {
+        AddressDiff::from_const(self.length.into())
     }
-    fn min_size() -> u64 {
-        1
+    fn min_size() -> Self::Unit {
+        AddressDiff::from_const(1)
     }
 }
 
