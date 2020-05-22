@@ -1,5 +1,5 @@
 use yaxpeax_arch::{Decoder, LengthedInstruction};
-use yaxpeax_x86::long_mode::{DecodeError, InstDecoder, Opcode};
+use yaxpeax_x86::protected_mode::{DecodeError, InstDecoder, Opcode, Operand, RegSpec};
 
 #[test]
 fn register_widths() {
@@ -12,5 +12,5 @@ fn register_widths() {
 
 #[test]
 fn memory_widths() {
-    assert_eq!(Operand::RegDeref(RegSpec::rsp()).width(), 4);
+    assert_eq!(Operand::RegDeref(RegSpec::esp()).width(), 4);
 }

@@ -1,5 +1,6 @@
 mod vex;
 mod display;
+pub mod uarch;
 
 use core::hint::unreachable_unchecked;
 
@@ -116,6 +117,14 @@ impl RegSpec {
         RegSpec {
             num: 4,
             bank: RegisterBank::D
+        }
+    }
+
+    #[inline]
+    pub fn sp() -> RegSpec {
+        RegSpec {
+            num: 4,
+            bank: RegisterBank::W
         }
     }
 
@@ -738,11 +747,16 @@ pub enum Opcode {
     XGETBV,
     XSETBV,
     VMFUNC,
+    XABORT,
+    XBEGIN,
     XEND,
     XTEST,
     ENCLU,
     RDPKRU,
     WRPKRU,
+
+    RDSEED,
+    RDRAND,
 
     ADDPS,
     ADDPD,
@@ -1289,6 +1303,31 @@ pub enum Opcode {
     PHADDW,
     HSUBPD,
     HADDPD,
+
+    SHA1RNDS4,
+    SHA1NEXTE,
+    SHA1MSG1,
+    SHA1MSG2,
+    SHA256RNDS2,
+    SHA256MSG1,
+    SHA256MSG2,
+
+    LZCNT,
+    CLGI,
+    STGI,
+    SKINIT,
+    VMLOAD,
+    VMMCALL,
+    VMSAVE,
+    VMRUN,
+    INVLPGA,
+
+    MOVBE,
+
+    ADCX,
+    ADOX,
+
+    PREFETCHW,
 }
 
 #[derive(Debug)]
@@ -1457,6 +1496,14 @@ pub struct InstDecoder {
     // 53. intel quirks
     // 54. amd quirks
     // 55. avx (intel ?, amd ?)
+    // 56. amd-v/svm
+    // 57. lahfsahf
+    // 58. cmov
+    // 59. f16c
+    // 60. fma4
+    // 61. prefetchw
+    // 62. tsx
+    // 63. lzcnt
     flags: u64,
 }
 
@@ -1543,6 +1590,12 @@ impl InstDecoder {
         self
     }
 
+    pub fn with_sse4(self) -> Self {
+        self
+            .with_sse4_1()
+            .with_sse4_2()
+    }
+
     pub fn movbe(&self) -> bool {
         self.flags & (1 << 8) != 0
     }
@@ -1615,6 +1668,9 @@ impl InstDecoder {
         self
     }
 
+    /// `bmi2` indicates support for the `BZHI`, `MULX`, `PDEP`, `PEXT`, `RORX`, `SARX`, `SHRX`,
+    /// and `SHLX` instructions. `bmi2` is implemented in all x86_64 chips that implement `bmi`,
+    /// except the amd `piledriver` and `steamroller` microarchitectures.
     pub fn bmi2(&self) -> bool {
         self.flags & (1 << 16) != 0
     }
@@ -1975,6 +2031,94 @@ impl InstDecoder {
         self
     }
 
+    pub fn svm(&self) -> bool {
+        self.flags & (1 << 56) != 0
+    }
+
+    pub fn with_svm(mut self) -> Self {
+        self.flags |= 1 << 56;
+        self
+    }
+
+    /// `lahfsahf` is only unset for early revisions of 64-bit amd and intel chips. unfortunately
+    /// the clearest documentation on when these instructions were reintroduced into 64-bit
+    /// architectures seems to be
+    /// [wikipedia](https://en.wikipedia.org/wiki/X86-64#Older_implementations):
+    /// ```
+    /// Early AMD64 and Intel 64 CPUs lacked LAHF and SAHF instructions in 64-bit mode. AMD
+    /// introduced these instructions (also in 64-bit mode) with their Athlon 64, Opteron and
+    /// Turion 64 revision D processors in March 2005[48][49][50] while Intel introduced the
+    /// instructions with the Pentium 4 G1 stepping in December 2005. The 64-bit version of Windows
+    /// 8.1 requires this feature.[47]
+    /// ```
+    ///
+    /// this puts reintroduction of these instructions somewhere in the middle of prescott and k8
+    /// lifecycles, for intel and amd respectively. because there is no specific uarch where these
+    /// features become enabled, prescott and k8 default to not supporting these instructions,
+    /// where later uarches support these instructions.
+    pub fn lahfsahf(&self) -> bool {
+        self.flags & (1 << 57) != 0
+    }
+
+    pub fn with_lahfsahf(mut self) -> Self {
+        self.flags |= 1 << 57;
+        self
+    }
+
+    pub fn cmov(&self) -> bool {
+        self.flags & (1 << 58) != 0
+    }
+
+    pub fn with_cmov(mut self) -> Self {
+        self.flags |= 1 << 58;
+        self
+    }
+
+    pub fn f16c(&self) -> bool {
+        self.flags & (1 << 59) != 0
+    }
+
+    pub fn with_f16c(mut self) -> Self {
+        self.flags |= 1 << 59;
+        self
+    }
+
+    pub fn fma4(&self) -> bool {
+        self.flags & (1 << 60) != 0
+    }
+
+    pub fn with_fma4(mut self) -> Self {
+        self.flags |= 1 << 60;
+        self
+    }
+
+    pub fn prefetchw(&self) -> bool {
+        self.flags & (1 << 61) != 0
+    }
+
+    pub fn with_prefetchw(mut self) -> Self {
+        self.flags |= 1 << 61;
+        self
+    }
+
+    pub fn tsx(&self) -> bool {
+        self.flags & (1 << 62) != 0
+    }
+
+    pub fn with_tsx(mut self) -> Self {
+        self.flags |= 1 << 62;
+        self
+    }
+
+    pub fn lzcnt(&self) -> bool {
+        self.flags & (1 << 63) != 0
+    }
+
+    pub fn with_lzcnt(mut self) -> Self {
+        self.flags |= 1 << 63;
+        self
+    }
+
     /// Optionally reject or reinterpret instruction according to the decoder's
     /// declared extensions.
     fn revise_instruction(&self, inst: &mut Instruction) -> Result<(), DecodeError> {
@@ -2107,21 +2251,15 @@ impl InstDecoder {
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            // AVX...
-            /* // TODO
             Opcode::XABORT |
-            Opcode::XACQUIRE |
-            Opcode::XRELEASE |
             Opcode::XBEGIN |
             Opcode::XEND |
             Opcode::XTEST => {
                 if !self.tsx() {
                     inst.opcode = Opcode::Invalid;
-                    return Err(());
+                    return Err(DecodeError::InvalidOpcode);
                 }
             }
-            */
-            /* // TODO
             Opcode::SHA1MSG1 |
             Opcode::SHA1MSG2 |
             Opcode::SHA1NEXTE |
@@ -2131,9 +2269,9 @@ impl InstDecoder {
             Opcode::SHA256RNDS2 => {
                 if !self.sha() {
                     inst.opcode = Opcode::Invalid;
-                    return Err(());
+                    return Err(DecodeError::InvalidOpcode);
                 }
-            }*/
+            }
             Opcode::ENCLV |
             Opcode::ENCLS |
             Opcode::ENCLU => {
@@ -2173,7 +2311,6 @@ impl InstDecoder {
             Opcode::VCVTDQ2PD |
             Opcode::VCVTDQ2PS |
             Opcode::VCVTPD2PS |
-            Opcode::VCVTPH2PS |
             Opcode::VCVTPS2DQ |
             Opcode::VCVTPS2PD |
             Opcode::VCVTSS2SD |
@@ -2181,7 +2318,6 @@ impl InstDecoder {
             Opcode::VCVTSI2SD |
             Opcode::VCVTSD2SI |
             Opcode::VCVTSD2SS |
-            Opcode::VCVTPS2PH |
             Opcode::VCVTSS2SI |
             Opcode::VCVTTPD2DQ |
             Opcode::VCVTTPS2DQ |
@@ -2480,6 +2616,124 @@ impl InstDecoder {
             Opcode::VAESKEYGENASSIST => {
                 // TODO: check a table for these
                 if !self.avx() || !self.aesni() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::MOVBE => {
+                if !self.movbe() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::POPCNT => {
+                /*
+                 * from the intel SDM:
+                 * ```
+                 * Before an application attempts to use the POPCNT instruction, it must check that
+                 * the processor supports SSE4.2 (if CPUID.01H:ECX.SSE4_2[bit 20] = 1) and POPCNT
+                 * (if CPUID.01H:ECX.POPCNT[bit 23] = 1).
+                 * ```
+                 */
+                if self.intel_quirks() && (!self.sse4_2() || !self.popcnt()) {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                } else if !self.popcnt() {
+                    /*
+                     * elsewhere from the amd APM:
+                     * `Instruction Subsets and CPUID Feature Flags` on page 507 indicates that
+                     * popcnt is present when the popcnt bit is reported by cpuid. this seems to be
+                     * the less quirky default, so `intel_quirks` is considered the outlier, and
+                     * before this default.
+                     * */
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::LZCNT => {
+                /*
+                 * amd APM, `LZCNT` page 212:
+                 * LZCNT is an Advanced Bit Manipulation (ABM) instruction. Support for the LZCNT
+                 * instruction is indicated by CPUID Fn8000_0001_ECX[ABM] = 1.
+                 *
+                 * meanwhile the intel SDM simply states:
+                 * ```
+                 * CPUID.EAX=80000001H:ECX.LZCNT[bit 5]: if 1 indicates the processor supports the
+                 * LZCNT instruction.
+                 * ```
+                 *
+                 * so that's considered the less-quirky (default) case here.
+                 * */
+                if self.amd_quirks() && !self.abm() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                } else if !self.lzcnt() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::ADCX |
+            Opcode::ADOX => {
+                if !self.adx() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::VMRUN |
+            Opcode::VMLOAD |
+            Opcode::VMSAVE |
+            Opcode::CLGI |
+            Opcode::VMMCALL |
+            Opcode::INVLPGA => {
+                if !self.svm() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::STGI |
+            Opcode::SKINIT => {
+                if !self.svm() || !self.skinit() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::LAHF |
+            Opcode::SAHF => {
+                if !self.lahfsahf() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::VCVTPS2PH |
+            Opcode::VCVTPH2PS => {
+                /*
+                 * from intel SDM:
+                 * ```
+                 * 14.4.1 Detection of F16C Instructions Application using float 16 instruction
+                 *    must follow a detection sequence similar to AVX to ensure: • The OS has
+                 *    enabled YMM state management support, • The processor support AVX as
+                 *    indicated by the CPUID feature flag, i.e. CPUID.01H:ECX.AVX[bit 28] = 1.  •
+                 *    The processor support 16-bit floating-point conversion instructions via a
+                 *    CPUID feature flag (CPUID.01H:ECX.F16C[bit 29] = 1).
+                 * ```
+                 *
+                 * TODO: only the VEX-coded variant of this instruction should be gated on `f16c`.
+                 * the EVEX-coded variant should be gated on `avx512f` or `avx512vl` if not
+                 * EVEX.512-coded.
+                 */
+                if !self.avx() || !self.f16c() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::RDRAND => {
+                if !self.rdrand() {
+                    inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::RDSEED => {
+                if !self.rdseed() {
                     inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
@@ -2808,11 +3062,13 @@ impl Prefixes {
 pub enum OperandCode {
     ModRM_0x0f00,
     ModRM_0x0f01,
+    ModRM_0x0f0d,
     ModRM_0x0fae,
     ModRM_0x0fba,
     ModRM_0xf238,
     ModRM_0xf30fc7,
     ModRM_0x660f38,
+    ModRM_0xf30f38,
     ModRM_0x660f3a,
     CVT_AA,
     CVT_DA,
@@ -3625,7 +3881,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -3766,7 +4022,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LZCNT), OperandCode::Gv_Ev),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0xc0
@@ -3889,7 +4145,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::UD2), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f0d),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0x10
@@ -5104,8 +5360,28 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
             }
         },
-        _op @ OperandCode::ModRM_0xc6_Eb_Ib |
-        _op @ OperandCode::ModRM_0xc7_Ev_Iv => {
+        op @ OperandCode::ModRM_0xc6_Eb_Ib |
+        op @ OperandCode::ModRM_0xc7_Ev_Iv => {
+            if modrm == 0xf8 {
+                if op == OperandCode::ModRM_0xc6_Eb_Ib {
+                    instruction.opcode = Opcode::XABORT;
+                    instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u32;
+                    instruction.operands[0] = OperandSpec::ImmI8;
+                    instruction.operand_count = 1;
+                    return Ok(());
+                } else {
+                    instruction.opcode = Opcode::XBEGIN;
+                    instruction.disp = if opwidth == 2 {
+                        read_imm_signed(&mut bytes_iter, 2, length)? as i16 as i32 as u32
+                    } else {
+                        read_imm_signed(&mut bytes_iter, 4, length)? as i32 as u32
+                    };
+                    instruction.modrm_mmm = RegSpec::eip();
+                    instruction.operands[0] = OperandSpec::RegDisp;
+                    instruction.operand_count = 1;
+                    return Ok(());
+                }
+            }
             if (modrm & 0b00111000) != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand); // Err("Invalid modr/m for opcode 0xc7".to_string());
@@ -5113,7 +5389,8 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
 
             instruction.operands[0] = mem_oper;
             instruction.opcode = Opcode::MOV;
-            instruction.imm = read_imm_signed(&mut bytes_iter, opwidth, length)? as u32;
+            let numwidth = if opwidth == 8 { 4 } else { opwidth };
+            instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u32;
             instruction.operands[1] = match opwidth {
                 1 => OperandSpec::ImmI8,
                 2 => OperandSpec::ImmI16,
@@ -5468,6 +5745,113 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
         }
+        OperandCode::ModRM_0x0f0d => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let r = modrm & 0b111;
+
+            let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
+
+            match r {
+                1 => {
+                    instruction.opcode = Opcode::PREFETCHW;
+                }
+                _ => {
+                    instruction.opcode = Opcode::NOP;
+                }
+            }
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            instruction.operand_count = 1;
+        }
+        OperandCode::ModRM_0x0f38 => {
+            let opcode = read_modrm(&mut bytes_iter, length)?;
+
+            let high = opcode >> 4;
+            let low = opcode & 0xf;
+
+            let operands = match high {
+                0 => {
+                    // PqQq
+                    OperandCode::G_E_mm
+                },
+                1 => {
+                    // PqQq
+                    OperandCode::G_E_mm
+                },
+                0xc => {
+                    // Vdq,Wdq
+                    OperandCode::G_E_xmm
+                }
+                0xf => {
+                    match low {
+                        0 => OperandCode::Gv_Ev,
+                        1 => OperandCode::Ev_Gv,
+                        _ => {
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                    }
+                }
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            };
+            instruction.opcode = match opcode {
+                0xc8 => Opcode::SHA1NEXTE,
+                0xc9 => Opcode::SHA1MSG1,
+                0xca => Opcode::SHA1MSG2,
+                0xcb => Opcode::SHA256RNDS2,
+                0xcc => Opcode::SHA256MSG1,
+                0xcd => Opcode::SHA256MSG2,
+                0xf0 | 0xf1 => Opcode::MOVBE,
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            };
+
+            return read_operands(decoder, bytes_iter, instruction, operands, length);
+        },
+        OperandCode::ModRM_0x0f3a => {
+        },
+        OperandCode::ModRM_0x0fc7 => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            if modrm >> 6 == 0b11 {
+                match (modrm >> 3) & 0b111 {
+                    0b111 => {
+                        instruction.opcode = Opcode::RDSEED;
+                        instruction.operand_count = 1;
+                        instruction.operands[0] = OperandSpec::RegRRR;
+                        let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
+                        instruction.modrm_rrr =
+                            RegSpec::from_parts(modrm & 7, match opwidth {
+                                4 => RegisterBank::D,
+                                2 => RegisterBank::W,
+                                _ => unreachable!()
+                            });
+                    }
+                    0b110 => {
+                        instruction.opcode = Opcode::RDRAND;
+                        instruction.operand_count = 1;
+                        instruction.operands[0] = OperandSpec::RegRRR;
+                        let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
+                        instruction.modrm_rrr =
+                            RegSpec::from_parts(modrm & 7, match opwidth {
+                                4 => RegisterBank::D,
+                                2 => RegisterBank::W,
+                                _ => unreachable!()
+                            });
+                    }
+                    _ => {
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                }
+            } else {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOpcode);
+            }
+        },
         OperandCode::ModRM_0x0f71 => {
             instruction.operand_count = 2;
 
@@ -5582,6 +5966,19 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
             instruction.operand_count = 2;
         }
+        OperandCode::ModRM_0xf30f38 => {
+            let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
+            match op {
+                0xf6 => {
+                    instruction.opcode = Opcode::ADOX;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::Gv_Ev, length);
+                }
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            };
+        }
         OperandCode::ModRM_0x660f38 => {
             let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
             match op {
@@ -5590,6 +5987,10 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 0xdd => { instruction.opcode = Opcode::AESENCLAST; }
                 0xde => { instruction.opcode = Opcode::AESDEC; }
                 0xdf => { instruction.opcode = Opcode::AESDECLAST; }
+                0xf6 => {
+                    instruction.opcode = Opcode::ADCX;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::Gv_Ev, length);
+                }
                 _ => {
                     instruction.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
@@ -5608,6 +6009,21 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::ModRM_0x660f3a => {
             let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
             match op {
+                0xcc => {
+                    instruction.opcode = Opcode::SHA1RNDS4;
+
+                    let modrm = read_modrm(&mut bytes_iter, length)?;
+                    instruction.modrm_rrr =
+                        RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
+
+
+                    instruction.operands[0] = OperandSpec::RegRRR;
+                    instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+                    instruction.imm =
+                        read_imm_unsigned(&mut bytes_iter, 1, length)?;
+                    instruction.operands[2] = OperandSpec::ImmU8;
+                    instruction.operand_count = 3;
+                }
                 0xdf => {
                     instruction.opcode = Opcode::AESKEYGENASSIST;
                     // read operands right here right now
@@ -6170,10 +6586,59 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             } else if r == 3 {
                 let mod_bits = modrm >> 6;
+                let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    instruction.opcode = Opcode::Invalid;
-                    instruction.operand_count = 0;
-                    return Err(DecodeError::InvalidOperand);
+                    match m {
+                        0b000 => {
+                            instruction.opcode = Opcode::VMRUN;
+                            instruction.operand_count = 1;
+                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.operands[0] = OperandSpec::RegRRR;
+                        },
+                        0b001 => {
+                            instruction.opcode = Opcode::VMMCALL;
+                            instruction.operand_count = 0;
+                        },
+                        0b010 => {
+                            instruction.opcode = Opcode::VMLOAD;
+                            instruction.operand_count = 1;
+                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.operands[0] = OperandSpec::RegRRR;
+                        },
+                        0b011 => {
+                            instruction.opcode = Opcode::VMSAVE;
+                            instruction.operand_count = 1;
+                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.operands[0] = OperandSpec::RegRRR;
+                        },
+                        0b100 => {
+                            instruction.opcode = Opcode::STGI;
+                            instruction.operand_count = 0;
+                        },
+                        0b101 => {
+                            instruction.opcode = Opcode::CLGI;
+                            instruction.operand_count = 0;
+                        },
+                        0b110 => {
+                            instruction.opcode = Opcode::SKINIT;
+                            instruction.operand_count = 1;
+                            instruction.operands[0] = OperandSpec::RegRRR;
+                            instruction.modrm_rrr = RegSpec::eax();
+                        },
+                        0b111 => {
+                            instruction.opcode = Opcode::INVLPGA;
+                            instruction.operand_count = 2;
+                            instruction.operands[0] = OperandSpec::RegRRR;
+                            instruction.operands[1] = OperandSpec::RegMMM;
+                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.modrm_mmm = RegSpec::ecx();
+                        },
+                        _ => {
+                            instruction.opcode = Opcode::Invalid;
+                            instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOperand);
+                        }
+                    }
                 } else {
                     instruction.opcode = Opcode::LIDT;
                     instruction.operand_count = 1;

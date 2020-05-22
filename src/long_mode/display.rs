@@ -1076,6 +1076,30 @@ impl fmt::Display for Opcode {
             &Opcode::HSUBPD => write!(f, "hsubpd"),
             &Opcode::HADDPD => write!(f, "haddpd"),
             &Opcode::ADDSUBPD => write!(f, "addsubpd"),
+            &Opcode::XABORT => write!(f, "xabort"),
+            &Opcode::XBEGIN => write!(f, "xbegin"),
+            &Opcode::RDSEED => write!(f, "rdseed"),
+            &Opcode::LZCNT => write!(f, "lzcnt"),
+            &Opcode::CLGI => write!(f, "clgi"),
+            &Opcode::STGI => write!(f, "stgi"),
+            &Opcode::SKINIT => write!(f, "skinit"),
+            &Opcode::VMLOAD => write!(f, "vmload"),
+            &Opcode::VMMCALL => write!(f, "vmmcall"),
+            &Opcode::VMSAVE => write!(f, "vmsave"),
+            &Opcode::VMRUN => write!(f, "vmrun"),
+            &Opcode::INVLPGA => write!(f, "invlpga"),
+            &Opcode::MOVBE => write!(f, "movbe"),
+            &Opcode::ADCX => write!(f, "adcx"),
+            &Opcode::ADOX => write!(f, "adox"),
+            &Opcode::PREFETCHW => write!(f, "prefetchw"),
+            &Opcode::RDRAND => write!(f, "rdrand"),
+            &Opcode::SHA1RNDS4 => write!(f, "sha1rnds4"),
+            &Opcode::SHA1NEXTE => write!(f, "sha1nexte"),
+            &Opcode::SHA1MSG1 => write!(f, "sha1msg1"),
+            &Opcode::SHA1MSG2 => write!(f, "sha1msg2"),
+            &Opcode::SHA256RNDS2 => write!(f, "sha256rnds2"),
+            &Opcode::SHA256MSG1 => write!(f, "sha256msg1"),
+            &Opcode::SHA256MSG2 => write!(f, "sha256msg2"),
             &Opcode::Invalid => write!(f, "invalid"),
         }
     }
@@ -1306,8 +1330,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::LEA |
             Opcode::ADD |
             Opcode::ADC |
+            Opcode::ADCX |
+            Opcode::ADOX |
             Opcode::SUB |
             Opcode::POPCNT |
+            Opcode::LZCNT |
             Opcode::BT |
             Opcode::BTS |
             Opcode::BTR |
@@ -1399,6 +1426,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PREFETCH0 |
             Opcode::PREFETCH1 |
             Opcode::PREFETCH2 |
+            Opcode::PREFETCHW |
             Opcode::NOP => { write!(out, "{}", colors.nop_op(self)) }
 
             /* Control flow */
@@ -1680,6 +1708,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PEXTRW |
             Opcode::PINSRW |
             Opcode::MOV |
+            Opcode::MOVBE |
             Opcode::LODS |
             Opcode::STOS |
             Opcode::LAHF |
@@ -1830,6 +1859,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SWAPGS |
             Opcode::RDTSCP |
             Opcode::INVLPG |
+            Opcode::INVLPGA |
             Opcode::CPUID |
             Opcode::WBINVD |
             Opcode::INVD |
@@ -1860,9 +1890,16 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMCALL |
             Opcode::VMLAUNCH |
             Opcode::VMRESUME |
+            Opcode::VMLOAD |
+            Opcode::VMMCALL |
+            Opcode::VMSAVE |
+            Opcode::VMRUN |
             Opcode::VMXOFF |
             Opcode::MONITOR |
             Opcode::MWAIT |
+            Opcode::SKINIT |
+            Opcode::CLGI |
+            Opcode::STGI |
             Opcode::CLAC |
             Opcode::STAC |
             Opcode::ENCLS |
@@ -1872,11 +1909,22 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMFUNC |
             Opcode::XEND |
             Opcode::XTEST |
+            Opcode::XABORT |
+            Opcode::XBEGIN |
             Opcode::ENCLU |
             Opcode::RDPKRU |
             Opcode::WRPKRU |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
+            Opcode::RDSEED |
+            Opcode::RDRAND |
+            Opcode::SHA1RNDS4 |
+            Opcode::SHA1NEXTE |
+            Opcode::SHA1MSG1 |
+            Opcode::SHA1MSG2 |
+            Opcode::SHA256RNDS2 |
+            Opcode::SHA256MSG1 |
+            Opcode::SHA256MSG2 |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |
