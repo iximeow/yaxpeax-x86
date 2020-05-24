@@ -203,7 +203,9 @@ pub mod intel {
     /// common denominator: if you want a `Skylake` decoder with AVX512, something like the
     /// following:
     /// ```
-    /// InstDecoder::skylake().with_avx512_f().with_avx512_dq()
+    /// yaxpeax_x86::long_mode::uarch::intel::skylake()
+    ///     .with_avx512_f()
+    ///     .with_avx512_dq();
     /// ```
     /// is likely your best option.
     pub fn skylake() -> InstDecoder {

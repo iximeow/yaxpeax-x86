@@ -306,6 +306,9 @@ impl fmt::Display for Opcode {
             &Opcode::BTC => write!(f, "btc"),
             &Opcode::BSF => write!(f, "bsf"),
             &Opcode::BSR => write!(f, "bsr"),
+            &Opcode::BZHI => write!(f, "bzhi"),
+            &Opcode::PDEP => write!(f, "pdep"),
+            &Opcode::PEXT => write!(f, "pext"),
             &Opcode::TZCNT => write!(f, "tzcnt"),
             &Opcode::MOVSS => write!(f, "movss"),
             &Opcode::SQRTSS => write!(f, "sqrtss"),
@@ -354,17 +357,30 @@ impl fmt::Display for Opcode {
             &Opcode::RDMSR => write!(f, "rdmsr"),
             &Opcode::RDTSC => write!(f, "rdtsc"),
             &Opcode::RDPMC => write!(f, "rdpmc"),
+            &Opcode::RDPID => write!(f, "rdpid"),
+            &Opcode::RDFSBASE => write!(f, "rdfsbase"),
+            &Opcode::RDGSBASE => write!(f, "rdgsbase"),
+            &Opcode::WRFSBASE => write!(f, "wrfsbase"),
+            &Opcode::WRGSBASE => write!(f, "wrgsbase"),
             &Opcode::FXSAVE => write!(f, "fxsave"),
             &Opcode::FXRSTOR => write!(f, "fxrstor"),
             &Opcode::LDMXCSR => write!(f, "ldmxcsr"),
             &Opcode::STMXCSR => write!(f, "stmxcsr"),
             &Opcode::XSAVE => write!(f, "xsave"),
+            &Opcode::XSAVEC => write!(f, "xsavec"),
+            &Opcode::XSAVES => write!(f, "xsaves"),
+            &Opcode::XSAVEC64 => write!(f, "xsavec64"),
+            &Opcode::XSAVES64 => write!(f, "xsaves64"),
             &Opcode::XRSTOR => write!(f, "xrstor"),
+            &Opcode::XRSTORS => write!(f, "xrstors"),
+            &Opcode::XRSTORS64 => write!(f, "xrstors64"),
             &Opcode::XSAVEOPT => write!(f, "xsaveopt"),
             &Opcode::LFENCE => write!(f, "lfence"),
             &Opcode::MFENCE => write!(f, "mfence"),
             &Opcode::SFENCE => write!(f, "sfence"),
             &Opcode::CLFLUSH => write!(f, "clflush"),
+            &Opcode::CLFLUSHOPT => write!(f, "clflushopt"),
+            &Opcode::CLWB => write!(f, "clwb"),
             &Opcode::SGDT => write!(f, "sgdt"),
             &Opcode::SIDT => write!(f, "sidt"),
             &Opcode::LGDT => write!(f, "lgdt"),
@@ -450,11 +466,15 @@ impl fmt::Display for Opcode {
             &Opcode::SAR => write!(f, "sar"),
             &Opcode::SAL => write!(f, "sal"),
             &Opcode::SHR => write!(f, "shr"),
+            &Opcode::SARX => write!(f, "sarx"),
+            &Opcode::SHLX => write!(f, "shlx"),
+            &Opcode::SHRX => write!(f, "shrx"),
             &Opcode::SHRD => write!(f, "shrd"),
             &Opcode::SHL => write!(f, "shl"),
             &Opcode::RCR => write!(f, "rcr"),
             &Opcode::RCL => write!(f, "rcl"),
             &Opcode::ROR => write!(f, "ror"),
+            &Opcode::RORX => write!(f, "rorx"),
             &Opcode::ROL => write!(f, "rol"),
             &Opcode::CMOVA => write!(f, "cmova"),
             &Opcode::CMOVB => write!(f, "cmovb"),
@@ -475,9 +495,12 @@ impl fmt::Display for Opcode {
             &Opcode::NEG => write!(f, "neg"),
             &Opcode::NOT => write!(f, "not"),
             &Opcode::MUL => write!(f, "mul"),
+            &Opcode::MULX => write!(f, "mulx"),
             &Opcode::DIV => write!(f, "div"),
             &Opcode::IDIV => write!(f, "idiv"),
             &Opcode::CMPXCHG => write!(f, "cmpxchg"),
+            &Opcode::CMPXCHG8B => write!(f, "cmpxchg8b"),
+            &Opcode::CMPXCHG16B => write!(f, "cmpxchg16b"),
             &Opcode::MOVSX_b => write!(f, "movsx"),
             &Opcode::MOVSX_w => write!(f, "movsx"),
             &Opcode::MOVZX_b => write!(f, "movzx"),
@@ -652,6 +675,8 @@ impl fmt::Display for Opcode {
             &Opcode::BLSMSK => write!(f, "blsmsk"),
             &Opcode::BLSR => write!(f, "blsr"),
             &Opcode::VMCLEAR => write!(f, "vmclear"),
+            &Opcode::VMPTRLD => write!(f, "vmptrld"),
+            &Opcode::VMPTRST => write!(f, "vmptrst"),
             &Opcode::VMXON => write!(f, "vmxon"),
             &Opcode::VMCALL => write!(f, "vmcall"),
             &Opcode::VMLAUNCH => write!(f, "vmlaunch"),
@@ -1310,16 +1335,21 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::DIV |
             Opcode::IDIV |
             Opcode::MUL |
+            Opcode::MULX |
             Opcode::NEG |
             Opcode::NOT |
             Opcode::SAR |
             Opcode::SAL |
             Opcode::SHR |
+            Opcode::SARX |
+            Opcode::SHLX |
+            Opcode::SHRX |
             Opcode::SHRD |
             Opcode::SHL |
             Opcode::RCR |
             Opcode::RCL |
             Opcode::ROR |
+            Opcode::RORX |
             Opcode::ROL |
             Opcode::INC |
             Opcode::DEC |
@@ -1341,6 +1371,9 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::BTC |
             Opcode::BSF |
             Opcode::BSR |
+            Opcode::BZHI |
+            Opcode::PDEP |
+            Opcode::PEXT |
             Opcode::TZCNT |
             Opcode::ANDN |
             Opcode::BEXTR |
@@ -1833,23 +1866,38 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CMP |
             Opcode::CMPPS |
             Opcode::CMPPD |
+            Opcode::CMPXCHG8B |
+            Opcode::CMPXCHG16B |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
             Opcode::WRMSR |
             Opcode::RDMSR |
             Opcode::RDTSC |
             Opcode::RDPMC |
+            Opcode::RDPID |
+            Opcode::RDFSBASE |
+            Opcode::RDGSBASE |
+            Opcode::WRFSBASE |
+            Opcode::WRGSBASE |
             Opcode::FXSAVE |
             Opcode::FXRSTOR |
             Opcode::LDMXCSR |
             Opcode::STMXCSR |
             Opcode::XSAVE |
+            Opcode::XSAVEC |
+            Opcode::XSAVES |
+            Opcode::XSAVEC64 |
+            Opcode::XSAVES64 |
             Opcode::XRSTOR |
+            Opcode::XRSTORS |
+            Opcode::XRSTORS64 |
             Opcode::XSAVEOPT |
             Opcode::LFENCE |
             Opcode::MFENCE |
             Opcode::SFENCE |
             Opcode::CLFLUSH |
+            Opcode::CLFLUSHOPT |
+            Opcode::CLWB |
             Opcode::SGDT |
             Opcode::SIDT |
             Opcode::LGDT |
@@ -1886,6 +1934,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMREAD |
             Opcode::VMWRITE |
             Opcode::VMCLEAR |
+            Opcode::VMPTRLD |
+            Opcode::VMPTRST |
             Opcode::VMXON |
             Opcode::VMCALL |
             Opcode::VMLAUNCH |
@@ -1992,6 +2042,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u6
         }
 
         self.opcode.colorize(colors, out)?;
+
+        if self.opcode == Opcode::XBEGIN {
+            return write!(out, " $+{}", colors.number(signed_i32_hex(self.imm as i32)));
+        }
 
         match self.operands[0] {
             OperandSpec::Nothing => {

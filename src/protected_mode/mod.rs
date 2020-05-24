@@ -478,17 +478,34 @@ const BMI1: [Opcode; 6] = [
     Opcode::TZCNT,
 ];
 
+const BMI2: [Opcode; 8] = [
+    Opcode::BZHI,
+    Opcode::MULX,
+    Opcode::PDEP,
+    Opcode::PEXT,
+    Opcode::RORX,
+    Opcode::SARX,
+    Opcode::SHRX,
+    Opcode::SHLX,
+];
+
+#[allow(dead_code)]
+const XSAVE: [Opcode; 8] = [
+    Opcode::XGETBV,
+    Opcode::XRSTOR,
+    Opcode::XRSTORS,
+    Opcode::XSAVE,
+    Opcode::XSAVEC,
+    Opcode::XSAVEOPT,
+    Opcode::XSAVES,
+    Opcode::XSETBV,
+];
+
 // TODO:
 // PTWRITE
-// RDFSBASE
-// RDGSBASE
-// WRFSBASE
-// WRGSBASE
 // TPAUSE
 // UMONITOR
 // UMWAIT
-// CLFLUSHOPT
-// CLWB
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
@@ -692,6 +709,8 @@ pub enum Opcode {
     MFENCE,
     SFENCE,
     CLFLUSH,
+    CLFLUSHOPT,
+    CLWB,
     WRMSR,
     RDTSC,
     RDMSR,
@@ -1328,6 +1347,28 @@ pub enum Opcode {
     ADOX,
 
     PREFETCHW,
+
+    RDPID,
+    CMPXCHG8B,
+    VMPTRLD,
+    VMPTRST,
+
+    BZHI,
+    MULX,
+    SHLX,
+    SHRX,
+    SARX,
+    PDEP,
+    PEXT,
+    RORX,
+    XRSTORS,
+    XSAVEC,
+    XSAVES,
+
+    RDFSBASE,
+    RDGSBASE,
+    WRFSBASE,
+    WRGSBASE,
 }
 
 #[derive(Debug)]
@@ -2044,7 +2085,7 @@ impl InstDecoder {
     /// the clearest documentation on when these instructions were reintroduced into 64-bit
     /// architectures seems to be
     /// [wikipedia](https://en.wikipedia.org/wiki/X86-64#Older_implementations):
-    /// ```
+    /// ```text
     /// Early AMD64 and Intel 64 CPUs lacked LAHF and SAHF instructions in 64-bit mode. AMD
     /// introduced these instructions (also in 64-bit mode) with their Athlon 64, Opteron and
     /// Turion 64 revision D processors in March 2005[48][49][50] while Intel introduced the
@@ -2635,9 +2676,8 @@ impl InstDecoder {
                  * (if CPUID.01H:ECX.POPCNT[bit 23] = 1).
                  * ```
                  */
-                if self.intel_quirks() && (!self.sse4_2() || !self.popcnt()) {
-                    inst.opcode = Opcode::Invalid;
-                    return Err(DecodeError::InvalidOpcode);
+                if self.intel_quirks() && (self.sse4_2() || self.popcnt()) {
+                    return Ok(());
                 } else if !self.popcnt() {
                     /*
                      * elsewhere from the amd APM:
@@ -2741,6 +2781,11 @@ impl InstDecoder {
             other => {
                 if !self.bmi1() {
                     if BMI1.contains(&other) {
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                }
+                if !self.bmi2() {
+                    if BMI2.contains(&other) {
                         return Err(DecodeError::InvalidOpcode);
                     }
                 }
@@ -3066,6 +3111,8 @@ pub enum OperandCode {
     ModRM_0x0fae,
     ModRM_0x0fba,
     ModRM_0xf238,
+    ModRM_0xf30fae,
+    ModRM_0x660fae,
     ModRM_0xf30fc7,
     ModRM_0x660f38,
     ModRM_0xf30f38,
@@ -3444,7 +3491,7 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660fae),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0xb0
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4006,7 +4053,7 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30fae),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 // 0xb0
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5371,13 +5418,12 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                     return Ok(());
                 } else {
                     instruction.opcode = Opcode::XBEGIN;
-                    instruction.disp = if opwidth == 2 {
+                    instruction.imm = if opwidth == 2 {
                         read_imm_signed(&mut bytes_iter, 2, length)? as i16 as i32 as u32
                     } else {
                         read_imm_signed(&mut bytes_iter, 4, length)? as i32 as u32
                     };
-                    instruction.modrm_mmm = RegSpec::eip();
-                    instruction.operands[0] = OperandSpec::RegDisp;
+                    instruction.operands[0] = OperandSpec::ImmI32;
                     instruction.operand_count = 1;
                     return Ok(());
                 }
@@ -5618,6 +5664,9 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.imm =
                 read_num(&mut bytes_iter, 1)? as u8 as u32;
             *length += 1;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::MM;
+            }
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         },
@@ -5747,7 +5796,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::ModRM_0x0f0d => {
             let modrm = read_modrm(&mut bytes_iter, length)?;
-            let r = modrm & 0b111;
+            let r = (modrm >> 3) & 0b111;
 
             let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
 
@@ -5813,44 +5862,78 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             return read_operands(decoder, bytes_iter, instruction, operands, length);
         },
         OperandCode::ModRM_0x0f3a => {
+            let opcode = read_modrm(&mut bytes_iter, length)?;
+            if opcode == 0xcc {
+                instruction.opcode = Opcode::SHA1RNDS4;
+                return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
+            } else if opcode == 0x0f {
+                instruction.opcode = Opcode::PALIGNR;
+                return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_mm_Ib, length);
+            }
         },
         OperandCode::ModRM_0x0fc7 => {
             let modrm = read_modrm(&mut bytes_iter, length)?;
-            if modrm >> 6 == 0b11 {
-                match (modrm >> 3) & 0b111 {
-                    0b111 => {
-                        instruction.opcode = Opcode::RDSEED;
-                        instruction.operand_count = 1;
-                        instruction.operands[0] = OperandSpec::RegRRR;
-                        let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
-                        instruction.modrm_rrr =
-                            RegSpec::from_parts(modrm & 7, match opwidth {
-                                4 => RegisterBank::D,
-                                2 => RegisterBank::W,
-                                _ => unreachable!()
-                            });
-                    }
-                    0b110 => {
-                        instruction.opcode = Opcode::RDRAND;
-                        instruction.operand_count = 1;
-                        instruction.operands[0] = OperandSpec::RegRRR;
-                        let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
-                        instruction.modrm_rrr =
-                            RegSpec::from_parts(modrm & 7, match opwidth {
-                                4 => RegisterBank::D,
-                                2 => RegisterBank::W,
-                                _ => unreachable!()
-                            });
-                    }
-                    _ => {
+            let is_reg = (modrm & 0xc0) == 0xc0;
+
+            let r = (modrm >> 3) & 0b111;
+
+            let opcode = match r {
+                0b001 => {
+                    if is_reg {
                         instruction.opcode = Opcode::Invalid;
-                        return Err(DecodeError::InvalidOpcode);
+                        return Err(DecodeError::InvalidOperand);
+                    } else {
+                        Opcode::CMPXCHG8B
                     }
                 }
-            } else {
-                instruction.opcode = Opcode::Invalid;
-                return Err(DecodeError::InvalidOpcode);
-            }
+                0b011 => {
+                    if is_reg {
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOperand);
+                    } else {
+                        Opcode::XRSTORS
+                    }
+                }
+                0b100 => {
+                    if is_reg {
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOperand);
+                    } else {
+                        Opcode::XSAVEC
+                    }
+                }
+                0b101 => {
+                    if is_reg {
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOperand);
+                    } else {
+                        Opcode::XSAVES
+                    }
+                }
+                0b110 => {
+                    if is_reg {
+                        Opcode::RDRAND
+                    } else {
+                        Opcode::VMPTRLD
+                    }
+                }
+                0b111 => {
+                    if is_reg {
+                        Opcode::RDSEED
+                    } else {
+                        Opcode::VMPTRST
+                    }
+                }
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOperand);
+                }
+            };
+
+            instruction.opcode = opcode;
+            instruction.operand_count = 1;
+            let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
         },
         OperandCode::ModRM_0x0f71 => {
             instruction.operand_count = 2;
@@ -6137,15 +6220,33 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0x660fc7 => {
+            let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
             let modrm = read_modrm(&mut bytes_iter, length)?;
 
             let r = (modrm >> 3) & 7;
             match r {
                 6 => {
                     instruction.opcode = Opcode::VMCLEAR;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 1 /* doesn't matter, something using this width is invalid */, length)?;
+                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
                     if instruction.operands[0] == OperandSpec::RegMMM {
-                        return Err(DecodeError::InvalidOperand);
+                        // this would be invalid as `vmclear`, so fall back to the parse as
+                        // 66-prefixed rdrand. this is a register operand, so just demote it to the
+                        // word-form operand:
+                        instruction.modrm_mmm = RegSpec { bank: RegisterBank::W, num: instruction.modrm_mmm.num };
+                        instruction.opcode = Opcode::RDRAND;
+                    }
+                    instruction.operand_count = 1;
+                }
+                7 => {
+                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    if instruction.operands[0] == OperandSpec::RegMMM {
+                        // this would be invalid as `vmclear`, so fall back to the parse as
+                        // 66-prefixed rdrand. this is a register operand, so just demote it to the
+                        // word-form operand:
+                        instruction.modrm_mmm = RegSpec { bank: RegisterBank::W, num: instruction.modrm_mmm.num };
+                        instruction.opcode = Opcode::RDSEED;
+                    } else {
+                        return Err(DecodeError::InvalidOpcode);
                     }
                     instruction.operand_count = 1;
                 }
@@ -6154,15 +6255,88 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             }
         },
+        OperandCode::ModRM_0x660fae => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            if modrm < 0xc0 {
+                instruction.opcode = match (modrm >> 3) & 7 {
+                    6 => {
+                        Opcode::CLWB
+                    }
+                    7 => {
+                        Opcode::CLFLUSHOPT
+                    }
+                    _ => {
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                };
+                instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 1 /* opwidth */, length)?;
+                instruction.operand_count = 1;
+            } else {
+                instruction.opcode = Opcode::Invalid;
+                return Err(DecodeError::InvalidOpcode);
+            }
+        },
+        OperandCode::ModRM_0xf30fae => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+            if (modrm & 0xc0) == 0xc0 {
+                let r = (modrm >> 3) & 7;
+                let m = modrm & 7;
+                match r {
+                    0 => {
+                        instruction.opcode = Opcode::RDFSBASE;
+                        instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                        instruction.operands[0] = OperandSpec::RegMMM;
+                        instruction.operand_count = 1;
+                    }
+                    1 => {
+                        instruction.opcode = Opcode::RDGSBASE;
+                        instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                        instruction.operands[0] = OperandSpec::RegMMM;
+                        instruction.operand_count = 1;
+
+                    }
+                    2 => {
+                        instruction.opcode = Opcode::WRFSBASE;
+                        instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                        instruction.operands[0] = OperandSpec::RegMMM;
+                        instruction.operand_count = 1;
+                    }
+                    3 => {
+                        instruction.opcode = Opcode::WRGSBASE;
+                        instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                        instruction.operands[0] = OperandSpec::RegMMM;
+                        instruction.operand_count = 1;
+
+                    }
+                    _ => {
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                }
+            }
+        }
         OperandCode::ModRM_0xf30fc7 => {
+            let opwidth = imm_width_from_prefixes(SizeCode::vd, instruction.prefixes);
             let modrm = read_modrm(&mut bytes_iter, length)?;
 
             let r = (modrm >> 3) & 7;
             match r {
                 6 => {
                     instruction.opcode = Opcode::VMXON;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 1 /* doesn't matter, something using this width is invalid */, length)?;
+                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
                     if instruction.operands[0] == OperandSpec::RegMMM {
+                        // this would be invalid as `vmxon`, so fall back to the parse as
+                        // f3-prefixed rdrand
+                        instruction.opcode = Opcode::RDRAND;
+                    }
+                    instruction.operand_count = 1;
+                }
+                7 => {
+                    instruction.opcode = Opcode::RDPID;
+                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    if instruction.operands[0] != OperandSpec::RegMMM {
                         return Err(DecodeError::InvalidOperand);
                     }
                     instruction.operand_count = 1;
