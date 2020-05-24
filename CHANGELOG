@@ -1,3 +1,15 @@
+## 0.0.12
+
+* fix improper decode of `sib` memory operand when `rex.x` is set and index is `0b100`
+  - functionally: instructions which should have had a memory operand like
+    `[rax + r12 + disp]` were missing `r12`
+* add instruction set extensions: `SHA`, `BMI1`, `BMI2`, `XSAVE`, `RDRAND`,
+  `RDSEED`, `CMPXCHG{8,16}B` `ADX`, `SVM`, `MOVBE`, `PREFETCHW`, `TSX`, and
+  `F16C`
+* add `RDFSBASE`, `RDGSBASE`, `WRFSBASE`, `WRGSBASE`
+* builders for per-uarch x86_64 instruction decoders, see `yaxpeax_x86::long_mode::uarch::{intel, amd}`
+* builders for per-uarch x86_32 instruction decoders, see `yaxpeax_x86::protected_mode::uarch::{intel, amd}`
+
 ## 0.0.11
 
 * fix mis-named 'cbd' instruction, which should be 'cwd'

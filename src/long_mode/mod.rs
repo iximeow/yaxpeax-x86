@@ -4906,14 +4906,28 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
 
                 OperandSpec::DispU32
             } else {
-                let reg = RegSpec::from_parts(0b100, instr.prefixes.rex().x(), addr_width);
-                instr.modrm_mmm = reg;
+                if instr.prefixes.rex().x() {
+                    let reg = RegSpec::from_parts(0b100, true, addr_width);
+                    instr.sib_index = reg;
+                    let scale = 1u8 << (sibbyte >> 6);
+                    instr.scale = scale;
 
-                if disp == 0 {
-                    OperandSpec::Deref
+                    if disp == 0 {
+                        OperandSpec::RegIndexBaseScale
+                    } else {
+                        instr.disp = disp as i64 as u64;
+                        OperandSpec::RegIndexBaseScaleDisp
+                    }
                 } else {
-                    instr.disp = disp as i64 as u64;
-                    OperandSpec::RegDisp
+                    let reg = RegSpec::from_parts(0b101, instr.prefixes.rex().b(), addr_width);
+                    instr.modrm_mmm = reg;
+
+                    if disp == 0 {
+                        OperandSpec::Deref
+                    } else {
+                        instr.disp = disp as i64 as u64;
+                        OperandSpec::RegDisp
+                    }
                 }
             }
         } else {
@@ -4952,11 +4966,25 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
         };
 
         if ((sibbyte >> 3) & 7) == 0b100 {
-            if disp == 0 {
-                OperandSpec::Deref
+            if instr.prefixes.rex().x() {
+                let reg = RegSpec::from_parts(0b100, true, addr_width);
+                instr.sib_index = reg;
+                let scale = 1u8 << (sibbyte >> 6);
+                instr.scale = scale;
+
+                if disp == 0 {
+                    OperandSpec::RegIndexBaseScale
+                } else {
+                    instr.disp = disp as i64 as u64;
+                    OperandSpec::RegIndexBaseScaleDisp
+                }
             } else {
-                instr.disp = disp as i64 as u64;
-                OperandSpec::RegDisp
+                if disp == 0 {
+                    OperandSpec::Deref
+                } else {
+                    instr.disp = disp as i64 as u64;
+                    OperandSpec::RegDisp
+                }
             }
         } else {
             instr.sib_index = RegSpec::from_parts((sibbyte >> 3) & 7, instr.prefixes.rex().x(), addr_width);
