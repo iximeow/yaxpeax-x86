@@ -2,6 +2,8 @@
 
 extern crate test;
 extern crate yaxpeax_x86;
+extern crate yaxpeax_arch;
+use yaxpeax_arch::Decoder;
 
 #[cfg(feature = "capstone_bench")]
 use std::ffi::c_void;
@@ -24,9 +26,9 @@ fn decode(bytes: &[u8]) -> Option<Instruction> {
 */
 
 #[bench]
-fn bench_102000_instrs(b: &mut Bencher) {
+fn bench_1020000_instrs(b: &mut Bencher) {
     b.iter(|| {
-        for _i in 0..3000 {
+        for _i in 0..30000 {
             test::black_box(do_decode_swathe());
         }
     })
@@ -86,15 +88,16 @@ const DECODE_DATA: [u8; 130] = [
 fn do_decode_swathe() {
 //    let mut buf = [0u8; 128];
     let mut iter = DECODE_DATA.iter().map(|x| *x);
-    let mut result = yaxpeax_x86::Instruction::invalid();
+    let mut result = yaxpeax_x86::long_mode::Instruction::invalid();
+    let decoder = yaxpeax_x86::long_mode::InstDecoder::default();
     loop {
-        match yaxpeax_x86::decode_one(&mut iter, &mut result) {
-            Some(_) => {
+        match decoder.decode_into(&mut result, &mut iter) {
+            Ok(()) => {
                 #[cfg(feature = "capstone_bench")]
                 test::black_box(write!(&mut buf[..], "{}", result));
                 test::black_box(&result);
             },
-            None => {
+            Err(_) => {
                 // println!("done.");
                 break;
             }
