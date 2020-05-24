@@ -1,16 +1,19 @@
 pub mod amd {
     //! most information about instruction set extensions for microarchitectures here was sourced
-    //! from https://en.wikipedia.org/wiki/AMD_Accelerated_Processing_Unit#Feature_overview and
-    //! https://en.wikipedia.org/wiki/Template:AMD_x86_CPU_features. these mappings are best-effort
-    //! but fairly unused, so a critical eye should be kept towards these decoders rejecting
-    //! instructions they should not, or incorrectly accepting instructions.
+    //! from
+    //! [https://en.wikipedia.org/wiki/AMD_Accelerated_Processing_Unit#Feature_overview](https://docs.rs/yaxpeax-x86/0.0.12/yaxpeax_x86/protected_mode/uarch/intel/index.html)
+    //! and
+    //! [https://en.wikipedia.org/wiki/Template:AMD_x86_CPU_features](https://docs.rs/yaxpeax-x86/0.0.12/yaxpeax_x86/protected_mode/uarch/intel/index.html).
+    //! these mappings are best-effort but fairly unused, so a critical eye should be kept towards
+    //! these decoders rejecting instructions they should not, or incorrectly accepting
+    //! instructions.
     //!
     //! microarchitectures as defined here are with respect to flags reported by CPUID. notably,
     //! `Zen` does not report `FMA4` support by `CPUID`, but instructions in that extension
     //! reportedly function correctly (agner p217).
     //!
     //! [agner](https://www.agner.org/optimize/microarchitecture.pdf)
-    //! as retrieved 2020 may 19
+    //! as retrieved 2020 may 19,
     //! `sha256: 87ff152ae18c017dcbfb9f7ee6e88a9f971f6250fd15a70a3dd87c3546323bd5`
 
     use long_mode::InstDecoder;
@@ -127,18 +130,18 @@ pub mod intel {
             .with_sse4()
     }
 
-    /// `Peryn` was the successor to `Core`, launched in early 2008. it added SSE4.1, along with
+    /// `Penryn` was the successor to `Core`, launched in early 2008. it added SSE4.1, along with
     /// virtualization extensions.
-    pub fn peryn() -> InstDecoder {
+    pub fn penryn() -> InstDecoder {
         core()
             .with_sse4_1()
     }
 
-    /// `Nehalem` was the successor to `Peryn`, launched in late 2008. not to be confused with the
+    /// `Nehalem` was the successor to `Penryn`, launched in late 2008. not to be confused with the
     /// earlier `Core` microarchitecture, the `Core i*` products were based on `Nehalem` cores.
     /// `Nehalem` added SSE4.2 extensions, along with the `POPCNT` instruction.
     pub fn nehalem() -> InstDecoder {
-        peryn()
+        penryn()
             .with_sse4_2()
             .with_popcnt()
     }

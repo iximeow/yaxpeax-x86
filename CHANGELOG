@@ -1,3 +1,7 @@
+## 0.0.13
+
+* the Intel microarchitecture is named `Penryn`, not `Peryn`.
+
 ## 0.0.12
 
 * fix improper decode of `sib` memory operand when `rex.x` is set and index is `0b100`
