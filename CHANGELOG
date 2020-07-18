@@ -1,3 +1,9 @@
+## 0.0.14
+
+* `netburst` supported `cmpxchg16b` from its first x86_64 incarnation. since no
+uarch in `long_mode` had declared `cmpxchg16b` support, no uarch-specific Intel
+decoder supported `cmpxchg16b`.
+
 ## 0.0.13
 
 * the Intel microarchitecture is named `Penryn`, not `Peryn`.
