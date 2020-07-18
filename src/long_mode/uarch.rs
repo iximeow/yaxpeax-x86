@@ -116,6 +116,7 @@ pub mod intel {
     pub fn netburst() -> InstDecoder {
         InstDecoder::minimal()
             .with_cmov()
+            .with_cmpxchg16b()
             .with_sse3()
     }
 
