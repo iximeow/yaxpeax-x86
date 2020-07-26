@@ -1530,9 +1530,11 @@ impl yaxpeax_arch::Arch for Arch {
 
 impl LengthedInstruction for Instruction {
     type Unit = AddressDiff<u64>;
+    #[inline]
     fn len(&self) -> Self::Unit {
         AddressDiff::from_const(self.length.into())
     }
+    #[inline]
     fn min_size() -> Self::Unit {
         AddressDiff::from_const(1)
     }
