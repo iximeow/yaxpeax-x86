@@ -566,6 +566,7 @@ const XSAVE: [Opcode; 10] = [
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
+    Invalid = 0,
     ADD = 1,
     OR = 2,
     ADC = 3,
@@ -574,7 +575,6 @@ pub enum Opcode {
     XOR = 6,
     SUB = 7,
     CMP = 8,
-    Invalid,
     XADD,
     BT,
     BTS,
@@ -3047,6 +3047,7 @@ pub struct Prefixes {
     bits: u8,
     rex: PrefixRex,
     segment: Segment,
+    _pad: u8,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -3080,6 +3081,7 @@ impl Prefixes {
             bits: bits,
             rex: PrefixRex { bits: 0 },
             segment: Segment::DS,
+            _pad: 0,
         }
     }
     #[inline]
@@ -4893,18 +4895,23 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
     let sibbyte = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
     *length += 1;
 
-    let op_spec = if (sibbyte & 7) == 0b101 {
-        let disp = if modbits == 0b00 {
+    let disp = if modbits == 0b00 {
+        if (sibbyte & 7) == 0b101 {
             *length += 4;
             read_num(bytes_iter, 4)? as i32
-        } else if modbits == 0b01 {
-            *length += 1;
-            read_num(bytes_iter, 1)? as i8 as i32
         } else {
-            *length += 4;
-            read_num(bytes_iter, 4)? as i32
-        };
+            0
+        }
+    } else if modbits == 0b01 {
+        *length += 1;
+        read_num(bytes_iter, 1)? as i8 as i32
+    } else {
+        *length += 4;
+        read_num(bytes_iter, 4)? as i32
+    };
+    instr.disp = disp as u32 as u64;
 
+    let op_spec = if (sibbyte & 7) == 0b101 {
         if ((sibbyte >> 3) & 7) == 0b100 {
             if modbits == 0b00 && !instr.prefixes.rex().x() {
                 instr.disp = disp as u32 as u64;
@@ -4959,16 +4966,6 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
         }
     } else {
         instr.modrm_mmm = RegSpec::from_parts(sibbyte & 7, instr.prefixes.rex().b(), addr_width);
-
-        let disp = if modbits == 0b00 {
-            0
-        } else if modbits == 0b01 {
-            *length += 1;
-            read_num(bytes_iter, 1)? as i8 as i32
-        } else {
-            *length += 4;
-            read_num(bytes_iter, 4)? as i32
-        };
 
         if ((sibbyte >> 3) & 7) == 0b100 {
             if instr.prefixes.rex().x() {
@@ -7352,15 +7349,36 @@ fn decode_one<'b, T: IntoIterator<Item=u8>>(decoder: &InstDecoder, bytes: T, ins
 
 #[inline]
 fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
-    let mut result = 0u64;
-    let mut idx = 0;
-    loop {
-        if idx == width {
-            return Ok(result);
+    match width {
+        1 => { bytes.next().map(|x| x as u64).ok_or(DecodeError::ExhaustedInput) }
+        2 => {
+            bytes.next().and_then(|b0| {
+                bytes.next().map(|b1| u16::from_le_bytes([b0, b1]) as u64)
+            }).ok_or(DecodeError::ExhaustedInput)
         }
-        let byte = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
-        result |= (byte as u64) << (idx * 8);
-        idx += 1;
+        4 => {
+            bytes.next()
+                .and_then(|b0| bytes.next().map(|b1| (b0, b1)))
+                .and_then(|(b0, b1)| bytes.next().map(|b2| (b0, b1, b2)))
+                .and_then(|(b0, b1, b2)| bytes.next().map(|b3| u32::from_le_bytes([b0, b1, b2, b3]) as u64))
+                .ok_or(DecodeError::ExhaustedInput)
+        }
+        8 => {
+            bytes.next()
+                .and_then(|b0| bytes.next().map(|b1| (b0, b1)))
+                .and_then(|(b0, b1)| bytes.next().map(|b2| (b0, b1, b2)))
+                .and_then(|(b0, b1, b2)| bytes.next().map(|b3| (b0, b1, b2, b3)))
+                .and_then(|(b0, b1, b2, b3)| bytes.next().map(|b4| (b0, b1, b2, b3, b4)))
+                .and_then(|(b0, b1, b2, b3, b4)| bytes.next().map(|b5| (b0, b1, b2, b3, b4, b5)))
+                .and_then(|(b0, b1, b2, b3, b4, b5)| bytes.next().map(|b6| (b0, b1, b2, b3, b4, b5, b6)))
+                .and_then(|(b0, b1, b2, b3, b4, b5, b6)| {
+                    bytes.next().map(|b7| u64::from_le_bytes([b0, b1, b2, b3, b4, b5, b6, b7]) as u64)
+                })
+                .ok_or(DecodeError::ExhaustedInput)
+        }
+        _ => {
+            panic!("unsupported read size");
+        }
     }
 }
 
