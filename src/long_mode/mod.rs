@@ -230,6 +230,11 @@ impl RegSpec {
     }
 
     #[inline]
+    pub fn dl() -> RegSpec {
+        RegSpec { bank: RegisterBank::B, num: 2 }
+    }
+
+    #[inline]
     pub fn ah() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 4 }
     }
@@ -7285,6 +7290,34 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
+        OperandCode::Yb_DX => {
+            instruction.modrm_rrr = RegSpec::dl();
+            instruction.modrm_mmm = RegSpec::rdi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
+        OperandCode::Yv_DX => {
+            instruction.modrm_rrr = RegSpec::dx();
+            instruction.modrm_mmm = RegSpec::rdi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
+        OperandCode::DX_Xb => {
+            instruction.modrm_rrr = RegSpec::dl();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::Deref;
+            instruction.operand_count = 2;
+        }
+        OperandCode::DX_Xv => {
+            instruction.modrm_rrr = RegSpec::dx();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::Deref;
             instruction.operand_count = 2;
         }
         _ => {
