@@ -5492,10 +5492,14 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         op @ OperandCode::ModRM_0xc1_Ev_Ib |
         op @ OperandCode::ModRM_0xd0_Eb_1 |
         op @ OperandCode::ModRM_0xd1_Ev_1 |
+        op @ OperandCode::ModRM_0xd2_Eb_CL |
         op @ OperandCode::ModRM_0xd3_Ev_CL => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
             if let OperandCode::ModRM_0xd3_Ev_CL = op {
+                instruction.modrm_rrr = RegSpec::cl();
+                instruction.operands[1] = OperandSpec::RegRRR;
+            } else if let OperandCode::ModRM_0xd2_Eb_CL = op {
                 instruction.modrm_rrr = RegSpec::cl();
                 instruction.operands[1] = OperandSpec::RegRRR;
             } else {
