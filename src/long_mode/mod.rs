@@ -4453,7 +4453,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPXCHG), OperandCode::Eb_Gb),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPXCHG), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::LSS), OperandCode::Gv_M),
-    OpcodeRecord(Interpretation::Instruction(Opcode::BTR), OperandCode::E_G_q),
+    OpcodeRecord(Interpretation::Instruction(Opcode::BTR), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::LFS), OperandCode::Gv_M),
     OpcodeRecord(Interpretation::Instruction(Opcode::LGS), OperandCode::Gv_M),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOVZX_b), OperandCode::Gv_Eb),
