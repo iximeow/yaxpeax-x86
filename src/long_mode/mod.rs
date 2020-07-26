@@ -6205,11 +6205,18 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             match op {
                 0x0c => { instruction.opcode = Opcode::BLENDPS; }
                 0x0d => { instruction.opcode = Opcode::BLENDPD; }
-                0x0f => { instruction.opcode = Opcode::PALIGNR; }
+                0x0f => {
+                    instruction.opcode = Opcode::PALIGNR;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_mm_Ib, length);
+                }
                 0x10 => { instruction.opcode = Opcode::BLENDVB; }
 
                 0x14 => { instruction.opcode = Opcode::BLENDVPS; }
                 0x15 => { instruction.opcode = Opcode::BLENDVPD; }
+                0x42 => {
+                    instruction.opcode = Opcode::MPSADBW;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
+                }
 
                 0xcc => {
                     instruction.opcode = Opcode::SHA1RNDS4;
