@@ -1346,7 +1346,7 @@ pub enum Opcode {
     PMINUD,
     PMINUW,
     BLENDW,
-    BLENDDVB,
+    BLENDVB,
     BLENDVPS,
     BLENDVPD,
     BLENDPS,
@@ -1359,7 +1359,7 @@ pub enum Opcode {
     PSIGND,
     PSIGNB,
     PSHUFB,
-    PMULHRSU,
+    PMULHRSW,
     PMADDUBSW,
     PABSD,
     PABSW,
@@ -2255,7 +2255,7 @@ impl InstDecoder {
             Opcode::PABSW |
             Opcode::PABSD |
             Opcode::PMADDUBSW |
-            Opcode::PMULHRSU |
+            Opcode::PMULHRSW |
             Opcode::PSHUFB |
             Opcode::PSIGNB |
             Opcode::PSIGNW |
@@ -2274,7 +2274,7 @@ impl InstDecoder {
             Opcode::BLENDPS |
             Opcode::BLENDVPD |
             Opcode::BLENDVPS |
-            Opcode::BLENDDVB |
+            Opcode::BLENDVB |
             Opcode::BLENDW |
             Opcode::PMINUW |
             Opcode::PMINUD |
@@ -3229,7 +3229,6 @@ pub enum OperandCode {
     Yv_Xv,
     G_E_q,
     E_G_q,
-    Rv_Gmm_Ib,
     G_mm_Ew_Ib,
     Mq_Dq,
     ModRM_0x0f38,
@@ -3348,6 +3347,7 @@ pub enum OperandCode {
     G_xmm_E_mm = 0xed,
     G_xmm_U_mm = 0x1ed,
     U_mm_G_xmm = 0x2ed,
+    Rv_Gmm_Ib = 0x3ed,
     G_xmm_Edq = 0xef,
     G_U_mm = 0xf1,
     Ev_Gv_Ib = 0xf3,
@@ -5909,6 +5909,19 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             };
             instruction.opcode = match opcode {
+                0x00 => Opcode::PSHUFB,
+                0x01 => Opcode::PHADDW,
+                0x02 => Opcode::PHADDD,
+                0x03 => Opcode::PHADDSW,
+                0x04 => Opcode::PMADDUBSW,
+                0x05 => Opcode::PHSUBW,
+                0x06 => Opcode::PHSUBD,
+                0x07 => Opcode::PHSUBSW,
+                0x08 => Opcode::PSIGNB,
+                0x09 => Opcode::PSIGNW,
+                0x0a => Opcode::PSIGND,
+                0x0b => Opcode::PMULHRSW,
+
                 0xc8 => Opcode::SHA1NEXTE,
                 0xc9 => Opcode::SHA1MSG1,
                 0xca => Opcode::SHA1MSG2,
@@ -6144,6 +6157,25 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::ModRM_0x660f38 => {
             let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
             match op {
+                0x00 => { instruction.opcode = Opcode::PSHUFB; }
+                0x01 => { instruction.opcode = Opcode::PHADDW; }
+                0x02 => { instruction.opcode = Opcode::PHADDD; }
+                0x03 => { instruction.opcode = Opcode::PHADDSW; }
+                0x04 => { instruction.opcode = Opcode::PMADDUBSW; }
+                0x05 => { instruction.opcode = Opcode::PHSUBW; }
+                0x06 => { instruction.opcode = Opcode::PHSUBD; }
+                0x07 => { instruction.opcode = Opcode::PHSUBSW; }
+                0x08 => { instruction.opcode = Opcode::PSIGNB; }
+                0x09 => { instruction.opcode = Opcode::PSIGNW; }
+                0x0a => { instruction.opcode = Opcode::PSIGND; }
+                0x0b => { instruction.opcode = Opcode::PMULHRSW; }
+
+                0x1c => { instruction.opcode = Opcode::PABSB; }
+                0x1d => { instruction.opcode = Opcode::PABSW; }
+                0x1e => { instruction.opcode = Opcode::PABSD; }
+
+                0x40 => { instruction.opcode = Opcode::PMULLD; }
+
                 0xdb => { instruction.opcode = Opcode::AESIMC; }
                 0xdc => { instruction.opcode = Opcode::AESENC; }
                 0xdd => { instruction.opcode = Opcode::AESENCLAST; }
@@ -6171,6 +6203,14 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::ModRM_0x660f3a => {
             let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
             match op {
+                0x0c => { instruction.opcode = Opcode::BLENDPS; }
+                0x0d => { instruction.opcode = Opcode::BLENDPD; }
+                0x0f => { instruction.opcode = Opcode::PALIGNR; }
+                0x10 => { instruction.opcode = Opcode::BLENDVB; }
+
+                0x14 => { instruction.opcode = Opcode::BLENDVPS; }
+                0x15 => { instruction.opcode = Opcode::BLENDVPD; }
+
                 0xcc => {
                     instruction.opcode = Opcode::SHA1RNDS4;
 
@@ -6562,6 +6602,20 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             }
         },
+        OperandCode::Rv_Gmm_Ib => {
+            instruction.operands[1] = mem_oper;
+            instruction.operands[2] = OperandSpec::ImmU8;
+            instruction.imm =
+                read_num(&mut bytes_iter, 1)? as u64;
+            *length += 1;
+            instruction.modrm_rrr.bank = RegisterBank::D;
+            if mem_oper == OperandSpec::RegMMM {
+                instruction.modrm_mmm.bank = RegisterBank::MM;
+                instruction.modrm_mmm.num &= 0b111;
+            } else {
+                return Err(DecodeError::InvalidOperand);
+            }
+        }
         OperandCode::U_mm_G_xmm => {
             instruction.operands[1] = mem_oper;
             instruction.modrm_mmm.bank = RegisterBank::X;

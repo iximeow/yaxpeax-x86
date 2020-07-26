@@ -1074,7 +1074,7 @@ impl fmt::Display for Opcode {
             &Opcode::PMINUD => write!(f, "pminud"),
             &Opcode::PMINUW => write!(f, "pminuw"),
             &Opcode::BLENDW => write!(f, "blendw"),
-            &Opcode::BLENDDVB => write!(f, "blenddvb"),
+            &Opcode::BLENDVB => write!(f, "blendvb"),
             &Opcode::BLENDVPS => write!(f, "blendvps"),
             &Opcode::BLENDVPD => write!(f, "blendvpd"),
             &Opcode::BLENDPS => write!(f, "blendps"),
@@ -1087,7 +1087,7 @@ impl fmt::Display for Opcode {
             &Opcode::PSIGND => write!(f, "psignd"),
             &Opcode::PSIGNB => write!(f, "psignb"),
             &Opcode::PSHUFB => write!(f, "pshufb"),
-            &Opcode::PMULHRSU => write!(f, "pmulhrsu"),
+            &Opcode::PMULHRSW => write!(f, "pmulhrsw"),
             &Opcode::PMADDUBSW => write!(f, "pmaddubsw"),
             &Opcode::PABSD => write!(f, "pabsd"),
             &Opcode::PABSW => write!(f, "pabsw"),
@@ -1244,7 +1244,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPMULUDQ |
             Opcode::PCLMULQDQ |
             Opcode::PMULDQ |
-            Opcode::PMULHRSU |
+            Opcode::PMULHRSW |
             Opcode::PMULLD |
             Opcode::VPSUBB |
             Opcode::VPSUBD |
@@ -1515,7 +1515,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VBLENDPS |
             Opcode::VBLENDVPD |
             Opcode::VBLENDVPS |
-            Opcode::BLENDDVB |
+            Opcode::BLENDVB |
             Opcode::BLENDPD |
             Opcode::BLENDPS |
             Opcode::BLENDVPD |

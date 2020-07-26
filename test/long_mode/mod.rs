@@ -130,9 +130,13 @@ fn test_mmx() {
     test_display(&[0x0f, 0x6f, 0xe9], "movq mm5, mm1");
     test_display(&[0x0f, 0xe5, 0x3d, 0xaa, 0xbb, 0xcc, 0x77], "pmulhw mm7, [rip + 0x77ccbbaa]");
 
+    test_display(&[0x0f, 0x38, 0x00, 0xda], "pshufb mm3, mm2");
+
     test_display(&[0x0f, 0x74, 0xc2], "pcmpeqb mm0, mm2");
     test_display(&[0x0f, 0x75, 0xc2], "pcmpeqw mm0, mm2");
     test_display(&[0x0f, 0x76, 0xc2], "pcmpeqd mm0, mm2");
+
+    test_display(&[0x0f, 0xc5, 0xd1, 0x00], "pextrw edx, mm1, 0x0");
 
     test_display(&[0x0f, 0xd8, 0xc2], "psubusb mm0, mm2");
     test_display(&[0x0f, 0xd9, 0xc2], "psubusw mm0, mm2");
@@ -579,6 +583,26 @@ fn test_sse3() {
     test_instr(&[0x66, 0x0f, 0x01, 0xc9], "mwait");
     test_instr(&[0xf2, 0x0f, 0x01, 0xc9], "mwait");
     test_instr(&[0xf3, 0x0f, 0x01, 0xc9], "mwait");
+}
+
+#[test]
+fn test_ssse3() {
+    fn test_instr(bytes: &[u8], text: &'static str) {
+        test_display_under(&InstDecoder::minimal().with_ssse3(), bytes, text);
+        test_invalid_under(&InstDecoder::minimal(), bytes);
+        // avx doesn't imply older instructions are necessarily valid
+        test_invalid_under(&InstDecoder::minimal().with_avx(), bytes);
+        // sse4 doesn't imply older instructions are necessarily valid
+        test_invalid_under(&InstDecoder::minimal().with_sse4_1(), bytes);
+        test_invalid_under(&InstDecoder::minimal().with_sse4_2(), bytes);
+    }
+
+    #[allow(unused)]
+    fn test_instr_invalid(bytes: &[u8]) {
+        test_invalid_under(&InstDecoder::minimal().with_ssse3(), bytes);
+        test_invalid_under(&InstDecoder::default(), bytes);
+    }
+    test_instr(&[0x66, 0x0f, 0x38, 0x00, 0xda], "pshufb xmm3, xmm2");
 }
 
 #[test]
@@ -1214,6 +1238,7 @@ fn prefixed_0f() {
     test_display(&[0x0f, 0x6e, 0xc2], "movd mm0, edx");
     test_display(&[0x0f, 0x6f, 0x00], "movq mm0, [rax]");
     test_display(&[0x0f, 0x6f, 0xc2], "movq mm0, mm2");
+    test_display(&[0x0f, 0x6f, 0xfb], "movq mm7, mm3");
     test_display(&[0x0f, 0x70, 0x00, 0x7f], "pshufw mm0, [rax], 0x7f");
     test_display(&[0x4f, 0x0f, 0x70, 0x00, 0x7f], "pshufw mm0, [r8], 0x7f");
     test_invalid(&[0x0f, 0x71, 0x00, 0x7f]);
