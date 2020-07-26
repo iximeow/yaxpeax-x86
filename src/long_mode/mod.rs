@@ -7321,6 +7321,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[1] = OperandSpec::Deref;
             instruction.operand_count = 2;
         }
+        OperandCode::AH => {
+            instruction.operand_count = 0;
+        }
         OperandCode::DX_Xv => {
             instruction.modrm_rrr = RegSpec::dx();
             instruction.modrm_mmm = RegSpec::rsi();
