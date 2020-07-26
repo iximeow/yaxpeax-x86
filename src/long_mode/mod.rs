@@ -6179,9 +6179,18 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 0x0a => { instruction.opcode = Opcode::PSIGND; }
                 0x0b => { instruction.opcode = Opcode::PMULHRSW; }
 
+                0x17 => { instruction.opcode = Opcode::PTEST; }
+
                 0x1c => { instruction.opcode = Opcode::PABSB; }
                 0x1d => { instruction.opcode = Opcode::PABSW; }
                 0x1e => { instruction.opcode = Opcode::PABSD; }
+
+                0x30 => { instruction.opcode = Opcode::PMOVZXBW; }
+                0x31 => { instruction.opcode = Opcode::PMOVZXBD; }
+                0x32 => { instruction.opcode = Opcode::PMOVZXBQ; }
+                0x33 => { instruction.opcode = Opcode::PMOVZXWD; }
+                0x34 => { instruction.opcode = Opcode::PMOVZXWQ; }
+                0x35 => { instruction.opcode = Opcode::PMOVZXDQ; }
 
                 0x40 => { instruction.opcode = Opcode::PMULLD; }
 
