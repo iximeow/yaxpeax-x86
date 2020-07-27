@@ -3362,6 +3362,7 @@ impl OperandCodeBuilder {
 #[repr(u16)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum OperandCode {
+    Nothing = 0,
     CVT_AA,
     CVT_DA,
     Rq_Cq_0,
@@ -3398,7 +3399,6 @@ pub enum OperandCode {
     E_G_q,
     G_mm_Ew_Ib = 0x8c00,
     Mq_Dq,
-    Nothing,
     // Implied,
     Unsupported,
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().special_case(0).bits(),
@@ -5513,6 +5513,10 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     Ok(())
 }
 fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
+    if operand_code == OperandCode::Nothing {
+        instruction.operand_count = 0;
+        return Ok(());
+    }
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
     if operand_code.has_embedded_instructions() {
         match operand_code.get_embedded_instructions() {
@@ -6120,9 +6124,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.imm = 3;
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
-        }
-        OperandCode::Nothing => {
-            instruction.operand_count = 0;
         }
         _ => {
             unlikely_operands(decoder, bytes_iter, instruction, operand_code, mem_oper, length)?;
