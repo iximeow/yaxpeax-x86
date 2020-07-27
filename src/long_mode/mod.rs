@@ -3616,14 +3616,13 @@ pub enum OperandCode {
     Ev_Gv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().mem_reg().bits(),
     Gb_Eb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().only_modrm_operands().reg_mem().bits(),
     Gv_Ev = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().bits(),
+    Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().operand_case(2).bits(),
     Gb_Eb_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().reg_mem().operand_case(1).bits(),
     Gv_Ev_Iv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(1).bits(),
     // gap: 0xc6
     Eb_R0 = 0x98,
     Rv_Gmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_modrm().read_E().reg_mem().operand_case(25).bits(),
     // gap, 0x9a
-//    Gv_M = 0xdb,
-    Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().bits(),
     G_xmm_E_mm = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(23).bits(),
     G_xmm_U_mm = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(24).bits(),
     U_mm_G_xmm = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().mem_reg().operand_case(25).bits(),
@@ -4551,7 +4550,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
     OpcodeRecord(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
-    OpcodeRecord(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_M),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::SYSCALL), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::CLTS), OperandCode::Nothing),
@@ -5934,12 +5933,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[0] = mem_oper;
             instruction.operand_count = 1;
         },
-        OperandCode::Gv_M => {
-            instruction.operands[1] = mem_oper;
-            instruction.modrm_rrr =
-                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
-            instruction.operand_count = 2;
-        },
         OperandCode::E_G_xmm => {
             instruction.modrm_rrr.bank = RegisterBank::X;
             instruction.operands[0] = mem_oper;
@@ -6122,6 +6115,11 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operands[2] = OperandSpec::CL;
             instruction.operand_count = 3;
+        }
+        OperandCode::I_3 => {
+            instruction.imm = 3;
+            instruction.operands[0] = OperandSpec::ImmU8;
+            instruction.operand_count = 1;
         }
         OperandCode::Nothing => {
             instruction.operand_count = 0;
@@ -7505,11 +7503,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::GS => {
             instruction.modrm_rrr = RegSpec::gs();
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operand_count = 1;
-        }
-        OperandCode::I_3 => {
-            instruction.imm = 3;
-            instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
         }
         OperandCode::AL_Ib => {
