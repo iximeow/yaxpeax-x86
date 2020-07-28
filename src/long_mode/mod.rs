@@ -566,15 +566,15 @@ const XSAVE: [Opcode; 10] = [
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Opcode {
-    Invalid = 0,
-    ADD = 1,
-    OR = 2,
-    ADC = 3,
-    SBB = 4,
-    AND = 5,
-    XOR = 6,
-    SUB = 7,
-    CMP = 8,
+    Invalid,
+    ADD,
+    OR,
+    ADC,
+    SBB,
+    AND,
+    XOR,
+    SUB,
+    CMP,
     XADD,
     BT,
     BTS,
@@ -5514,6 +5514,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
 }
 fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
     if operand_code == OperandCode::Nothing {
+        instruction.operands[0] = OperandSpec::Nothing;
         instruction.operand_count = 0;
         return Ok(());
     }
@@ -7135,10 +7136,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.opcode = Opcode::VERW;
             } else if r == 6 {
                 instruction.opcode = Opcode::JMPE;
+                instruction.operands[0] = OperandSpec::Nothing;
                 instruction.operand_count = 0;
                 return Ok(());
             } else if r == 7 {
                 instruction.opcode = Opcode::Invalid;
+                instruction.operands[0] = OperandSpec::Nothing;
                 instruction.operand_count = 0;
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -7154,6 +7157,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
                     match m {
                         0b000 => {
@@ -7185,6 +7189,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
                     match m {
                         0b000 => {
@@ -7216,6 +7221,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
                     match m {
                         0b000 => {
@@ -7259,6 +7265,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         },
                         0b001 => {
                             instruction.opcode = Opcode::VMMCALL;
+                            instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
                         },
                         0b010 => {
@@ -7275,10 +7282,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         },
                         0b100 => {
                             instruction.opcode = Opcode::STGI;
+                            instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
                         },
                         0b101 => {
                             instruction.opcode = Opcode::CLGI;
+                            instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
                         },
                         0b110 => {
@@ -7297,6 +7306,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         },
                         _ => {
                             instruction.opcode = Opcode::Invalid;
+                            instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
                             return Err(DecodeError::InvalidOperand);
                         }
@@ -7317,14 +7327,17 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 match m {
                     0b110 => {
                         instruction.opcode = Opcode::RDPKRU;
-                        instruction.operand_count = 1;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
                     }
                     0b111 => {
                         instruction.opcode = Opcode::WRPKRU;
-                        instruction.operand_count = 1;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
                     }
                     _ => {
                         instruction.opcode = Opcode::Invalid;
+                        instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
                         return Err(DecodeError::InvalidOpcode);
                     }
@@ -7339,9 +7352,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 if mod_bits == 0b11 {
                     if m == 0 {
                         instruction.opcode = Opcode::SWAPGS;
+                        instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
                     } else if m == 1 {
                         instruction.opcode = Opcode::RDTSCP;
+                        instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
                     } else {
                         instruction.opcode = Opcode::Invalid;
@@ -7363,6 +7378,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
 
             // all the 0b11 instructions are err or no-operands
             if mod_bits == 0b11 {
+                instruction.operands[0] = OperandSpec::Nothing;
                 instruction.operand_count = 0;
                 let m = modrm & 7;
                 match r {
@@ -7606,6 +7622,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operand_count = 2;
         }
         OperandCode::AH => {
+            instruction.operands[0] = OperandSpec::Nothing;
             instruction.operand_count = 0;
         }
         OperandCode::DX_Xv => {
