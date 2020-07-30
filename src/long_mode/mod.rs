@@ -1433,6 +1433,8 @@ pub enum Opcode {
     RDGSBASE,
     WRFSBASE,
     WRGSBASE,
+
+    CRC32,
 }
 
 #[derive(Debug)]
@@ -2338,6 +2340,7 @@ impl InstDecoder {
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
+            Opcode::CRC32 |
             Opcode::PCMPESTRI |
             Opcode::PCMPESTRM |
             Opcode::PCMPISTRI |
@@ -3419,11 +3422,11 @@ pub enum OperandCode {
     ModRM_0x0f0d = OperandCodeBuilder::new().read_modrm().special_case(2).bits(),
     ModRM_0x0fae = OperandCodeBuilder::new().read_modrm().special_case(3).bits(),
     ModRM_0x0fba = OperandCodeBuilder::new().read_modrm().special_case(4).bits(),
-    ModRM_0xf238 = OperandCodeBuilder::new().read_modrm().special_case(5).bits(),
     ModRM_0xf30fae = OperandCodeBuilder::new().read_modrm().special_case(6).bits(),
     ModRM_0x660fae = OperandCodeBuilder::new().read_modrm().special_case(7).bits(),
     ModRM_0xf30fc7 = OperandCodeBuilder::new().read_modrm().special_case(8).bits(),
     ModRM_0x660f38 = OperandCodeBuilder::new().read_modrm().special_case(9).bits(),
+    ModRM_0xf20f38 = OperandCodeBuilder::new().read_modrm().special_case(24).bits(),
     ModRM_0xf30f38 = OperandCodeBuilder::new().read_modrm().special_case(10).bits(),
     ModRM_0x660f3a = OperandCodeBuilder::new().read_modrm().special_case(11).bits(),
     ModRM_0x0f38 = OperandCodeBuilder::new().read_modrm().special_case(12).bits(),
@@ -3617,6 +3620,7 @@ pub enum OperandCode {
     Gv_Ew = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(5).bits(),
     Gv_Ew_LSL = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(7).bits(),
     Gdq_Ed = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(6).bits(),
+    Gdq_Ev = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(10).bits(),
     G_E_mm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(2).bits(),
     G_E_xmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(8).bits(),
     AL_Ob = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(0).bits(),
@@ -4029,7 +4033,7 @@ const OPCODE_F20F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf238),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf20f38),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5958,6 +5962,24 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
             instruction.operand_count = 2;
         },
+        OperandCode::Gdq_Ev => {
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+//                println!("mod_bits: {:2b}, r: {:3b}, m: {:3b}", mod_bits, r, m);
+            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            // `opwidth` can be 2, 4, or 8 here. if opwidth is 2, the first operand is a dword.
+            // if opwidth is 4, both registers are dwords. and if opwidth is 8, both registers are
+            // qword.
+            let regwidth = if opwidth == 2 {
+                4
+            } else {
+                opwidth
+            };
+            instruction.modrm_rrr =
+                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), regwidth, instruction.prefixes.rex().present());
+            instruction.operand_count = 2;
+        },
         OperandCode::Ev => {
             instruction.operands[0] = mem_oper;
             instruction.operand_count = 1;
@@ -6474,6 +6496,23 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
             instruction.operand_count = 2;
         }
+        OperandCode::ModRM_0xf20f38 => {
+            let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
+            match op {
+                0xf0 => {
+                    instruction.opcode = Opcode::CRC32;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::Gv_Eb, length);
+                }
+                0xf1 => {
+                    instruction.opcode = Opcode::CRC32;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::Gdq_Ev, length);
+                }
+                _ => {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            };
+        }
         OperandCode::ModRM_0xf30f38 => {
             let op = bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })?;
             match op {
@@ -6535,6 +6574,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 0x34 => { instruction.opcode = Opcode::PMOVZXWQ; }
                 0x35 => { instruction.opcode = Opcode::PMOVZXDQ; }
 
+                0x37 => { instruction.opcode = Opcode::PCMPGTQ; }
                 0x38 => { instruction.opcode = Opcode::PMINSB; }
                 0x39 => { instruction.opcode = Opcode::PMINSD; }
                 0x3a => { instruction.opcode = Opcode::PMINUW; }
@@ -6644,6 +6684,22 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
                 }
 
+                0x60 => {
+                    instruction.opcode = Opcode::PCMPESTRM;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
+                }
+                0x61 => {
+                    instruction.opcode = Opcode::PCMPESTRI;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
+                }
+                0x62 => {
+                    instruction.opcode = Opcode::PCMPISTRM;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
+                }
+                0x63 => {
+                    instruction.opcode = Opcode::PCMPISTRI;
+                    return read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm_Ib, length);
+                }
                 0xcc => {
                     instruction.opcode = Opcode::SHA1RNDS4;
 

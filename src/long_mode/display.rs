@@ -1138,6 +1138,7 @@ const MNEMONICS: &[&'static str] = &[
     "rdgsbase",
     "wrfsbase",
     "wrgsbase",
+    "crc32",
 ];
 
 impl Opcode {
@@ -1989,6 +1990,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::WRPKRU |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
+            Opcode::CRC32 |
             Opcode::RDSEED |
             Opcode::RDRAND |
             Opcode::SHA1RNDS4 |
