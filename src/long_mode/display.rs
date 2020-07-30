@@ -623,7 +623,6 @@ const MNEMONICS: &[&'static str] = &[
     "pcmpgtb",
     "pcmpgtd",
     "pcmpgtw",
-    "pextrw",
     "pinsrw",
     "pmaddwd",
     "pmaxsw",
@@ -1032,6 +1031,8 @@ const MNEMONICS: &[&'static str] = &[
     "pcmpeqq",
     "ptest",
     "phminposuw",
+    "dpps",
+    "dppd",
     "mpsadbw",
     "pmovzxdq",
     "pmovsxdq",
@@ -1044,6 +1045,8 @@ const MNEMONICS: &[&'static str] = &[
     "pmovsxwd",
     "pmovzxwd",
     "pextrq",
+    "pextrd",
+    "pextrw",
     "pextrb",
     "pmovsxbw",
     "pmovzxbw",
@@ -1057,6 +1060,7 @@ const MNEMONICS: &[&'static str] = &[
     "roundps",
     "roundpd",
     "pmaxsb",
+    "pmaxsd",
     "pmaxuw",
     "pmaxud",
     "pminsd",
@@ -1064,7 +1068,8 @@ const MNEMONICS: &[&'static str] = &[
     "pminud",
     "pminuw",
     "blendw",
-    "blendvb",
+    "pblendvb",
+    "pblendw",
     "blendvps",
     "blendvpd",
     "blendps",
@@ -1328,6 +1333,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PHSUBW |
             Opcode::PMADDUBSW |
             Opcode::ADDSUBPD |
+            Opcode::DPPS |
+            Opcode::DPPD |
             Opcode::MPSADBW |
             Opcode::RCPSS |
             Opcode::RSQRTSS |
@@ -1528,7 +1535,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VBLENDPS |
             Opcode::VBLENDVPD |
             Opcode::VBLENDVPS |
-            Opcode::BLENDVB |
+            Opcode::PBLENDVB |
+            Opcode::PBLENDW |
             Opcode::BLENDPD |
             Opcode::BLENDPS |
             Opcode::BLENDVPD |
@@ -1649,6 +1657,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPEXTRQ |
             Opcode::VPEXTRW |
             Opcode::PEXTRB |
+            Opcode::PEXTRD |
             Opcode::PEXTRQ |
             Opcode::PINSRB |
             Opcode::PINSRD |
@@ -1861,6 +1870,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MINSD |
             Opcode::MINSS |
             Opcode::PMAXSB |
+            Opcode::PMAXSD |
             Opcode::PMAXSW |
             Opcode::PMAXUB |
             Opcode::PMAXUD |
