@@ -1221,6 +1221,7 @@ pub enum Opcode {
     VPMAXSW,
     VPMAXUB,
     VPMAXUD,
+    VPMINSW,
     VPMINSD,
     VPMINUD,
     VPMOVMSKB,
@@ -2739,6 +2740,7 @@ impl InstDecoder {
             Opcode::VPMAXSW |
             Opcode::VPMAXUB |
             Opcode::VPMAXUD |
+            Opcode::VPMINSW |
             Opcode::VPMINSD |
             Opcode::VPMINUD |
             Opcode::VPMOVMSKB |
