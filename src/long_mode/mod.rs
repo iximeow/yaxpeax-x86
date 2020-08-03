@@ -5966,20 +5966,22 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         },
         OperandCode::ModRM_0xfe_Eb => {
             instruction.operands[0] = mem_oper;
+            let r = (modrm >> 3) & 7;
+            if r >= 2 {
+                return Err(DecodeError::InvalidOpcode);
+            }
             instruction.opcode = [
                 Opcode::INC,
                 Opcode::DEC,
-                Opcode::Invalid,
-                Opcode::Invalid,
-                Opcode::Invalid,
-                Opcode::Invalid,
-                Opcode::Invalid,
-                Opcode::Invalid
-            ][((modrm >> 3) & 7) as usize];
+            ][r as usize];
             instruction.operand_count = 1;
         }
         OperandCode::ModRM_0xff_Ev => {
             instruction.operands[0] = mem_oper;
+            let r = (modrm >> 3) & 7;
+            if r == 7 {
+                return Err(DecodeError::InvalidOpcode);
+            }
             let opcode = [
                 Opcode::INC,
                 Opcode::DEC,
@@ -5988,8 +5990,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 Opcode::JMP,
                 Opcode::JMPF,
                 Opcode::PUSH,
-                Opcode::Invalid
-            ][((modrm >> 3) & 7) as usize];
+            ][r as usize];
             if instruction.operands[0] == OperandSpec::RegMMM {
                 if opcode == Opcode::CALL || opcode == Opcode::JMP {
                     instruction.modrm_mmm.bank = RegisterBank::Q;
