@@ -3760,7 +3760,7 @@ pub enum OperandCode {
     Ev_Gv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().mem_reg().bits(),
     Gb_Eb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().only_modrm_operands().reg_mem().bits(),
     Gv_Ev = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().bits(),
-    Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(25).bits(),
+    Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().operand_case(25).bits(),
     Gb_Eb_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().reg_mem().operand_case(1).bits(),
     Gv_Ev_Iv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(1).bits(),
     Rv_Gmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_modrm().read_E().reg_mem().operand_case(25).bits(),
@@ -5705,10 +5705,15 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             }
         };
         modrm = read_modrm(&mut bytes_iter, length)?;
-        instruction.modrm_rrr =
-            RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), bank);
+        instruction.modrm_rrr.bank = bank;
+        instruction.modrm_rrr.num = ((modrm >> 3) & 7) + if instruction.prefixes.rex().r() { 0b1000 } else { 0 };
 
         mem_oper = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+        if operand_code.bits() == (OperandCode::Gv_M as u16) {
+            if mem_oper == OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+        }
     }
 
     if operand_code.is_only_modrm_operands() {
@@ -5727,12 +5732,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
     } else {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
     match operand_code {
-        OperandCode::Gv_M => {
-            if mem_oper == OperandSpec::RegMMM {
-                return Err(DecodeError::InvalidOperand);
-            }
-            instruction.operands[1] = mem_oper;
-        }
         OperandCode::Eb_R0 => {
             // turns out xed cand capstone both permit nonzero rrr bits here.
             // if (modrm & 0b00111000) != 0 {
