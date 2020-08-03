@@ -77,7 +77,7 @@ enum VEXOperandCode {
     G_V_M_xmm,
     G_V_M_ymm,
     V_xmm_G_ymm_E_ymm_imm8,
-    V_ymm_G_ymm_E_xmm_imm8,
+    G_ymm_V_ymm_E_xmm_imm8,
     G_V_xmm_Ew_imm8,
     Eq_G_xmm,
     Ed_G_xmm,
@@ -639,14 +639,14 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 4;
             Ok(())
         }
-        _op @ VEXOperandCode::V_ymm_G_ymm_E_xmm_imm8 => {
+        _op @ VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8 => {
             let modrm = read_modrm(bytes, length)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             instruction.vex_reg.bank = RegisterBank::Y;
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
-            instruction.operands[0] = OperandSpec::RegVex;
-            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = mem_oper;
             instruction.imm = read_imm_unsigned(bytes, 1, length)?;
             instruction.operands[3] = OperandSpec::ImmU8;
@@ -2616,10 +2616,10 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         })
                     },
                     0x38 => (Opcode::VINSERTI128, if L {
+                        VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8
+                    } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
-                    } else {
-                        VEXOperandCode::V_ymm_G_ymm_E_xmm_imm8
                     }),
                     0x39 => (Opcode::VEXTRACTI128, if L {
                         VEXOperandCode::V_xmm_G_ymm_E_ymm_imm8
