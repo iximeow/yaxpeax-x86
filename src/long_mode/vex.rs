@@ -272,9 +272,15 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            // VEXOperandCode::G_E_xmm_imm8 ? this is reg1, reg2, imm8, but r is used for
-            // picking the opcode. is one of these actually the vex reg?
-            Err(DecodeError::IncompleteDecoder) // :)
+            instruction.modrm_rrr =
+                RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+            Ok(())
         }
         VEXOperandCode::VPS_73_L => {
             let modrm = read_modrm(bytes, length)?;
@@ -301,9 +307,15 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
                     unreachable!("r is only three bits");
                 }
             }
-            // VEXOperandCode::G_E_ymm_imm8 ? this is reg1, reg2, imm8, but r is used for
-            // picking the opcode. is one of these actually the vex reg?
-            Err(DecodeError::IncompleteDecoder) // :)
+            instruction.modrm_rrr =
+                RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+            Ok(())
         }
         VEXOperandCode::VMOVSS_10 |
         VEXOperandCode::VMOVSD_10 => {
