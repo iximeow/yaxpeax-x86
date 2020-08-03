@@ -3327,6 +3327,7 @@ struct EmbeddedOperandInstructions {
 }
 
 impl EmbeddedOperandInstructions {
+    #[allow(unused)]
     fn bits(&self) -> u16 {
         self.bits
     }
@@ -3362,7 +3363,8 @@ impl OperandCodeBuilder {
         self
     }
 
-    fn op0_is_rrr(&self) -> bool {
+    #[allow(unused)]
+    const fn op0_is_rrr(&self) -> bool {
         self.bits & 0x2000 != 0
     }
 
@@ -3380,6 +3382,7 @@ impl OperandCodeBuilder {
         }
     }
 
+    #[allow(unused)]
     fn special_case_handler_index(&self) -> u16 {
         self.bits & 0x1ff
     }
@@ -3440,6 +3443,7 @@ impl OperandCodeBuilder {
         (self.bits & 0x0800) != 0
     }
 
+    #[allow(unused)]
     const fn has_mem_reg(&self) -> bool {
         (self.bits & 0x0400) != 0
     }
@@ -5713,10 +5717,10 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 }
                 return Ok(());
             },
-            Err(embedded_operand_instructions) => {
-                if operand_code.op0_is_rrr() {
-                }
-            }
+            // EmbeddedOperandInstructions but those are entirely handled in the fall-through
+            // below. one day this may grow to be an `Err(the_operand_instructions)` though, so for
+            // a simpler diff the above is pre-`match`/`Ok`'d.
+            _ => {}
         }
     }
 

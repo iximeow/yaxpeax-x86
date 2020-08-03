@@ -4,7 +4,7 @@ mod operand;
 use std::fmt::Write;
 
 use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
-use yaxpeax_x86::long_mode::{DecodeError, InstDecoder, Opcode};
+use yaxpeax_x86::long_mode::{InstDecoder, Opcode};
 
 fn test_invalid(data: &[u8]) {
     test_invalid_under(&InstDecoder::default(), data);
