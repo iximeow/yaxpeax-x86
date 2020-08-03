@@ -5516,6 +5516,9 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
         match bytes_iter.next() {
             Some(b) => {
                 length += 1;
+                if length > 15 {
+                    return Err(DecodeError::TooLong);
+                }
                 let record = OPCODES[b as usize];
                 if (b & 0xf0) == 0x40 {
                     prefixes.rex_from(b);
@@ -5649,6 +5652,9 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     }
     instruction.prefixes = prefixes;
     read_operands(decoder, bytes_iter, instruction, record.1, &mut length)?;
+    if length > 15 {
+        return Err(DecodeError::TooLong);
+    }
     instruction.length = length;
 
     if decoder != &InstDecoder::default() {
