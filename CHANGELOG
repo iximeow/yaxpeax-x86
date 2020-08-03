@@ -1,3 +1,15 @@
+## 0.0.15
+
+* the `x87` instruction set is now fully supported
+  - textual disassembly differs slightly from other decoders in that
+    yaxpeax-x86 does not prefer using `st` in place of `st(0)`
+* do not decode `into` in 64-bit mode
+* support `vmread`, `vmwrite`
+* support `iret`/`iretd`/`iretq`
+* support `enter`
+* support `maskmovq`, `movnti`, and `movntq`
+  - this brings full support to non-vex-coded x86 instructions
+
 ## 0.0.14
 
 * `netburst` supported `cmpxchg16b` from its first x86_64 incarnation. since no

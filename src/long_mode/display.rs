@@ -374,6 +374,8 @@ const MNEMONICS: &[&'static str] = &[
     "int",
     "into",
     "iret",
+    "iretd",
+    "iretq",
     "retf",
     "enter",
     "leave",
@@ -1139,6 +1141,100 @@ const MNEMONICS: &[&'static str] = &[
     "wrfsbase",
     "wrgsbase",
     "crc32",
+    "xlat",
+
+    "f2xm1",
+    "fabs",
+    "fadd",
+    "faddp",
+    "fbld",
+    "fbstp",
+    "fchs",
+    "fcmovb",
+    "fcmovbe",
+    "fcmove",
+    "fcmovnb",
+    "fcmovnbe",
+    "fcmovne",
+    "fcmovnu",
+    "fcmovu",
+    "fcom",
+    "fcomi",
+    "fcomip",
+    "fcomp",
+    "fcompp",
+    "fcos",
+    "fdecstp",
+    "fdisi8087_nop",
+    "fdiv",
+    "fdivp",
+    "fdivr",
+    "fdivrp",
+    "feni8087_nop",
+    "ffree",
+    "ffreep",
+    "fiadd",
+    "ficom",
+    "ficomp",
+    "fidiv",
+    "fidivr",
+    "fild",
+    "fimul",
+    "fincstp",
+    "fist",
+    "fistp",
+    "fisttp",
+    "fisub",
+    "fisubr",
+    "fld",
+    "fld1",
+    "fldcw",
+    "fldenv",
+    "fldl2e",
+    "fldl2t",
+    "fldlg2",
+    "fldln2",
+    "fldpi",
+    "fldz",
+    "fmul",
+    "fmulp",
+    "fnclex",
+    "fninit",
+    "fnop",
+    "fnsave",
+    "fnstcw",
+    "fnstenv",
+    "fnstor",
+    "fnstsw",
+    "fpatan",
+    "fprem",
+    "fprem1",
+    "fptan",
+    "frndint",
+    "frstor",
+    "fscale",
+    "fsetpm287_nop",
+    "fsin",
+    "fsincos",
+    "fsqrt",
+    "fst",
+    "fstp",
+    "fstpnce",
+    "fsub",
+    "fsubp",
+    "fsubr",
+    "fsubrp",
+    "ftst",
+    "fucom",
+    "fucomi",
+    "fucomip",
+    "fucomp",
+    "fucompp",
+    "fxam",
+    "fxch",
+    "fxtract",
+    "fyl2x",
+    "fyl2xp1",
 ];
 
 impl Opcode {
@@ -1468,6 +1564,42 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SLHD |
             Opcode::UCOMISD |
             Opcode::UCOMISS |
+            Opcode::F2XM1 |
+            Opcode::FABS |
+            Opcode::FADD |
+            Opcode::FADDP |
+            Opcode::FCHS |
+            Opcode::FCOS |
+            Opcode::FDIV |
+            Opcode::FDIVP |
+            Opcode::FDIVR |
+            Opcode::FDIVRP |
+            Opcode::FIADD |
+            Opcode::FIDIV |
+            Opcode::FIDIVR |
+            Opcode::FIMUL |
+            Opcode::FISUB |
+            Opcode::FISUBR |
+            Opcode::FMUL |
+            Opcode::FMULP |
+            Opcode::FNCLEX |
+            Opcode::FNINIT |
+            Opcode::FPATAN |
+            Opcode::FPREM |
+            Opcode::FPREM1 |
+            Opcode::FPTAN |
+            Opcode::FRNDINT |
+            Opcode::FSCALE |
+            Opcode::FSIN |
+            Opcode::FSINCOS |
+            Opcode::FSQRT |
+            Opcode::FSUB |
+            Opcode::FSUBP |
+            Opcode::FSUBR |
+            Opcode::FSUBRP |
+            Opcode::FXTRACT |
+            Opcode::FYL2X |
+            Opcode::FYL2XP1 |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
             Opcode::PUSHF |
@@ -1476,6 +1608,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PUSH |
             Opcode::POP => { write!(out, "{}", colors.stack_op(self)) }
             Opcode::WAIT |
+            Opcode::FNOP |
+            Opcode::FDISI8087_NOP |
+            Opcode::FENI8087_NOP |
+            Opcode::FSETPM287_NOP |
             Opcode::PREFETCHNTA |
             Opcode::PREFETCH0 |
             Opcode::PREFETCH1 |
@@ -1488,6 +1624,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::INT |
             Opcode::INTO |
             Opcode::IRET |
+            Opcode::IRETD |
+            Opcode::IRETQ |
             Opcode::RETF |
             Opcode::RETURN => { write!(out, "{}", colors.stop_op(self)) }
             Opcode::CALL |
@@ -1780,7 +1918,34 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MOVZX_w |
             Opcode::MOVSX |
             Opcode::MOVSXD |
+            Opcode::FILD |
+            Opcode::FBLD |
+            Opcode::FBSTP |
+            Opcode::FIST |
+            Opcode::FISTP |
+            Opcode::FISTTP |
+            Opcode::FLD |
+            Opcode::FLD1 |
+            Opcode::FLDCW |
+            Opcode::FLDENV |
+            Opcode::FLDL2E |
+            Opcode::FLDL2T |
+            Opcode::FLDLG2 |
+            Opcode::FLDLN2 |
+            Opcode::FLDPI |
+            Opcode::FLDZ |
+            Opcode::FST |
+            Opcode::FSTP |
+            Opcode::FSTPNCE |
+            Opcode::FNSAVE |
+            Opcode::FNSTCW |
+            Opcode::FNSTENV |
+            Opcode::FNSTOR |
+            Opcode::FNSTSW |
+            Opcode::FRSTOR |
+            Opcode::FXCH |
             Opcode::XCHG |
+            Opcode::XLAT |
             Opcode::CMOVA |
             Opcode::CMOVB |
             Opcode::CMOVG |
@@ -1797,6 +1962,14 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CMOVP |
             Opcode::CMOVS |
             Opcode::CMOVZ |
+            Opcode::FCMOVB |
+            Opcode::FCMOVBE |
+            Opcode::FCMOVE |
+            Opcode::FCMOVNB |
+            Opcode::FCMOVNBE |
+            Opcode::FCMOVNE |
+            Opcode::FCMOVNU |
+            Opcode::FCMOVU |
             Opcode::SETO |
             Opcode::SETNO |
             Opcode::SETB |
@@ -1885,6 +2058,20 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
+            Opcode::FTST |
+            Opcode::FXAM |
+            Opcode::FUCOM |
+            Opcode::FUCOMI |
+            Opcode::FUCOMIP |
+            Opcode::FUCOMP |
+            Opcode::FUCOMPP |
+            Opcode::FCOM |
+            Opcode::FCOMI |
+            Opcode::FCOMIP |
+            Opcode::FCOMP |
+            Opcode::FCOMPP |
+            Opcode::FICOM |
+            Opcode::FICOMP |
             Opcode::CMPSD |
             Opcode::CMPSS |
             Opcode::CMP |
@@ -2000,6 +2187,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SHA256RNDS2 |
             Opcode::SHA256MSG1 |
             Opcode::SHA256MSG2 |
+            Opcode::FFREE |
+            Opcode::FFREEP |
+            Opcode::FDECSTP |
+            Opcode::FINCSTP |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |

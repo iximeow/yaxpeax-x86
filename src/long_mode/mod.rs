@@ -65,6 +65,18 @@ impl RegSpec {
     }
 
     #[inline]
+    fn st(num: u8) -> RegSpec {
+        if num >= 8 {
+            panic!("invalid x87 reg st({})", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::ST
+        }
+    }
+
+    #[inline]
     fn from_parts(num: u8, extended: bool, bank: RegisterBank) -> RegSpec {
         RegSpec {
             num: num + if extended { 0b1000 } else { 0 },
@@ -356,8 +368,7 @@ impl OperandSpec {
             OperandSpec::RegRRR |
             OperandSpec::RegMMM |
             OperandSpec::RegVex |
-            OperandSpec::AL |
-            OperandSpec::CL |
+            OperandSpec::EnterFrameSize |
             OperandSpec::Nothing => {
                 false
             }
@@ -381,12 +392,6 @@ impl Operand {
             OperandSpec::RegVex => {
                 Operand::Register(inst.vex_reg)
             }
-            OperandSpec::AL => {
-                Operand::Register(RegSpec::al())
-            }
-            OperandSpec::CL => {
-                Operand::Register(RegSpec::cl())
-            }
             OperandSpec::ImmI8 => Operand::ImmediateI8(inst.imm as i8),
             OperandSpec::ImmU8 => Operand::ImmediateU8(inst.imm as u8),
             OperandSpec::ImmI16 => Operand::ImmediateI16(inst.imm as i16),
@@ -395,6 +400,7 @@ impl Operand {
             OperandSpec::ImmU32 => Operand::ImmediateU32(inst.imm as u32),
             OperandSpec::ImmI64 => Operand::ImmediateI64(inst.imm as i64),
             OperandSpec::ImmU64 => Operand::ImmediateU64(inst.imm as u64),
+            OperandSpec::EnterFrameSize => Operand::ImmediateU16(inst.disp as u16),
             OperandSpec::DispU32 => Operand::DisplacementU32(inst.disp as u32),
             OperandSpec::DispU64 => Operand::DisplacementU64(inst.disp as u64),
             OperandSpec::Deref => {
@@ -655,6 +661,8 @@ pub enum Opcode {
     INT,
     INTO,
     IRET,
+    IRETD,
+    IRETQ,
     RETF,
     ENTER,
     LEAVE,
@@ -1435,6 +1443,100 @@ pub enum Opcode {
     WRGSBASE,
 
     CRC32,
+    XLAT,
+
+    F2XM1,
+    FABS,
+    FADD,
+    FADDP,
+    FBLD,
+    FBSTP,
+    FCHS,
+    FCMOVB,
+    FCMOVBE,
+    FCMOVE,
+    FCMOVNB,
+    FCMOVNBE,
+    FCMOVNE,
+    FCMOVNU,
+    FCMOVU,
+    FCOM,
+    FCOMI,
+    FCOMIP,
+    FCOMP,
+    FCOMPP,
+    FCOS,
+    FDECSTP,
+    FDISI8087_NOP,
+    FDIV,
+    FDIVP,
+    FDIVR,
+    FDIVRP,
+    FENI8087_NOP,
+    FFREE,
+    FFREEP,
+    FIADD,
+    FICOM,
+    FICOMP,
+    FIDIV,
+    FIDIVR,
+    FILD,
+    FIMUL,
+    FINCSTP,
+    FIST,
+    FISTP,
+    FISTTP,
+    FISUB,
+    FISUBR,
+    FLD,
+    FLD1,
+    FLDCW,
+    FLDENV,
+    FLDL2E,
+    FLDL2T,
+    FLDLG2,
+    FLDLN2,
+    FLDPI,
+    FLDZ,
+    FMUL,
+    FMULP,
+    FNCLEX,
+    FNINIT,
+    FNOP,
+    FNSAVE,
+    FNSTCW,
+    FNSTENV,
+    FNSTOR,
+    FNSTSW,
+    FPATAN,
+    FPREM,
+    FPREM1,
+    FPTAN,
+    FRNDINT,
+    FRSTOR,
+    FSCALE,
+    FSETPM287_NOP,
+    FSIN,
+    FSINCOS,
+    FSQRT,
+    FST,
+    FSTP,
+    FSTPNCE,
+    FSUB,
+    FSUBP,
+    FSUBR,
+    FSUBRP,
+    FTST,
+    FUCOM,
+    FUCOMI,
+    FUCOMIP,
+    FUCOMP,
+    FUCOMPP,
+    FXAM,
+    FXCH,
+    FXTRACT,
+    FYL2X,
+    FYL2XP1,
 }
 
 #[derive(Debug)]
@@ -1486,10 +1588,6 @@ enum OperandSpec {
     RegMMM,
     // the register selected by vex-vvvv bits
     RegVex,
-    // the register `al`. Used for MOVS.
-    AL,
-    // the register `cl`. Used for SHLD and SHRD.
-    CL,
     ImmI8,
     ImmI16,
     ImmI32,
@@ -1498,6 +1596,9 @@ enum OperandSpec {
     ImmU16,
     ImmU32,
     ImmU64,
+    // ENTER is a two-immediate instruction, where the first immediate is stored in the disp field.
+    // for this case, a second immediate-style operand is needed.
+    EnterFrameSize,
     DispU32,
     DispU64,
     Deref,
@@ -2308,9 +2409,6 @@ impl InstDecoder {
             Opcode::PINSRB |
             Opcode::PINSRD |
             Opcode::PINSRQ |
-            Opcode::PEXTRB |
-            Opcode::PEXTRW |
-            Opcode::PEXTRQ |
             Opcode::PMOVSXBW |
             Opcode::PMOVZXBW |
             Opcode::PMOVSXBD |
@@ -3234,6 +3332,7 @@ impl EmbeddedOperandInstructions {
     }
 }
 
+#[allow(non_snake_case)]
 impl OperandCodeBuilder {
     const fn new() -> Self {
         OperandCodeBuilder { bits: 0 }
@@ -3411,10 +3510,16 @@ pub enum OperandCode {
     Yb_Xb,
     Yv_AX,
     Yv_Xv,
-    G_E_q = 0x8b00,
-    E_G_q,
-    G_mm_Ew_Ib = 0x8c00,
-    Mq_Dq,
+
+    x87_d8 = OperandCodeBuilder::new().special_case(31).bits(),
+    x87_d9 = OperandCodeBuilder::new().special_case(32).bits(),
+    x87_da = OperandCodeBuilder::new().special_case(33).bits(),
+    x87_db = OperandCodeBuilder::new().special_case(34).bits(),
+    x87_dc = OperandCodeBuilder::new().special_case(35).bits(),
+    x87_dd = OperandCodeBuilder::new().special_case(36).bits(),
+    x87_de = OperandCodeBuilder::new().special_case(37).bits(),
+    x87_df = OperandCodeBuilder::new().special_case(38).bits(),
+
     // Implied,
     Unsupported,
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().special_case(0).bits(),
@@ -3621,11 +3726,11 @@ pub enum OperandCode {
     Gv_Ew_LSL = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(7).bits(),
     Gdq_Ed = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(6).bits(),
     Gdq_Ev = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(10).bits(),
+    Mdq_Gdq = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(11).bits(),
     G_E_mm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(2).bits(),
     G_E_xmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(8).bits(),
     AL_Ob = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(0).bits(),
     AL_Xb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(1).bits(),
-    AX_AL = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(2).bits(),
     AX_Ov = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(3).bits(),
     AL_Ibs = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().byte_operands().operand_case(0).bits(),
     AX_Ivd = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(9).bits(),
@@ -3665,6 +3770,11 @@ pub enum OperandCode {
     G_mm_E = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().mem_reg().operand_case(20).bits(),
     Ev_Gv_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(21).bits(),
     Ev_Gv_CL = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(22).bits(),
+    G_mm_U_mm = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(32).bits(),
+    G_Md_mm = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(33).bits(),
+    G_mm_Ew_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(20).bits(),
+    G_E_q = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(21).bits(),
+    E_G_q = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(22).bits(),
 }
 
 fn base_opcode_map(v: u8) -> Opcode {
@@ -4782,7 +4892,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::XADD), OperandCode::Eb_Gb),
     OpcodeRecord(Interpretation::Instruction(Opcode::XADD), OperandCode::Ev_Gv),
     OpcodeRecord(Interpretation::Instruction(Opcode::CMPPS), OperandCode::G_E_xmm_Ib),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTI), OperandCode::Mq_Dq),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTI), OperandCode::Mdq_Gdq),
     OpcodeRecord(Interpretation::Instruction(Opcode::PINSRW), OperandCode::G_mm_Ew_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRW), OperandCode::Rv_Gmm_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::SHUFPS), OperandCode::G_E_xmm_Ib),
@@ -4823,7 +4933,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PMULHUW), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PMULHW), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTQ), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTQ), OperandCode::G_Md_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSUBSB), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSUBSW), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PMINSW), OperandCode::G_E_mm),
@@ -4840,7 +4950,7 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PMULUDQ), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PMADDWD), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSADBW), OperandCode::G_E_mm),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MASKMOVQ), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MASKMOVQ), OperandCode::G_mm_U_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSUBB), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSUBW), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::PSUBD), OperandCode::G_E_mm),
@@ -5034,7 +5144,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::CVT_AA),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::CVT_DA),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::WAIT), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::PUSHF), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::POPF), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::SAHF), OperandCode::AH),
@@ -5087,7 +5197,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::RETF), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::INT), OperandCode::I_3),
     OpcodeRecord(Interpretation::Instruction(Opcode::INT), OperandCode::Ib),
-    OpcodeRecord(Interpretation::Instruction(Opcode::INTO), OperandCode::Fw),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::IRET), OperandCode::Fw),
 // 0xd0
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xd0_Eb_1),
@@ -5098,23 +5208,23 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     // XLAT
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::XLAT), OperandCode::Nothing),
     // x86 d8
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_d8),
     // x86 d9
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_d9),
     // x86 da
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_da),
     // x86 db
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_db),
     // x86 dc
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_dc),
     // x86 dd
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_dd),
     // x86 de
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_de),
     // x86 df
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Unsupported),
+    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_df),
 // 0xe0
     // LOOPNZ
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5165,6 +5275,14 @@ pub(self) fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instru
     let bank = width_to_gp_reg_bank(width, instr.prefixes.rex().present());
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
+    } else {
+        read_M(bytes_iter, instr, modrm, length)
+    }
+}
+#[allow(non_snake_case)]
+pub(self) fn read_E_st<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+    if modrm >= 0b11000000 {
+        read_modrm_reg(instr, modrm, RegisterBank::ST)
     } else {
         read_M(bytes_iter, instr, modrm, length)
     }
@@ -5492,10 +5610,6 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                         0x67 => {
                             prefixes.set_address_size();
                         },
-                        0x9b => {
-                            // TODO: WAIT prefix
-                            return Err(DecodeError::IncompleteDecoder);
-                        },
                         0xf0 => {
                             prefixes.set_lock();
                         },
@@ -5651,52 +5765,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
     } else {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
     match operand_code {
-        /*
-        Gv_Ev_Iv,
-        Gb_Eb_Ib,
-        Yb_DX,
-        Yv_DX,
-        DX_Xb,
-        DX_Xv,
-        OR,
-        AH,
-        AL_Ib,
-        AL_Ob,
-        AL_Xb,
-        AX_AL,
-        AX_Ivd,
-        AX_Ov,
-        AX_Xv,
-        DX_AX,
-        Eb_1,
-        Eb_Ib,
-        Eb_CL,
-        Ev,
-        Ev_1,
-        Ev_CL,
-        Ev_Ibs,
-        Ev_Iv,
-        Ev_Ivs,
-        Ew_Sw,
-        Fw,
-        Gv_M,
-        I_3,
-        Ib,
-        Ibs,
-        Ivs,
-        Iw,
-        Iw_Ib,
-        Ob_AL,
-        Ov_AX,
-        Sw_Ew,
-        Yb_AL,
-        Yb_Xb,
-        Yv_AX,
-        Yv_Xv,
-        Zb_Ib,
-        Zv,
-        Zv_AX,
-        */
         OperandCode::Eb_R0 => {
             if (modrm & 0b00111000) != 0 {
                 instruction.opcode = Opcode::Invalid;
@@ -6159,7 +6227,8 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         OperandCode::Ev_Gv_CL => {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.operands[2] = OperandSpec::CL;
+            instruction.operands[2] = OperandSpec::RegVex;
+            instruction.vex_reg = RegSpec::cl();
             instruction.operand_count = 3;
         }
         OperandCode::I_3 => {
@@ -6180,6 +6249,85 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::Unsupported => {
             return Err(DecodeError::IncompleteDecoder);
         }
+        OperandCode::Iw_Ib => {
+            instruction.disp = read_num(&mut bytes_iter, 2)? as u64;
+            instruction.imm = read_num(&mut bytes_iter, 1)? as u64;
+            instruction.operands[0] = OperandSpec::EnterFrameSize;
+            instruction.operands[1] = OperandSpec::ImmU8;
+            instruction.operand_count = 2;
+            *length += 3;
+        }
+        OperandCode::Fw => {
+            if instruction.prefixes.rex().w() {
+                instruction.opcode = Opcode::IRETQ;
+            } else if instruction.prefixes.operand_size() {
+                instruction.opcode = Opcode::IRET;
+            } else {
+                instruction.opcode = Opcode::IRETD;
+            }
+            instruction.operand_count = 0;
+        }
+        OperandCode::Mdq_Gdq => {
+            let opwidth = if instruction.prefixes.rex().w() { 8 } else { 4 };
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            if instruction.operands[0] == OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.modrm_rrr =
+                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
+            instruction.operand_count = 2;
+
+        }
+        OperandCode::G_mm_U_mm => {
+            instruction.operands[1] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            if mem_oper != OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.modrm_mmm.bank = RegisterBank::MM;
+            instruction.modrm_mmm.num &= 0b111;
+            instruction.modrm_rrr.num &= 0b111;
+            instruction.operand_count = 2;
+        },
+        OperandCode::E_G_q => {
+            if instruction.prefixes.operand_size() {
+                return Err(DecodeError::InvalidOpcode);
+            }
+
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::Q);
+            instruction.operand_count = 2;
+        }
+        OperandCode::G_E_q => {
+            if instruction.prefixes.operand_size() {
+                return Err(DecodeError::InvalidOpcode);
+            }
+
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.modrm_rrr =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::Q);
+            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+            instruction.operand_count = 2;
+        }
+        OperandCode::G_Md_mm => {
+            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[0] = mem_oper;
+            instruction.modrm_rrr.bank = RegisterBank::MM;
+            if mem_oper == OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.modrm_rrr.num &= 0b111;
+            instruction.operand_count = 2;
+        },
         OperandCode::MOVQ_f30f => {
             // if rex.w is set, the f3 prefix no longer applies and this becomes an 0f7e movq,
             // rather than f30f7e movq.
@@ -7117,17 +7265,24 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
-            instruction.operands[0] = OperandSpec::AL;
-            instruction.operands[1] = OperandSpec::Deref_rsi;
+            instruction.modrm_rrr = RegSpec::al();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = OperandSpec::Deref;
+            instruction.operand_count = 2;
         }
         // TODO: two memory operands! this is wrong!!!
         OperandCode::Yb_Xb => {
             instruction.operands[0] = OperandSpec::Deref_rdi;
             instruction.operands[1] = OperandSpec::Deref_rsi;
+            instruction.operand_count = 2;
         }
         OperandCode::Yb_AL => {
-            instruction.operands[0] = OperandSpec::Deref_rdi;
-            instruction.operands[1] = OperandSpec::AL;
+            instruction.modrm_rrr = RegSpec::al();
+            instruction.modrm_mmm = RegSpec::rsi();
+            instruction.operands[0] = OperandSpec::Deref;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
         }
         OperandCode::AX_Xv => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
@@ -7811,6 +7966,16 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[1] = OperandSpec::Deref;
             instruction.operand_count = 2;
         }
+        OperandCode::x87_d8 |
+        OperandCode::x87_d9 |
+        OperandCode::x87_da |
+        OperandCode::x87_db |
+        OperandCode::x87_dc |
+        OperandCode::x87_dd |
+        OperandCode::x87_de |
+        OperandCode::x87_df => {
+            return decode_x87(decoder, bytes_iter, instruction, operand_code, length);
+        }
         _ => {
             // TODO: this should be unreachable - safe to panic now?
             // can't simply delete this arm because the non-unlikely operands are handled outside
@@ -7824,6 +7989,416 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             return Err(DecodeError::InvalidOperand);
         }
     };
+    Ok(())
+}
+
+fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
+    #[allow(non_camel_case_types)]
+    enum OperandCodeX87 {
+        Est,
+        St_Est,
+        St_Ew,
+        St_Ed,
+        St_Md,
+        Md,
+        Ew,
+        Est_St,
+        Ed_St,
+        Md_St,
+        Ex87S,
+        Nothing,
+    }
+
+    // every x87 instruction is conditional on rrr bits
+    let modrm = read_modrm(&mut bytes_iter, length)?;
+    let r = (modrm >> 3) & 0b111;
+
+    let (opcode, x87_operands) = match operand_code {
+        OperandCode::x87_d8 => {
+            match r {
+                0 => (Opcode::FADD, OperandCodeX87::St_Est),
+                1 => (Opcode::FMUL, OperandCodeX87::St_Est),
+                2 => (Opcode::FCOM, OperandCodeX87::St_Est),
+                3 => (Opcode::FCOMP, OperandCodeX87::St_Est),
+                4 => (Opcode::FSUB, OperandCodeX87::St_Est),
+                5 => (Opcode::FSUBR, OperandCodeX87::St_Est),
+                6 => (Opcode::FDIV, OperandCodeX87::St_Est),
+                7 => (Opcode::FDIVR, OperandCodeX87::St_Est),
+                _ => { unreachable!("impossible r"); }
+            }
+        }
+        OperandCode::x87_d9 => {
+            match r {
+                0 => (Opcode::FLD, OperandCodeX87::St_Est),
+                1 => {
+                    if modrm >= 0xc0 {
+                        (Opcode::FXCH, OperandCodeX87::St_Est)
+                    } else {
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                },
+                2 => {
+                    if modrm >= 0xc0 {
+                        if modrm == 0xd0 {
+                            (Opcode::FNOP, OperandCodeX87::Nothing)
+                        } else {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                    } else {
+                        (Opcode::FST, OperandCodeX87::Ed_St)
+                    }
+                }
+                3 => {
+                    if modrm >= 0xc0 {
+                        (Opcode::FSTPNCE, OperandCodeX87::Est_St)
+                    } else {
+                        (Opcode::FSTP, OperandCodeX87::Est_St)
+                    }
+                },
+                4 => {
+                    if modrm >= 0xc0 {
+                        match modrm {
+                            0xe0 => (Opcode::FCHS, OperandCodeX87::Nothing),
+                            0xe1 => (Opcode::FABS, OperandCodeX87::Nothing),
+                            0xe2 => { return Err(DecodeError::InvalidOpcode); },
+                            0xe3 => { return Err(DecodeError::InvalidOpcode); },
+                            0xe4 => (Opcode::FTST, OperandCodeX87::Nothing),
+                            0xe5 => (Opcode::FXAM, OperandCodeX87::Nothing),
+                            0xe6 => { return Err(DecodeError::InvalidOpcode); },
+                            0xe7 => { return Err(DecodeError::InvalidOpcode); },
+                            _ => { unreachable!("invalid modrm"); }
+                        }
+                    } else {
+                        (Opcode::FLDENV, OperandCodeX87::Ex87S) // x87 state
+                    }
+                },
+                5 => {
+                    if modrm >= 0xc0 {
+                        match modrm {
+                            0xe8 => (Opcode::FLD1, OperandCodeX87::Nothing),
+                            0xe9 => (Opcode::FLDL2T, OperandCodeX87::Nothing),
+                            0xea => (Opcode::FLDL2E, OperandCodeX87::Nothing),
+                            0xeb => (Opcode::FLDPI, OperandCodeX87::Nothing),
+                            0xec => (Opcode::FLDLG2, OperandCodeX87::Nothing),
+                            0xed => (Opcode::FLDLN2, OperandCodeX87::Nothing),
+                            0xee => (Opcode::FLDZ, OperandCodeX87::Nothing),
+                            0xef => (Opcode::Invalid, OperandCodeX87::Nothing),
+                            _ => { unreachable!("invalid modrm"); }
+                        }
+                    } else {
+                        (Opcode::FLDCW, OperandCodeX87::Ew)
+                    }
+                }
+                6 => {
+                    if modrm >= 0xc0 {
+                        match modrm {
+                            0xf0 => (Opcode::F2XM1, OperandCodeX87::Nothing),
+                            0xf1 => (Opcode::FYL2X, OperandCodeX87::Nothing),
+                            0xf2 => (Opcode::FPTAN, OperandCodeX87::Nothing),
+                            0xf3 => (Opcode::FPATAN, OperandCodeX87::Nothing),
+                            0xf4 => (Opcode::FXTRACT, OperandCodeX87::Nothing),
+                            0xf5 => (Opcode::FPREM1, OperandCodeX87::Nothing),
+                            0xf6 => (Opcode::FDECSTP, OperandCodeX87::Nothing),
+                            0xf7 => (Opcode::FINCSTP, OperandCodeX87::Nothing),
+                            _ => { unreachable!("invalid modrm"); }
+                        }
+                    } else {
+                        (Opcode::FNSTENV, OperandCodeX87::Ex87S) // x87 state
+                    }
+                }
+                7 => {
+                    if modrm >= 0xc0 {
+                        match modrm {
+                            0xf8 => (Opcode::FPREM, OperandCodeX87::Nothing),
+                            0xf9 => (Opcode::FYL2XP1, OperandCodeX87::Nothing),
+                            0xfa => (Opcode::FSQRT, OperandCodeX87::Nothing),
+                            0xfb => (Opcode::FSINCOS, OperandCodeX87::Nothing),
+                            0xfc => (Opcode::FRNDINT, OperandCodeX87::Nothing),
+                            0xfd => (Opcode::FSCALE, OperandCodeX87::Nothing),
+                            0xfe => (Opcode::FSIN, OperandCodeX87::Nothing),
+                            0xff => (Opcode::FCOS, OperandCodeX87::Nothing),
+                            _ => { unreachable!("invalid modrm"); }
+                        }
+                    } else {
+                        (Opcode::FNSTCW, OperandCodeX87::Ew)
+                    }
+                }
+                _ => { unreachable!("impossible r"); }
+            }
+        }
+        OperandCode::x87_da => {
+            if modrm >= 0xc0 {
+                match r {
+                    0 => (Opcode::FCMOVB, OperandCodeX87::St_Est),
+                    1 => (Opcode::FCMOVE, OperandCodeX87::St_Est),
+                    2 => (Opcode::FCMOVBE, OperandCodeX87::St_Est),
+                    3 => (Opcode::FCMOVU, OperandCodeX87::St_Est),
+                    _ => {
+                        if modrm == 0xe9 {
+                            (Opcode::FUCOMPP, OperandCodeX87::Nothing)
+                        } else {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                    }
+                }
+            } else {
+                match r {
+                    0 => (Opcode::FIADD, OperandCodeX87::St_Md), // 0xd9d0 -> fnop
+                    1 => (Opcode::FIMUL, OperandCodeX87::St_Md),
+                    2 => (Opcode::FICOM, OperandCodeX87::St_Md), // FCMOVE
+                    3 => (Opcode::FICOMP, OperandCodeX87::St_Md), // FCMOVBE
+                    4 => (Opcode::FISUB, OperandCodeX87::St_Md),
+                    5 => (Opcode::FISUBR, OperandCodeX87::St_Md), // FUCOMPP
+                    6 => (Opcode::FIDIV, OperandCodeX87::St_Md),
+                    7 => (Opcode::FIDIVR, OperandCodeX87::St_Md),
+                    _ => { unreachable!("impossible r"); }
+                }
+            }
+        }
+        OperandCode::x87_db => {
+            if modrm >= 0xc0 {
+                match r {
+                    0 => (Opcode::FCMOVNB, OperandCodeX87::St_Est),
+                    1 => (Opcode::FCMOVNE, OperandCodeX87::St_Est),
+                    2 => (Opcode::FCMOVNBE, OperandCodeX87::St_Est),
+                    3 => (Opcode::FCMOVNU, OperandCodeX87::St_Est),
+                    4 => {
+                        match modrm {
+                            0xe0 => (Opcode::FENI8087_NOP, OperandCodeX87::Nothing),
+                            0xe1 => (Opcode::FDISI8087_NOP, OperandCodeX87::Nothing),
+                            0xe2 => (Opcode::FNCLEX, OperandCodeX87::Nothing),
+                            0xe3 => (Opcode::FNINIT, OperandCodeX87::Nothing),
+                            0xe4 => (Opcode::FSETPM287_NOP, OperandCodeX87::Nothing),
+                            _ => {
+                                return Err(DecodeError::InvalidOpcode);
+                            }
+                        }
+                    }
+                    5 => (Opcode::FUCOMI, OperandCodeX87::St_Est),
+                    6 => (Opcode::FCOMI, OperandCodeX87::St_Est),
+                    _ => {
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                }
+            } else {
+                match r {
+                    0 => (Opcode::FILD, OperandCodeX87::St_Md),
+                    1 => (Opcode::FISTTP, OperandCodeX87::Md_St),
+                    2 => (Opcode::FIST, OperandCodeX87::Md_St),
+                    3 => (Opcode::FISTP, OperandCodeX87::Md_St),
+                    5 => (Opcode::FLD, OperandCodeX87::St_Md), // 80bit
+                    7 => (Opcode::FSTP, OperandCodeX87::Md_St), // 80bit
+                    _ => {
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                }
+            }
+
+        }
+        OperandCode::x87_dc => {
+            // mod=11 swaps operand order for some instructions
+            if modrm >= 0xc0 {
+                match r {
+                    0 => (Opcode::FADD, OperandCodeX87::Est_St),
+                    1 => (Opcode::FMUL, OperandCodeX87::Est_St),
+                    2 => (Opcode::FCOM, OperandCodeX87::St_Est),
+                    3 => (Opcode::FCOMP, OperandCodeX87::St_Est),
+                    4 => (Opcode::FSUBR, OperandCodeX87::Est_St),
+                    5 => (Opcode::FSUB, OperandCodeX87::Est_St),
+                    6 => (Opcode::FDIVR, OperandCodeX87::Est_St),
+                    7 => (Opcode::FDIV, OperandCodeX87::Est_St),
+                    _ => { unreachable!("impossible r"); }
+                }
+            } else {
+                match r {
+                    0 => (Opcode::FADD, OperandCodeX87::St_Est),
+                    1 => (Opcode::FMUL, OperandCodeX87::St_Est),
+                    2 => (Opcode::FCOM, OperandCodeX87::St_Est),
+                    3 => (Opcode::FCOMP, OperandCodeX87::St_Est),
+                    4 => (Opcode::FSUB, OperandCodeX87::St_Est),
+                    5 => (Opcode::FSUBR, OperandCodeX87::St_Est),
+                    6 => (Opcode::FDIV, OperandCodeX87::St_Est),
+                    7 => (Opcode::FDIVR, OperandCodeX87::St_Est),
+                    _ => { unreachable!("impossible r"); }
+                }
+            }
+        }
+        OperandCode::x87_dd => {
+            if modrm >= 0xc0 {
+                match r {
+                    0 => (Opcode::FFREE, OperandCodeX87::Est),
+                    1 => (Opcode::FXCH, OperandCodeX87::St_Est),
+                    2 => (Opcode::FST, OperandCodeX87::Est_St),
+                    3 => (Opcode::FSTP, OperandCodeX87::Est_St),
+                    4 => (Opcode::FUCOM, OperandCodeX87::St_Est),
+                    5 => (Opcode::FUCOMP, OperandCodeX87::St_Est),
+                    6 => (Opcode::Invalid, OperandCodeX87::Nothing),
+                    7 => (Opcode::Invalid, OperandCodeX87::Nothing),
+                    _ => { unreachable!("impossible r"); }
+                }
+            } else {
+                match r {
+                    0 => (Opcode::FLD, OperandCodeX87::St_Est),
+                    1 => (Opcode::FISTTP, OperandCodeX87::Est_St),
+                    2 => (Opcode::FST, OperandCodeX87::Est_St),
+                    3 => (Opcode::FSTP, OperandCodeX87::Est_St),
+                    4 => (Opcode::FRSTOR, OperandCodeX87::Md), // TODO: m94/108byte
+                    5 => (Opcode::Invalid, OperandCodeX87::Nothing),
+                    6 => (Opcode::FNSAVE, OperandCodeX87::Est),
+                    7 => (Opcode::FNSTSW, OperandCodeX87::Ew),
+                    _ => { unreachable!("impossible r"); }
+                }
+            }
+        }
+        OperandCode::x87_de => {
+            if modrm >= 0xc0 {
+                match r {
+                    0 => (Opcode::FADDP, OperandCodeX87::Est_St),
+                    1 => (Opcode::FMULP, OperandCodeX87::Est_St),
+                    // undocumented in intel manual, argument order inferred from
+                    // by xed and capstone. TODO: check amd manual.
+                    2 => (Opcode::FCOMP, OperandCodeX87::St_Est),
+                    3 => {
+                        if modrm == 0xd9 {
+                            (Opcode::FCOMPP, OperandCodeX87::Nothing)
+                        } else {
+                            return Err(DecodeError::InvalidOperand);
+                        }
+                    },
+                    4 => (Opcode::FSUBRP, OperandCodeX87::Est_St),
+                    5 => (Opcode::FSUBP, OperandCodeX87::Est_St),
+                    6 => (Opcode::FDIVRP, OperandCodeX87::Est_St),
+                    7 => (Opcode::FDIVP, OperandCodeX87::Est_St),
+                    _ => { unreachable!("impossible r"); }
+                }
+            } else {
+                match r {
+                    0 => (Opcode::FIADD, OperandCodeX87::St_Ew),
+                    1 => (Opcode::FIMUL, OperandCodeX87::St_Ew),
+                    2 => (Opcode::FICOM, OperandCodeX87::St_Ew),
+                    3 => (Opcode::FICOMP, OperandCodeX87::St_Ew),
+                    4 => (Opcode::FISUB, OperandCodeX87::St_Ew),
+                    5 => (Opcode::FISUBR, OperandCodeX87::St_Ew),
+                    6 => (Opcode::FIDIV, OperandCodeX87::St_Ew),
+                    7 => (Opcode::FIDIVR, OperandCodeX87::St_Ew),
+                    _ => { unreachable!("impossible r"); }
+                }
+            }
+        }
+        OperandCode::x87_df => {
+            if modrm >= 0xc0 {
+                match r {
+                    0 => (Opcode::FFREEP, OperandCodeX87::Est),
+                    1 => (Opcode::FXCH, OperandCodeX87::St_Est),
+                    2 => (Opcode::FSTP, OperandCodeX87::Est_St),
+                    3 => (Opcode::FSTP, OperandCodeX87::Est_St),
+                    4 => {
+                        if modrm == 0xe0 {
+                            (Opcode::FNSTSW, OperandCodeX87::Ew)
+                        } else {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                    },
+                    5 => (Opcode::FUCOMIP, OperandCodeX87::St_Est),
+                    6 => (Opcode::FCOMIP, OperandCodeX87::St_Est),
+                    7 => {
+                        return Err(DecodeError::InvalidOpcode);
+                    },
+                    _ => { unreachable!("impossible r"); }
+                }
+            } else {
+                match r {
+                    0 => (Opcode::FILD, OperandCodeX87::St_Est),
+                    1 => (Opcode::FISTTP, OperandCodeX87::Est_St),
+                    2 => (Opcode::FIST, OperandCodeX87::Est_St),
+                    3 => (Opcode::FISTP, OperandCodeX87::Est_St),
+                    4 => (Opcode::FBLD, OperandCodeX87::St_Est),
+                    5 => (Opcode::FILD, OperandCodeX87::St_Est),
+                    6 => (Opcode::FBSTP, OperandCodeX87::Est_St),
+                    7 => (Opcode::FISTP, OperandCodeX87::Est_St),
+                    _ => { unreachable!("impossible r"); }
+                }
+            }
+        }
+        other => {
+            panic!("invalid x87 operand dispatch, operand code is {:?}", other);
+        }
+    };
+    instruction.opcode = opcode;
+    // TODO: support 80-bit operands
+    match x87_operands {
+        OperandCodeX87::Est => {
+            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operand_count = 1;
+        }
+        OperandCodeX87::St_Est => {
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operands[1] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::St_Ew => {
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::St_Ed => {
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::St_Md => {
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::Md => {
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            if instruction.operands[0] == OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.operand_count = 1;
+        }
+        OperandCodeX87::Ew => {
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operand_count = 1;
+        }
+        OperandCodeX87::Est_St => {
+            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::Ed_St => {
+            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::Md_St => {
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            if instruction.operands[0] == OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.operand_count = 2;
+        }
+        OperandCodeX87::Ex87S => {
+            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operand_count = 1;
+        }
+        OperandCodeX87::Nothing => {
+            instruction.operand_count = 0;
+        },
+    }
+
     Ok(())
 }
 
