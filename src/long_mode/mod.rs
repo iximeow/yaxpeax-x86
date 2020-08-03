@@ -3520,6 +3520,17 @@ pub enum OperandCode {
     x87_de = OperandCodeBuilder::new().special_case(37).bits(),
     x87_df = OperandCodeBuilder::new().special_case(38).bits(),
 
+    Eb_R0 = OperandCodeBuilder::new().special_case(39).bits(),
+    AL_Ib = OperandCodeBuilder::new().special_case(40).bits(),
+    AX_Ib = OperandCodeBuilder::new().special_case(41).bits(),
+    Ib_AL = OperandCodeBuilder::new().special_case(42).bits(),
+    Ib_AX = OperandCodeBuilder::new().special_case(43).bits(),
+    AX_DX = OperandCodeBuilder::new().special_case(44).bits(),
+    AL_DX = OperandCodeBuilder::new().special_case(45).bits(),
+    DX_AX = OperandCodeBuilder::new().special_case(46).bits(),
+    DX_AL = OperandCodeBuilder::new().special_case(47).bits(),
+    MOVQ_f30f = OperandCodeBuilder::new().special_case(48).bits(),
+
     // Implied,
     Unsupported,
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().special_case(0).bits(),
@@ -3680,15 +3691,6 @@ pub enum OperandCode {
         .read_E()
         .operand_case(11)
         .bits(),
-    AL_Ib = 0x100,
-    AX_Ib = 0x101,
-    Ib_AL = 0x102,
-    Ib_AX = 0x103,
-    AX_DX = 0x104,
-    AL_DX = 0x105,
-    DX_AX = 0x106,
-    DX_AL = 0x107,
-    MOVQ_f30f = 0x108,
     Zv_R0 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 0).bits(),
     Zv_R1 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 1).bits(),
     Zv_R2 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 2).bits(),
@@ -3742,8 +3744,6 @@ pub enum OperandCode {
     Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().operand_case(2).bits(),
     Gb_Eb_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().reg_mem().operand_case(1).bits(),
     Gv_Ev_Iv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(1).bits(),
-    // gap: 0xc6
-    Eb_R0 = 0x98,
     Rv_Gmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_modrm().read_E().reg_mem().operand_case(25).bits(),
     // gap, 0x9a
     G_xmm_E_mm = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(23).bits(),
