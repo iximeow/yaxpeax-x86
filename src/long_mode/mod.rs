@@ -5643,6 +5643,9 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     } else {
         unsafe { unreachable_unchecked(); }
     }
+    if instruction.opcode == Opcode::Invalid && record.1 == OperandCode::Nothing {
+        return Err(DecodeError::InvalidOpcode);
+    }
     instruction.prefixes = prefixes;
     read_operands(decoder, bytes_iter, instruction, record.1, &mut length)?;
     instruction.length = length;
@@ -8336,6 +8339,9 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         }
     };
     instruction.opcode = opcode;
+    if instruction.opcode == Opcode::Invalid {
+        return Err(DecodeError::InvalidOpcode);
+    }
     // TODO: support 80-bit operands
     match x87_operands {
         OperandCodeX87::Est => {
