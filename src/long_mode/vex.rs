@@ -165,24 +165,15 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            /*
-            0x71 => (Opcode::VPSLLW, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x71 => (Opcode::VPSRAW, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x71 => (Opcode::VPSRLW, if L {
-                VEXOperandCode::G_V_E_ymm
-            } else {
-                VEXOperandCode::G_V_E_ymm
-            }),
-            */
-            Err(DecodeError::IncompleteDecoder) // :)
+            instruction.modrm_rrr =
+                RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+            Ok(())
         }
         VEXOperandCode::VPS_71_L => {
             let modrm = read_modrm(bytes, length)?;
@@ -200,24 +191,15 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            /*
-            0x71 => (Opcode::VPSLLW, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x71 => (Opcode::VPSRAW, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x71 => (Opcode::VPSRLW, if L {
-                VEXOperandCode::G_V_E_ymm
-            } else {
-                VEXOperandCode::G_V_E_ymm
-            }),
-            */
-            Err(DecodeError::IncompleteDecoder) // :)
+            instruction.modrm_rrr =
+                RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+            Ok(())
         }
         VEXOperandCode::VPS_72 => {
             let modrm = read_modrm(bytes, length)?;
@@ -235,24 +217,15 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            /*
-            0x72 => (Opcode::VPSLLD, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x72 => (Opcode::VPSRAD, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x72 => (Opcode::VPSRLD, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            */
-            Err(DecodeError::IncompleteDecoder) // :)
+            instruction.modrm_rrr =
+                RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::X);
+            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+            Ok(())
         }
         VEXOperandCode::VPS_72_L => {
             let modrm = read_modrm(bytes, length)?;
@@ -270,24 +243,15 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            /*
-            0x72 => (Opcode::VPSLLD, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x72 => (Opcode::VPSRAD, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            0x72 => (Opcode::VPSRLD, if L {
-                VEXOperandCode::G_E_ymm_imm8
-            } else {
-                VEXOperandCode::G_E_ymm_imm8
-            }),
-            */
-            Err(DecodeError::IncompleteDecoder) // :)
+            instruction.modrm_rrr =
+                RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
+            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.operands[0] = OperandSpec::RegVex;
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operand_count = 3;
+            Ok(())
         }
         VEXOperandCode::VPS_73 => {
             let modrm = read_modrm(bytes, length)?;
@@ -1322,8 +1286,7 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         0xDC => (Opcode::VPADDUSB, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
-                            instruction.opcode = Opcode::Invalid;
-                            return Err(DecodeError::InvalidOpcode);
+                            VEXOperandCode::G_V_E_xmm
                         }),
                         0xDD => (Opcode::VPADDUSW, if L {
                             VEXOperandCode::G_V_E_ymm
