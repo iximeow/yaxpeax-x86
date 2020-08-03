@@ -3531,8 +3531,8 @@ pub enum OperandCode {
     DX_AL = OperandCodeBuilder::new().special_case(47).bits(),
     MOVQ_f30f = OperandCodeBuilder::new().special_case(48).bits(),
 
-    // Implied,
-    Unsupported,
+    Unsupported = OperandCodeBuilder::new().special_case(49).bits(),
+
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().special_case(0).bits(),
     ModRM_0x0f01 = OperandCodeBuilder::new().read_modrm().special_case(1).bits(),
     ModRM_0x0f0d = OperandCodeBuilder::new().read_modrm().special_case(2).bits(),
@@ -7998,7 +7998,6 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         Est,
         St_Est,
         St_Ew,
-        St_Ed,
         St_Md,
         Md,
         Ew,
@@ -8341,12 +8340,6 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
             instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
-            instruction.operand_count = 2;
-        }
-        OperandCodeX87::St_Ed => {
-            instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
             instruction.operand_count = 2;
         }
         OperandCodeX87::St_Md => {
