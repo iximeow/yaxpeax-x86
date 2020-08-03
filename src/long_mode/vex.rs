@@ -461,7 +461,9 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.operand_count = 2;
+            instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+            instruction.operands[2] = OperandSpec::ImmU8;
+            instruction.operand_count = 3;
             Ok(())
         }
 
