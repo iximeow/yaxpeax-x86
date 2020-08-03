@@ -3524,7 +3524,13 @@ pub enum OperandCode {
     x87_de = OperandCodeBuilder::new().special_case(37).bits(),
     x87_df = OperandCodeBuilder::new().special_case(38).bits(),
 
-    Eb_R0 = OperandCodeBuilder::new().special_case(39).bits(),
+    Eb_R0 = OperandCodeBuilder::new()
+        .read_modrm()
+        .set_embedded_instructions()
+        .read_E()
+        .byte_operands()
+        .operand_case(20)
+        .bits(),
     AL_Ib = OperandCodeBuilder::new().special_case(40).bits(),
     AX_Ib = OperandCodeBuilder::new().special_case(41).bits(),
     Ib_AL = OperandCodeBuilder::new().special_case(42).bits(),
@@ -5770,10 +5776,11 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
     match operand_code {
         OperandCode::Eb_R0 => {
-            if (modrm & 0b00111000) != 0 {
-                instruction.opcode = Opcode::Invalid;
-                return Err(DecodeError::InvalidOperand); // Err("Invalid modr/m for opcode 0xc6".to_owned());
-            }
+            // turns out xed cand capstone both permit nonzero rrr bits here.
+            // if (modrm & 0b00111000) != 0 {
+            //    instruction.opcode = Opcode::Invalid;
+            //    return Err(DecodeError::InvalidOperand);
+            //}
 
             instruction.operands[0] = mem_oper;
             instruction.operand_count = 1;
