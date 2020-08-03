@@ -5982,6 +5982,17 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             ][r as usize];
             instruction.operand_count = 1;
         }
+        OperandCode::ModRM_0x8f_Ev => {
+            instruction.operands[0] = mem_oper;
+            let r = (modrm >> 3) & 7;
+            if r >= 1 {
+                return Err(DecodeError::InvalidOpcode);
+            }
+            instruction.opcode = [
+                Opcode::POP,
+            ][r as usize];
+            instruction.operand_count = 1;
+        }
         OperandCode::ModRM_0xff_Ev => {
             instruction.operands[0] = mem_oper;
             let r = (modrm >> 3) & 7;

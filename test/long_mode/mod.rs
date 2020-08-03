@@ -1132,6 +1132,8 @@ fn test_push_pop() {
     test_display(&[0x5b], "pop rbx");
     test_display(&[0x41, 0x5e], "pop r14");
     test_display(&[0x68, 0x7f, 0x63, 0xc4, 0x00], "push 0xc4637f");
+    test_display(&[0x66, 0x8f, 0x00], "pop [rax]");
+    test_display(&[0x8f, 0x00], "pop [rax]");
 }
 
 #[test]
