@@ -5799,9 +5799,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                     unsafe { unreachable_unchecked() }
                 }
             };
-            let _addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
-            // stupid RCT thing:
-            let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
+            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             let imm = read_num(&mut bytes_iter, addr_width)?;
             *length += addr_width;
             instruction.modrm_rrr =
@@ -5825,9 +5823,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                     unsafe { unreachable_unchecked() }
                 }
             };
-            let _addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
-            // stupid RCT thing:
-            let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
+            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             let imm = read_num(&mut bytes_iter, addr_width)?;
             *length += addr_width;
             instruction.disp = imm;
