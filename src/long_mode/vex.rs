@@ -1330,6 +1330,11 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
+                        0xDE => (Opcode::VPMAXUB, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
                         0xDF => (Opcode::VPANDN, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
