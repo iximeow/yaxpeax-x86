@@ -4095,13 +4095,6 @@ const OPCODE_660F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PADDQ), OperandCode::G_E_xmm),
 ];
 
-fn read_opcode_660f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Result<(OpcodeRecord, u8), DecodeError> {
-    bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| {
-        *length += 1;
-        (OPCODE_660F_MAP[b as usize], b)
-    })
-}
-
 const OPCODE_F20F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4375,13 +4368,6 @@ const OPCODE_F20F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 ];
-
-fn read_opcode_f20f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Result<(OpcodeRecord, u8), DecodeError> {
-    bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| {
-        *length += 1;
-        (OPCODE_F20F_MAP[b as usize], b)
-    })
-}
 
 const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -4657,42 +4643,6 @@ const OPCODE_F30F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 ];
 
-fn read_opcode_f30f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Result<(OpcodeRecord, u8), DecodeError> {
-    bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| {
-        *length += 1;
-        (OPCODE_F30F_MAP[b as usize], b)
-    })
-    /*
-    match bytes_iter.next() {
-        Some(b) => {
-            *length += 1;
-            match b {
-                0x10 => { instruction.opcode = Opcode::MOVSS; Some(OperandCode::G_E_xmm) },
-                0x11 => { instruction.opcode = Opcode::MOVSS; Some(OperandCode::E_G_xmm) },
-                0x12 => { instruction.opcode = Opcode::MOVSLDUP; Some(OperandCode::G_E_xmm) },
-                0x2a => { instruction.opcode = Opcode::CVTSI2SS; Some(OperandCode::G_E_xmm) },
-                0x2c => { instruction.opcode = Opcode::CVTTSS2SI; Some(OperandCode::G_E_xmm) },
-                0x2d => { instruction.opcode = Opcode::CVTSS2SI; Some(OperandCode::G_E_xmm) },
-                0x51 => { instruction.opcode = Opcode::SQRTSS; Some(OperandCode::G_E_xmm) },
-                0x58 => { instruction.opcode = Opcode::ADDSS; Some(OperandCode::G_E_xmm) },
-                0x59 => { instruction.opcode = Opcode::MULSS; Some(OperandCode::G_E_xmm) },
-                0x5a => { instruction.opcode = Opcode::CVTSS2SD; Some(OperandCode::G_E_xmm) },
-                0x5c => { instruction.opcode = Opcode::SUBSS; Some(OperandCode::G_E_xmm) },
-                0x5d => { instruction.opcode = Opcode::MINSS; Some(OperandCode::G_E_xmm) },
-                0x5e => { instruction.opcode = Opcode::DIVSS; Some(OperandCode::G_E_xmm) },
-                0x5f => { instruction.opcode = Opcode::MAXSS; Some(OperandCode::G_E_xmm) },
-                _ => {
-                    instruction.opcode = Opcode::Invalid;
-                    Some(OperandCode::Nothing)
-                }
-            }
-        }
-        None => {
-            None
-        }
-    }
-    */
-}
 const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
@@ -4979,12 +4929,6 @@ const OPCODE_0F_MAP: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::PADDD), OperandCode::G_E_mm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 ];
-fn read_opcode_0f_map<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Result<OpcodeRecord, DecodeError> {
-    bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| {
-        *length += 1;
-        OPCODE_0F_MAP[b as usize]
-    })
-}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Interpretation {
@@ -5520,35 +5464,37 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
         match bytes_iter.next() {
             Some(b) => {
                 length += 1;
-                if length > 15 {
+                if length >= 15 {
                     return Err(DecodeError::TooLong);
                 }
                 let record = OPCODES[b as usize];
                 if (b & 0xf0) == 0x40 {
                     prefixes.rex_from(b);
                 } else if b == 0x0f {
+                    let b = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
+                    length += 1;
                     let record = match alternate_opcode_map {
                         Some(opcode_map) => {
-                            let (rec, opcode_byte) = match opcode_map {
+                            let rec = match opcode_map {
                                 OpcodeMap::Map66 => {
-                                    read_opcode_660f_map(&mut bytes_iter, &mut length)?
+                                    OPCODE_660F_MAP[b as usize]
                                 },
                                 OpcodeMap::MapF2 => {
-                                    read_opcode_f20f_map(&mut bytes_iter, &mut length)?
+                                    OPCODE_F20F_MAP[b as usize]
                                 },
                                 OpcodeMap::MapF3 => {
-                                    read_opcode_f30f_map(&mut bytes_iter, &mut length)?
+                                    OPCODE_F30F_MAP[b as usize]
                                 },
                             };
                             if rec == OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing) {
                                 escapes_are_prefixes_actually(&mut prefixes, &mut Some(opcode_map));
-                                OPCODE_0F_MAP[opcode_byte as usize]
+                                OPCODE_0F_MAP[b as usize]
                             } else {
                                 rec
                             }
                         },
                         None => {
-                            read_opcode_0f_map(&mut bytes_iter, &mut length)?
+                            OPCODE_0F_MAP[b as usize]
                         }
                     };
 
@@ -5651,9 +5597,6 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     } else {
         unsafe { unreachable_unchecked(); }
     }
-    if instruction.opcode == Opcode::Invalid && record.1 == OperandCode::Nothing {
-        return Err(DecodeError::InvalidOpcode);
-    }
     instruction.prefixes = prefixes;
     read_operands(decoder, bytes_iter, instruction, record.1, &mut length)?;
     if length > 15 {
@@ -5669,11 +5612,6 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     Ok(())
 }
 fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
-    if operand_code == OperandCode::Nothing {
-        instruction.operands[0] = OperandSpec::Nothing;
-        instruction.operand_count = 0;
-        return Ok(());
-    }
     instruction.operand_count = 2;
     instruction.operands[0] = OperandSpec::RegRRR;
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
@@ -6285,6 +6223,11 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
 }
 fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), DecodeError> {
     match operand_code {
+        OperandCode::Nothing => {
+            instruction.operands[0] = OperandSpec::Nothing;
+            instruction.operand_count = 0;
+            return Ok(());
+        },
         OperandCode::Unsupported => {
             return Err(DecodeError::IncompleteDecoder);
         }
