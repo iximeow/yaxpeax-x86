@@ -1235,6 +1235,10 @@ const MNEMONICS: &[&'static str] = &[
     "fxtract",
     "fyl2x",
     "fyl2xp1",
+    "loopnz",
+    "loopz",
+    "loop",
+    "jrcxz",
 ];
 
 impl Opcode {
@@ -1628,6 +1632,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::IRETQ |
             Opcode::RETF |
             Opcode::RETURN => { write!(out, "{}", colors.stop_op(self)) }
+            Opcode::LOOPNZ |
+            Opcode::LOOPZ |
+            Opcode::LOOP |
+            Opcode::JRCXZ |
             Opcode::CALL |
             Opcode::CALLF |
             Opcode::JMP |

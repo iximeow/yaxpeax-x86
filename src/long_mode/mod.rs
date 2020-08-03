@@ -1537,6 +1537,11 @@ pub enum Opcode {
     FXTRACT,
     FYL2X,
     FYL2XP1,
+
+    LOOPNZ,
+    LOOPZ,
+    LOOP,
+    JRCXZ,
 }
 
 #[derive(Debug)]
@@ -5236,14 +5241,10 @@ const OPCODES: [OpcodeRecord; 256] = [
     // x86 df
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::x87_df),
 // 0xe0
-    // LOOPNZ
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // LOOPZ
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // LOOP
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    // JECXZ
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LOOPNZ), OperandCode::Ibs),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LOOPZ), OperandCode::Ibs),
+    OpcodeRecord(Interpretation::Instruction(Opcode::LOOP), OperandCode::Ibs),
+    OpcodeRecord(Interpretation::Instruction(Opcode::JRCXZ), OperandCode::Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AL_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AX_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::OUT), OperandCode::Ib_AL),

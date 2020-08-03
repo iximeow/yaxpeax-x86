@@ -1099,6 +1099,10 @@ fn test_control_flow() {
     test_display(&[0x67, 0xff, 0xe0], "jmp rax");
     test_invalid(&[0xff, 0xd8]);
     test_display(&[0xff, 0x18], "callf [rax]");
+    test_display(&[0xe0, 0x12], "loopnz 0x12");
+    test_display(&[0xe1, 0x12], "loopz 0x12");
+    test_display(&[0xe2, 0x12], "loop 0x12");
+    test_display(&[0xe3, 0x12], "jrcxz 0x12");
     test_display(&[0xc3], "ret");
 }
 
