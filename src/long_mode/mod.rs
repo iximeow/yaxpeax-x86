@@ -5592,6 +5592,9 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
             }
         }
     };
+    if record == OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing) {
+        return Err(DecodeError::InvalidOpcode);
+    }
     if let Interpretation::Instruction(opcode) = record.0 {
         instruction.opcode = opcode;
     } else {
