@@ -497,6 +497,7 @@ const MNEMONICS: &[&'static str] = &[
     "ltr",
     "verr",
     "verw",
+    "cmc",
     "clc",
     "stc",
     "cli",
@@ -1888,6 +1889,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SHUFPS |
             Opcode::PMOVMSKB |
             Opcode::LDDQU |
+            Opcode::CMC |
             Opcode::CLC |
             Opcode::CLI |
             Opcode::CLD |

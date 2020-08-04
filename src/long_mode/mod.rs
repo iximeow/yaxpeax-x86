@@ -784,6 +784,7 @@ pub enum Opcode {
     LTR,
     VERR,
     VERW,
+    CMC,
     CLC,
     STC,
     CLI,
@@ -3505,10 +3506,9 @@ pub enum OperandCode {
     DX_Xv,
     AH,
     AX_Xv,
-    // DX_AX,
-    // Ev_Ivs,
     Ew_Sw,
     Fw,
+    I_1,
     I_3,
     Ib,
     Ibs,
@@ -3522,7 +3522,7 @@ pub enum OperandCode {
     Yb_AL,
     Yb_Xb,
     Yv_AX,
-    Yv_Xv,
+    Yv_Xv = OperandCodeBuilder::new().special_case(50).bits(),
 
     x87_d8 = OperandCodeBuilder::new().special_case(31).bits(),
     x87_d9 = OperandCodeBuilder::new().special_case(32).bits(),
@@ -5209,13 +5209,13 @@ const OPCODES: [OpcodeRecord; 256] = [
 // 0xf0
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     // ICEBP?
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::INT), OperandCode::I_1),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
 // 0xf4
     OpcodeRecord(Interpretation::Instruction(Opcode::HLT), OperandCode::Nothing),
     // CMC
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CMC), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf6),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf7),
     OpcodeRecord(Interpretation::Instruction(Opcode::CLC), OperandCode::Nothing),
@@ -6230,6 +6230,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operand_count = 0;
             return Ok(());
         },
+        OperandCode::I_1 => {
+            instruction.imm = 1;
+            instruction.operands[0] = OperandSpec::ImmU8;
+            instruction.operand_count = 1;
+        }
         OperandCode::Unsupported => {
             return Err(DecodeError::IncompleteDecoder);
         }

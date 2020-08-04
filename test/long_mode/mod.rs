@@ -1211,6 +1211,8 @@ fn test_bitwise() {
 
 #[test]
 fn test_misc() {
+    test_display(&[0xf1], "int 0x1");
+    test_display(&[0xf5], "cmc");
     test_display(&[0xc8, 0x01, 0x02, 0x03], "enter 0x201, 0x3");
     test_display(&[0xc9], "leave");
     test_display(&[0xca, 0x12, 0x34], "retf 0x3412");
