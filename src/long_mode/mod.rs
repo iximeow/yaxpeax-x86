@@ -5614,6 +5614,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     }
     Ok(())
 }
+#[inline(always)]
 fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
     instruction.operand_count = 2;
     instruction.operands[0] = OperandSpec::RegRRR;
