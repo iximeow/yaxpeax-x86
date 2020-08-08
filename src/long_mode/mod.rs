@@ -5317,7 +5317,7 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
                         OperandSpec::RegIndexBaseScaleDisp
                     }
                 } else {
-                    instr.modrm_mmm.num = 0b101 + if instr.prefixes.rex().b() { 0b1000 } else { 0 };
+                    instr.modrm_mmm.num |= 0b101;
 
                     if disp == 0 {
                         OperandSpec::Deref
@@ -5328,7 +5328,7 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
                 }
             }
         } else {
-            instr.modrm_mmm.num = 0b101 + if instr.prefixes.rex().b() { 0b1000 } else { 0 };
+            instr.modrm_mmm.num |= 0b101;
             instr.sib_index.num = ((sibbyte >> 3) & 7) + if instr.prefixes.rex().x() { 0b1000 } else { 0 };
 
             let scale = 1u8 << (sibbyte >> 6);
@@ -5350,7 +5350,7 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
             }
         }
     } else {
-        instr.modrm_mmm.num = (sibbyte & 7) + if instr.prefixes.rex().b() { 0b1000 } else { 0 };
+        instr.modrm_mmm.num |= sibbyte & 7;
 
         if ((sibbyte >> 3) & 7) == 0b100 {
             if instr.prefixes.rex().x() {
@@ -5392,6 +5392,11 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
     let op_spec = if mmm == 4 {
+        if instr.prefixes.rex().b() {
+            instr.modrm_mmm.num = 0b1000;
+        } else {
+            instr.modrm_mmm.num = 0;
+        }
         return read_sib(bytes_iter, instr, modrm, length);
     } else if mmm == 5 && modbits == 0b00 {
         *length += 4;
