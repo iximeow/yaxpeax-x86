@@ -5272,13 +5272,6 @@ fn read_modrm_reg(instr: &mut Instruction, modrm: u8, reg_bank: RegisterBank) ->
 #[allow(non_snake_case)]
 fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
     let modbits = modrm >> 6;
-    if instr.prefixes.address_size() {
-        instr.sib_index.bank = RegisterBank::D;
-        instr.modrm_mmm.bank = RegisterBank::D;
-    } else {
-        instr.sib_index.bank = RegisterBank::Q;
-        instr.modrm_mmm.bank = RegisterBank::Q;
-    };
     let sibbyte = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
     *length += 1;
 
@@ -5329,7 +5322,7 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
             }
         } else {
             instr.modrm_mmm.num |= 0b101;
-            instr.sib_index.num = ((sibbyte >> 3) & 7) + if instr.prefixes.rex().x() { 0b1000 } else { 0 };
+            instr.sib_index.num |= (sibbyte >> 3) & 7;
 
             let scale = 1u8 << (sibbyte >> 6);
             instr.scale = scale;
@@ -5373,7 +5366,8 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
                 }
             }
         } else {
-            instr.sib_index.num = ((sibbyte >> 3) & 7) + if instr.prefixes.rex().x() { 0b1000 } else { 0 };
+            instr.sib_index.num |= (sibbyte >> 3) & 7;
+
             let scale = 1u8 << (sibbyte >> 6);
             instr.scale = scale;
             if disp == 0 {
@@ -5391,11 +5385,16 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
 fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
+    if instr.prefixes.rex().b() {
+        instr.modrm_mmm.num = 0b1000;
+    } else {
+        instr.modrm_mmm.num = 0;
+    }
     let op_spec = if mmm == 4 {
-        if instr.prefixes.rex().b() {
-            instr.modrm_mmm.num = 0b1000;
+        if instr.prefixes.rex().x() {
+            instr.sib_index.num = 0b1000;
         } else {
-            instr.modrm_mmm.num = 0;
+            instr.sib_index.num = 0;
         }
         return read_sib(bytes_iter, instr, modrm, length);
     } else if mmm == 5 && modbits == 0b00 {
@@ -5410,12 +5409,7 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
             OperandSpec::RegDisp
         }
     } else {
-        if instr.prefixes.address_size() {
-            instr.modrm_mmm.bank = RegisterBank::D
-        } else {
-            instr.modrm_mmm.bank = RegisterBank::Q
-        };
-        instr.modrm_mmm.num = mmm + if instr.prefixes.rex().b() { 0b1000 } else { 0 };
+        instr.modrm_mmm.num |= mmm;
 
         if modbits == 0b00 {
             OperandSpec::Deref
@@ -5454,6 +5448,9 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     let mut alternate_opcode_map: Option<OpcodeMap> = None;
 //    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
+
+    instruction.modrm_mmm.bank = RegisterBank::Q;
+    instruction.sib_index.bank = RegisterBank::Q;
 
     fn escapes_are_prefixes_actually(prefixes: &mut Prefixes, opc_map: &mut Option<OpcodeMap>) {
         match opc_map {
@@ -5585,6 +5582,8 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                         },
                         0x67 => {
                             prefixes.set_address_size();
+                            instruction.modrm_mmm.bank = RegisterBank::D;
+                            instruction.sib_index.bank = RegisterBank::D;
                         },
                         0xf0 => {
                             prefixes.set_lock();
