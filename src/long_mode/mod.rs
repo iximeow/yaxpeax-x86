@@ -6245,6 +6245,16 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operand_count = 0;
             return Ok(());
         },
+        _ => {
+            unlikely_operands(decoder, bytes_iter, instruction, operand_code, mem_oper, length)?;
+        }
+    };
+    }
+
+    Ok(())
+}
+fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), DecodeError> {
+    match operand_code {
         OperandCode::I_1 => {
             instruction.imm = 1;
             instruction.operands[0] = OperandSpec::ImmU8;
@@ -7967,7 +7977,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             return Err(DecodeError::InvalidOperand);
         }
     };
-    }
     Ok(())
 }
 
