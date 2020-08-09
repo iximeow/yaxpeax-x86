@@ -5390,12 +5390,12 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
     } else {
         instr.modrm_mmm.num = 0;
     }
+    if instr.prefixes.rex().x() {
+        instr.sib_index.num = 0b1000;
+    } else {
+        instr.sib_index.num = 0;
+    }
     let op_spec = if mmm == 4 {
-        if instr.prefixes.rex().x() {
-            instr.sib_index.num = 0b1000;
-        } else {
-            instr.sib_index.num = 0;
-        }
         return read_sib(bytes_iter, instr, modrm, length);
     } else if mmm == 5 && modbits == 0b00 {
         *length += 4;
