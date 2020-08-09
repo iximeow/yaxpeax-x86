@@ -368,6 +368,7 @@ impl OperandSpec {
             OperandSpec::RegRRR |
             OperandSpec::RegMMM |
             OperandSpec::RegVex |
+            OperandSpec::Reg4 |
             OperandSpec::EnterFrameSize |
             OperandSpec::Nothing => {
                 false
@@ -391,6 +392,9 @@ impl Operand {
             }
             OperandSpec::RegVex => {
                 Operand::Register(inst.vex_reg)
+            }
+            OperandSpec::Reg4 => {
+                Operand::Register(RegSpec { num: inst.imm as u8, bank: inst.vex_reg.bank })
             }
             OperandSpec::ImmI8 => Operand::ImmediateI8(inst.imm as i8),
             OperandSpec::ImmU8 => Operand::ImmediateU8(inst.imm as u8),
@@ -1596,6 +1600,9 @@ enum OperandSpec {
     RegMMM,
     // the register selected by vex-vvvv bits
     RegVex,
+    // the register selected by a handful of avx2 vex-coded instructions,
+    // stuffed in imm4.
+    Reg4,
     ImmI8,
     ImmI16,
     ImmI32,
