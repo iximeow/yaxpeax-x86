@@ -2244,18 +2244,18 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u6
             write!(out, "lock ")?;
         }
 
-        /*
-        if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
-            // only a few of you actually use the prefix...
-            if self.prefixes.rep() {
-                write!(out, "rep ")?;
-            } else if self.prefixes.repz() {
-                write!(out, "repz ")?;
-            } else if self.prefixes.repnz() {
-                write!(out, "repnz ")?;
+        if self.prefixes.rep_any() {
+            if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
+                // only a few of you actually use the prefix...
+                if self.prefixes.rep() {
+                    write!(out, "rep ")?;
+                } else if self.prefixes.repz() {
+                    write!(out, "repz ")?;
+                } else if self.prefixes.repnz() {
+                    write!(out, "repnz ")?;
+                }
             }
         }
-        */
 
         out.write_str(self.opcode.name())?;
 

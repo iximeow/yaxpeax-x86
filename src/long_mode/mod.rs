@@ -3223,6 +3223,8 @@ impl Prefixes {
     #[inline]
     fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30 }
     #[inline]
+    pub fn rep_any(&self) -> bool { self.bits & 0x30 != 0x00 }
+    #[inline]
     fn operand_size(&self) -> bool { self.bits & 0x1 == 1 }
     #[inline]
     fn set_operand_size(&mut self) { self.bits = self.bits | 0x1 }
