@@ -508,21 +508,21 @@ fn operand_size() {
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum RegisterBank {
-    Q, D, W, B, rB, // Quadword, Dword, Word, Byte
-    CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
-    X, Y, Z,    // XMM, YMM, ZMM
-    ST, MM,     // ST, MM regs (x87, mmx)
-    K, // AVX512 mask registers
+    Q = 0, D = 2, W = 4, B = 6, rB = 8, // Quadword, Dword, Word, Byte
+    CR = 10, DR = 12, S = 14, EIP = 30, RIP = 31, EFlags = 32, RFlags = 33,  // Control reg, Debug reg, Selector, ...
+    X = 15, Y = 19, Z = 23,    // XMM, YMM, ZMM
+    ST = 27, MM = 28,     // ST, MM regs (x87, mmx)
+    K = 29, // AVX512 mask registers
 }
 #[allow(non_camel_case_types)]
 #[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum RegisterBank {
-    Q, D, W, B, rB, // Quadword, Dword, Word, Byte
-    CR, DR, S, EIP, RIP, EFlags, RFlags,  // Control reg, Debug reg, Selector, ...
-    X, Y, Z,    // XMM, YMM, ZMM
-    ST, MM,     // ST, MM regs (x87, mmx)
-    K, // AVX512 mask registers
+    Q = 0, D = 2, W = 4, B = 6, rB = 8, // Quadword, Dword, Word, Byte
+    CR = 10, DR = 12, S = 14, EIP = 30, RIP = 31, EFlags = 32, RFlags = 33,  // Control reg, Debug reg, Selector, ...
+    X = 15, Y = 19, Z = 23,    // XMM, YMM, ZMM
+    ST = 27, MM = 28,     // ST, MM regs (x87, mmx)
+    K = 29, // AVX512 mask registers
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
