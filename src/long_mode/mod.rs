@@ -3394,12 +3394,12 @@ impl OperandCodeBuilder {
 
     #[allow(unused)]
     fn special_case_handler_index(&self) -> u16 {
-        self.bits & 0x1ff
+        self.bits & 0xff
     }
 
     const fn special_case(mut self, case: u16) -> Self {
         // leave 0x4000 unset
-        self.bits |= case & 0x1ff;
+        self.bits |= case & 0xff;
         self
     }
 
@@ -3470,6 +3470,28 @@ impl OperandCodeBuilder {
     const fn is_only_modrm_operands(&self) -> bool {
         self.bits & 0x0200 != 0
     }
+
+    // WHEN AN IMMEDIATE IS PRESENT, THERE ARE ONLY 0x1F ALLOWED SPECIAL CASES.
+    // WHEN NO IMMEDIATE IS PRESENT, THERE ARE 0xFF ALLOWED SPECIAL CASES.
+    // SIZE IS DECIDED BY THE FOLLOWING TABLE:
+    // 0: 1 BYTE
+    // 1: 2 BYTES
+    // 2: 4 BYTES
+    // 4: 8 BYTES
+    const fn with_imm(mut self, only_imm: bool, size: u8) -> Self {
+        self.bits |= 0x100;
+        self.bits |= (size as u16) << 5;
+        self.bits |= (only_imm as u16) << 7;
+        self
+    }
+
+    fn has_imm(&self) -> Option<(bool, u8)> {
+        if self.bits & 0x100 != 0 {
+            Some(((self.bits & 0x80) != 0, (self.bits as u8 >> 5) & 3))
+        } else {
+            None
+        }
+    }
 }
 
 #[allow(non_camel_case_types)]
@@ -3510,18 +3532,18 @@ pub enum OperandCode {
     Fw,
     I_1,
     I_3,
-    Ib,
-    Ibs,
     Ivs,
     Iw,
     Iw_Ib,
-    Jvds,
     Ob_AL,
     Ov_AX,
     Sw_Ew,
     Yb_AL,
     Yb_Xb,
     Yv_AX,
+    Ib = OperandCodeBuilder::new().with_imm(false, 0).special_case(0).bits(),
+    Ibs = OperandCodeBuilder::new().with_imm(true, 0).special_case(1).bits(),
+    Jvds = OperandCodeBuilder::new().with_imm(true, 2).special_case(0).bits(),
     Yv_Xv = OperandCodeBuilder::new().special_case(50).bits(),
 
     x87_d8 = OperandCodeBuilder::new().special_case(31).bits(),
@@ -3540,10 +3562,10 @@ pub enum OperandCode {
         .byte_operands()
         .operand_case(20)
         .bits(),
-    AL_Ib = OperandCodeBuilder::new().special_case(40).bits(),
-    AX_Ib = OperandCodeBuilder::new().special_case(41).bits(),
-    Ib_AL = OperandCodeBuilder::new().special_case(42).bits(),
-    Ib_AX = OperandCodeBuilder::new().special_case(43).bits(),
+    AL_Ib = OperandCodeBuilder::new().special_case(2).with_imm(false, 0).bits(),
+    AX_Ib = OperandCodeBuilder::new().special_case(3).with_imm(false, 0).bits(),
+    Ib_AL = OperandCodeBuilder::new().special_case(4).with_imm(false, 0).bits(),
+    Ib_AX = OperandCodeBuilder::new().special_case(5).with_imm(false, 0).bits(),
     AX_DX = OperandCodeBuilder::new().special_case(44).bits(),
     AL_DX = OperandCodeBuilder::new().special_case(45).bits(),
     DX_AX = OperandCodeBuilder::new().special_case(46).bits(),
@@ -3636,6 +3658,7 @@ pub enum OperandCode {
         .read_modrm()
         .set_embedded_instructions()
         .read_E()
+        .with_imm(false, 0)
         .byte_operands()
         .operand_case(3)
         .bits(),
@@ -3643,6 +3666,7 @@ pub enum OperandCode {
         .read_modrm()
         .set_embedded_instructions()
         .read_E()
+        .with_imm(false, 0)
         .operand_case(3)
         .bits(),
     // this would be Eb_Ivs, 0x8e
@@ -3748,12 +3772,12 @@ pub enum OperandCode {
     Gdq_Ed = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(6).bits(),
     Gdq_Ev = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(10).bits(),
     Mdq_Gdq = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(11).bits(),
-    G_E_mm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(2).bits(),
+    G_E_mm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().with_imm(false, 0).reg_mem().operand_case(2).bits(),
     G_E_xmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(8).bits(),
     AL_Ob = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(0).bits(),
     AL_Xb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(1).bits(),
     AX_Ov = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(3).bits(),
-    AL_Ibs = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().byte_operands().operand_case(0).bits(),
+    AL_Ibs = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().with_imm(false, 0).byte_operands().operand_case(0).bits(),
     AX_Ivd = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(9).bits(),
 
     Eb_Gb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().only_modrm_operands().mem_reg().bits(),
@@ -3761,7 +3785,7 @@ pub enum OperandCode {
     Gb_Eb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().only_modrm_operands().reg_mem().bits(),
     Gv_Ev = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().bits(),
     Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().operand_case(25).bits(),
-    Gb_Eb_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().reg_mem().operand_case(1).bits(),
+    Gb_Eb_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().with_imm(false, 0).byte_operands().reg_mem().operand_case(1).bits(),
     Gv_Ev_Iv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(1).bits(),
     Rv_Gmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_modrm().read_E().reg_mem().operand_case(25).bits(),
     // gap, 0x9a
@@ -5676,7 +5700,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                         instruction.imm =
                             read_imm_ivq(&mut bytes_iter, opwidth, length)?;
                         instruction.operands[1] = match opwidth {
-                            1 => OperandSpec::ImmI8,
                             2 => OperandSpec::ImmI16,
                             4 => OperandSpec::ImmI32,
                             8 => OperandSpec::ImmI64,
@@ -5734,16 +5757,25 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         instruction.operands[1] = mem_oper;
     }
 
+    if let Some((only_imm, immsz)) = operand_code.has_imm() {
+        instruction.imm =
+            read_imm_signed(&mut bytes_iter, 1 << immsz, length)? as u64;
+        if only_imm {
+            if immsz == 0 {
+                instruction.operands[0] = OperandSpec::ImmI8;
+            } else {
+                instruction.operands[0] = OperandSpec::ImmI32;
+            }
+            instruction.operand_count = 1;
+            return Ok(());
+        }
+    }
+
     if operand_code.is_only_modrm_operands() {
         if !operand_code.has_reg_mem() {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
         };
-    } else if operand_code.bits() == OperandCode::Ibs as u16 {
-        instruction.imm =
-            read_imm_signed(&mut bytes_iter, 1, length)? as u64;
-        instruction.operands[0] = OperandSpec::ImmI8;
-        instruction.operand_count = 1;
     } else {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
     match operand_code {
@@ -5806,14 +5838,17 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
-        _op @ OperandCode::ModRM_0x80_Eb_Ib |
+        _op @ OperandCode::ModRM_0x80_Eb_Ib => {
+            instruction.operands[0] = mem_oper;
+            instruction.operands[1] = OperandSpec::ImmI8;
+            instruction.operand_count = 2;
+        }
         _op @ OperandCode::ModRM_0x81_Ev_Ivs => {
             instruction.operands[0] = mem_oper;
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
             instruction.operands[1] = match opwidth {
-                1 => OperandSpec::ImmI8,
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
                 8 => OperandSpec::ImmI64,
@@ -6107,9 +6142,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         },
         OperandCode::G_E_mm_Ib => {
             instruction.modrm_rrr = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
-            instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 instruction.modrm_mmm.bank = RegisterBank::MM;
             }
@@ -6135,8 +6167,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         OperandCode::AL_Ibs => {
             instruction.modrm_rrr =
                 RegSpec::al();
-            instruction.imm =
-                read_imm_signed(&mut bytes_iter, 1, length)? as u64;
             instruction.operands[1] = OperandSpec::ImmI8;
             instruction.operand_count = 2;
         }
@@ -6170,20 +6200,10 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         OperandCode::ModRM_0x83_Ev_Ibs => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
-            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
             instruction.operands[1] = OperandSpec::ImmI8;
             instruction.operand_count = 2;
         },
-        OperandCode::Jvds => {
-            let offset = read_num(&mut bytes_iter, 4)?;
-            *length += 4;
-            instruction.imm = offset;
-            instruction.operand_count = 1;
-            instruction.operands[0] = OperandSpec::ImmI32;
-        }
         OperandCode::Gb_Eb_Ib => {
-            instruction.imm =
-                read_imm_signed(&mut bytes_iter, 1, length)? as u64;
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         }
@@ -7423,8 +7443,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::Ib => {
-            instruction.imm =
-                read_imm_unsigned(&mut bytes_iter, 1, length)?;
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
         }
@@ -7833,9 +7851,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::AL_Ib => {
             instruction.modrm_rrr =
                 RegSpec::al();
-            instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u64;
-            *length += 1;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
@@ -7847,9 +7862,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             } else {
                RegSpec::ax()
             };
-            instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u64;
-            *length += 1;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
@@ -7857,9 +7869,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::Ib_AL => {
             instruction.modrm_rrr =
                 RegSpec::al();
-            instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u64;
-            *length += 1;
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
@@ -7871,9 +7880,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             } else {
                 RegSpec::ax()
             };
-            instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u64;
-            *length += 1;
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
