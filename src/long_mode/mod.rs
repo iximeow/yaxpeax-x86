@@ -5789,55 +5789,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[0] = mem_oper;
             instruction.operand_count = 1;
         },
-        op @ OperandCode::AL_Ob |
-        op @ OperandCode::AX_Ov => {
-            let opwidth = match op {
-                OperandCode::AL_Ob => 1,
-                OperandCode::AX_Ov => {
-                    imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes)
-                }
-                _ => {
-                    unsafe { unreachable_unchecked() }
-                }
-            };
-            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
-            let imm = read_num(&mut bytes_iter, addr_width)?;
-            *length += addr_width;
-            instruction.modrm_rrr =
-                RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present());
-            instruction.disp = imm;
-            if instruction.prefixes.address_size() {
-                instruction.operands[1] = OperandSpec::DispU32;
-            } else {
-                instruction.operands[1] = OperandSpec::DispU64;
-            };
-            instruction.operand_count = 2;
-        }
-        op @ OperandCode::Ob_AL |
-        op @ OperandCode::Ov_AX => {
-            let opwidth = match op {
-                OperandCode::Ob_AL => 1,
-                OperandCode::Ov_AX => {
-                    imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes)
-                }
-                _ => {
-                    unsafe { unreachable_unchecked() }
-                }
-            };
-            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
-            let imm = read_num(&mut bytes_iter, addr_width)?;
-            *length += addr_width;
-            instruction.disp = imm;
-            instruction.operands[0] = if instruction.prefixes.address_size() {
-                OperandSpec::DispU32
-            } else {
-                OperandSpec::DispU64
-            };
-            instruction.modrm_rrr =
-                RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present());
-            instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.operand_count = 2;
-        }
         _op @ OperandCode::ModRM_0x80_Eb_Ib => {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::ImmI8;
@@ -6255,6 +6206,55 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
 }
 fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), DecodeError> {
     match operand_code {
+        op @ OperandCode::AL_Ob |
+        op @ OperandCode::AX_Ov => {
+            let opwidth = match op {
+                OperandCode::AL_Ob => 1,
+                OperandCode::AX_Ov => {
+                    imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes)
+                }
+                _ => {
+                    unsafe { unreachable_unchecked() }
+                }
+            };
+            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
+            let imm = read_num(&mut bytes_iter, addr_width)?;
+            *length += addr_width;
+            instruction.modrm_rrr =
+                RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present());
+            instruction.disp = imm;
+            if instruction.prefixes.address_size() {
+                instruction.operands[1] = OperandSpec::DispU32;
+            } else {
+                instruction.operands[1] = OperandSpec::DispU64;
+            };
+            instruction.operand_count = 2;
+        }
+        op @ OperandCode::Ob_AL |
+        op @ OperandCode::Ov_AX => {
+            let opwidth = match op {
+                OperandCode::Ob_AL => 1,
+                OperandCode::Ov_AX => {
+                    imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes)
+                }
+                _ => {
+                    unsafe { unreachable_unchecked() }
+                }
+            };
+            let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
+            let imm = read_num(&mut bytes_iter, addr_width)?;
+            *length += addr_width;
+            instruction.disp = imm;
+            instruction.operands[0] = if instruction.prefixes.address_size() {
+                OperandSpec::DispU32
+            } else {
+                OperandSpec::DispU64
+            };
+            instruction.modrm_rrr =
+                RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present());
+            instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.operand_count = 2;
+        }
         OperandCode::I_1 => {
             instruction.imm = 1;
             instruction.operands[0] = OperandSpec::ImmU8;
