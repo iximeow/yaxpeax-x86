@@ -7,8 +7,16 @@
 * support `vmread`, `vmwrite`
 * support `iret`/`iretd`/`iretq`
 * support `enter`
+* support `cmc` and `int1`
+* support `loopz`, `loopnz`, `jecxz`
 * support `maskmovq`, `movnti`, and `movntq`
   - this brings full support to non-vex-coded x86 instructions
+* reject excessively-long instructions
+* reject reg-reg encodings where instructions forbid those operands
+* correctly handle `mov [0xoffset], ax` and `mov ax, [0xoffset]`
+  - offset had been read with incorrect size
+* `vpsrlw`, `vpermq`, `vpminsq`, `vpsrlq`, `vextractf128`, `vinserti128`
+* reorganize likely decoding paths for a smidge more speed
 
 ## 0.0.14
 
