@@ -5723,11 +5723,13 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         instruction.modrm_rrr.bank = bank;
         instruction.modrm_rrr.num = ((modrm >> 3) & 7) + if instruction.prefixes.rex().r() { 0b1000 } else { 0 };
 
-        mem_oper = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
-        if operand_code.bits() == (OperandCode::Gv_M as u16) {
-            if mem_oper == OperandSpec::RegMMM {
+        mem_oper = if modrm >= 0b11000000 {
+            if operand_code.bits() == (OperandCode::Gv_M as u16) {
                 return Err(DecodeError::InvalidOperand);
             }
+            read_modrm_reg(instruction, modrm, bank)?
+        } else {
+            read_M(&mut bytes_iter, instruction, modrm, length)?
         }
     }
 
