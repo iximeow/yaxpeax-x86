@@ -3777,6 +3777,27 @@ pub enum OperandCode {
     DS = OperandCodeBuilder::new().special_case(106).bits(),
 }
 
+const LOCKABLE_INSTRUCTIONS: &[Opcode] = &[
+    Opcode::ADD,
+    Opcode::ADC,
+    Opcode::AND,
+    Opcode::BTC,
+    Opcode::BTR,
+    Opcode::BTS,
+    Opcode::CMPXCHG,
+    Opcode::CMPXCHG8B,
+    Opcode::DEC,
+    Opcode::INC,
+    Opcode::NEG,
+    Opcode::NOT,
+    Opcode::OR,
+    Opcode::SBB,
+    Opcode::SUB,
+    Opcode::XOR,
+    Opcode::XADD,
+    Opcode::XCHG,
+];
+
 fn base_opcode_map(v: u8) -> Opcode {
     match v {
         0 => Opcode::ADD,
@@ -5570,6 +5591,12 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
         return Err(DecodeError::TooLong);
     }
     instruction.length = length;
+
+    if instruction.prefixes.lock() {
+        if !LOCKABLE_INSTRUCTIONS.contains(&instruction.opcode) || !instruction.operands[0].is_memory() {
+            return Err(DecodeError::InvalidPrefixes);
+        }
+    }
 
     if decoder != &InstDecoder::default() {
         // we might have to fix up or reject this instruction under whatever cpu features we need to
