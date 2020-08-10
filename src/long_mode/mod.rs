@@ -158,12 +158,12 @@ impl RegSpec {
 
     #[inline]
     pub fn fs() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 3 }
+        RegSpec { bank: RegisterBank::S, num: 4 }
     }
 
     #[inline]
     pub fn gs() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 4 }
+        RegSpec { bank: RegisterBank::S, num: 5 }
     }
 
     #[inline]
@@ -1450,6 +1450,7 @@ pub enum Opcode {
     WRGSBASE,
 
     CRC32,
+    SALC,
     XLAT,
 
     F2XM1,
@@ -5200,7 +5201,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xd3_Ev_CL),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::SALC), OperandCode::Nothing),
     // XLAT
     OpcodeRecord(Interpretation::Instruction(Opcode::XLAT), OperandCode::Nothing),
     // x86 d8

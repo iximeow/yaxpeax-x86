@@ -125,7 +125,7 @@ const REG_NAMES: &[&'static str] = &[
     "al", "cl", "dl", "bl", "spl", "bpl", "sil", "dil", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b",
     "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7", "cr8", "cr9", "cr10", "cr11", "cr12", "cr13", "cr14", "cr15",
     "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7", "dr8", "dr9", "dr10", "dr11", "dr12", "dr13", "dr14", "dr15",
-    "cs", "ds", "es", "fs", "gs", "ss", "", "",
+    "es", "cs", "ss", "ds", "fs", "gs", "", "",
     "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
     "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
     "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
@@ -1122,6 +1122,7 @@ const MNEMONICS: &[&'static str] = &[
     "wrfsbase",
     "wrgsbase",
     "crc32",
+    "salc",
     "xlat",
 
     "f2xm1",
@@ -1960,6 +1961,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::FCMOVNE |
             Opcode::FCMOVNU |
             Opcode::FCMOVU |
+            Opcode::SALC |
             Opcode::SETO |
             Opcode::SETNO |
             Opcode::SETB |

@@ -112,32 +112,32 @@ impl RegSpec {
 
     #[inline]
     pub fn cs() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 0 }
-    }
-
-    #[inline]
-    pub fn ds() -> RegSpec {
         RegSpec { bank: RegisterBank::S, num: 1 }
     }
 
     #[inline]
-    pub fn es() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 2 }
-    }
-
-    #[inline]
-    pub fn ss() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 5 }
-    }
-
-    #[inline]
-    pub fn fs() -> RegSpec {
+    pub fn ds() -> RegSpec {
         RegSpec { bank: RegisterBank::S, num: 3 }
     }
 
     #[inline]
-    pub fn gs() -> RegSpec {
+    pub fn es() -> RegSpec {
+        RegSpec { bank: RegisterBank::S, num: 0 }
+    }
+
+    #[inline]
+    pub fn ss() -> RegSpec {
+        RegSpec { bank: RegisterBank::S, num: 2 }
+    }
+
+    #[inline]
+    pub fn fs() -> RegSpec {
         RegSpec { bank: RegisterBank::S, num: 4 }
+    }
+
+    #[inline]
+    pub fn gs() -> RegSpec {
+        RegSpec { bank: RegisterBank::S, num: 5 }
     }
 
     #[inline]
@@ -1407,6 +1407,7 @@ pub enum Opcode {
     WRGSBASE,
 
     CRC32,
+    SALC,
     XLAT,
 
     F2XM1,
@@ -5149,7 +5150,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xd3_Ev_CL),
     OpcodeRecord(Interpretation::Instruction(Opcode::AMX), OperandCode::Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::ADX), OperandCode::Ib),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::SALC), OperandCode::Nothing),
     // XLAT
     OpcodeRecord(Interpretation::Instruction(Opcode::XLAT), OperandCode::Nothing),
     // x86 d8

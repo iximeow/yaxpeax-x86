@@ -1073,6 +1073,16 @@ fn test_mov() {
     test_display(&[0x0f, 0x97, 0xc8], "seta al");
     test_display(&[0x0f, 0x97, 0x00], "seta [rax]");
     test_display(&[0x0f, 0x97, 0x08], "seta [rax]");
+    test_display(&[0xd6], "salc");
+    test_display(&[0x8e, 0x00], "mov es, [rax]");
+    // cs is not an allowed destination - would #ud on execution
+    test_display(&[0x8e, 0x08], "mov cs, [rax]");
+    test_display(&[0x8e, 0x10], "mov ss, [rax]");
+    test_display(&[0x8e, 0x18], "mov ds, [rax]");
+    test_display(&[0x8e, 0x20], "mov fs, [rax]");
+    test_display(&[0x8e, 0x28], "mov gs, [rax]");
+    test_invalid(&[0x8e, 0x30]);
+    test_invalid(&[0x8e, 0x38]);
 }
 
 #[test]
