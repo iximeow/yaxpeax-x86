@@ -5,7 +5,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use crate::protected_mode::{RegSpec, RegisterBank, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixVex, OperandSpec, DecodeError};
+use crate::protected_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixVex, OperandSpec, DecodeError};
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -97,7 +97,7 @@ impl fmt::Display for PrefixVex {
                 if self.b() { "b" } else { "-" },
             )
         } else {
-            write!(f, "rex:none")
+            write!(f, "vex:none")
         }
     }
 }
@@ -115,52 +115,34 @@ impl fmt::Display for Segment {
     }
 }
 
+// register names are grouped by indices scaled by 16.
+// xmm, ymm, zmm all get two indices.
+const REG_NAMES: &[&'static str] = &[
+    "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi",
+    "ax", "cx", "dx", "bx", "sp", "bp", "si", "di",
+    "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
+    "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7",
+    "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7",
+    "cs", "ds", "es", "fs", "gs", "ss", "", "",
+    "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+    "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+    "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
+    "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
+    "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31",
+    "st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)",
+    "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7",
+    "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+    "eip", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+    "eflags", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+];
+
 pub(crate) fn regspec_label(spec: &RegSpec) -> &'static str {
-    match spec.bank {
-        RegisterBank::D => {
-            ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"][spec.num as usize]
-        },
-        RegisterBank::W => {
-            ["ax", "cx", "dx", "bx", "sp", "bp", "si", "di"][spec.num as usize]
-        },
-        RegisterBank::B => {
-            ["al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"][spec.num as usize]
-        },
-        RegisterBank::EIP => { "eip" },
-        RegisterBank::EFlags => { "eflags" },
-        RegisterBank::CR => {
-            ["cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7"][spec.num as usize]
-        }
-        RegisterBank::DR => {
-            ["dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7"][spec.num as usize]
-        }
-        RegisterBank::X => {
-            ["xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"][spec.num as usize]
-        },
-        RegisterBank::Y => {
-            ["ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"][spec.num as usize]
-        },
-        RegisterBank::Z => {
-            ["zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31"][spec.num as usize]
-        },
-        RegisterBank::ST => {
-            ["st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"][spec.num as usize]
-        },
-        RegisterBank::MM => {
-            ["mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"][spec.num as usize]
-        }
-        RegisterBank::S => {
-            ["cs", "ds", "es", "fs", "gs", "ss"][spec.num as usize]
-        }
-        RegisterBank::K => {
-            ["k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7"][spec.num as usize]
-        }
-    }
+    unsafe { REG_NAMES.get_unchecked((spec.num as u16 + ((spec.bank as u16) << 3)) as usize) }
 }
 
 impl fmt::Display for RegSpec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", regspec_label(self))
+        f.write_str(regspec_label(self))
     }
 }
 
@@ -195,61 +177,64 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
                     colors.number(signed_i32_hex(imm)))
             },
             &Operand::Register(ref spec) => {
-                write!(f, "{}", colors.register(spec))
+                f.write_str(regspec_label(spec))
             }
             &Operand::DisplacementU16(imm) => {
-                write!(f, "[{}]", colors.address(u32_hex(imm as u32)))
+                write!(f, "[{}]", colors.address(u16_hex(imm)))
             }
             &Operand::DisplacementU32(imm) => {
                 write!(f, "[{}]", colors.address(u32_hex(imm)))
             }
             &Operand::RegDisp(ref spec, disp) => {
-                write!(f, "[{} ", colors.register(spec))?;
+                write!(f, "[{} ", regspec_label(spec))?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
             &Operand::RegDeref(ref spec) => {
-                write!(f, "[{}]", colors.register(spec))
+                f.write_str("[")?;
+                f.write_str(regspec_label(spec))?;
+                f.write_str("]")
             },
             &Operand::RegScale(ref spec, scale) => {
                 write!(f, "[{} * {}]",
-                    colors.register(spec),
+                    regspec_label(spec),
                     colors.number(scale)
                 )
             },
             &Operand::RegScaleDisp(ref spec, scale, disp) => {
                 write!(f, "[{} * {} ",
-                    colors.register(spec),
+                    regspec_label(spec),
                     colors.number(scale),
                 )?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
             &Operand::RegIndexBase(ref base, ref index) => {
-                write!(f, "[{} + {}]",
-                    colors.register(base),
-                    colors.register(index)
-                )
+                f.write_str("[")?;
+                f.write_str(regspec_label(base))?;
+                f.write_str(" + ")?;
+                f.write_str(regspec_label(index))?;
+                f.write_str("]")
             }
             &Operand::RegIndexBaseDisp(ref base, ref index, disp) => {
                 write!(f, "[{} + {} ",
-                    colors.register(base),
-                    colors.register(index),
+                    regspec_label(base),
+                    regspec_label(index),
                 )?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
             },
             &Operand::RegIndexBaseScale(ref base, ref index, scale) => {
                 write!(f, "[{} + {} * {}]",
-                    colors.register(base),
-                    colors.register(index),
+                    regspec_label(base),
+                    regspec_label(index),
                     colors.number(scale)
                 )
             }
             &Operand::RegIndexBaseScaleDisp(ref base, ref index, scale, disp) => {
                 write!(f, "[{} + {} * {} ",
-                    colors.register(base),
-                    colors.register(index),
+                    regspec_label(base),
+                    regspec_label(index),
                     colors.number(scale),
                 )?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
@@ -262,853 +247,979 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
 
 impl fmt::Display for Opcode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            &Opcode::POPCNT => write!(f, "popcnt"),
-            &Opcode::MOVDQU => write!(f, "movdqu"),
-            &Opcode::MOVDQA => write!(f, "movdqa"),
-            &Opcode::MOVQ => write!(f, "movq"),
-            &Opcode::CMPSS => write!(f, "cmpss"),
-            &Opcode::CMPSD => write!(f, "cmpsd"),
-            &Opcode::UNPCKLPS => write!(f, "unpcklps"),
-            &Opcode::UNPCKLPD => write!(f, "unpcklpd"),
-            &Opcode::UNPCKHPS => write!(f, "unpckhps"),
-            &Opcode::UNPCKHPD => write!(f, "unpckhpd"),
-            &Opcode::MOVUPS => write!(f, "movups"),
-            &Opcode::MOVQ2DQ => write!(f, "movq2dq"),
-            &Opcode::MOVDQ2Q => write!(f, "movdq2q"),
-            &Opcode::RSQRTSS => write!(f, "rsqrtss"),
-            &Opcode::MOVSHDUP => write!(f, "movshdup"),
-            &Opcode::CVTTPS2DQ => write!(f, "cvttps2dq"),
-            &Opcode::CVTPD2DQ => write!(f, "cvtpd2dq"),
-            &Opcode::RCPSS => write!(f, "rcpss"),
-            &Opcode::CVTDQ2PD => write!(f, "cvtdq2pd"),
-            &Opcode::PSHUFHW => write!(f, "pshufhw"),
-            &Opcode::PSHUFLW => write!(f, "pshuflw"),
-            &Opcode::XADD => write!(f, "xadd"),
-            &Opcode::BT => write!(f, "bt"),
-            &Opcode::BTS => write!(f, "bts"),
-            &Opcode::BTR => write!(f, "btr"),
-            &Opcode::BTC => write!(f, "btc"),
-            &Opcode::BSF => write!(f, "bsf"),
-            &Opcode::BSR => write!(f, "bsr"),
-            &Opcode::BZHI => write!(f, "bzhi"),
-            &Opcode::PDEP => write!(f, "pdep"),
-            &Opcode::PEXT => write!(f, "pext"),
-            &Opcode::TZCNT => write!(f, "tzcnt"),
-            &Opcode::MOVSS => write!(f, "movss"),
-            &Opcode::SQRTSS => write!(f, "sqrtss"),
-            &Opcode::ADDSS => write!(f, "addss"),
-            &Opcode::SUBSS => write!(f, "subss"),
-            &Opcode::MULSS => write!(f, "mulss"),
-            &Opcode::DIVSS => write!(f, "divss"),
-            &Opcode::MINSS => write!(f, "minss"),
-            &Opcode::MAXSS => write!(f, "maxss"),
-            &Opcode::MOVSD => write!(f, "movsd"),
-            &Opcode::SQRTSD => write!(f, "sqrtsd"),
-            &Opcode::ADDSD => write!(f, "addsd"),
-            &Opcode::SUBSD => write!(f, "subsd"),
-            &Opcode::MULSD => write!(f, "mulsd"),
-            &Opcode::DIVSD => write!(f, "divsd"),
-            &Opcode::MINSD => write!(f, "minsd"),
-            &Opcode::MAXSD => write!(f, "maxsd"),
-            &Opcode::MOVDDUP => write!(f, "movddup"),
-            &Opcode::MOVSLDUP => write!(f, "movsldup"),
-            &Opcode::HADDPS => write!(f, "haddps"),
-            &Opcode::HSUBPS => write!(f, "hsubps"),
-            &Opcode::ADDSUBPS => write!(f, "addsubps"),
-            &Opcode::CVTSI2SS => write!(f, "cvtsi2ss"),
-            &Opcode::CVTSI2SD => write!(f, "cvtsi2sd"),
-            &Opcode::CVTTSD2SI => write!(f, "cvttsd2si"),
-            &Opcode::CVTSD2SI => write!(f, "cvtsd2si"),
-            &Opcode::CVTSD2SS => write!(f, "cvtsd2ss"),
-            &Opcode::CVTTSS2SI => write!(f, "cvttss2si"),
-            &Opcode::CVTSS2SI => write!(f, "cvtss2si"),
-            &Opcode::CVTSS2SD => write!(f, "cvtss2sd"),
-            &Opcode::LDDQU => write!(f, "lddqu"),
-            &Opcode::STI => write!(f, "sti"),
-            &Opcode::STD => write!(f, "std"),
-            &Opcode::STC => write!(f, "stc"),
-            &Opcode::CLI => write!(f, "cli"),
-            &Opcode::CLD => write!(f, "cld"),
-            &Opcode::CLC => write!(f, "clc"),
-            &Opcode::SLDT => write!(f, "sldt"),
-            &Opcode::STR => write!(f, "str"),
-            &Opcode::LLDT => write!(f, "lldt"),
-            &Opcode::LTR => write!(f, "ltr"),
-            &Opcode::VERR => write!(f, "verr"),
-            &Opcode::VERW => write!(f, "verw"),
-            &Opcode::JMPE => write!(f, "jmpe"),
-            &Opcode::WRMSR => write!(f, "wrmsr"),
-            &Opcode::RDMSR => write!(f, "rdmsr"),
-            &Opcode::RDTSC => write!(f, "rdtsc"),
-            &Opcode::RDPMC => write!(f, "rdpmc"),
-            &Opcode::RDPID => write!(f, "rdpid"),
-            &Opcode::RDFSBASE => write!(f, "rdfsbase"),
-            &Opcode::RDGSBASE => write!(f, "rdgsbase"),
-            &Opcode::WRFSBASE => write!(f, "wrfsbase"),
-            &Opcode::WRGSBASE => write!(f, "wrgsbase"),
-            &Opcode::FXSAVE => write!(f, "fxsave"),
-            &Opcode::FXRSTOR => write!(f, "fxrstor"),
-            &Opcode::LDMXCSR => write!(f, "ldmxcsr"),
-            &Opcode::STMXCSR => write!(f, "stmxcsr"),
-            &Opcode::XSAVE => write!(f, "xsave"),
-            &Opcode::XSAVEC => write!(f, "xsavec"),
-            &Opcode::XSAVES => write!(f, "xsaves"),
-            &Opcode::XRSTOR => write!(f, "xrstor"),
-            &Opcode::XRSTORS => write!(f, "xrstors"),
-            &Opcode::XSAVEOPT => write!(f, "xsaveopt"),
-            &Opcode::LFENCE => write!(f, "lfence"),
-            &Opcode::MFENCE => write!(f, "mfence"),
-            &Opcode::SFENCE => write!(f, "sfence"),
-            &Opcode::CLFLUSH => write!(f, "clflush"),
-            &Opcode::CLFLUSHOPT => write!(f, "clflushopt"),
-            &Opcode::CLWB => write!(f, "clwb"),
-            &Opcode::LDS => write!(f, "lds"),
-            &Opcode::LES => write!(f, "les"),
-            &Opcode::SGDT => write!(f, "sgdt"),
-            &Opcode::SIDT => write!(f, "sidt"),
-            &Opcode::LGDT => write!(f, "lgdt"),
-            &Opcode::LIDT => write!(f, "lidt"),
-            &Opcode::SMSW => write!(f, "smsw"),
-            &Opcode::LMSW => write!(f, "lmsw"),
-            &Opcode::SWAPGS => write!(f, "swapgs"),
-            &Opcode::RDTSCP => write!(f, "rdtscp"),
-            &Opcode::INVLPG => write!(f, "invlpg"),
-            &Opcode::CPUID => write!(f, "cpuid"),
-            &Opcode::UD2 => write!(f, "ud2"),
-            &Opcode::WBINVD => write!(f, "wbinvd"),
-            &Opcode::INVD => write!(f, "invd"),
-            &Opcode::SYSRET => write!(f, "sysret"),
-            &Opcode::CLTS => write!(f, "clts"),
-            &Opcode::SYSCALL => write!(f, "syscall"),
-            &Opcode::LSL => write!(f, "lsl"),
-            &Opcode::LAR => write!(f, "lar"),
-            &Opcode::INC => write!(f, "inc"),
-            &Opcode::DEC => write!(f, "dec"),
-            &Opcode::HLT => write!(f, "hlt"),
-            &Opcode::SBB => write!(f, "sbb"),
-            &Opcode::AND => write!(f, "and"),
-            &Opcode::XOR => write!(f, "xor"),
-            &Opcode::OR => write!(f, "or"),
-            &Opcode::PUSH => write!(f, "push"),
-            &Opcode::POP => write!(f, "pop"),
-            &Opcode::LEA => write!(f, "lea"),
-            &Opcode::NOP => write!(f, "nop"),
-            &Opcode::PREFETCHNTA => write!(f, "prefetchnta"),
-            &Opcode::PREFETCH0 => write!(f, "prefetch0"),
-            &Opcode::PREFETCH1 => write!(f, "prefetch1"),
-            &Opcode::PREFETCH2 => write!(f, "prefetch2"),
-            &Opcode::XCHG => write!(f, "xchg"),
-            &Opcode::POPF => write!(f, "popf"),
-            &Opcode::ADD => write!(f, "add"),
-            &Opcode::ADC => write!(f, "adc"),
-            &Opcode::SUB => write!(f, "sub"),
-            &Opcode::INT => write!(f, "int"),
-            &Opcode::INTO => write!(f, "into"),
-            &Opcode::IRET => write!(f, "iret"),
-            &Opcode::RETF => write!(f, "retf"),
-            &Opcode::ENTER => write!(f, "enter"),
-            &Opcode::LEAVE => write!(f, "leave"),
-            &Opcode::MOV => write!(f, "mov"),
-            &Opcode::RETURN => write!(f, "ret"),
-            &Opcode::PUSHF => write!(f, "pushf"),
-            &Opcode::WAIT => write!(f, "wait"),
-            &Opcode::LODS => write!(f, "lods"),
-            &Opcode::STOS => write!(f, "stos"),
-            &Opcode::LAHF => write!(f, "lahf"),
-            &Opcode::SAHF => write!(f, "sahf"),
-            &Opcode::CMPS => write!(f, "cmps"),
-            &Opcode::SCAS => write!(f, "scas"),
-            &Opcode::MOVS => write!(f, "movs"),
-            &Opcode::TEST => write!(f, "test"),
-            &Opcode::CMP => write!(f, "cmp"),
-            &Opcode::INS => write!(f, "ins"),
-            &Opcode::IN => write!(f, "in"),
-            &Opcode::OUTS => write!(f, "outs"),
-            &Opcode::OUT => write!(f, "out"),
-            &Opcode::IMUL => write!(f, "imul"),
-            &Opcode::JO => write!(f, "jo"),
-            &Opcode::JNO => write!(f, "jno"),
-            &Opcode::JB => write!(f, "jb"),
-            &Opcode::JNB => write!(f, "jnb"),
-            &Opcode::JZ => write!(f, "jz"),
-            &Opcode::JNZ => write!(f, "jnz"),
-            &Opcode::JA => write!(f, "ja"),
-            &Opcode::JNA => write!(f, "jna"),
-            &Opcode::JS => write!(f, "js"),
-            &Opcode::JNS => write!(f, "jns"),
-            &Opcode::JP => write!(f, "jp"),
-            &Opcode::JNP => write!(f, "jnp"),
-            &Opcode::JL => write!(f, "jl"),
-            &Opcode::JGE => write!(f, "jge"),
-            &Opcode::JLE => write!(f, "jle"),
-            &Opcode::JG => write!(f, "jg"),
-            &Opcode::CALL => write!(f, "call"),
-            &Opcode::JMP => write!(f, "jmp"),
-            &Opcode::CALLF => write!(f, "callf"),
-            &Opcode::JMPF => write!(f, "jmpf"),
-            &Opcode::SAR => write!(f, "sar"),
-            &Opcode::SAL => write!(f, "sal"),
-            &Opcode::SHR => write!(f, "shr"),
-            &Opcode::SARX => write!(f, "sarx"),
-            &Opcode::SHLX => write!(f, "shlx"),
-            &Opcode::SHRX => write!(f, "shrx"),
-            &Opcode::SHRD => write!(f, "shrd"),
-            &Opcode::SHL => write!(f, "shl"),
-            &Opcode::RCR => write!(f, "rcr"),
-            &Opcode::RCL => write!(f, "rcl"),
-            &Opcode::ROR => write!(f, "ror"),
-            &Opcode::RORX => write!(f, "rorx"),
-            &Opcode::ROL => write!(f, "rol"),
-            &Opcode::CMOVA => write!(f, "cmova"),
-            &Opcode::CMOVB => write!(f, "cmovb"),
-            &Opcode::CMOVG => write!(f, "cmovg"),
-            &Opcode::CMOVGE => write!(f, "cmovge"),
-            &Opcode::CMOVL => write!(f, "cmovl"),
-            &Opcode::CMOVLE => write!(f, "cmovle"),
-            &Opcode::CMOVNA => write!(f, "cmovna"),
-            &Opcode::CMOVNB => write!(f, "cmovnb"),
-            &Opcode::CMOVNO => write!(f, "cmovno"),
-            &Opcode::CMOVNP => write!(f, "cmovnp"),
-            &Opcode::CMOVNS => write!(f, "cmovns"),
-            &Opcode::CMOVNZ => write!(f, "cmovnz"),
-            &Opcode::CMOVO => write!(f, "cmovo"),
-            &Opcode::CMOVP => write!(f, "cmovp"),
-            &Opcode::CMOVS => write!(f, "cmovs"),
-            &Opcode::CMOVZ => write!(f, "cmovz"),
-            &Opcode::NEG => write!(f, "neg"),
-            &Opcode::NOT => write!(f, "not"),
-            &Opcode::MUL => write!(f, "mul"),
-            &Opcode::MULX => write!(f, "mulx"),
-            &Opcode::DIV => write!(f, "div"),
-            &Opcode::IDIV => write!(f, "idiv"),
-            &Opcode::CMPXCHG => write!(f, "cmpxchg"),
-            &Opcode::CMPXCHG8B => write!(f, "cmpxchg8b"),
-            &Opcode::MOVSX_b => write!(f, "movsx"),
-            &Opcode::MOVSX_w => write!(f, "movsx"),
-            &Opcode::MOVZX_b => write!(f, "movzx"),
-            &Opcode::MOVZX_w => write!(f, "movzx"),
-            &Opcode::MOVSX => write!(f, "movsx"),
-            &Opcode::SETO => write!(f, "seto"),
-            &Opcode::SETNO => write!(f, "setno"),
-            &Opcode::SETB => write!(f, "setb"),
-            &Opcode::SETAE => write!(f, "setae"),
-            &Opcode::SETZ => write!(f, "setz"),
-            &Opcode::SETNZ => write!(f, "setnz"),
-            &Opcode::SETBE => write!(f, "setbe"),
-            &Opcode::SETA => write!(f, "seta"),
-            &Opcode::SETS => write!(f, "sets"),
-            &Opcode::SETNS => write!(f, "setns"),
-            &Opcode::SETP => write!(f, "setp"),
-            &Opcode::SETNP => write!(f, "setnp"),
-            &Opcode::SETL => write!(f, "setl"),
-            &Opcode::SETGE => write!(f, "setge"),
-            &Opcode::SETLE => write!(f, "setle"),
-            &Opcode::SETG => write!(f, "setg"),
-            &Opcode::ADDPS => write!(f, "addps"),
-            &Opcode::ADDPD => write!(f, "addpd"),
-            &Opcode::ANDNPS => write!(f, "andnps"),
-            &Opcode::ANDNPD => write!(f, "andnpd"),
-            &Opcode::ANDPS => write!(f, "andps"),
-            &Opcode::ANDPD => write!(f, "andpd"),
-            &Opcode::BSWAP => write!(f, "bswap"),
-            &Opcode::CMPPS => write!(f, "cmpps"),
-            &Opcode::CMPPD => write!(f, "cmppd"),
-            &Opcode::COMISD => write!(f, "comisd"),
-            &Opcode::COMISS => write!(f, "comiss"),
-            &Opcode::CVTDQ2PS => write!(f, "cvtdq2ps"),
-            &Opcode::CVTPS2DQ => write!(f, "cvtps2dq"),
-            &Opcode::CVTPI2PS => write!(f, "cvtpi2ps"),
-            &Opcode::CVTPI2PD => write!(f, "cvtpi2pd"),
-            &Opcode::CVTPS2PD => write!(f, "cvtps2pd"),
-            &Opcode::CVTPD2PS => write!(f, "cvtpd2ps"),
-            &Opcode::CVTPS2PI => write!(f, "cvtps2pi"),
-            &Opcode::CVTPD2PI => write!(f, "cvtpd2pi"),
-            &Opcode::CVTTPS2PI => write!(f, "cvttps2pi"),
-            &Opcode::CVTTPD2PI => write!(f, "cvttpd2pi"),
-            &Opcode::CVTTPD2DQ => write!(f, "cvttpd2dq"),
-            &Opcode::DIVPS => write!(f, "divps"),
-            &Opcode::DIVPD => write!(f, "divpd"),
-            &Opcode::EMMS => write!(f, "emms"),
-            &Opcode::GETSEC => write!(f, "getsec"),
-            &Opcode::LFS => write!(f, "lfs"),
-            &Opcode::LGS => write!(f, "lgs"),
-            &Opcode::LSS => write!(f, "lss"),
-            &Opcode::ARPL => write!(f, "arpl"),
-            &Opcode::MASKMOVQ => write!(f, "maskmovq"),
-            &Opcode::MASKMOVDQU => write!(f, "maskmovdqu"),
-            &Opcode::MAXPS => write!(f, "maxps"),
-            &Opcode::MAXPD => write!(f, "maxpd"),
-            &Opcode::MINPS => write!(f, "minps"),
-            &Opcode::MINPD => write!(f, "minpd"),
-            &Opcode::MOVAPS => write!(f, "movaps"),
-            &Opcode::MOVAPD => write!(f, "movapd"),
-            &Opcode::MOVD => write!(f, "movd"),
-            &Opcode::MOVLPS => write!(f, "movlps"),
-            &Opcode::MOVLPD => write!(f, "movlpd"),
-            &Opcode::MOVLHPS => write!(f, "movlhps"),
-            &Opcode::MOVHPS => write!(f, "movhps"),
-            &Opcode::MOVHPD => write!(f, "movhpd"),
-            &Opcode::MOVHLPS => write!(f, "movhlps"),
-            &Opcode::MOVUPD => write!(f, "movupd"),
-            &Opcode::MOVMSKPS => write!(f, "movmskps"),
-            &Opcode::MOVMSKPD => write!(f, "movmskpd"),
-            &Opcode::MOVNTI => write!(f, "movnti"),
-            &Opcode::MOVNTPS => write!(f, "movntps"),
-            &Opcode::MOVNTPD => write!(f, "movntpd"),
-            &Opcode::MOVNTQ => write!(f, "movntq"),
-            &Opcode::MOVNTDQ => write!(f, "movntdq"),
-            &Opcode::MULPS => write!(f, "mulps"),
-            &Opcode::MULPD => write!(f, "mulpd"),
-            &Opcode::ORPS => write!(f, "orps"),
-            &Opcode::ORPD => write!(f, "orpd"),
-            &Opcode::PACKSSDW => write!(f, "packssdw"),
-            &Opcode::PACKSSWB => write!(f, "packsswb"),
-            &Opcode::PACKUSWB => write!(f, "packuswb"),
-            &Opcode::PADDB => write!(f, "paddb"),
-            &Opcode::PADDD => write!(f, "paddd"),
-            &Opcode::PADDQ => write!(f, "paddq"),
-            &Opcode::PADDSB => write!(f, "paddsb"),
-            &Opcode::PADDSW => write!(f, "paddsw"),
-            &Opcode::PADDUSB => write!(f, "paddusb"),
-            &Opcode::PADDUSW => write!(f, "paddusw"),
-            &Opcode::PADDW => write!(f, "paddw"),
-            &Opcode::PAND => write!(f, "pand"),
-            &Opcode::PANDN => write!(f, "pandn"),
-            &Opcode::PAVGB => write!(f, "pavgb"),
-            &Opcode::PAVGW => write!(f, "pavgw"),
-            &Opcode::PCMPEQB => write!(f, "pcmpeqb"),
-            &Opcode::PCMPEQD => write!(f, "pcmpeqd"),
-            &Opcode::PCMPEQW => write!(f, "pcmpeqw"),
-            &Opcode::PCMPGTB => write!(f, "pcmpgtb"),
-            &Opcode::PCMPGTD => write!(f, "pcmpgtd"),
-            &Opcode::PCMPGTW => write!(f, "pcmpgtw"),
-            &Opcode::PEXTRW => write!(f, "pextrw"),
-            &Opcode::PINSRW => write!(f, "pinsrw"),
-            &Opcode::PMADDWD => write!(f, "pmaddwd"),
-            &Opcode::PMAXSW => write!(f, "pmaxsw"),
-            &Opcode::PMAXUB => write!(f, "pmaxub"),
-            &Opcode::PMINSW => write!(f, "pminsw"),
-            &Opcode::PMINUB => write!(f, "pminub"),
-            &Opcode::PMOVMSKB => write!(f, "pmovmskb"),
-            &Opcode::PMULHUW => write!(f, "pmulhuw"),
-            &Opcode::PMULHW => write!(f, "pmulhw"),
-            &Opcode::PMULLW => write!(f, "pmullw"),
-            &Opcode::PMULUDQ => write!(f, "pmuludq"),
-            &Opcode::POR => write!(f, "por"),
-            &Opcode::PSADBW => write!(f, "psadbw"),
-            &Opcode::PSHUFW => write!(f, "pshufw"),
-            &Opcode::PSHUFD => write!(f, "pshufd"),
-            &Opcode::PSLLD => write!(f, "pslld"),
-            &Opcode::PSLLDQ => write!(f, "pslldq"),
-            &Opcode::PSLLQ => write!(f, "psllq"),
-            &Opcode::PSLLW => write!(f, "psllw"),
-            &Opcode::PSRAD => write!(f, "psrad"),
-            &Opcode::PSRAW => write!(f, "psraw"),
-            &Opcode::PSRLD => write!(f, "psrld"),
-            &Opcode::PSRLDQ => write!(f, "psrldq"),
-            &Opcode::PSRLQ => write!(f, "psrlq"),
-            &Opcode::PSRLW => write!(f, "psrlw"),
-            &Opcode::PSUBB => write!(f, "psubb"),
-            &Opcode::PSUBD => write!(f, "psubd"),
-            &Opcode::PSUBQ => write!(f, "psubq"),
-            &Opcode::PSUBSB => write!(f, "psubsb"),
-            &Opcode::PSUBSW => write!(f, "psubsw"),
-            &Opcode::PSUBUSB => write!(f, "psubusb"),
-            &Opcode::PSUBUSW => write!(f, "psubusw"),
-            &Opcode::PSUBW => write!(f, "psubw"),
-            &Opcode::PUNPCKHBW => write!(f, "punpckhbw"),
-            &Opcode::PUNPCKHDQ => write!(f, "punpckhdq"),
-            &Opcode::PUNPCKHWD => write!(f, "punpckhwd"),
-            &Opcode::PUNPCKLBW => write!(f, "punpcklbw"),
-            &Opcode::PUNPCKLDQ => write!(f, "punpckldq"),
-            &Opcode::PUNPCKLWD => write!(f, "punpcklwd"),
-            &Opcode::PUNPCKLQDQ => write!(f, "punpcklqdq"),
-            &Opcode::PUNPCKHQDQ => write!(f, "punpckhqdq"),
-            &Opcode::PXOR => write!(f, "pxor"),
-            &Opcode::RCPPS => write!(f, "rcpps"),
-            &Opcode::RSM => write!(f, "rsm"),
-            &Opcode::RSQRTPS => write!(f, "rsqrtps"),
-            &Opcode::SHLD => write!(f, "shld"),
-            &Opcode::SHUFPD => write!(f, "shufpd"),
-            &Opcode::SHUFPS => write!(f, "shufps"),
-            &Opcode::SLHD => write!(f, "slhd"),
-            &Opcode::SQRTPS => write!(f, "sqrtps"),
-            &Opcode::SQRTPD => write!(f, "sqrtpd"),
-            &Opcode::SUBPS => write!(f, "subps"),
-            &Opcode::SUBPD => write!(f, "subpd"),
-            &Opcode::SYSENTER => write!(f, "sysenter"),
-            &Opcode::SYSEXIT => write!(f, "sysexit"),
-            &Opcode::UCOMISD => write!(f, "ucomisd"),
-            &Opcode::UCOMISS => write!(f, "ucomiss"),
-            &Opcode::UD2E => write!(f, "ud2e"),
-            &Opcode::VMREAD => write!(f, "vmread"),
-            &Opcode::VMWRITE => write!(f, "vmwrite"),
-            &Opcode::XORPS => write!(f, "xorps"),
-            &Opcode::XORPD => write!(f, "xorpd"),
-            &Opcode::CBW => write!(f, "cbw"),
-            &Opcode::CWDE => write!(f, "cwde"),
-            &Opcode::CDQE => write!(f, "cdqe"),
-            &Opcode::CWD => write!(f, "cwd"),
-            &Opcode::CDQ => write!(f, "cdq"),
-            &Opcode::CQO => write!(f, "cqo"),
-            &Opcode::ANDN => write!(f, "andn"),
-            &Opcode::BEXTR => write!(f, "bextr"),
-            &Opcode::BLSI => write!(f, "blsi"),
-            &Opcode::BLSMSK => write!(f, "blsmsk"),
-            &Opcode::BLSR => write!(f, "blsr"),
-            &Opcode::VMCLEAR => write!(f, "vmclear"),
-            &Opcode::VMPTRLD => write!(f, "vmptrld"),
-            &Opcode::VMPTRST => write!(f, "vmptrst"),
-            &Opcode::VMXON => write!(f, "vmxon"),
-            &Opcode::VMCALL => write!(f, "vmcall"),
-            &Opcode::VMLAUNCH => write!(f, "vmlaunch"),
-            &Opcode::VMRESUME => write!(f, "vmresume"),
-            &Opcode::VMXOFF => write!(f, "vmxoff"),
-            &Opcode::MONITOR => write!(f, "monitor"),
-            &Opcode::MWAIT => write!(f, "mwait"),
-            &Opcode::CLAC => write!(f, "clac"),
-            &Opcode::STAC => write!(f, "stac"),
-            &Opcode::ENCLS => write!(f, "encls"),
-            &Opcode::ENCLV => write!(f, "enclv"),
-            &Opcode::XGETBV => write!(f, "xgetbv"),
-            &Opcode::XSETBV => write!(f, "xsetbv"),
-            &Opcode::VMFUNC => write!(f, "vmfunc"),
-            &Opcode::XEND => write!(f, "xend"),
-            &Opcode::XTEST => write!(f, "xtest"),
-            &Opcode::ENCLU => write!(f, "enclu"),
-            &Opcode::RDPKRU => write!(f, "rdpkru"),
-            &Opcode::WRPKRU => write!(f, "wrpkru"),
-            &Opcode::VADDPD => write!(f, "vaddpd"),
-            &Opcode::VADDPS => write!(f, "vaddps"),
-            &Opcode::VADDSUBPD => write!(f, "vaddsubpd"),
-            &Opcode::VAESDEC => write!(f, "vaesdec"),
-            &Opcode::VAESDECLAST => write!(f, "vaesdeclast"),
-            &Opcode::VAESENC => write!(f, "vaesenc"),
-            &Opcode::VAESENCLAST => write!(f, "vaesenclast"),
-            &Opcode::VAESIMC => write!(f, "vaesimc"),
-            &Opcode::VAESKEYGENASSIST => write!(f, "vaeskeygenassist"),
-            &Opcode::VBLENDPD => write!(f, "vblendpd"),
-            &Opcode::VBLENDPS => write!(f, "vblendps"),
-            &Opcode::VBLENDVPD => write!(f, "vblendvpd"),
-            &Opcode::VBLENDVPS => write!(f, "vblendvps"),
-            &Opcode::VBROADCASTF128 => write!(f, "vbroadcastf128"),
-            &Opcode::VBROADCASTI128 => write!(f, "vbroadcasti128"),
-            &Opcode::VBROADCASTSD => write!(f, "vbroadcastsd"),
-            &Opcode::VBROADCASTSS => write!(f, "vbroadcastss"),
-            &Opcode::VCMPPD => write!(f, "vcmppd"),
-            &Opcode::VCMPPS => write!(f, "vcmpps"),
-            &Opcode::VCVTDQ2PD => write!(f, "vcvtdq2pd"),
-            &Opcode::VCVTDQ2PS => write!(f, "vcvtdq2ps"),
-            &Opcode::VCVTPD2PS => write!(f, "vcvtpd2ps"),
-            &Opcode::VCVTPH2PS => write!(f, "vcvtph2ps"),
-            &Opcode::VCVTPS2DQ => write!(f, "vcvtps2dq"),
-            &Opcode::VCVTPS2PD => write!(f, "vcvtps2pd"),
-            &Opcode::VCVTPS2PH => write!(f, "vcvtps2ph"),
-            &Opcode::VCVTTPD2DQ => write!(f, "vcvttpd2dq"),
-            &Opcode::VCVTTPS2DQ => write!(f, "vcvttps2dq"),
-            &Opcode::VDIVPD => write!(f, "vdivpd"),
-            &Opcode::VDIVPS => write!(f, "vdivps"),
-            &Opcode::VDPPD => write!(f, "vdppd"),
-            &Opcode::VDPPS => write!(f, "vdpps"),
-            &Opcode::VEXTRACTF128 => write!(f, "vextractf128"),
-            &Opcode::VEXTRACTI128 => write!(f, "vextracti128"),
-            &Opcode::VEXTRACTPS => write!(f, "vextractps"),
-            &Opcode::VFMADD132PD => write!(f, "vfmadd132pd"),
-            &Opcode::VFMADD132PS => write!(f, "vfmadd132ps"),
-            &Opcode::VFMADD213PD => write!(f, "vfmadd213pd"),
-            &Opcode::VFMADD213PS => write!(f, "vfmadd213ps"),
-            &Opcode::VFMADD231PD => write!(f, "vfmadd231pd"),
-            &Opcode::VFMADD231PS => write!(f, "vfmadd231ps"),
-            &Opcode::VFMADDSUB132PD => write!(f, "vfmaddsub132pd"),
-            &Opcode::VFMADDSUB132PS => write!(f, "vfmaddsub132ps"),
-            &Opcode::VFMADDSUB213PD => write!(f, "vfmaddsub213pd"),
-            &Opcode::VFMADDSUB213PS => write!(f, "vfmaddsub213ps"),
-            &Opcode::VFMADDSUB231PD => write!(f, "vfmaddsub231pd"),
-            &Opcode::VFMADDSUB231PS => write!(f, "vfmaddsub231ps"),
-            &Opcode::VFMSUB132PD => write!(f, "vfmsub132pd"),
-            &Opcode::VFMSUB132PS => write!(f, "vfmsub132ps"),
-            &Opcode::VFMSUB213PD => write!(f, "vfmsub213pd"),
-            &Opcode::VFMSUB213PS => write!(f, "vfmsub213ps"),
-            &Opcode::VFMSUB231PD => write!(f, "vfmsub231pd"),
-            &Opcode::VFMSUB231PS => write!(f, "vfmsub231ps"),
-            &Opcode::VFMSUBADD132PD => write!(f, "vfmsubadd132pd"),
-            &Opcode::VFMSUBADD132PS => write!(f, "vfmsubadd132ps"),
-            &Opcode::VFMSUBADD213PD => write!(f, "vfmsubadd213pd"),
-            &Opcode::VFMSUBADD213PS => write!(f, "vfmsubadd213ps"),
-            &Opcode::VFMSUBADD231PD => write!(f, "vfmsubadd231pd"),
-            &Opcode::VFMSUBADD231PS => write!(f, "vfmsubadd231ps"),
-            &Opcode::VFNMADD132PD => write!(f, "vfnmadd132pd"),
-            &Opcode::VFNMADD132PS => write!(f, "vfnmadd132ps"),
-            &Opcode::VFNMADD213PD => write!(f, "vfnmadd213pd"),
-            &Opcode::VFNMADD213PS => write!(f, "vfnmadd213ps"),
-            &Opcode::VFNMADD231PD => write!(f, "vfnmadd231pd"),
-            &Opcode::VFNMADD231PS => write!(f, "vfnmadd231ps"),
-            &Opcode::VFNMSUB132PD => write!(f, "vfnmsub132pd"),
-            &Opcode::VFNMSUB132PS => write!(f, "vfnmsub132ps"),
-            &Opcode::VFNMSUB213PD => write!(f, "vfnmsub213pd"),
-            &Opcode::VFNMSUB213PS => write!(f, "vfnmsub213ps"),
-            &Opcode::VFNMSUB231PD => write!(f, "vfnmsub231pd"),
-            &Opcode::VFNMSUB231PS => write!(f, "vfnmsub231ps"),
-            &Opcode::VGATHERDPD => write!(f, "vgatherdpd"),
-            &Opcode::VGATHERDPS => write!(f, "vgatherdps"),
-            &Opcode::VGATHERQPD => write!(f, "vgatherqpd"),
-            &Opcode::VGATHERQPS => write!(f, "vgatherqps"),
-            &Opcode::VHADDPD => write!(f, "vhaddpd"),
-            &Opcode::VHSUBPD => write!(f, "vhsubpd"),
-            &Opcode::VINSERTF128 => write!(f, "vinsertf128"),
-            &Opcode::VINSERTI128 => write!(f, "vinserti128"),
-            &Opcode::VINSERTPS => write!(f, "vinsertps"),
-            &Opcode::VMASKMOVDQU => write!(f, "vmaskmovdqu"),
-            &Opcode::VMASKMOVPD => write!(f, "vmaskmovpd"),
-            &Opcode::VMASKMOVPS => write!(f, "vmaskmovps"),
-            &Opcode::VMAXPD => write!(f, "vmaxpd"),
-            &Opcode::VMAXPS => write!(f, "vmaxps"),
-            &Opcode::VMINPD => write!(f, "vminpd"),
-            &Opcode::VMINPS => write!(f, "vminps"),
-            &Opcode::VMOVAPD => write!(f, "vmovapd"),
-            &Opcode::VMOVAPS => write!(f, "vmovaps"),
-            &Opcode::VMOVD => write!(f, "vmovd"),
-            &Opcode::VMOVDQA => write!(f, "vmovdqa"),
-            &Opcode::VMOVDQU => write!(f, "vmovdqu"),
-            &Opcode::VMOVHLPS => write!(f, "vmovhlps"),
-            &Opcode::VMOVHPD => write!(f, "vmovhpd"),
-            &Opcode::VMOVHPS => write!(f, "vmovhps"),
-            &Opcode::VMOVLHPS => write!(f, "vmovlhps"),
-            &Opcode::VMOVLPD => write!(f, "vmovlpd"),
-            &Opcode::VMOVLPS => write!(f, "vmovlps"),
-            &Opcode::VMOVMSKPD => write!(f, "vmovmskpd"),
-            &Opcode::VMOVMSKPS => write!(f, "vmovmskps"),
-            &Opcode::VMOVNTDQ => write!(f, "vmovntdq"),
-            &Opcode::VMOVNTDQA => write!(f, "vmovntdqa"),
-            &Opcode::VMOVNTPD => write!(f, "vmovntpd"),
-            &Opcode::VMOVNTPS => write!(f, "vmovntps"),
-            &Opcode::VMOVQ => write!(f, "vmovq"),
-            &Opcode::VMOVSHDUP => write!(f, "vmovshdup"),
-            &Opcode::VMOVSLDUP => write!(f, "vmovsldup"),
-            &Opcode::VMOVUPD => write!(f, "vmovupd"),
-            &Opcode::VMOVUPS => write!(f, "vmovups"),
-            &Opcode::VMPSADBW => write!(f, "vmpsadbw"),
-            &Opcode::VMULPD => write!(f, "vmulpd"),
-            &Opcode::VMULPS => write!(f, "vmulps"),
-            &Opcode::VPABSB => write!(f, "vpabsb"),
-            &Opcode::VPABSD => write!(f, "vpabsd"),
-            &Opcode::VPABSW => write!(f, "vpabsw"),
-            &Opcode::VPACKSSDW => write!(f, "vpackssdw"),
-            &Opcode::VPACKSSWB => write!(f, "vpacksswb"),
-            &Opcode::VPACKUSWB => write!(f, "vpackuswb"),
-            &Opcode::VPADDB => write!(f, "vpaddb"),
-            &Opcode::VPADDD => write!(f, "vpaddd"),
-            &Opcode::VPADDQ => write!(f, "vpaddq"),
-            &Opcode::VPADDSB => write!(f, "vpaddsb"),
-            &Opcode::VPADDSW => write!(f, "vpaddsw"),
-            &Opcode::VPADDUSB => write!(f, "vpaddusb"),
-            &Opcode::VPADDUSW => write!(f, "vpaddusw"),
-            &Opcode::VPADDW => write!(f, "vpaddw"),
-            &Opcode::VPALIGNR => write!(f, "vpalignr"),
-            &Opcode::VPAND => write!(f, "vpand"),
-            &Opcode::VPANDN => write!(f, "vpandn"),
-            &Opcode::VPAVGB => write!(f, "vpavgb"),
-            &Opcode::VPAVGW => write!(f, "vpavgw"),
-            &Opcode::VPBLENDD => write!(f, "vpblendd"),
-            &Opcode::VPBLENDVB => write!(f, "vpblendvb"),
-            &Opcode::VPBLENDW => write!(f, "vpblendw"),
-            &Opcode::VPBROADCASTB => write!(f, "vpbroadcastb"),
-            &Opcode::VPBROADCASTD => write!(f, "vpbroadcastd"),
-            &Opcode::VPBROADCASTQ => write!(f, "vpbroadcastq"),
-            &Opcode::VPBROADCASTW => write!(f, "vpbroadcastw"),
-            &Opcode::VPCLMULQDQ => write!(f, "vpclmulqdq"),
-            &Opcode::VPCMPEQB => write!(f, "vpcmpeqb"),
-            &Opcode::VPCMPEQD => write!(f, "vpcmpeqd"),
-            &Opcode::VPCMPEQQ => write!(f, "vpcmpeqq"),
-            &Opcode::VPCMPEQW => write!(f, "vpcmpeqw"),
-            &Opcode::VPCMPGTB => write!(f, "vpcmpgtb"),
-            &Opcode::VPCMPGTD => write!(f, "vpcmpgtd"),
-            &Opcode::VPCMPGTQ => write!(f, "vpcmpgtq"),
-            &Opcode::VPCMPGTW => write!(f, "vpcmpgtw"),
-            &Opcode::VPCMPISTRI => write!(f, "vpcmpistri"),
-            &Opcode::VPCMPISTRM => write!(f, "vpcmpistrm"),
-            &Opcode::VPERM2F128 => write!(f, "vperm2f128"),
-            &Opcode::VPERM2I128 => write!(f, "vperm2i128"),
-            &Opcode::VPERMD => write!(f, "vpermd"),
-            &Opcode::VPERMILPD => write!(f, "vpermilpd"),
-            &Opcode::VPERMILPS => write!(f, "vpermilps"),
-            &Opcode::VPERMPD => write!(f, "vpermpd"),
-            &Opcode::VPERMPS => write!(f, "vpermps"),
-            &Opcode::VPERMQ => write!(f, "vpermq"),
-            &Opcode::VPEXTRB => write!(f, "vpextrb"),
-            &Opcode::VPEXTRD => write!(f, "vpextrd"),
-            &Opcode::VPEXTRQ => write!(f, "vpextrq"),
-            &Opcode::VPEXTRW => write!(f, "vpextrw"),
-            &Opcode::VPGATHERDD => write!(f, "vpgatherdd"),
-            &Opcode::VPGATHERDQ => write!(f, "vpgatherdq"),
-            &Opcode::VPGATHERQD => write!(f, "vpgatherqd"),
-            &Opcode::VPGATHERQQ => write!(f, "vpgatherqq"),
-            &Opcode::VPHADDD => write!(f, "vphaddd"),
-            &Opcode::VPHADDSW => write!(f, "vphaddsw"),
-            &Opcode::VPHADDUBSW => write!(f, "vphaddubsw"),
-            &Opcode::VPHADDW => write!(f, "vphaddw"),
-            &Opcode::VPHMINPOSUW => write!(f, "vphminposuw"),
-            &Opcode::VPHSUBD => write!(f, "vphsubd"),
-            &Opcode::VPHSUBSW => write!(f, "vphsubsw"),
-            &Opcode::VPHSUBW => write!(f, "vphsubw"),
-            &Opcode::VPINSRB => write!(f, "vpinsrb"),
-            &Opcode::VPINSRD => write!(f, "vpinsrd"),
-            &Opcode::VPINSRQ => write!(f, "vpinsrq"),
-            &Opcode::VPINSRW => write!(f, "vpinsrw"),
-            &Opcode::VPMADDWD => write!(f, "vpmaddwd"),
-            &Opcode::VPMASKMOVD => write!(f, "vpmaskmovd"),
-            &Opcode::VPMASKMOVQ => write!(f, "vpmaskmovq"),
-            &Opcode::VPMAXSB => write!(f, "vpmaxsb"),
-            &Opcode::VPMAXSD => write!(f, "vpmaxsd"),
-            &Opcode::VPMAXSW => write!(f, "vpmaxsw"),
-            &Opcode::VPMAXUD => write!(f, "vpmaxud"),
-            &Opcode::VPMINSD => write!(f, "vpminsd"),
-            &Opcode::VPMINUD => write!(f, "vpminud"),
-            &Opcode::VPMOVMSKB => write!(f, "vpmovmskb"),
-            &Opcode::VPMOVSXBD => write!(f, "vpmovsxbd"),
-            &Opcode::VPMOVSXBQ => write!(f, "vpmovsxbq"),
-            &Opcode::VPMOVSXBW => write!(f, "vpmovsxbw"),
-            &Opcode::VPMOVSXDQ => write!(f, "vpmovsxdq"),
-            &Opcode::VPMOVSXWD => write!(f, "vpmovsxwd"),
-            &Opcode::VPMOVSXWQ => write!(f, "vpmovsxwq"),
-            &Opcode::VPMOVZXBD => write!(f, "vpmovzxbd"),
-            &Opcode::VPMOVZXBQ => write!(f, "vpmovzxbq"),
-            &Opcode::VPMOVZXBW => write!(f, "vpmovzxbw"),
-            &Opcode::VPMOVZXDQ => write!(f, "vpmovzxdq"),
-            &Opcode::VPMOVZXWD => write!(f, "vpmovzxwd"),
-            &Opcode::VPMOVZXWQ => write!(f, "vpmovzxwq"),
-            &Opcode::VPMULDQ => write!(f, "vpmuldq"),
-            &Opcode::VPMULHRSW => write!(f, "vpmulhrsw"),
-            &Opcode::VPMULHUW => write!(f, "vpmulhuw"),
-            &Opcode::VPMULHW => write!(f, "vpmulhw"),
-            &Opcode::VPMULLD => write!(f, "vpmulld"),
-            &Opcode::VPMULLW => write!(f, "vpmullw"),
-            &Opcode::VPMULUDQ => write!(f, "vpmuludq"),
-            &Opcode::VPOR => write!(f, "vpor"),
-            &Opcode::VPSADBW => write!(f, "vpsadbw"),
-            &Opcode::VPSHUFB => write!(f, "vpshufb"),
-            &Opcode::VPSHUFD => write!(f, "vpshufd"),
-            &Opcode::VPSIGNB => write!(f, "vpsignb"),
-            &Opcode::VPSIGND => write!(f, "vpsignd"),
-            &Opcode::VPSIGNW => write!(f, "vpsignw"),
-            &Opcode::VPSLLD => write!(f, "vpslld"),
-            &Opcode::VPSLLDQ => write!(f, "vpslldq"),
-            &Opcode::VPSLLQ => write!(f, "vpsllq"),
-            &Opcode::VPSLLVD => write!(f, "vpsllvd"),
-            &Opcode::VPSLLVQ => write!(f, "vpsllvq"),
-            &Opcode::VPSLLW => write!(f, "vpsllw"),
-            &Opcode::VPSRAD => write!(f, "vpsrad"),
-            &Opcode::VPSRAVD => write!(f, "vpsravd"),
-            &Opcode::VPSRAW => write!(f, "vpsraw"),
-            &Opcode::VPSRLD => write!(f, "vpsrld"),
-            &Opcode::VPSRLDQ => write!(f, "vpsrldq"),
-            &Opcode::VPSRLQ => write!(f, "vpsrlq"),
-            &Opcode::VPSRLVD => write!(f, "vpsrlvd"),
-            &Opcode::VPSRLVQ => write!(f, "vpsrlvq"),
-            &Opcode::VPSRLW => write!(f, "vpsrlw"),
-            &Opcode::VPSUBB => write!(f, "vpsubb"),
-            &Opcode::VPSUBD => write!(f, "vpsubd"),
-            &Opcode::VPSUBQ => write!(f, "vpsubq"),
-            &Opcode::VPSUBSB => write!(f, "vpsubsb"),
-            &Opcode::VPSUBSW => write!(f, "vpsubsw"),
-            &Opcode::VPSUBUSB => write!(f, "vpsubusb"),
-            &Opcode::VPSUBUSW => write!(f, "vpsubusw"),
-            &Opcode::VPSUBW => write!(f, "vpsubw"),
-            &Opcode::VPTEST => write!(f, "vptest"),
-            &Opcode::VPUNPCKHBW => write!(f, "vpunpckhbw"),
-            &Opcode::VPUNPCKHDQ => write!(f, "vpunpckhdq"),
-            &Opcode::VPUNPCKHQDQ => write!(f, "vpunpckhqdq"),
-            &Opcode::VPUNPCKHWD => write!(f, "vpunpckhwd"),
-            &Opcode::VPUNPCKLBW => write!(f, "vpunpcklbw"),
-            &Opcode::VPUNPCKLDQ => write!(f, "vpunpckldq"),
-            &Opcode::VPUNPCKLQDQ => write!(f, "vpunpcklqdq"),
-            &Opcode::VPUNPCKLWD => write!(f, "vpunpcklwd"),
-            &Opcode::VPXOR => write!(f, "vpxor"),
-            &Opcode::VRCPPS => write!(f, "vrcpps"),
-            &Opcode::VROUNDPD => write!(f, "vroundpd"),
-            &Opcode::VROUNDPS => write!(f, "vroundps"),
-            &Opcode::VRSQRTPS => write!(f, "vrsqrtps"),
-            &Opcode::VSHUFPD => write!(f, "vshufpd"),
-            &Opcode::VSHUFPS => write!(f, "vshufps"),
-            &Opcode::VSQRTPD => write!(f, "vsqrtpd"),
-            &Opcode::VSQRTPS => write!(f, "vsqrtps"),
-            &Opcode::VSUBPD => write!(f, "vsubpd"),
-            &Opcode::VSUBPS => write!(f, "vsubps"),
-            &Opcode::VTESTPD => write!(f, "vtestpd"),
-            &Opcode::VTESTPS => write!(f, "vtestps"),
-            &Opcode::VUNPCKHPD => write!(f, "vunpckhpd"),
-            &Opcode::VUNPCKHPS => write!(f, "vunpckhps"),
-            &Opcode::VUNPCKLPD => write!(f, "vunpcklpd"),
-            &Opcode::VUNPCKLPS => write!(f, "vunpcklps"),
-            &Opcode::VXORPD => write!(f, "vxorpd"),
-            &Opcode::VXORPS => write!(f, "vxorps"),
-            &Opcode::VZEROUPPER => write!(f, "vzeroupper"),
-            &Opcode::VMOVDDUP => write!(f, "vmovddup"),
-            &Opcode::VPSHUFLW => write!(f, "vpshuflw"),
-            &Opcode::VHADDPS => write!(f, "vhaddps"),
-            &Opcode::VHSUBPS => write!(f, "vhsubps"),
-            &Opcode::VADDSUBPS => write!(f, "vaddsubps"),
-            &Opcode::VCVTPD2DQ => write!(f, "vcvtpd2dq"),
-            &Opcode::VLDDQU => write!(f, "vlddqu"),
-            &Opcode::VADDSD => write!(f, "vaddsd"),
-            &Opcode::VADDSS => write!(f, "vaddss"),
-            &Opcode::VCMPSD => write!(f, "vcmpsd"),
-            &Opcode::VCMPSS => write!(f, "vcmpss"),
-            &Opcode::VCOMISD => write!(f, "vcomisd"),
-            &Opcode::VCOMISS => write!(f, "vcomiss"),
-            &Opcode::VCVTSD2SI => write!(f, "vcvtsd2si"),
-            &Opcode::VCVTSD2SS => write!(f, "vcvtsd2ss"),
-            &Opcode::VCVTSI2SD => write!(f, "vcvtsi2sd"),
-            &Opcode::VCVTSI2SS => write!(f, "vcvtsi2ss"),
-            &Opcode::VCVTSS2SD => write!(f, "vcvtss2sd"),
-            &Opcode::VCVTSS2SI => write!(f, "vcvtss2si"),
-            &Opcode::VCVTTSD2SI => write!(f, "vcvttsd2si"),
-            &Opcode::VCVTTSS2SI => write!(f, "vcvttss2si"),
-            &Opcode::VDIVSD => write!(f, "vdivsd"),
-            &Opcode::VDIVSS => write!(f, "vdivss"),
-            &Opcode::VFMADD132SD => write!(f, "vfmadd132sd"),
-            &Opcode::VFMADD132SS => write!(f, "vfmadd132ss"),
-            &Opcode::VFMADD213SD => write!(f, "vfmadd213sd"),
-            &Opcode::VFMADD213SS => write!(f, "vfmadd213ss"),
-            &Opcode::VFMADD231SD => write!(f, "vfmadd231sd"),
-            &Opcode::VFMADD231SS => write!(f, "vfmadd231ss"),
-            &Opcode::VFMSUB132SD => write!(f, "vfmsub132sd"),
-            &Opcode::VFMSUB132SS => write!(f, "vfmsub132ss"),
-            &Opcode::VFMSUB213SD => write!(f, "vfmsub213sd"),
-            &Opcode::VFMSUB213SS => write!(f, "vfmsub213ss"),
-            &Opcode::VFMSUB231SD => write!(f, "vfmsub231sd"),
-            &Opcode::VFMSUB231SS => write!(f, "vfmsub231ss"),
-            &Opcode::VFNMADD132SD => write!(f, "vfnmadd132sd"),
-            &Opcode::VFNMADD132SS => write!(f, "vfnmadd132ss"),
-            &Opcode::VFNMADD213SD => write!(f, "vfnmadd213sd"),
-            &Opcode::VFNMADD213SS => write!(f, "vfnmadd213ss"),
-            &Opcode::VFNMADD231SD => write!(f, "vfnmadd231sd"),
-            &Opcode::VFNMADD231SS => write!(f, "vfnmadd231ss"),
-            &Opcode::VFNMSUB132SD => write!(f, "vfnmsub132sd"),
-            &Opcode::VFNMSUB132SS => write!(f, "vfnmsub132ss"),
-            &Opcode::VFNMSUB213SD => write!(f, "vfnmsub213sd"),
-            &Opcode::VFNMSUB213SS => write!(f, "vfnmsub213ss"),
-            &Opcode::VFNMSUB231SD => write!(f, "vfnmsub231sd"),
-            &Opcode::VFNMSUB231SS => write!(f, "vfnmsub231ss"),
-            &Opcode::VMAXSD => write!(f, "vmaxsd"),
-            &Opcode::VMAXSS => write!(f, "vmaxss"),
-            &Opcode::VMINSD => write!(f, "vminsd"),
-            &Opcode::VMINSS => write!(f, "vminss"),
-            &Opcode::VMOVSD => write!(f, "vmovsd"),
-            &Opcode::VMOVSS => write!(f, "vmovss"),
-            &Opcode::VMULSD => write!(f, "vmulsd"),
-            &Opcode::VMULSS => write!(f, "vmulss"),
-            &Opcode::VRCPSS => write!(f, "vrcpss"),
-            &Opcode::VROUNDSD => write!(f, "vroundsd"),
-            &Opcode::VROUNDSS => write!(f, "vroundss"),
-            &Opcode::VRSQRTSS => write!(f, "vrsqrtss"),
-            &Opcode::VSQRTSD => write!(f, "vsqrtsd"),
-            &Opcode::VSQRTSS => write!(f, "vsqrtss"),
-            &Opcode::VSUBSD => write!(f, "vsubsd"),
-            &Opcode::VSUBSS => write!(f, "vsubss"),
-            &Opcode::VUCOMISD => write!(f, "vucomisd"),
-            &Opcode::VUCOMISS => write!(f, "vucomiss"),
-            &Opcode::PCLMULQDQ => write!(f, "pclmulqdq"),
-            &Opcode::AESKEYGENASSIST => write!(f, "aeskeygenassist"),
-            &Opcode::AESIMC => write!(f, "aesimc"),
-            &Opcode::AESENC => write!(f, "aesenc"),
-            &Opcode::AESENCLAST => write!(f, "aesenclast"),
-            &Opcode::AESDEC => write!(f, "aesdec"),
-            &Opcode::AESDECLAST => write!(f, "aesdeclast"),
-            &Opcode::PCMPGTQ => write!(f, "pcmpgtq"),
-            &Opcode::PCMPISTRM => write!(f, "pcmpistrm"),
-            &Opcode::PCMPISTRI => write!(f, "pcmpistri"),
-            &Opcode::PCMPESTRI => write!(f, "pcmpestri"),
-            &Opcode::PACKUSDW => write!(f, "packusdw"),
-            &Opcode::PCMPESTRM => write!(f, "pcmpestrm"),
-            &Opcode::PCMPEQQ => write!(f, "pcmpeqq"),
-            &Opcode::PTEST => write!(f, "ptest"),
-            &Opcode::PHMINPOSUW => write!(f, "phminposuw"),
-            &Opcode::MPSADBW => write!(f, "mpsadbw"),
-            &Opcode::PMOVZXDQ => write!(f, "pmovzxdq"),
-            &Opcode::PMOVSXDQ => write!(f, "pmovsxdq"),
-            &Opcode::PMOVZXBD => write!(f, "pmovzxbd"),
-            &Opcode::PMOVSXBD => write!(f, "pmovsxbd"),
-            &Opcode::PMOVZXWQ => write!(f, "pmovzxwq"),
-            &Opcode::PMOVSXWQ => write!(f, "pmovsxwq"),
-            &Opcode::PMOVZXBQ => write!(f, "pmovzxbq"),
-            &Opcode::PMOVSXBQ => write!(f, "pmovsxbq"),
-            &Opcode::PMOVSXWD => write!(f, "pmovsxwd"),
-            &Opcode::PMOVZXWD => write!(f, "pmovzxwd"),
-            &Opcode::PEXTRQ => write!(f, "pextrq"),
-            &Opcode::PEXTRB => write!(f, "pextrb"),
-            &Opcode::PMOVSXBW => write!(f, "pmovsxbw"),
-            &Opcode::PMOVZXBW => write!(f, "pmovzxbw"),
-            &Opcode::PINSRQ => write!(f, "pinsrq"),
-            &Opcode::PINSRD => write!(f, "pinsrd"),
-            &Opcode::PINSRB => write!(f, "pinsrb"),
-            &Opcode::EXTRACTPS => write!(f, "extractps"),
-            &Opcode::INSERTPS => write!(f, "insertps"),
-            &Opcode::ROUNDSS => write!(f, "roundss"),
-            &Opcode::ROUNDSD => write!(f, "roundsd"),
-            &Opcode::ROUNDPS => write!(f, "roundps"),
-            &Opcode::ROUNDPD => write!(f, "roundpd"),
-            &Opcode::PMAXSB => write!(f, "pmaxsb"),
-            &Opcode::PMAXUW => write!(f, "pmaxuw"),
-            &Opcode::PMAXUD => write!(f, "pmaxud"),
-            &Opcode::PMINSD => write!(f, "pminsd"),
-            &Opcode::PMINSB => write!(f, "pminsb"),
-            &Opcode::PMINUD => write!(f, "pminud"),
-            &Opcode::PMINUW => write!(f, "pminuw"),
-            &Opcode::BLENDW => write!(f, "blendw"),
-            &Opcode::BLENDDVB => write!(f, "blenddvb"),
-            &Opcode::BLENDVPS => write!(f, "blendvps"),
-            &Opcode::BLENDVPD => write!(f, "blendvpd"),
-            &Opcode::BLENDPS => write!(f, "blendps"),
-            &Opcode::BLENDPD => write!(f, "blendpd"),
-            &Opcode::PMULDQ => write!(f, "pmuldq"),
-            &Opcode::MOVNTDQA => write!(f, "movntdqa"),
-            &Opcode::PMULLD => write!(f, "pmulld"),
-            &Opcode::PALIGNR => write!(f, "palignr"),
-            &Opcode::PSIGNW => write!(f, "psignw"),
-            &Opcode::PSIGND => write!(f, "psignd"),
-            &Opcode::PSIGNB => write!(f, "psignb"),
-            &Opcode::PSHUFB => write!(f, "pshufb"),
-            &Opcode::PMULHRSU => write!(f, "pmulhrsu"),
-            &Opcode::PMADDUBSW => write!(f, "pmaddubsw"),
-            &Opcode::PABSD => write!(f, "pabsd"),
-            &Opcode::PABSW => write!(f, "pabsw"),
-            &Opcode::PABSB => write!(f, "pabsb"),
-            &Opcode::PHSUBSW => write!(f, "phsubsw"),
-            &Opcode::PHSUBW => write!(f, "phsubw"),
-            &Opcode::PHSUBD => write!(f, "phsubd"),
-            &Opcode::PHADDD => write!(f, "phaddd"),
-            &Opcode::PHADDSW => write!(f, "phaddsw"),
-            &Opcode::PHADDW => write!(f, "phaddw"),
-            &Opcode::HSUBPD => write!(f, "hsubpd"),
-            &Opcode::HADDPD => write!(f, "haddpd"),
-            &Opcode::ADDSUBPD => write!(f, "addsubpd"),
-            &Opcode::XABORT => write!(f, "xabort"),
-            &Opcode::XBEGIN => write!(f, "xbegin"),
-            &Opcode::RDSEED => write!(f, "rdseed"),
-            &Opcode::LZCNT => write!(f, "lzcnt"),
-            &Opcode::CLGI => write!(f, "clgi"),
-            &Opcode::STGI => write!(f, "stgi"),
-            &Opcode::SKINIT => write!(f, "skinit"),
-            &Opcode::VMLOAD => write!(f, "vmload"),
-            &Opcode::VMMCALL => write!(f, "vmmcall"),
-            &Opcode::VMSAVE => write!(f, "vmsave"),
-            &Opcode::VMRUN => write!(f, "vmrun"),
-            &Opcode::INVLPGA => write!(f, "invlpga"),
-            &Opcode::MOVBE => write!(f, "movbe"),
-            &Opcode::ADCX => write!(f, "adcx"),
-            &Opcode::ADOX => write!(f, "adox"),
-            &Opcode::PREFETCHW => write!(f, "prefetchw"),
-            &Opcode::RDRAND => write!(f, "rdrand"),
-            &Opcode::SHA1RNDS4 => write!(f, "sha1rnds4"),
-            &Opcode::SHA1NEXTE => write!(f, "sha1nexte"),
-            &Opcode::SHA1MSG1 => write!(f, "sha1msg1"),
-            &Opcode::SHA1MSG2 => write!(f, "sha1msg2"),
-            &Opcode::SHA256RNDS2 => write!(f, "sha256rnds2"),
-            &Opcode::SHA256MSG1 => write!(f, "sha256msg1"),
-            &Opcode::SHA256MSG2 => write!(f, "sha256msg2"),
-            &Opcode::Invalid => write!(f, "invalid"),
+        f.write_str(self.name())
+    }
+}
+
+const MNEMONICS: &[&'static str] = &[
+    "invalid",
+    "add",
+    "or",
+    "adc",
+    "sbb",
+    "and",
+    "xor",
+    "sub",
+    "cmp",
+    "xadd",
+    "bt",
+    "bts",
+    "btc",
+    "btr",
+    "bsf",
+    "bsr",
+    "tzcnt",
+    "movss",
+    "addss",
+    "subss",
+    "mulss",
+    "divss",
+    "minss",
+    "maxss",
+    "sqrtss",
+    "movsd",
+    "sqrtsd",
+    "addsd",
+    "subsd",
+    "mulsd",
+    "divsd",
+    "minsd",
+    "maxsd",
+    "movsldup",
+    "movshdup",
+    "movddup",
+    "haddps",
+    "hsubps",
+    "addsubpd",
+    "addsubps",
+    "cvtsi2ss",
+    "cvtsi2sd",
+    "cvttsd2si",
+    "cvttps2dq",
+    "cvtpd2dq",
+    "cvtpd2ps",
+    "cvtps2dq",
+    "cvtsd2si",
+    "cvtsd2ss",
+    "cvttss2si",
+    "cvtss2si",
+    "cvtss2sd",
+    "cvtdq2pd",
+    "lddqu",
+    "movsx",
+    "movsx",
+    "movzx",
+    "movzx",
+    "movsx",
+    "movsxd",
+    "sar",
+    "sal",
+    "shr",
+    "shrd",
+    "shl",
+    "rcr",
+    "rcl",
+    "ror",
+    "rol",
+    "inc",
+    "dec",
+    "hlt",
+    "call",
+    "callf",
+    "jmp",
+    "jmpf",
+    "push",
+    "pop",
+    "lea",
+    "nop",
+    "prefetchnta",
+    "prefetch0",
+    "prefetch1",
+    "prefetch2",
+    "xchg",
+    "popf",
+    "int",
+    "into",
+    "iret",
+    "iretd",
+    "iretq",
+    "retf",
+    "enter",
+    "leave",
+    "mov",
+    "ret",
+    "pushf",
+    "wait",
+    "cbw",
+    "cwde",
+    "cdqe",
+    "cwd",
+    "cdq",
+    "cqo",
+    "lods",
+    "stos",
+    "lahf",
+    "sahf",
+    "cmps",
+    "scas",
+    "movs",
+    "test",
+    "ins",
+    "in",
+    "outs",
+    "out",
+    "imul",
+    "jo",
+    "jno",
+    "jb",
+    "jnb",
+    "jz",
+    "jnz",
+    "ja",
+    "jna",
+    "js",
+    "jns",
+    "jp",
+    "jnp",
+    "jl",
+    "jge",
+    "jle",
+    "jg",
+    "cmova",
+    "cmovb",
+    "cmovg",
+    "cmovge",
+    "cmovl",
+    "cmovle",
+    "cmovna",
+    "cmovnb",
+    "cmovno",
+    "cmovnp",
+    "cmovns",
+    "cmovnz",
+    "cmovo",
+    "cmovp",
+    "cmovs",
+    "cmovz",
+    "div",
+    "idiv",
+    "mul",
+    "neg",
+    "not",
+    "cmpxchg",
+    "seto",
+    "setno",
+    "setb",
+    "setae",
+    "setz",
+    "setnz",
+    "setbe",
+    "seta",
+    "sets",
+    "setns",
+    "setp",
+    "setnp",
+    "setl",
+    "setge",
+    "setle",
+    "setg",
+    "cpuid",
+    "ud2",
+    "wbinvd",
+    "invd",
+    "sysret",
+    "clts",
+    "syscall",
+    "lsl",
+    "lar",
+    "les",
+    "lds",
+    "sgdt",
+    "sidt",
+    "lgdt",
+    "lidt",
+    "smsw",
+    "lmsw",
+    "swapgs",
+    "rdtscp",
+    "invlpg",
+    "fxsave",
+    "fxrstor",
+    "ldmxcsr",
+    "stmxcsr",
+    "xsave",
+    "xrstor",
+    "xsaveopt",
+    "lfence",
+    "mfence",
+    "sfence",
+    "clflush",
+    "clflushopt",
+    "clwb",
+    "wrmsr",
+    "rdtsc",
+    "rdmsr",
+    "rdpmc",
+    "sldt",
+    "str",
+    "lldt",
+    "ltr",
+    "verr",
+    "verw",
+    "cmc",
+    "clc",
+    "stc",
+    "cli",
+    "sti",
+    "cld",
+    "std",
+    "jmpe",
+    "popcnt",
+    "movdqu",
+    "movdqa",
+    "movq",
+    "cmpss",
+    "cmpsd",
+    "unpcklps",
+    "unpcklpd",
+    "unpckhps",
+    "unpckhpd",
+    "pshufhw",
+    "pshuflw",
+    "movups",
+    "movq2dq",
+    "movdq2q",
+    "rsqrtss",
+    "rcpss",
+    "andn",
+    "bextr",
+    "blsi",
+    "blsmsk",
+    "blsr",
+    "vmclear",
+    "vmxon",
+    "vmcall",
+    "vmlaunch",
+    "vmresume",
+    "vmxoff",
+    "monitor",
+    "mwait",
+    "clac",
+    "stac",
+    "encls",
+    "enclv",
+    "xgetbv",
+    "xsetbv",
+    "vmfunc",
+    "xabort",
+    "xbegin",
+    "xend",
+    "xtest",
+    "enclu",
+    "rdpkru",
+    "wrpkru",
+    "rdseed",
+    "rdrand",
+    "addps",
+    "addpd",
+    "andnps",
+    "andnpd",
+    "andps",
+    "andpd",
+    "bswap",
+    "cmppd",
+    "cmpps",
+    "comisd",
+    "comiss",
+    "cvtdq2ps",
+    "cvtpi2ps",
+    "cvtpi2pd",
+    "cvtps2pd",
+    "cvtps2pi",
+    "cvtpd2pi",
+    "cvttps2pi",
+    "cvttpd2pi",
+    "cvttpd2dq",
+    "divps",
+    "divpd",
+    "emms",
+    "getsec",
+    "lfs",
+    "lgs",
+    "lss",
+    "maskmovq",
+    "maskmovdqu",
+    "maxps",
+    "maxpd",
+    "minps",
+    "minpd",
+    "movaps",
+    "movapd",
+    "movd",
+    "movlps",
+    "movlpd",
+    "movhps",
+    "movhpd",
+    "movlhps",
+    "movhlps",
+    "movupd",
+    "movmskps",
+    "movmskpd",
+    "movnti",
+    "movntps",
+    "movntpd",
+    "movntq",
+    "movntdq",
+    "mulps",
+    "mulpd",
+    "orps",
+    "orpd",
+    "packssdw",
+    "packsswb",
+    "packuswb",
+    "paddb",
+    "paddd",
+    "paddq",
+    "paddsb",
+    "paddsw",
+    "paddusb",
+    "paddusw",
+    "paddw",
+    "pand",
+    "pandn",
+    "pavgb",
+    "pavgw",
+    "pcmpeqb",
+    "pcmpeqd",
+    "pcmpeqw",
+    "pcmpgtb",
+    "pcmpgtd",
+    "pcmpgtw",
+    "pinsrw",
+    "pmaddwd",
+    "pmaxsw",
+    "pmaxub",
+    "pminsw",
+    "pminub",
+    "pmovmskb",
+    "pmulhuw",
+    "pmulhw",
+    "pmullw",
+    "pmuludq",
+    "por",
+    "psadbw",
+    "pshufw",
+    "pshufd",
+    "pslld",
+    "pslldq",
+    "psllq",
+    "psllw",
+    "psrad",
+    "psraw",
+    "psrld",
+    "psrldq",
+    "psrlq",
+    "psrlw",
+    "psubb",
+    "psubd",
+    "psubq",
+    "psubsb",
+    "psubsw",
+    "psubusb",
+    "psubusw",
+    "psubw",
+    "punpckhbw",
+    "punpckhdq",
+    "punpckhwd",
+    "punpcklbw",
+    "punpckldq",
+    "punpcklwd",
+    "punpcklqdq",
+    "punpckhqdq",
+    "pxor",
+    "rcpps",
+    "rsm",
+    "rsqrtps",
+    "shld",
+    "shufpd",
+    "shufps",
+    "slhd",
+    "sqrtps",
+    "sqrtpd",
+    "subps",
+    "subpd",
+    "sysenter",
+    "sysexit",
+    "ucomisd",
+    "ucomiss",
+    "ud2e",
+    "vmread",
+    "vmwrite",
+    "xorps",
+    "xorpd",
+    "vmovddup",
+    "vpshuflw",
+    "vhaddps",
+    "vhsubps",
+    "vaddsubps",
+    "vcvtpd2dq",
+    "vlddqu",
+    "vcomisd",
+    "vcomiss",
+    "vucomisd",
+    "vucomiss",
+    "vaddpd",
+    "vaddps",
+    "vaddsd",
+    "vaddss",
+    "vaddsubpd",
+    "vaesdec",
+    "vaesdeclast",
+    "vaesenc",
+    "vaesenclast",
+    "vaesimc",
+    "vaeskeygenassist",
+    "vblendpd",
+    "vblendps",
+    "vblendvpd",
+    "vblendvps",
+    "vbroadcastf128",
+    "vbroadcasti128",
+    "vbroadcastsd",
+    "vbroadcastss",
+    "vcmpsd",
+    "vcmpss",
+    "vcmppd",
+    "vcmpps",
+    "vcvtdq2pd",
+    "vcvtdq2ps",
+    "vcvtpd2ps",
+    "vcvtph2ps",
+    "vcvtps2dq",
+    "vcvtps2pd",
+    "vcvtss2sd",
+    "vcvtsi2ss",
+    "vcvtsi2sd",
+    "vcvtsd2si",
+    "vcvtsd2ss",
+    "vcvtps2ph",
+    "vcvtss2si",
+    "vcvttpd2dq",
+    "vcvttps2dq",
+    "vcvttss2si",
+    "vcvttsd2si",
+    "vdivpd",
+    "vdivps",
+    "vdivsd",
+    "vdivss",
+    "vdppd",
+    "vdpps",
+    "vextractf128",
+    "vextracti128",
+    "vextractps",
+    "vfmadd132pd",
+    "vfmadd132ps",
+    "vfmadd132sd",
+    "vfmadd132ss",
+    "vfmadd213pd",
+    "vfmadd213ps",
+    "vfmadd213sd",
+    "vfmadd213ss",
+    "vfmadd231pd",
+    "vfmadd231ps",
+    "vfmadd231sd",
+    "vfmadd231ss",
+    "vfmaddsub132pd",
+    "vfmaddsub132ps",
+    "vfmaddsub213pd",
+    "vfmaddsub213ps",
+    "vfmaddsub231pd",
+    "vfmaddsub231ps",
+    "vfmsub132pd",
+    "vfmsub132ps",
+    "vfmsub132sd",
+    "vfmsub132ss",
+    "vfmsub213pd",
+    "vfmsub213ps",
+    "vfmsub213sd",
+    "vfmsub213ss",
+    "vfmsub231pd",
+    "vfmsub231ps",
+    "vfmsub231sd",
+    "vfmsub231ss",
+    "vfmsubadd132pd",
+    "vfmsubadd132ps",
+    "vfmsubadd213pd",
+    "vfmsubadd213ps",
+    "vfmsubadd231pd",
+    "vfmsubadd231ps",
+    "vfnmadd132pd",
+    "vfnmadd132ps",
+    "vfnmadd132sd",
+    "vfnmadd132ss",
+    "vfnmadd213pd",
+    "vfnmadd213ps",
+    "vfnmadd213sd",
+    "vfnmadd213ss",
+    "vfnmadd231pd",
+    "vfnmadd231ps",
+    "vfnmadd231sd",
+    "vfnmadd231ss",
+    "vfnmsub132pd",
+    "vfnmsub132ps",
+    "vfnmsub132sd",
+    "vfnmsub132ss",
+    "vfnmsub213pd",
+    "vfnmsub213ps",
+    "vfnmsub213sd",
+    "vfnmsub213ss",
+    "vfnmsub231pd",
+    "vfnmsub231ps",
+    "vfnmsub231sd",
+    "vfnmsub231ss",
+    "vgatherdpd",
+    "vgatherdps",
+    "vgatherqpd",
+    "vgatherqps",
+    "vhaddpd",
+    "vhsubpd",
+    "vinsertf128",
+    "vinserti128",
+    "vinsertps",
+    "vmaskmovdqu",
+    "vmaskmovpd",
+    "vmaskmovps",
+    "vmaxpd",
+    "vmaxps",
+    "vmaxsd",
+    "vmaxss",
+    "vminpd",
+    "vminps",
+    "vminsd",
+    "vminss",
+    "vmovapd",
+    "vmovaps",
+    "vmovd",
+    "vmovdqa",
+    "vmovdqu",
+    "vmovhlps",
+    "vmovhpd",
+    "vmovhps",
+    "vmovlhps",
+    "vmovlpd",
+    "vmovlps",
+    "vmovmskpd",
+    "vmovmskps",
+    "vmovntdq",
+    "vmovntdqa",
+    "vmovntpd",
+    "vmovntps",
+    "vmovq",
+    "vmovss",
+    "vmovsd",
+    "vmovshdup",
+    "vmovsldup",
+    "vmovupd",
+    "vmovups",
+    "vmpsadbw",
+    "vmulpd",
+    "vmulps",
+    "vmulsd",
+    "vmulss",
+    "vpabsb",
+    "vpabsd",
+    "vpabsw",
+    "vpackssdw",
+    "vpacksswb",
+    "vpackuswb",
+    "vpaddb",
+    "vpaddd",
+    "vpaddq",
+    "vpaddsb",
+    "vpaddsw",
+    "vpaddusb",
+    "vpaddusw",
+    "vpaddw",
+    "vpalignr",
+    "vpand",
+    "vpandn",
+    "vpavgb",
+    "vpavgw",
+    "vpblendd",
+    "vpblendvb",
+    "vpblendw",
+    "vpbroadcastb",
+    "vpbroadcastd",
+    "vpbroadcastq",
+    "vpbroadcastw",
+    "vpclmulqdq",
+    "vpcmpeqb",
+    "vpcmpeqd",
+    "vpcmpeqq",
+    "vpcmpeqw",
+    "vpcmpgtb",
+    "vpcmpgtd",
+    "vpcmpgtq",
+    "vpcmpgtw",
+    "vpcmpistri",
+    "vpcmpistrm",
+    "vperm2f128",
+    "vperm2i128",
+    "vpermd",
+    "vpermilpd",
+    "vpermilps",
+    "vpermpd",
+    "vpermps",
+    "vpermq",
+    "vpextrb",
+    "vpextrd",
+    "vpextrq",
+    "vpextrw",
+    "vpgatherdd",
+    "vpgatherdq",
+    "vpgatherqd",
+    "vpgatherqq",
+    "vphaddd",
+    "vphaddsw",
+    "vphaddw",
+    "vphaddubsw",
+    "vphminposuw",
+    "vphsubd",
+    "vphsubsw",
+    "vphsubw",
+    "vpinsrb",
+    "vpinsrd",
+    "vpinsrq",
+    "vpinsrw",
+    "vpmaddwd",
+    "vpmaskmovd",
+    "vpmaskmovq",
+    "vpmaxsb",
+    "vpmaxsd",
+    "vpmaxsw",
+    "vpmaxub",
+    "vpmaxud",
+    "vpminsw",
+    "vpminsd",
+    "vpminud",
+    "vpmovmskb",
+    "vpmovsxbd",
+    "vpmovsxbq",
+    "vpmovsxbw",
+    "vpmovsxdq",
+    "vpmovsxwd",
+    "vpmovsxwq",
+    "vpmovzxbd",
+    "vpmovzxbq",
+    "vpmovzxbw",
+    "vpmovzxdq",
+    "vpmovzxwd",
+    "vpmovzxwq",
+    "vpmuldq",
+    "vpmulhrsw",
+    "vpmulhuw",
+    "vpmulhw",
+    "vpmulld",
+    "vpmullw",
+    "vpmuludq",
+    "vpor",
+    "vpsadbw",
+    "vpshufb",
+    "vpshufd",
+    "vpsignb",
+    "vpsignd",
+    "vpsignw",
+    "vpslld",
+    "vpslldq",
+    "vpsllq",
+    "vpsllvd",
+    "vpsllvq",
+    "vpsllw",
+    "vpsrad",
+    "vpsravd",
+    "vpsraw",
+    "vpsrld",
+    "vpsrldq",
+    "vpsrlq",
+    "vpsrlvd",
+    "vpsrlvq",
+    "vpsrlw",
+    "vpsubb",
+    "vpsubd",
+    "vpsubq",
+    "vpsubsb",
+    "vpsubsw",
+    "vpsubusb",
+    "vpsubusw",
+    "vpsubw",
+    "vptest",
+    "vpunpckhbw",
+    "vpunpckhdq",
+    "vpunpckhqdq",
+    "vpunpckhwd",
+    "vpunpcklbw",
+    "vpunpckldq",
+    "vpunpcklqdq",
+    "vpunpcklwd",
+    "vpxor",
+    "vrcpps",
+    "vroundpd",
+    "vroundps",
+    "vroundsd",
+    "vroundss",
+    "vrsqrtps",
+    "vrsqrtss",
+    "vrcpss",
+    "vshufpd",
+    "vshufps",
+    "vsqrtpd",
+    "vsqrtps",
+    "vsqrtss",
+    "vsqrtsd",
+    "vsubpd",
+    "vsubps",
+    "vsubsd",
+    "vsubss",
+    "vtestpd",
+    "vtestps",
+    "vunpckhpd",
+    "vunpckhps",
+    "vunpcklpd",
+    "vunpcklps",
+    "vxorpd",
+    "vxorps",
+    "vzeroupper",
+    "pclmulqdq",
+    "aeskeygenassist",
+    "aesimc",
+    "aesenc",
+    "aesenclast",
+    "aesdec",
+    "aesdeclast",
+    "pcmpgtq",
+    "pcmpistrm",
+    "pcmpistri",
+    "pcmpestri",
+    "packusdw",
+    "pcmpestrm",
+    "pcmpeqq",
+    "ptest",
+    "phminposuw",
+    "dpps",
+    "dppd",
+    "mpsadbw",
+    "pmovzxdq",
+    "pmovsxdq",
+    "pmovzxbd",
+    "pmovsxbd",
+    "pmovzxwq",
+    "pmovsxwq",
+    "pmovzxbq",
+    "pmovsxbq",
+    "pmovsxwd",
+    "pmovzxwd",
+    "pextrq",
+    "pextrd",
+    "pextrw",
+    "pextrb",
+    "pmovsxbw",
+    "pmovzxbw",
+    "pinsrq",
+    "pinsrd",
+    "pinsrb",
+    "extractps",
+    "insertps",
+    "roundss",
+    "roundsd",
+    "roundps",
+    "roundpd",
+    "pmaxsb",
+    "pmaxsd",
+    "pmaxuw",
+    "pmaxud",
+    "pminsd",
+    "pminsb",
+    "pminud",
+    "pminuw",
+    "blendw",
+    "pblendvb",
+    "pblendw",
+    "blendvps",
+    "blendvpd",
+    "blendps",
+    "blendpd",
+    "pmuldq",
+    "movntdqa",
+    "pmulld",
+    "palignr",
+    "psignw",
+    "psignd",
+    "psignb",
+    "pshufb",
+    "pmulhrsw",
+    "pmaddubsw",
+    "pabsd",
+    "pabsw",
+    "pabsb",
+    "phsubsw",
+    "phsubw",
+    "phsubd",
+    "phaddd",
+    "phaddsw",
+    "phaddw",
+    "hsubpd",
+    "haddpd",
+    "sha1rnds4",
+    "sha1nexte",
+    "sha1msg1",
+    "sha1msg2",
+    "sha256rnds2",
+    "sha256msg1",
+    "sha256msg2",
+    "lzcnt",
+    "clgi",
+    "stgi",
+    "skinit",
+    "vmload",
+    "vmmcall",
+    "vmsave",
+    "vmrun",
+    "invlpga",
+    "movbe",
+    "adcx",
+    "adox",
+    "prefetchw",
+    "rdpid",
+    "cmpxchg8b",
+    "cmpxchg16b",
+    "vmptrld",
+    "vmptrst",
+    "bzhi",
+    "mulx",
+    "shlx",
+    "shrx",
+    "sarx",
+    "pdep",
+    "pext",
+    "rorx",
+    "xrstors",
+    "xrstors64",
+    "xsavec",
+    "xsavec64",
+    "xsaves",
+    "xsaves64",
+    "rdfsbase",
+    "rdgsbase",
+    "wrfsbase",
+    "wrgsbase",
+    "crc32",
+    "xlat",
+
+    "f2xm1",
+    "fabs",
+    "fadd",
+    "faddp",
+    "fbld",
+    "fbstp",
+    "fchs",
+    "fcmovb",
+    "fcmovbe",
+    "fcmove",
+    "fcmovnb",
+    "fcmovnbe",
+    "fcmovne",
+    "fcmovnu",
+    "fcmovu",
+    "fcom",
+    "fcomi",
+    "fcomip",
+    "fcomp",
+    "fcompp",
+    "fcos",
+    "fdecstp",
+    "fdisi8087_nop",
+    "fdiv",
+    "fdivp",
+    "fdivr",
+    "fdivrp",
+    "feni8087_nop",
+    "ffree",
+    "ffreep",
+    "fiadd",
+    "ficom",
+    "ficomp",
+    "fidiv",
+    "fidivr",
+    "fild",
+    "fimul",
+    "fincstp",
+    "fist",
+    "fistp",
+    "fisttp",
+    "fisub",
+    "fisubr",
+    "fld",
+    "fld1",
+    "fldcw",
+    "fldenv",
+    "fldl2e",
+    "fldl2t",
+    "fldlg2",
+    "fldln2",
+    "fldpi",
+    "fldz",
+    "fmul",
+    "fmulp",
+    "fnclex",
+    "fninit",
+    "fnop",
+    "fnsave",
+    "fnstcw",
+    "fnstenv",
+    "fnstor",
+    "fnstsw",
+    "fpatan",
+    "fprem",
+    "fprem1",
+    "fptan",
+    "frndint",
+    "frstor",
+    "fscale",
+    "fsetpm287_nop",
+    "fsin",
+    "fsincos",
+    "fsqrt",
+    "fst",
+    "fstp",
+    "fstpnce",
+    "fsub",
+    "fsubp",
+    "fsubr",
+    "fsubrp",
+    "ftst",
+    "fucom",
+    "fucomi",
+    "fucomip",
+    "fucomp",
+    "fucompp",
+    "fxam",
+    "fxch",
+    "fxtract",
+    "fyl2x",
+    "fyl2xp1",
+    "loopnz",
+    "loopz",
+    "loop",
+    "jrcxz",
+    "pusha",
+    "popa",
+    "arpl",
+];
+
+impl Opcode {
+    fn name(&self) -> &'static str {
+        unsafe {
+            MNEMONICS.get_unchecked(*self as usize)
         }
     }
 }
@@ -1227,7 +1338,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPMULUDQ |
             Opcode::PCLMULQDQ |
             Opcode::PMULDQ |
-            Opcode::PMULHRSU |
+            Opcode::PMULHRSW |
             Opcode::PMULLD |
             Opcode::VPSUBB |
             Opcode::VPSUBD |
@@ -1298,6 +1409,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PHSUBW |
             Opcode::PMADDUBSW |
             Opcode::ADDSUBPD |
+            Opcode::DPPS |
+            Opcode::DPPD |
             Opcode::MPSADBW |
             Opcode::RCPSS |
             Opcode::RSQRTSS |
@@ -1430,14 +1543,56 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SLHD |
             Opcode::UCOMISD |
             Opcode::UCOMISS |
+            Opcode::F2XM1 |
+            Opcode::FABS |
+            Opcode::FADD |
+            Opcode::FADDP |
+            Opcode::FCHS |
+            Opcode::FCOS |
+            Opcode::FDIV |
+            Opcode::FDIVP |
+            Opcode::FDIVR |
+            Opcode::FDIVRP |
+            Opcode::FIADD |
+            Opcode::FIDIV |
+            Opcode::FIDIVR |
+            Opcode::FIMUL |
+            Opcode::FISUB |
+            Opcode::FISUBR |
+            Opcode::FMUL |
+            Opcode::FMULP |
+            Opcode::FNCLEX |
+            Opcode::FNINIT |
+            Opcode::FPATAN |
+            Opcode::FPREM |
+            Opcode::FPREM1 |
+            Opcode::FPTAN |
+            Opcode::FRNDINT |
+            Opcode::FSCALE |
+            Opcode::FSIN |
+            Opcode::FSINCOS |
+            Opcode::FSQRT |
+            Opcode::FSUB |
+            Opcode::FSUBP |
+            Opcode::FSUBR |
+            Opcode::FSUBRP |
+            Opcode::FXTRACT |
+            Opcode::FYL2X |
+            Opcode::FYL2XP1 |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
             Opcode::PUSHF |
             Opcode::ENTER |
             Opcode::LEAVE |
+            Opcode::PUSHA |
+            Opcode::POPA |
             Opcode::PUSH |
             Opcode::POP => { write!(out, "{}", colors.stack_op(self)) }
             Opcode::WAIT |
+            Opcode::FNOP |
+            Opcode::FDISI8087_NOP |
+            Opcode::FENI8087_NOP |
+            Opcode::FSETPM287_NOP |
             Opcode::PREFETCHNTA |
             Opcode::PREFETCH0 |
             Opcode::PREFETCH1 |
@@ -1450,8 +1605,14 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::INT |
             Opcode::INTO |
             Opcode::IRET |
+            Opcode::IRETD |
+            Opcode::IRETQ |
             Opcode::RETF |
             Opcode::RETURN => { write!(out, "{}", colors.stop_op(self)) }
+            Opcode::LOOPNZ |
+            Opcode::LOOPZ |
+            Opcode::LOOP |
+            Opcode::JRCXZ |
             Opcode::CALL |
             Opcode::CALLF |
             Opcode::JMP |
@@ -1498,7 +1659,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VBLENDPS |
             Opcode::VBLENDVPD |
             Opcode::VBLENDVPS |
-            Opcode::BLENDDVB |
+            Opcode::PBLENDVB |
+            Opcode::PBLENDW |
             Opcode::BLENDPD |
             Opcode::BLENDPS |
             Opcode::BLENDVPD |
@@ -1619,6 +1781,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPEXTRQ |
             Opcode::VPEXTRW |
             Opcode::PEXTRB |
+            Opcode::PEXTRD |
             Opcode::PEXTRQ |
             Opcode::PINSRB |
             Opcode::PINSRD |
@@ -1700,6 +1863,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SHUFPS |
             Opcode::PMOVMSKB |
             Opcode::LDDQU |
+            Opcode::CMC |
             Opcode::CLC |
             Opcode::CLI |
             Opcode::CLD |
@@ -1739,7 +1903,35 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MOVZX_b |
             Opcode::MOVZX_w |
             Opcode::MOVSX |
+            Opcode::MOVSXD |
+            Opcode::FILD |
+            Opcode::FBLD |
+            Opcode::FBSTP |
+            Opcode::FIST |
+            Opcode::FISTP |
+            Opcode::FISTTP |
+            Opcode::FLD |
+            Opcode::FLD1 |
+            Opcode::FLDCW |
+            Opcode::FLDENV |
+            Opcode::FLDL2E |
+            Opcode::FLDL2T |
+            Opcode::FLDLG2 |
+            Opcode::FLDLN2 |
+            Opcode::FLDPI |
+            Opcode::FLDZ |
+            Opcode::FST |
+            Opcode::FSTP |
+            Opcode::FSTPNCE |
+            Opcode::FNSAVE |
+            Opcode::FNSTCW |
+            Opcode::FNSTENV |
+            Opcode::FNSTOR |
+            Opcode::FNSTSW |
+            Opcode::FRSTOR |
+            Opcode::FXCH |
             Opcode::XCHG |
+            Opcode::XLAT |
             Opcode::CMOVA |
             Opcode::CMOVB |
             Opcode::CMOVG |
@@ -1756,6 +1948,14 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CMOVP |
             Opcode::CMOVS |
             Opcode::CMOVZ |
+            Opcode::FCMOVB |
+            Opcode::FCMOVBE |
+            Opcode::FCMOVE |
+            Opcode::FCMOVNB |
+            Opcode::FCMOVNBE |
+            Opcode::FCMOVNE |
+            Opcode::FCMOVNU |
+            Opcode::FCMOVU |
             Opcode::SETO |
             Opcode::SETNO |
             Opcode::SETB |
@@ -1802,7 +2002,9 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPMAXSB |
             Opcode::VPMAXSD |
             Opcode::VPMAXSW |
+            Opcode::VPMAXUB |
             Opcode::VPMAXUD |
+            Opcode::VPMINSW |
             Opcode::VPMINSD |
             Opcode::VPMINUD |
             Opcode::VPTEST |
@@ -1830,6 +2032,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MINSD |
             Opcode::MINSS |
             Opcode::PMAXSB |
+            Opcode::PMAXSD |
             Opcode::PMAXSW |
             Opcode::PMAXUB |
             Opcode::PMAXUD |
@@ -1843,12 +2046,27 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
+            Opcode::FTST |
+            Opcode::FXAM |
+            Opcode::FUCOM |
+            Opcode::FUCOMI |
+            Opcode::FUCOMIP |
+            Opcode::FUCOMP |
+            Opcode::FUCOMPP |
+            Opcode::FCOM |
+            Opcode::FCOMI |
+            Opcode::FCOMIP |
+            Opcode::FCOMP |
+            Opcode::FCOMPP |
+            Opcode::FICOM |
+            Opcode::FICOMP |
             Opcode::CMPSD |
             Opcode::CMPSS |
             Opcode::CMP |
             Opcode::CMPPS |
             Opcode::CMPPD |
             Opcode::CMPXCHG8B |
+            Opcode::CMPXCHG16B |
             Opcode::CMPXCHG => { write!(out, "{}", colors.comparison_op(self)) }
 
             Opcode::WRMSR |
@@ -1867,8 +2085,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::XSAVE |
             Opcode::XSAVEC |
             Opcode::XSAVES |
+            Opcode::XSAVEC64 |
+            Opcode::XSAVES64 |
             Opcode::XRSTOR |
             Opcode::XRSTORS |
+            Opcode::XRSTORS64 |
             Opcode::XSAVEOPT |
             Opcode::LFENCE |
             Opcode::MFENCE |
@@ -1907,7 +2128,6 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::LFS |
             Opcode::LGS |
             Opcode::LSS |
-            Opcode::ARPL |
             Opcode::RSM |
             Opcode::SYSENTER |
             Opcode::SYSEXIT |
@@ -1915,8 +2135,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMREAD |
             Opcode::VMWRITE |
             Opcode::VMCLEAR |
-            Opcode::VMPTRST |
             Opcode::VMPTRLD |
+            Opcode::VMPTRST |
             Opcode::VMXON |
             Opcode::VMCALL |
             Opcode::VMLAUNCH |
@@ -1945,8 +2165,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::ENCLU |
             Opcode::RDPKRU |
             Opcode::WRPKRU |
+            Opcode::ARPL |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
+            Opcode::CRC32 |
             Opcode::RDSEED |
             Opcode::RDRAND |
             Opcode::SHA1RNDS4 |
@@ -1956,6 +2178,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SHA256RNDS2 |
             Opcode::SHA256MSG1 |
             Opcode::SHA256MSG2 |
+            Opcode::FFREE |
+            Opcode::FFREEP |
+            Opcode::FDECSTP |
+            Opcode::FINCSTP |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |
@@ -2005,95 +2231,100 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
 /// No per-operand context when contextualizing an instruction!
 struct NoContext;
 
+impl Instruction {
+    pub fn write_to<T: fmt::Write>(&self, out: &mut T) -> fmt::Result {
+        self.contextualize(&NoColors, 0, Some(&NoContext), out)
+    }
+}
+
 impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u64, NoContext, Color, T, Y> for Instruction {
     fn contextualize(&self, colors: &Y, _address: u64, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
         if self.prefixes.lock() {
             write!(out, "lock ")?;
         }
 
-        if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
-            // only a few of you actually use the prefix...
-            if self.prefixes.rep() {
-                write!(out, "rep ")?;
-            } else if self.prefixes.repz() {
-                write!(out, "repz ")?;
-            } else if self.prefixes.repnz() {
-                write!(out, "repnz ")?;
+        if self.prefixes.rep_any() {
+            if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
+                // only a few of you actually use the prefix...
+                if self.prefixes.rep() {
+                    write!(out, "rep ")?;
+                } else if self.prefixes.repz() {
+                    write!(out, "repz ")?;
+                } else if self.prefixes.repnz() {
+                    write!(out, "repnz ")?;
+                }
             }
         }
 
-        self.opcode.colorize(colors, out)?;
+        out.write_str(self.opcode.name())?;
 
         if self.opcode == Opcode::XBEGIN {
             return write!(out, " $+{}", colors.number(signed_i32_hex(self.imm as i32)));
         }
 
-        match self.operands[0] {
-            OperandSpec::Nothing => {
-                return Ok(());
-            },
-            _ => {
-                write!(out, " ")?;
-                if let Some(prefix) = self.segment_override_for_op(0) {
-                    write!(out, "{}:", prefix)?;
-                }
-            }
-        }
-        let x = Operand::from_spec(self, self.operands[0]);
-        x.colorize(colors, out)?;
+        if self.operand_count > 0 {
+            out.write_str(" ")?;
 
-        for i in 1..4 {
-            match self.opcode {
-                Opcode::MOVSX_b |
-                Opcode::MOVZX_b => {
-                    match &self.operands[i] {
-                        &OperandSpec::Nothing => {
-                            return Ok(());
-                        },
-                        &OperandSpec::RegMMM => {
-                            write!(out, ", ")?;
-                        }
-                        _ => {
-                            write!(out, ", byte ")?;
-                            if let Some(prefix) = self.segment_override_for_op(1) {
-                                write!(out, "{}:", prefix)?;
+            if let Some(prefix) = self.segment_override_for_op(0) {
+                write!(out, "{}:", prefix)?;
+            }
+
+            let x = Operand::from_spec(self, self.operands[0]);
+            x.colorize(colors, out)?;
+
+            for i in 1..self.operand_count {
+                match self.opcode {
+                    Opcode::MOVSX_b |
+                    Opcode::MOVZX_b => {
+                        match &self.operands[i as usize] {
+                            &OperandSpec::Nothing => {
+                                return Ok(());
+                            },
+                            &OperandSpec::RegMMM => {
+                                out.write_str(", ")?;
+                            }
+                            _ => {
+                                out.write_str(", byte ")?;
+                                if let Some(prefix) = self.segment_override_for_op(i) {
+                                    write!(out, "{}:", prefix)?;
+                                }
                             }
                         }
-                    }
-                    let x = Operand::from_spec(self, self.operands[i]);
-                    x.colorize(colors, out)?
-                },
-                Opcode::MOVSX_w |
-                Opcode::MOVZX_w => {
-                    match &self.operands[i] {
-                        &OperandSpec::Nothing => {
-                            return Ok(());
-                        },
-                        &OperandSpec::RegMMM => {
-                            write!(out, ", ")?;
-                        }
-                        _ => {
-                            write!(out, ", word ")?;
-                            if let Some(prefix) = self.segment_override_for_op(1) {
-                                write!(out, "{}:", prefix)?;
+                        let x = Operand::from_spec(self, self.operands[i as usize]);
+                        x.colorize(colors, out)?
+                    },
+                    Opcode::MOVSX_w |
+                    Opcode::MOVZX_w => {
+                        match &self.operands[i as usize] {
+                            &OperandSpec::Nothing => {
+                                return Ok(());
+                            },
+                            &OperandSpec::RegMMM => {
+                                out.write_str(", ")?;
+                            }
+                            _ => {
+                                out.write_str(", word ")?;
+                                if let Some(prefix) = self.segment_override_for_op(1) {
+                                    write!(out, "{}:", prefix)?;
+                                }
                             }
                         }
-                    }
-                    let x = Operand::from_spec(self, self.operands[i]);
-                    x.colorize(colors, out)?
-                },
-                _ => {
-                    match &self.operands[i] {
-                        &OperandSpec::Nothing => {
-                            return Ok(());
-                        },
-                        _ => {
-                            write!(out, ", ")?;
-                            if let Some(prefix) = self.segment_override_for_op(1) {
-                                write!(out, "{}:", prefix)?;
+                        let x = Operand::from_spec(self, self.operands[i as usize]);
+                        x.colorize(colors, out)?
+                    },
+                    _ => {
+                        match &self.operands[i as usize] {
+                            &OperandSpec::Nothing => {
+                                return Ok(());
+                            },
+                            _ => {
+                                out.write_str(", ")?;
+                                if let Some(prefix) = self.segment_override_for_op(1) {
+                                    write!(out, "{}:", prefix)?;
+                                }
+                                let x = Operand::from_spec(self, self.operands[i as usize]);
+                                x.colorize(colors, out)?
                             }
-                            let x = Operand::from_spec(self, self.operands[i]);
-                            x.colorize(colors, out)?
                         }
                     }
                 }
