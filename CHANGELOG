@@ -8,6 +8,14 @@
 * support x86_32 `pusha`/`popa`
 * support x86_32 BCD instructions
   - for `aam`/`aad`, the undocumented `amx` and `adx` forms are used in all cases, including when the base is 10
+* begin some proper documentation for public items
+
+/!\ BREAKING CHANGES /!\
+* `RegisterBank` is no longer public. `RegisterClass` should be a suitable
+  replacement, accessible via `reg.class()`, with the register class name
+  available by `reg.class().name`, and size available by `reg.class().width()`.
+  `reg.width()` still works, and just forwards to `reg.class().width()`.
+* the field `opcode` of `Instruction` is no longer public. it can now be accessed by `inst.opcode()`.
 
 ## 0.0.15
 

@@ -19,16 +19,6 @@ pub struct RegSpec {
     bank: RegisterBank
 }
 
-impl RegSpec {
-    pub fn num(&self) -> u8 {
-        self.num
-    }
-
-    pub fn class(&self) -> RegisterClass {
-        RegisterClass { kind: self.bank }
-    }
-}
-
 use core::hash::Hash;
 use core::hash::Hasher;
 impl Hash for RegSpec {
@@ -70,6 +60,16 @@ pub enum ConditionCode {
 
 #[allow(non_snake_case)]
 impl RegSpec {
+    pub fn num(&self) -> u8 {
+        self.num
+    }
+
+    pub fn class(&self) -> RegisterClass {
+        RegisterClass { kind: self.bank }
+    }
+
+    /// return a human-friendly name for this register. the returned name is the same as would be
+    /// used to render this register in an instruction.
     pub fn name(&self) -> &'static str {
         display::regspec_label(self)
     }
@@ -270,6 +270,7 @@ impl RegSpec {
         RegSpec { bank: RegisterBank::MM, num: 0 }
     }
 
+    /// return the size of this register, in bytes
     #[inline]
     pub fn width(&self) -> u8 {
         self.class().width()
@@ -427,6 +428,10 @@ impl Operand {
         }
     }
 
+    /// return the width of this operand, in bytes. register widths are determined by the
+    /// register's class.
+    ///
+    /// TODO: /!\ MEMORY WIDTHS ARE ALWAYS REPORTED AS 8 /!\
     pub fn width(&self) -> u8 {
         match self {
             Operand::Nothing => {
@@ -3133,15 +3138,22 @@ impl Instruction {
         self.opcode
     }
 
+    /// get the `Operand` at the provided index.
+    ///
+    /// panics if the index is `>= 4`.
     pub fn operand(&self, i: u8) -> Operand {
         assert!(i < 4);
         Operand::from_spec(self, self.operands[i as usize])
     }
 
+    /// get the number of operands in this instruction. useful in iterating an instruction's
+    /// operands generically.
     pub fn operand_count(&self) -> u8 {
         self.operand_count
     }
 
+    /// check if operand `i` is an actual operand or not. will be `false` for `i >=
+    /// inst.operand_count()`.
     pub fn operand_present(&self, i: u8) -> bool {
         assert!(i < 4);
         if i >= self.operand_count {
@@ -3155,6 +3167,8 @@ impl Instruction {
         }
     }
 
+    /// build a new instruction representing nothing in particular. this is primarily useful as a
+    /// default to pass to `decode_into`.
     pub fn invalid() -> Instruction {
         Instruction {
             prefixes: Prefixes::new(0),
@@ -3583,7 +3597,7 @@ enum OperandCode {
     DX_AL = OperandCodeBuilder::new().special_case(47).bits(),
     MOVQ_f30f = OperandCodeBuilder::new().special_case(48).bits(),
 
-    Unsupported = OperandCodeBuilder::new().special_case(49).bits(),
+//    Unsupported = OperandCodeBuilder::new().special_case(49).bits(),
 
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().special_case(40).bits(),
     ModRM_0x0f01 = OperandCodeBuilder::new().read_modrm().special_case(41).bits(),
@@ -6390,9 +6404,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
         }
+        /*
         OperandCode::Unsupported => {
             return Err(DecodeError::IncompleteDecoder);
         }
+        */
         OperandCode::Iw_Ib => {
             instruction.disp = read_num(&mut bytes_iter, 2)?;
             instruction.imm = read_num(&mut bytes_iter, 1)?;
@@ -7328,7 +7344,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[1] = OperandSpec::Deref;
             instruction.operand_count = 2;
         }
-        // TODO: two memory operands! this is wrong!!!
         OperandCode::Yb_Xb => {
             instruction.operands[0] = OperandSpec::Deref_edi;
             instruction.operands[1] = OperandSpec::Deref_esi;
