@@ -1457,6 +1457,21 @@ fn only_32bit() {
     test_display(&[0x60], "pusha");
     test_display(&[0x61], "popa");
     test_display(&[0xce], "into");
+    test_display(&[0x06], "push es");
+    test_display(&[0x07], "pop es");
+    test_display(&[0x0e], "push cs");
+    test_display(&[0x16], "push ss");
+    test_display(&[0x17], "pop ss");
+    test_display(&[0x1e], "push ds");
+    test_display(&[0x1f], "pop ds");
+    test_display(&[0x27], "daa");
+    test_display(&[0x2f], "das");
+    test_display(&[0x37], "aaa");
+    test_display(&[0x3f], "aas");
+    test_display(&[0xd4, 0x01], "amx 0x1");
+    test_display(&[0xd4, 0x0a], "amx 0xa"); // aka "aam"
+    test_display(&[0xd5, 0x01], "adx 0x1");
+    test_display(&[0xd5, 0x0a], "adx 0xa"); // aka "aad"
 }
 
 #[test]

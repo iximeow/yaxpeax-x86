@@ -1214,6 +1214,12 @@ const MNEMONICS: &[&'static str] = &[
     "pusha",
     "popa",
     "arpl",
+    "aas",
+    "aaa",
+    "das",
+    "daa",
+    "amx",
+    "adx",
 ];
 
 impl Opcode {
@@ -1579,6 +1585,12 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::FXTRACT |
             Opcode::FYL2X |
             Opcode::FYL2XP1 |
+            Opcode::AAS |
+            Opcode::AAA |
+            Opcode::DAS |
+            Opcode::DAA |
+            Opcode::ADX |
+            Opcode::AMX |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
             Opcode::PUSHF |
