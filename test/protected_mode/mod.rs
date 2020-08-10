@@ -816,6 +816,7 @@ fn test_0fae() {
 fn test_system() {
     test_display(&[0x63, 0xc1], "arpl cx, ax");
     test_display(&[0x63, 0x04, 0xba], "arpl [edx + edi * 4], ax");
+    test_display(&[0x0f, 0x06], "clts");
 }
 
 #[test]

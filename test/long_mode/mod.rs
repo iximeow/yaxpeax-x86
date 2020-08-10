@@ -929,6 +929,7 @@ fn test_system() {
     test_display(&[0x40, 0x0f, 0x23, 0xc8], "mov dr1, rax");
     test_display(&[0x0f, 0x23, 0xc8], "mov dr1, rax");
     test_display(&[0x0f, 0x21, 0xc8], "mov rax, dr1");
+    test_display(&[0x0f, 0x06], "clts");
 }
 
 #[test]
