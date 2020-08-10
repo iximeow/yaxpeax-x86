@@ -9,14 +9,24 @@ use yaxpeax_arch::{AddressDiff, Decoder, LengthedInstruction};
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Serialize, Deserialize)]
 pub struct RegSpec {
-    pub num: u8,
-    pub bank: RegisterBank
+    num: u8,
+    bank: RegisterBank
 }
 #[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub struct RegSpec {
-    pub num: u8,
-    pub bank: RegisterBank
+    num: u8,
+    bank: RegisterBank
+}
+
+impl RegSpec {
+    pub fn num(&self) -> u8 {
+        self.num
+    }
+
+    pub fn class(&self) -> RegisterClass {
+        RegisterClass { kind: self.bank }
+    }
 }
 
 use core::hash::Hash;
@@ -236,43 +246,33 @@ impl RegSpec {
     }
 
     #[inline]
+    pub fn zmm0() -> RegSpec {
+        RegSpec { bank: RegisterBank::Z, num: 0 }
+    }
+
+    #[inline]
+    pub fn ymm0() -> RegSpec {
+        RegSpec { bank: RegisterBank::Y, num: 0 }
+    }
+
+    #[inline]
+    pub fn xmm0() -> RegSpec {
+        RegSpec { bank: RegisterBank::X, num: 0 }
+    }
+
+    #[inline]
+    pub fn st0() -> RegSpec {
+        RegSpec { bank: RegisterBank::ST, num: 0 }
+    }
+
+    #[inline]
+    pub fn mm0() -> RegSpec {
+        RegSpec { bank: RegisterBank::MM, num: 0 }
+    }
+
+    #[inline]
     pub fn width(&self) -> u8 {
-        match self.bank {
-            RegisterBank::D => 4,
-            RegisterBank::W => 2,
-            RegisterBank::B => 1,
-            RegisterBank::CR |
-            RegisterBank::DR => {
-                4
-            },
-            RegisterBank::S => {
-                2
-            },
-            RegisterBank::EIP => {
-                4
-            }
-            RegisterBank::EFlags => {
-                4
-            }
-            RegisterBank::X => {
-                16
-            }
-            RegisterBank::Y => {
-                32
-            }
-            RegisterBank::Z => {
-                64
-            }
-            RegisterBank::ST => {
-                10
-            }
-            RegisterBank::MM => {
-                8
-            }
-            RegisterBank::K => {
-                8
-            }
-        }
+        self.class().width()
     }
 }
 
@@ -463,10 +463,95 @@ fn operand_size() {
     // assert_eq!(core::mem::size_of::<Instruction>(), 40);
 }
 
+#[cfg(feature="use-serde")]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct RegisterClass {
+    pub(self) kind: RegisterBank,
+}
+
+#[cfg(not(feature="use-serde"))]
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+pub struct RegisterClass {
+    pub(self) kind: RegisterBank,
+}
+
+const REGISTER_CLASS_NAMES: &[&'static str] = &[
+    "dword",
+    "word",
+    "byte",
+    "cr",
+    "dr",
+    "segment",
+    "xmm",
+    "BUG. PLEASE REPORT.",
+    "BUG. PLEASE REPORT.",
+    "BUG. PLEASE REPORT.",
+    "ymm",
+    "BUG. PLEASE REPORT.",
+    "BUG. PLEASE REPORT.",
+    "BUG. PLEASE REPORT.",
+    "zmm",
+    "BUG. PLEASE REPORT.",
+    "BUG. PLEASE REPORT.",
+    "BUG. PLEASE REPORT.",
+    "x87-stack",
+    "mmx",
+    "k",
+    "eip",
+    "eflags",
+];
+
+impl RegisterClass {
+    /// return a human-friendly name for this register class
+    pub fn name(&self) -> &'static str {
+        REGISTER_CLASS_NAMES[self.kind as usize]
+    }
+
+    /// return the size of this register class, in bytes
+    pub fn width(&self) -> u8 {
+        match self.kind {
+            RegisterBank::D => 4,
+            RegisterBank::W => 2,
+            RegisterBank::B => 1,
+            RegisterBank::CR |
+            RegisterBank::DR => {
+                4
+            },
+            RegisterBank::S => {
+                2
+            },
+            RegisterBank::EIP => {
+                4
+            }
+            RegisterBank::EFlags => {
+                4
+            }
+            RegisterBank::X => {
+                16
+            }
+            RegisterBank::Y => {
+                32
+            }
+            RegisterBank::Z => {
+                64
+            }
+            RegisterBank::ST => {
+                10
+            }
+            RegisterBank::MM => {
+                8
+            }
+            RegisterBank::K => {
+                8
+            }
+        }
+    }
+}
+
 #[allow(non_camel_case_types)]
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub enum RegisterBank {
+enum RegisterBank {
     D = 0, W = 1, B = 2, // Dword, Word, Byte
     CR = 3, DR = 4, S = 5, EIP = 21, EFlags = 22,  // Control reg, Debug reg, Selector, ...
     X = 6, Y = 10, Z = 14,    // XMM, YMM, ZMM
@@ -476,7 +561,7 @@ pub enum RegisterBank {
 #[allow(non_camel_case_types)]
 #[cfg(not(feature="use-serde"))]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
-pub enum RegisterBank {
+enum RegisterBank {
     D = 0, W = 1, B = 2, // Dword, Word, Byte
     CR = 3, DR = 4, S = 5, EIP = 21, EFlags = 22,  // Control reg, Debug reg, Selector, ...
     X = 6, Y = 10, Z = 14,    // XMM, YMM, ZMM
@@ -1532,7 +1617,7 @@ pub struct Instruction {
     operands: [OperandSpec; 4],
     imm: u32,
     disp: u32,
-    pub opcode: Opcode,
+    opcode: Opcode,
 }
 
 impl yaxpeax_arch::Instruction for Instruction {
@@ -3044,25 +3129,25 @@ impl Default for Instruction {
 }
 
 impl Instruction {
+    pub fn opcode(&self) -> Opcode {
+        self.opcode
+    }
+
     pub fn operand(&self, i: u8) -> Operand {
         assert!(i < 4);
         Operand::from_spec(self, self.operands[i as usize])
     }
 
     pub fn operand_count(&self) -> u8 {
-        let mut i = 0;
-        for op in self.operands.iter() {
-            if let OperandSpec::Nothing = op {
-                return i;
-            } else {
-                i += 1;
-            }
-        }
-        return i;
+        self.operand_count
     }
 
     pub fn operand_present(&self, i: u8) -> bool {
         assert!(i < 4);
+        if i >= self.operand_count {
+            return false;
+        }
+
         if let OperandSpec::Nothing = self.operands[i as usize] {
             false
         } else {
@@ -3212,7 +3297,7 @@ impl Prefixes {
     #[inline]
     pub fn lock(&self) -> bool { self.bits & 0x4 == 4 }
     #[inline]
-    fn cs(&mut self) { self.segment = Segment::CS }
+    pub fn cs(&mut self) { self.segment = Segment::CS }
     #[inline]
     fn set_cs(&mut self) { self.segment = Segment::CS }
     #[inline]
@@ -3463,7 +3548,7 @@ impl OperandCodeBuilder {
 //   ---------------------------> read modr/m?
 #[repr(u16)]
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum OperandCode {
+enum OperandCode {
     Ivs = OperandCodeBuilder::new().special_case(25).bits(),
     I_3 = OperandCodeBuilder::new().special_case(27).bits(),
     Nothing = OperandCodeBuilder::new().special_case(28).bits(),

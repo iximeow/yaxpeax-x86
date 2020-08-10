@@ -1,3 +1,14 @@
+## 0.1.0
+* port `long_mode` improvements to `protected_mode` decoder
+  - real mode will wait until another day
+* support undocumented instruction `salc`
+* fix segment registers being numbered wrong
+  - this is relevant only for mov to/from segments
+* support x86_32 `push <segment>``/`pop <segment>`
+* support x86_32 `pusha`/`popa`
+* support x86_32 BCD instructions
+  - for `aam`/`aad`, the undocumented `amx` and `adx` forms are used in all cases, including when the base is 10
+
 ## 0.0.15
 
 * the `x87` instruction set is now fully supported

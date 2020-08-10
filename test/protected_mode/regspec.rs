@@ -18,3 +18,18 @@ fn test_labels() {
     assert_eq!(RegSpec::gs().name(), "gs");
     assert_eq!(RegSpec::al().name(), "al");
 }
+
+#[test]
+fn test_bank_names() {
+    assert_eq!(RegSpec::al().class().name(), "byte");
+    assert_eq!(RegSpec::ax().class().name(), "word");
+    assert_eq!(RegSpec::eax().class().name(), "dword");
+    assert_eq!(RegSpec::fs().class().name(), "segment");
+    assert_eq!(RegSpec::eflags().class().name(), "eflags");
+    assert_eq!(RegSpec::eip().class().name(), "eip");
+    assert_eq!(RegSpec::st0().class().name(), "x87-stack");
+    assert_eq!(RegSpec::mm0().class().name(), "mmx");
+    assert_eq!(RegSpec::xmm0().class().name(), "xmm");
+    assert_eq!(RegSpec::ymm0().class().name(), "ymm");
+    assert_eq!(RegSpec::zmm0().class().name(), "zmm");
+}
