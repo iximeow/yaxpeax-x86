@@ -1,3 +1,8 @@
+## 0.1.2
+* expose constructors for `RegSpec` in both `long_mode` and `protected_mode`
+* expose a const `RegSpec::RIP`
+  - most useful for matching `Operand::RegDisp(RegSpec::RIP, disp)` in patterns, really
+
 ## 0.1.1
 * add `long_mode::register_class` and `protected_mode::register_class` where
   `RegisterClass` constants for each register class are defined.

@@ -60,6 +60,9 @@ pub enum ConditionCode {
 
 #[allow(non_snake_case)]
 impl RegSpec {
+    /// the register `rip`. this register is in the class `rip`, which contains only it.
+    pub const RIP: RegSpec = RegSpec::rip();
+
     pub fn num(&self) -> u8 {
         self.num
     }
@@ -75,7 +78,7 @@ impl RegSpec {
     }
 
     #[inline]
-    fn st(num: u8) -> RegSpec {
+    pub fn st(num: u8) -> RegSpec {
         if num >= 8 {
             panic!("invalid x87 reg st({})", num);
         }
@@ -83,6 +86,110 @@ impl RegSpec {
         RegSpec {
             num,
             bank: RegisterBank::ST
+        }
+    }
+
+    /// construct a `RegSpec` for xmm reg `num`
+    #[inline]
+    pub fn xmm(num: u8) -> RegSpec {
+        if num >= 32 {
+            panic!("invalid x86 xmm reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::X
+        }
+    }
+
+    /// construct a `RegSpec` for ymm reg `num`
+    #[inline]
+    pub fn ymm(num: u8) -> RegSpec {
+        if num >= 32 {
+            panic!("invalid x86 ymm reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::Y
+        }
+    }
+
+    /// construct a `RegSpec` for zmm reg `num`
+    #[inline]
+    pub fn zmm(num: u8) -> RegSpec {
+        if num >= 32 {
+            panic!("invalid x86 zmm reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::Z
+        }
+    }
+
+    /// construct a `RegSpec` for qword reg `num`
+    #[inline]
+    pub fn q(num: u8) -> RegSpec {
+        if num >= 16 {
+            panic!("invalid x86 qword reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::Q
+        }
+    }
+
+    /// construct a `RegSpec` for dword reg `num`
+    #[inline]
+    pub fn d(num: u8) -> RegSpec {
+        if num >= 16 {
+            panic!("invalid x86 dword reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::D
+        }
+    }
+
+    /// construct a `RegSpec` for word reg `num`
+    #[inline]
+    pub fn w(num: u8) -> RegSpec {
+        if num >= 16 {
+            panic!("invalid x86 word reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::W
+        }
+    }
+
+    /// construct a `RegSpec` for non-rex byte reg `num`
+    #[inline]
+    pub fn rb(num: u8) -> RegSpec {
+        if num >= 18 {
+            panic!("invalid x86 rex-byte reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::rB
+        }
+    }
+
+    /// construct a `RegSpec` for non-rex byte reg `num`
+    #[inline]
+    pub fn b(num: u8) -> RegSpec {
+        if num >= 8 {
+            panic!("invalid x86 non-rex byte reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::B
         }
     }
 
@@ -103,7 +210,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn rip() -> RegSpec {
+    pub const fn rip() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::RIP
@@ -111,7 +218,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn eip() -> RegSpec {
+    pub const fn eip() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::EIP
@@ -119,7 +226,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn eflags() -> RegSpec {
+    pub const fn eflags() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::EFlags
@@ -127,7 +234,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn rflags() -> RegSpec {
+    pub const fn rflags() -> RegSpec {
         RegSpec {
             num: 0,
             bank: RegisterBank::RFlags
@@ -135,7 +242,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn rbp() -> RegSpec {
+    pub const fn rbp() -> RegSpec {
         RegSpec {
             num: 5,
             bank: RegisterBank::Q
@@ -143,7 +250,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn rsp() -> RegSpec {
+    pub const fn rsp() -> RegSpec {
         RegSpec {
             num: 4,
             bank: RegisterBank::Q
@@ -151,7 +258,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn esp() -> RegSpec {
+    pub const fn esp() -> RegSpec {
         RegSpec {
             num: 4,
             bank: RegisterBank::D
@@ -159,7 +266,7 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn sp() -> RegSpec {
+    pub const fn sp() -> RegSpec {
         RegSpec {
             num: 4,
             bank: RegisterBank::W
@@ -167,132 +274,132 @@ impl RegSpec {
     }
 
     #[inline]
-    pub fn fs() -> RegSpec {
+    pub const fn fs() -> RegSpec {
         RegSpec { bank: RegisterBank::S, num: 4 }
     }
 
     #[inline]
-    pub fn gs() -> RegSpec {
+    pub const fn gs() -> RegSpec {
         RegSpec { bank: RegisterBank::S, num: 5 }
     }
 
     #[inline]
-    pub fn rax() -> RegSpec {
+    pub const fn rax() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 0 }
     }
 
     #[inline]
-    pub fn rcx() -> RegSpec {
+    pub const fn rcx() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 1 }
     }
 
     #[inline]
-    pub fn rdx() -> RegSpec {
+    pub const fn rdx() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 2 }
     }
 
     #[inline]
-    pub fn rsi() -> RegSpec {
+    pub const fn rsi() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 6 }
     }
 
     #[inline]
-    pub fn rdi() -> RegSpec {
+    pub const fn rdi() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 7 }
     }
 
     #[inline]
-    pub fn r8() -> RegSpec {
+    pub const fn r8() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 8 }
     }
 
     #[inline]
-    pub fn r9() -> RegSpec {
+    pub const fn r9() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 9 }
     }
 
     #[inline]
-    pub fn eax() -> RegSpec {
+    pub const fn eax() -> RegSpec {
         RegSpec { bank: RegisterBank::D, num: 0 }
     }
 
     #[inline]
-    pub fn ecx() -> RegSpec {
+    pub const fn ecx() -> RegSpec {
         RegSpec { bank: RegisterBank::D, num: 1 }
     }
 
     #[inline]
-    pub fn edx() -> RegSpec {
+    pub const fn edx() -> RegSpec {
         RegSpec { bank: RegisterBank::D, num: 2 }
     }
 
     #[inline]
-    pub fn ebx() -> RegSpec {
+    pub const fn ebx() -> RegSpec {
         RegSpec { bank: RegisterBank::D, num: 3 }
     }
 
     #[inline]
-    pub fn ax() -> RegSpec {
+    pub const fn ax() -> RegSpec {
         RegSpec { bank: RegisterBank::W, num: 0 }
     }
 
     #[inline]
-    pub fn dx() -> RegSpec {
+    pub const fn dx() -> RegSpec {
         RegSpec { bank: RegisterBank::W, num: 2 }
     }
 
     #[inline]
-    pub fn al() -> RegSpec {
+    pub const fn al() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 0 }
     }
 
     #[inline]
-    pub fn cl() -> RegSpec {
+    pub const fn cl() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 1 }
     }
 
     #[inline]
-    pub fn dl() -> RegSpec {
+    pub const fn dl() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 2 }
     }
 
     #[inline]
-    pub fn ah() -> RegSpec {
+    pub const fn ah() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 4 }
     }
 
     #[inline]
-    pub fn ch() -> RegSpec {
+    pub const fn ch() -> RegSpec {
         RegSpec { bank: RegisterBank::B, num: 5 }
     }
 
     #[inline]
-    pub fn r8b() -> RegSpec {
+    pub const fn r8b() -> RegSpec {
         RegSpec { bank: RegisterBank::rB, num: 8 }
     }
 
     #[inline]
-    pub fn zmm0() -> RegSpec {
+    pub const fn zmm0() -> RegSpec {
         RegSpec { bank: RegisterBank::Z, num: 0 }
     }
 
     #[inline]
-    pub fn ymm0() -> RegSpec {
+    pub const fn ymm0() -> RegSpec {
         RegSpec { bank: RegisterBank::Y, num: 0 }
     }
 
     #[inline]
-    pub fn xmm0() -> RegSpec {
+    pub const fn xmm0() -> RegSpec {
         RegSpec { bank: RegisterBank::X, num: 0 }
     }
 
     #[inline]
-    pub fn st0() -> RegSpec {
+    pub const fn st0() -> RegSpec {
         RegSpec { bank: RegisterBank::ST, num: 0 }
     }
 
     #[inline]
-    pub fn mm0() -> RegSpec {
+    pub const fn mm0() -> RegSpec {
         RegSpec { bank: RegisterBank::MM, num: 0 }
     }
 

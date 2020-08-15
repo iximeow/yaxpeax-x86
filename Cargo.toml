@@ -1,7 +1,7 @@
 [package]
 
 name = "yaxpeax-x86"
-version = "0.1.1"
+version = "0.1.2"
 authors = [ "iximeow <me@iximeow.net>" ]
 license = "0BSD"
 repository = "http://git.iximeow.net/yaxpeax-x86/"
