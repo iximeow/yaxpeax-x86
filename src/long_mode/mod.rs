@@ -558,6 +558,95 @@ const REGISTER_CLASS_NAMES: &[&'static str] = &[
     "rflags",
 ];
 
+/// high-level register classes in an x86 machine, such as "8-byte general purpose", "xmm", "x87",
+/// and so on. constants in this module are useful for inspecting the register class of a decoded
+/// instruction. as an example:
+/// ```
+/// extern crate yaxpeax_arch;
+/// use yaxpeax_x86::long_mode::{self as amd64};
+/// use yaxpeax_x86::long_mode::{Opcode, Operand, RegisterClass};
+/// use yaxpeax_arch::Decoder;
+///
+/// let movsx_eax_cl = &[0x0f, 0xbe, 0xc1];
+/// let decoder = amd64::InstDecoder::default();
+/// let instruction = decoder
+///     .decode(movsx_eax_cl.into_iter().cloned())
+///     .expect("can decode");
+///
+/// assert_eq!(instruction.opcode(), Opcode::MOVSX_b);
+///
+/// fn show_register_class_info(regclass: RegisterClass) {
+///     match regclass {
+///         amd64::register_class::D => {
+///             println!("  and is a dword register");
+///         }
+///         amd64::register_class::B => {
+///             println!("  and is a byte register");
+///         }
+///         other => {
+///             panic!("unexpected and invalid register class {:?}", other);
+///         }
+///     }
+/// }
+///
+/// if let Operand::Register(regspec) = instruction.operand(0) {
+///     println!("first operand is {}", regspec);
+///     show_register_class_info(regspec.class());
+/// }
+///
+/// if let Operand::Register(regspec) = instruction.operand(1) {
+///     println!("first operand is {}", regspec);
+///     show_register_class_info(regspec.class());
+/// }
+/// ```
+///
+/// this is preferable to alternatives like checking register names against a known list: a
+/// register class is one byte and "is qword general-purpose" can then be a simple one-byte
+/// compare, instead of 16 string compares.
+///
+/// `yaxpeax-x86` does not attempt to further distinguish between, for example, register
+/// suitability as operands. as an example, `cl` is only a byte register, with no additional
+/// register class to describe its use as an implicit shift operand.
+pub mod register_class {
+    use super::{RegisterBank, RegisterClass};
+    /// quadword registers: rax through r15
+    pub const Q: RegisterClass = RegisterClass { kind: RegisterBank::Q };
+    /// doubleword registers: eax through r15d
+    pub const D: RegisterClass = RegisterClass { kind: RegisterBank::D };
+    /// word registers: ax through r15w
+    pub const W: RegisterClass = RegisterClass { kind: RegisterBank::W };
+    /// byte registers: al, cl, dl, bl, ah, ch, dh, bh. `B` registers do *not* have a rex prefix.
+    pub const B: RegisterClass = RegisterClass { kind: RegisterBank::B };
+    /// byte registers with rex prefix present: al through r15b. `RB` registers have a rex prefix.
+    pub const RB: RegisterClass = RegisterClass { kind: RegisterBank::rB };
+    /// control registers cr0 through cr15.
+    pub const CR: RegisterClass = RegisterClass { kind: RegisterBank::CR};
+    /// debug registers dr0 through dr15.
+    pub const DR: RegisterClass = RegisterClass { kind: RegisterBank::DR };
+    /// segment registers es, cs, ss, ds, fs, gs.
+    pub const S: RegisterClass = RegisterClass { kind: RegisterBank::S };
+    /// xmm registers xmm0 through xmm31.
+    pub const X: RegisterClass = RegisterClass { kind: RegisterBank::X };
+    /// ymm registers ymm0 through ymm31.
+    pub const Y: RegisterClass = RegisterClass { kind: RegisterBank::Y };
+    /// zmm registers zmm0 through zmm31.
+    pub const Z: RegisterClass = RegisterClass { kind: RegisterBank::Z };
+    /// x87 floating point stack entries st(0) through st(7).
+    pub const ST: RegisterClass = RegisterClass { kind: RegisterBank::ST };
+    /// mmx registers mm0 through mm7.
+    pub const MM: RegisterClass = RegisterClass { kind: RegisterBank::MM };
+    /// `AVX512` mask registers k0 through k7.
+    pub const K: RegisterClass = RegisterClass { kind: RegisterBank::K };
+    /// the full instruction pointer register.
+    pub const RIP: RegisterClass = RegisterClass { kind: RegisterBank::RIP };
+    /// the low 32 bits of `rip`.
+    pub const EIP: RegisterClass = RegisterClass { kind: RegisterBank::EIP };
+    /// the full cpu flags register.
+    pub const RFLAGS: RegisterClass = RegisterClass { kind: RegisterBank::RFlags };
+    /// the low 32 bits of rflags.
+    pub const EFLAGS: RegisterClass = RegisterClass { kind: RegisterBank::EFlags };
+}
+
 impl RegisterClass {
     /// return a human-friendly name for this register class
     pub fn name(&self) -> &'static str {

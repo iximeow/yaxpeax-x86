@@ -1,3 +1,8 @@
+## 0.1.1
+* add `long_mode::register_class` and `protected_mode::register_class` where
+  `RegisterClass` constants for each register class are defined.
+  - without these, the only way to distinguish register classes would be string compares. bad. sorry!
+
 ## 0.1.0
 * port `long_mode` improvements to `protected_mode` decoder
   - real mode will wait until another day

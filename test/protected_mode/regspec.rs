@@ -1,4 +1,4 @@
-use yaxpeax_x86::protected_mode::RegSpec;
+use yaxpeax_x86::protected_mode::{register_class, RegSpec};
 use std::collections::{BTreeMap, HashMap};
 
 #[test]
@@ -32,4 +32,20 @@ fn test_bank_names() {
     assert_eq!(RegSpec::xmm0().class().name(), "xmm");
     assert_eq!(RegSpec::ymm0().class().name(), "ymm");
     assert_eq!(RegSpec::zmm0().class().name(), "zmm");
+}
+
+// this should compile.
+#[test]
+fn match_bank_kind() {
+    match RegSpec::al().class() {
+        register_class::X => {
+            panic!("al is an xmm register? don't think so");
+        }
+        register_class::B => {
+            println!("al is a byte register");
+        }
+        other => {
+            panic!("unknown register kind: {:?}", other);
+        }
+    }
 }
