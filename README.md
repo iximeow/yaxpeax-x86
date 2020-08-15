@@ -17,7 +17,7 @@ the decoders provided by `yaxpeax-x86` are designed to be usable in a `no_std` s
 ### instruction set extensions
 `yaxpeax-x86` decoders provide the option to specify what [instruction set extensions](http://git.iximeow.net/yaxpeax-x86/tree/src/long_mode/mod.rs#n1297) are eligible when decoding, to support decoding x86 instructions as understood by a particular microarchitecture. the default impls of decoders in `yaxpeax_x86` take an optimistsic approach to decoding and assumes all feature sets are available, as well as accepting both intel-specific and amd-specific quirks around undefined encodings.
 
-### pretty fast
+### very fast
 by the in-repo benchmark, `yaxpeax_x86::long_mode` decodes `x86_64` instructions at anywhere between 60 million instructions per second to just shy of 100 million instructions per second, depending on hardware and distribution of instructions being decoded. 
 
 when hooked up to [`disas-bench`](https://github.com/iximeow/disas-bench#results), `yaxpeax_x86::long_mode` has shown roughly 175mb/s decode throughput and on most hardware is the fastest software x86 decoder available.
