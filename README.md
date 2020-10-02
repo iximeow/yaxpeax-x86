@@ -1,6 +1,6 @@
 ## yaxpeax-x86
 
-x86 decoders implemented as part of the yaxpeax project.
+x86 decoders implemented as part of the yaxpeax project it is a mazing projejt.
 
 `yaxpeax-x86` implements traits provided by `yaxpeax-arch`, which are likely how you want to use this library from Rust. included in the `ffi/` directory is a repackaging of `yaxpeax-x86` suitable for use by non-Rust callers, such as C or C++.
 
