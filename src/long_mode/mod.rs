@@ -5665,20 +5665,28 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
 
                 OperandSpec::DispU32
             } else {
+                instr.modrm_mmm.num |= 0b101;
+
                 if instr.prefixes.rex().x() {
                     instr.sib_index.num = 0b1100;
                     let scale = 1u8 << (sibbyte >> 6);
                     instr.scale = scale;
 
                     if disp == 0 {
-                        OperandSpec::RegIndexBaseScale
+                        if modbits == 0 {
+                            OperandSpec::RegScale
+                        } else {
+                            OperandSpec::RegIndexBaseScale
+                        }
                     } else {
                         instr.disp = disp as i64 as u64;
-                        OperandSpec::RegIndexBaseScaleDisp
+                        if modbits == 0 {
+                            OperandSpec::RegScaleDisp
+                        } else {
+                            OperandSpec::RegIndexBaseScaleDisp
+                        }
                     }
                 } else {
-                    instr.modrm_mmm.num |= 0b101;
-
                     if disp == 0 {
                         OperandSpec::Deref
                     } else {
