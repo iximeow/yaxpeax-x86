@@ -1036,6 +1036,8 @@ pub enum Opcode {
     VMXOFF,
     MONITOR,
     MWAIT,
+    MONITORX,
+    MWAITX,
     CLAC,
     STAC,
     ENCLS,
@@ -1050,6 +1052,9 @@ pub enum Opcode {
     ENCLU,
     RDPKRU,
     WRPKRU,
+
+    RDPRU,
+    CLZERO,
 
     RDSEED,
     RDRAND,
@@ -3188,6 +3193,12 @@ impl InstDecoder {
             Opcode::RDSEED => {
                 if !self.rdseed() {
                     inst.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            }
+            Opcode::MONITORX | Opcode::MWAITX | // these are gated on the `monitorx` and `mwaitx` cpuid bits, but are AMD-only.
+            Opcode::CLZERO | Opcode::RDPRU => { // again, gated on specific cpuid bits, but AMD-only.
+                if !self.amd_quirks() {
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -7893,6 +7904,14 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.operand_count = 1;
                 instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
             } else if r == 5 {
+                let mod_bits = modrm >> 6;
+                if mod_bits != 0b11 {
+                    instruction.opcode = Opcode::Invalid;
+                    instruction.operands[0] = OperandSpec::Nothing;
+                    instruction.operand_count = 0;
+                    return Err(DecodeError::InvalidOpcode);
+                }
+
                 let m = modrm & 7;
                 match m {
                     0b110 => {
@@ -7921,13 +7940,30 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
                     if m == 0 {
-                        instruction.opcode = Opcode::SWAPGS;
-                        instruction.operands[0] = OperandSpec::Nothing;
-                        instruction.operand_count = 0;
+                        // swapgs is not valid in modes other than 64-bit
+                        instruction.opcode = Opcode::Invalid;
+                        return Err(DecodeError::InvalidOpcode);
                     } else if m == 1 {
                         instruction.opcode = Opcode::RDTSCP;
                         instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
+                    } else if m == 2 {
+                        instruction.opcode = Opcode::MONITORX;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
+                    } else if m == 3 {
+                        instruction.opcode = Opcode::MWAITX;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
+                    } else if m == 4 {
+                        instruction.opcode = Opcode::CLZERO;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
+                    } else if m == 5 {
+                        instruction.opcode = Opcode::RDPRU;
+                        instruction.operands[0] = OperandSpec::RegRRR;
+                        instruction.modrm_rrr = RegSpec::ecx();
+                        instruction.operand_count = 1;
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);

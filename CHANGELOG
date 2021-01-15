@@ -1,3 +1,9 @@
+## 0.1.5
+* fix several issues around 0f01* opcode decoding;
+  - AMD-only `monitorx`, `mwaitx`, `clzero`, and `rdpru` are now supported
+  - `swapgs` is invalid in non-64-bit modes
+  - `rdpkru` and `wrpkru` were incorrectly decoded when modrm bits were not `11`
+
 ## 0.1.4
 * [long mode only]: fix decoding of rex-prefixed modrm+sib operands selecting index 0b100 and base 0b101
   - for memory operands with a base, index, and displacement either

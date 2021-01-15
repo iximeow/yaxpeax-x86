@@ -513,6 +513,8 @@ const MNEMONICS: &[&'static str] = &[
     "vmxoff",
     "monitor",
     "mwait",
+    "monitorx",
+    "mwaitx",
     "clac",
     "stac",
     "encls",
@@ -527,6 +529,8 @@ const MNEMONICS: &[&'static str] = &[
     "enclu",
     "rdpkru",
     "wrpkru",
+    "rdpru",
+    "clzero",
     "rdseed",
     "rdrand",
     "addps",
@@ -2152,6 +2156,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMXOFF |
             Opcode::MONITOR |
             Opcode::MWAIT |
+            Opcode::MONITORX |
+            Opcode::MWAITX |
             Opcode::SKINIT |
             Opcode::CLGI |
             Opcode::STGI |
@@ -2169,6 +2175,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::ENCLU |
             Opcode::RDPKRU |
             Opcode::WRPKRU |
+            Opcode::RDPRU |
+            Opcode::CLZERO |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::CRC32 |
