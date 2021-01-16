@@ -1030,6 +1030,13 @@ fn test_mov() {
 }
 
 #[test]
+fn test_xchg() {
+    test_display(&[0x90], "nop");
+    test_display(&[0x91], "xchg eax, ecx");
+    test_display(&[0x66, 0x91], "xchg ax, cx");
+}
+
+#[test]
 fn test_stack() {
     test_display(&[0x66, 0x50], "push ax");
 }

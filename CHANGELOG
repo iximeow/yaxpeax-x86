@@ -5,6 +5,7 @@
   - `rdpkru` and `wrpkru` were incorrectly decoded when modrm bits were not `11`
 * small performance tweaks. read_imm_signed is now inline(always) and some
   pre-decode initialization is a bit better-packed
+* `xchg {r,e,}ax, reg` was not supported! it's supported now.
 
 ## 0.1.4
 * [long mode only]: fix decoding of rex-prefixed modrm+sib operands selecting index 0b100 and base 0b101

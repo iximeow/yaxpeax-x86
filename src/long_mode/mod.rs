@@ -6079,6 +6079,20 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                     }
                     1 => {
                         // Zv_AX
+                        let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                        let bank = if opwidth == 4 {
+                            RegisterBank::D
+                        } else if opwidth == 2 {
+                            RegisterBank::W
+                        } else {
+                            RegisterBank::Q
+                        };
+                        instruction.modrm_rrr =
+                            RegSpec::from_parts(0, instruction.prefixes.rex().b(), bank);
+                        instruction.operands[1] = OperandSpec::RegMMM;
+                        instruction.modrm_mmm =
+                            RegSpec::from_parts(reg, instruction.prefixes.rex().b(), bank);
+                        instruction.operand_count = 2;
                     }
                     2 => {
                         // these are Zb_Ib_R

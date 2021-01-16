@@ -5933,6 +5933,17 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                     }
                     1 => {
                         // Zv_AX
+                        let bank = if !instruction.prefixes.operand_size() {
+                            RegisterBank::D
+                        } else {
+                            RegisterBank::W
+                        };
+                        instruction.modrm_rrr =
+                            RegSpec::from_parts(0, bank);
+                        instruction.operands[1] = OperandSpec::RegMMM;
+                        instruction.modrm_mmm =
+                            RegSpec::from_parts(reg, bank);
+                        instruction.operand_count = 2;
                     }
                     2 => {
                         // these are Zb_Ib_R
