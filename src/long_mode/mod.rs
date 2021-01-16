@@ -5835,8 +5835,10 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
 //    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
 
-    instruction.modrm_mmm.bank = RegisterBank::Q;
-    instruction.sib_index.bank = RegisterBank::Q;
+    // ever so slightly faster than just setting .bank: this allows the two assignments to merge
+    // into one `mov 0, dword [instruction + modrm_mmm_offset]`
+    instruction.modrm_mmm = RegSpec::rax();
+    instruction.sib_index = RegSpec::rax();
 
     fn escapes_are_prefixes_actually(prefixes: &mut Prefixes, opc_map: &mut Option<OpcodeMap>) {
         match opc_map {
@@ -8881,7 +8883,7 @@ fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8)
     }
 }
 
-#[inline]
+#[inline(always)]
 fn read_imm_signed<T: Iterator<Item=u8>>(bytes: &mut T, num_width: u8, length: &mut u8) -> Result<i64, DecodeError> {
     if num_width == 1 {
         *length += 1;

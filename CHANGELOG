@@ -3,6 +3,8 @@
   - AMD-only `monitorx`, `mwaitx`, `clzero`, and `rdpru` are now supported
   - `swapgs` is invalid in non-64-bit modes
   - `rdpkru` and `wrpkru` were incorrectly decoded when modrm bits were not `11`
+* small performance tweaks. read_imm_signed is now inline(always) and some
+  pre-decode initialization is a bit better-packed
 
 ## 0.1.4
 * [long mode only]: fix decoding of rex-prefixed modrm+sib operands selecting index 0b100 and base 0b101
