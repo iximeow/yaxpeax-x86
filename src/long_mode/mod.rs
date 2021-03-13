@@ -1,10 +1,25 @@
 mod vex;
+#[cfg(feature = "fmt")]
 mod display;
 pub mod uarch;
 
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, LengthedInstruction};
+
+use core::fmt;
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DecodeError::ExhaustedInput => { write!(f, "exhausted input") },
+            DecodeError::InvalidOpcode => { write!(f, "invalid opcode") },
+            DecodeError::InvalidOperand => { write!(f, "invalid operand") },
+            DecodeError::InvalidPrefixes => { write!(f, "invalid prefixes") },
+            DecodeError::TooLong => { write!(f, "too long") },
+            DecodeError::IncompleteDecoder => { write!(f, "the decoder is incomplete") },
+        }
+    }
+}
 
 #[cfg(feature="use-serde")]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Serialize, Deserialize)]
@@ -71,6 +86,7 @@ impl RegSpec {
         RegisterClass { kind: self.bank }
     }
 
+    #[cfg(feature = "fmt")]
     /// return a human-friendly name for this register. the returned name is the same as would be
     /// used to render this register in an instruction.
     pub fn name(&self) -> &'static str {

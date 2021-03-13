@@ -5,20 +5,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use crate::long_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec, DecodeError};
-
-impl fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DecodeError::ExhaustedInput => { write!(f, "exhausted input") },
-            DecodeError::InvalidOpcode => { write!(f, "invalid opcode") },
-            DecodeError::InvalidOperand => { write!(f, "invalid operand") },
-            DecodeError::InvalidPrefixes => { write!(f, "invalid prefixes") },
-            DecodeError::TooLong => { write!(f, "too long") },
-            DecodeError::IncompleteDecoder => { write!(f, "the decoder is incomplete") },
-        }
-    }
-}
+use crate::long_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

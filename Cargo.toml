@@ -33,10 +33,13 @@ opt-level = 3
 lto = true
 
 [features]
-default = ["std", "colors", "use-serde"]
+default = ["std", "colors", "use-serde", "fmt"]
 
 # opt-in for some apis that are really much nicer with String
 std = []
+
+# feature for formatting instructions and their components
+fmt = []
 
 use-serde = ["yaxpeax-arch/use-serde", "serde", "serde_derive"]
 
