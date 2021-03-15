@@ -3,6 +3,9 @@ mod vex;
 mod display;
 pub mod uarch;
 
+#[cfg(feature = "fmt")]
+pub use self::display::DisplayStyle;
+
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, LengthedInstruction};
@@ -1891,6 +1894,7 @@ pub struct Instruction {
     imm: u64,
     disp: u64,
     opcode: Opcode,
+    mem_size: u8,
 }
 
 impl yaxpeax_arch::Instruction for Instruction {
@@ -3449,6 +3453,7 @@ impl Instruction {
         Instruction {
             prefixes: Prefixes::new(0),
             opcode: Opcode::Invalid,
+            mem_size: 1,
             modrm_rrr: RegSpec::rax(),
             modrm_mmm: RegSpec::rax(), // doubles as sib_base
             sib_index: RegSpec::rax(),
@@ -3512,6 +3517,14 @@ impl Instruction {
                     None
                 }
             }
+        }
+    }
+
+    #[cfg(feature = "fmt")]
+    pub fn display_with<'a>(&'a self, style: display::DisplayStyle) -> display::InstructionDisplayer<'a> {
+        display::InstructionDisplayer {
+            style,
+            instr: self,
         }
     }
 }
@@ -5855,6 +5868,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     // into one `mov 0, dword [instruction + modrm_mmm_offset]`
     instruction.modrm_mmm = RegSpec::rax();
     instruction.sib_index = RegSpec::rax();
+    instruction.mem_size = 0;
 
     fn escapes_are_prefixes_actually(prefixes: &mut Prefixes, opc_map: &mut Option<OpcodeMap>) {
         match opc_map {
@@ -6161,6 +6175,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
             opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.mem_size = opwidth;
             if opwidth == 4 {
                 bank = RegisterBank::D;
             } else if opwidth == 2 {
@@ -6168,6 +6183,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             }
         } else {
             opwidth = 1;
+            instruction.mem_size = opwidth;
             if instruction.prefixes.rex().present() {
                 bank = RegisterBank::rB;
             } else {
@@ -7709,11 +7725,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec::rsi();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
+            instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_Xb => {
             instruction.operands[0] = OperandSpec::Deref_rdi;
             instruction.operands[1] = OperandSpec::Deref_rsi;
+            instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_AL => {
@@ -7721,6 +7739,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec::rsi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::AX_Xv => {
@@ -7733,6 +7752,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             };
             instruction.modrm_mmm = RegSpec::rsi();
             instruction.operands[1] = OperandSpec::Deref;
+            instruction.mem_size = opwidth;
         }
         OperandCode::Yv_AX => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
@@ -7745,9 +7765,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec::rdi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
+            instruction.mem_size = opwidth;
         }
         OperandCode::Yv_Xv => {
-            // TODO: repsect prefixes
+            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.mem_size = opwidth;
             instruction.operands[0] = OperandSpec::Deref_rdi;
             instruction.operands[1] = OperandSpec::Deref_rsi;
         }
