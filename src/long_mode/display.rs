@@ -422,6 +422,8 @@ const MNEMONICS: &[&'static str] = &[
     "setle",
     "setg",
     "cpuid",
+    "ud0",
+    "ud1",
     "ud2",
     "wbinvd",
     "invd",
@@ -652,7 +654,6 @@ const MNEMONICS: &[&'static str] = &[
     "sysexit",
     "ucomisd",
     "ucomiss",
-    "ud2e",
     "vmread",
     "vmwrite",
     "xorps",
@@ -1212,6 +1213,50 @@ const MNEMONICS: &[&'static str] = &[
     "loopz",
     "loop",
     "jrcxz",
+    "movdir64b",
+    "movdiri",
+    "aesdec128kl",
+    "aesdec256kl",
+    "aesdecwide128kl",
+    "aesdecwide256kl",
+    "aesenc128kl",
+    "aesenc256kl",
+    "aesencwide128kl",
+    "aesencwide256kl",
+    "encodekey128",
+    "encodekey256",
+    "loadiwkey",
+
+    // 3dnow
+    "femms",
+    "pi2fw",
+    "pi2fd",
+    "pi2iw",
+    "pi2id",
+    "pmulhrw",
+    "pfcmpge",
+    "pfmin",
+    "pfrcp",
+    "pfrsqrt",
+    "pfsub",
+    "pfadd",
+    "pfcmpgt",
+    "pfmax",
+    "pfrcpit1",
+    "pfrsqit1",
+    "pfsubr",
+    "pfacc",
+    "pfcmpeq",
+    "pfmul",
+    "pfrcpit2",
+    "pfnacc",
+    "pswapd",
+    "pfpnacc",
+    "pavgusb",
+
+    // ENQCMD
+    "enqcmd",
+    "enqcmds",
 ];
 
 impl Opcode {
@@ -1425,6 +1470,21 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::HADDPS |
             Opcode::HSUBPS |
             Opcode::ADDSUBPS |
+            Opcode::PMULHRW |
+            Opcode::PFRCP |
+            Opcode::PFRSQRT |
+            Opcode::PFSUB |
+            Opcode::PFADD |
+            Opcode::PFRCPIT1 |
+            Opcode::PFRSQIT1 |
+            Opcode::PFSUBR |
+            Opcode::PFACC |
+            Opcode::PFMUL |
+            Opcode::PFRCPIT2 |
+            Opcode::PFNACC |
+            Opcode::PSWAPD |
+            Opcode::PFPNACC |
+            Opcode::PAVGUSB |
             Opcode::XADD|
             Opcode::DIV |
             Opcode::IDIV |
@@ -1631,6 +1691,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::JG => { write!(out, "{}", colors.control_flow_op(self)) }
 
             /* Data transfer */
+            Opcode::PI2FW |
+            Opcode::PI2FD |
+            Opcode::PF2ID |
+            Opcode::PF2IW |
             Opcode::VCVTDQ2PD |
             Opcode::VCVTDQ2PS |
             Opcode::VCVTPD2DQ |
@@ -1698,6 +1762,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMOVNTDQA |
             Opcode::VMOVNTPD |
             Opcode::VMOVNTPS |
+            Opcode::MOVDIR64B |
+            Opcode::MOVDIRI |
             Opcode::MOVNTDQA |
             Opcode::VMOVQ |
             Opcode::VMOVSHDUP |
@@ -2040,6 +2106,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PMINUB |
             Opcode::PMINUD |
             Opcode::PMINUW |
+            Opcode::PFCMPGE |
+            Opcode::PFMIN |
+            Opcode::PFCMPGT |
+            Opcode::PFMAX |
+            Opcode::PFCMPEQ |
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
@@ -2119,6 +2190,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VERW |
             Opcode::JMPE |
             Opcode::EMMS |
+            Opcode::FEMMS |
             Opcode::GETSEC |
             Opcode::LFS |
             Opcode::LGS |
@@ -2126,7 +2198,6 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::RSM |
             Opcode::SYSENTER |
             Opcode::SYSEXIT |
-            Opcode::UD2E |
             Opcode::VMREAD |
             Opcode::VMWRITE |
             Opcode::VMCLEAR |
@@ -2164,6 +2235,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::WRPKRU |
             Opcode::RDPRU |
             Opcode::CLZERO |
+            Opcode::ENQCMD |
+            Opcode::ENQCMDS |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::CRC32 |
@@ -2180,6 +2253,17 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::FFREEP |
             Opcode::FDECSTP |
             Opcode::FINCSTP |
+            Opcode::AESDEC128KL |
+            Opcode::AESDEC256KL |
+            Opcode::AESDECWIDE128KL |
+            Opcode::AESDECWIDE256KL |
+            Opcode::AESENC128KL |
+            Opcode::AESENC256KL |
+            Opcode::AESENCWIDE128KL |
+            Opcode::AESENCWIDE256KL |
+            Opcode::ENCODEKEY128 |
+            Opcode::ENCODEKEY256 |
+            Opcode::LOADIWKEY |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |
@@ -2193,6 +2277,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VAESIMC |
             Opcode::VAESKEYGENASSIST => { write!(out, "{}", colors.misc_op(self)) }
 
+            Opcode::UD0 |
+            Opcode::UD1 |
             Opcode::UD2 |
             Opcode::Invalid => { write!(out, "{}", colors.invalid_op(self)) }
         }
@@ -2331,7 +2417,7 @@ fn contextualize_intel<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(
                         }
                         _ => {
                             out.write_str(", word ")?;
-                            if let Some(prefix) = instr.segment_override_for_op(1) {
+                            if let Some(prefix) = instr.segment_override_for_op(i) {
                                 write!(out, "{}:", prefix)?;
                             }
                         }
@@ -2346,7 +2432,7 @@ fn contextualize_intel<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(
                         },
                         _ => {
                             out.write_str(", ")?;
-                            if let Some(prefix) = instr.segment_override_for_op(1) {
+                            if let Some(prefix) = instr.segment_override_for_op(i) {
                                 write!(out, "{}:", prefix)?;
                             }
                             let x = Operand::from_spec(instr, instr.operands[i as usize]);
