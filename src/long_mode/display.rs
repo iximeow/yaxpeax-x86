@@ -848,6 +848,8 @@ const MNEMONICS: &[&'static str] = &[
     "vpalignr",
     "vandps",
     "vandpd",
+    "vorps",
+    "vorpd",
     "vandnps",
     "vandnpd",
     "vpand",
@@ -1285,6 +1287,11 @@ const MNEMONICS: &[&'static str] = &[
     // CET
     "wruss",
     "wrss",
+    "incssp",
+    "saveprevssp",
+    "setssbsy",
+    "clrssbsy",
+    "rstorssp",
 
     // TDX
     "tdcall",
@@ -1296,6 +1303,13 @@ const MNEMONICS: &[&'static str] = &[
     "tpause",
     "umonitor",
     "umwait",
+
+    // UINTR
+    "uiret",
+    "testui",
+    "clui",
+    "stui",
+    "senduipi",
 ];
 
 impl Opcode {
@@ -1462,6 +1476,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VDPPD |
             Opcode::VDPPS |
             Opcode::VRCPPS |
+            Opcode::VORPD |
+            Opcode::VORPS |
             Opcode::VANDPD |
             Opcode::VANDPS |
             Opcode::VANDNPD |
@@ -2298,6 +2314,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::ENQCMD |
             Opcode::ENQCMDS |
             Opcode::PTWRITE |
+            Opcode::UIRET |
+            Opcode::TESTUI |
+            Opcode::CLUI |
+            Opcode::STUI |
+            Opcode::SENDUIPI |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::CRC32 |
@@ -2330,6 +2351,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::LOADIWKEY |
             Opcode::WRUSS |
             Opcode::WRSS |
+            Opcode::INCSSP |
+            Opcode::SAVEPREVSSP |
+            Opcode::SETSSBSY |
+            Opcode::CLRSSBSY |
+            Opcode::RSTORSSP |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |

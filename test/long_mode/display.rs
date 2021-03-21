@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
-use yaxpeax_x86::long_mode::{DisplayStyle, InstDecoder, Opcode};
+use yaxpeax_x86::long_mode::{DisplayStyle, InstDecoder};
 
 fn test_display(data: &[u8], expected: &'static str) {
     test_display_under(&InstDecoder::default(), data, expected);

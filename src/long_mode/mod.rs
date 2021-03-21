@@ -1488,6 +1488,8 @@ pub enum Opcode {
     VPALIGNR,
     VANDPD,
     VANDPS,
+    VORPD,
+    VORPS,
     VANDNPD,
     VANDNPS,
     VPAND,
@@ -1940,6 +1942,11 @@ pub enum Opcode {
     // CET
     WRUSS,
     WRSS,
+    INCSSP,
+    SAVEPREVSSP,
+    SETSSBSY,
+    CLRSSBSY,
+    RSTORSSP,
 
     // TDX
     TDCALL,
@@ -1951,6 +1958,13 @@ pub enum Opcode {
     TPAUSE,
     UMONITOR,
     UMWAIT,
+
+    // UINTR
+    UIRET,
+    TESTUI,
+    CLUI,
+    STUI,
+    SENDUIPI,
 }
 
 #[derive(Debug)]
@@ -3109,6 +3123,8 @@ impl InstDecoder {
             Opcode::VANDPS |
             Opcode::VANDNPD |
             Opcode::VANDNPS |
+            Opcode::VORPD |
+            Opcode::VORPS |
             Opcode::VPANDN |
             Opcode::VPAVGB |
             Opcode::VPAVGW |
@@ -7233,9 +7249,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 0x1d => {
                     instruction.opcode = Opcode::PF2ID;
                 }
-                0x59 => {
-                    instruction.opcode = Opcode::PMULHRW;
-                }
                 0x8a => {
                     instruction.opcode = Opcode::PFNACC;
                 }
@@ -7292,9 +7305,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
                 0xbb => {
                     instruction.opcode = Opcode::PSWAPD;
-                }
-                0xbe => {
-                    instruction.opcode = Opcode::PFPNACC;
                 }
                 0xbf => {
                     instruction.opcode = Opcode::PAVGUSB;
@@ -7414,9 +7424,10 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         instruction.opcode = Opcode::VMXON;
                         instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
-                            // this would be invalid as `vmxon`, so fall back to the parse as
-                            // f3-prefixed rdrand
-                            instruction.opcode = Opcode::RDRAND;
+                            // invalid as `vmxon`, reg-form is `senduipi`
+                            instruction.opcode = Opcode::SENDUIPI;
+                            // and the operand is always a qword register
+                            instruction.modrm_mmm.bank = RegisterBank::Q;
                         }
                         instruction.operand_count = 1;
                     }
@@ -8301,20 +8312,69 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             } else if r == 5 {
                 let mod_bits = modrm >> 6;
                 if mod_bits != 0b11 {
-                    instruction.opcode = Opcode::Invalid;
-                    instruction.operands[0] = OperandSpec::Nothing;
-                    instruction.operand_count = 0;
-                    return Err(DecodeError::InvalidOpcode);
+                    if !instruction.prefixes.rep() {
+                        return Err(DecodeError::InvalidOpcode);
+                    }
+                    instruction.opcode = Opcode::RSTORSSP;
+                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+                    instruction.operand_count = 1;
+                    return Ok(());
                 }
 
                 let m = modrm & 7;
                 match m {
+                    0b000 => {
+                        if !instruction.prefixes.rep() || instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                        instruction.opcode = Opcode::SETSSBSY;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
+                    }
+                    0b010 => {
+                        if !instruction.prefixes.rep() || instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                        instruction.opcode = Opcode::SAVEPREVSSP;
+                        instruction.operands[0] = OperandSpec::Nothing;
+                        instruction.operand_count = 0;
+                    }
+                    0b100 => {
+                        if instruction.prefixes.rep() {
+                            instruction.opcode = Opcode::UIRET;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                        }
+                    }
+                    0b101 => {
+                        if instruction.prefixes.rep() {
+                            instruction.opcode = Opcode::TESTUI;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                        }
+                    }
                     0b110 => {
+                        if instruction.prefixes.rep() {
+                            instruction.opcode = Opcode::CLUI;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        } else if instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         instruction.opcode = Opcode::RDPKRU;
                         instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
                     }
                     0b111 => {
+                        if instruction.prefixes.rep() {
+                            instruction.opcode = Opcode::STUI;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        } else if instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         instruction.opcode = Opcode::WRPKRU;
                         instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
@@ -8509,13 +8569,21 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
+                        5 => {
+                            instruction.opcode = Opcode::INCSSP;
+                            let opwidth = if instruction.prefixes.rex().w() {
+                                RegisterBank::Q
+                            } else {
+                                RegisterBank::D
+                            };
+                            instruction.modrm_mmm = RegSpec::from_parts(m, instruction.prefixes.rex().x(), opwidth);
+                            instruction.operands[0] = OperandSpec::RegMMM;
+                            instruction.operand_count = 1;
+                        }
                         6 => {
                             instruction.opcode = Opcode::UMONITOR;
-                            instruction.modrm_rrr = RegSpec {
-                                bank: RegisterBank::Q,
-                                num: m + if instruction.prefixes.rex().x() { 0b1000 } else { 0 },
-                            };
-                            instruction.operands[0] = OperandSpec::RegRRR;
+                            instruction.modrm_mmm = RegSpec::from_parts(m, instruction.prefixes.rex().x(), RegisterBank::Q);
+                            instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
                         _ => {
@@ -8525,7 +8593,17 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     }
                     return Ok(());
                 } else {
-                    return Err(DecodeError::InvalidOperand);
+                    match r {
+                        6 => {
+                            instruction.opcode = Opcode::CLRSSBSY;
+                            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+                            instruction.operand_count = 1;
+                            return Ok(());
+                        }
+                        _ => {
+                            return Err(DecodeError::InvalidOperand);
+                        }
+                    }
                 }
             }
 

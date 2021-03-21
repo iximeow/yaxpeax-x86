@@ -952,6 +952,11 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
+                        0x56 => (Opcode::VORPS, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
                         0x57 => (Opcode::VXORPS, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
@@ -1095,6 +1100,11 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                             VEXOperandCode::G_V_E_xmm
                         }),
                         0x55 => (Opcode::VANDNPD, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
+                        0x56 => (Opcode::VORPD, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
                             VEXOperandCode::G_V_E_xmm
