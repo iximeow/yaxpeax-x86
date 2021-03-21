@@ -1021,8 +1021,8 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                 },
                 VEXOpcodePrefix::Prefix66 => {
                     match opc {
-                        0x0a => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xmm_imm8),
-                        0x0b => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xmm_imm8),
+//                        0x0a => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xmm_imm8),
+//                        0x0b => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xmm_imm8),
                         0x10 => (Opcode::VMOVUPD, if L {
                             VEXOperandCode::G_E_ymm
                         } else {

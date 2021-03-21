@@ -6516,12 +6516,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
 //    match operand_code {
     match operand_code.special_case_handler_index() {
         0 => {
-            // turns out xed cand capstone both permit nonzero rrr bits here.
-            // if (modrm & 0b00111000) != 0 {
-            //    instruction.opcode = Opcode::Invalid;
-            //    return Err(DecodeError::InvalidOperand);
-            //}
-
             instruction.operands[0] = mem_oper;
             instruction.operand_count = 1;
         },
@@ -8349,8 +8343,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
                             return Ok(());
+                        } else {
+                            instruction.opcode = Opcode::Invalid;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOpcode);
                         }
-                        return Err(DecodeError::InvalidOpcode);
                     }
                     0b010 => {
                         if !instruction.prefixes.rep() || instruction.prefixes.repnz() {
@@ -8365,6 +8363,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             instruction.opcode = Opcode::UIRET;
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
+                        } else {
+                            instruction.opcode = Opcode::Invalid;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOpcode);
                         }
                     }
                     0b101 => {
@@ -8372,6 +8375,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             instruction.opcode = Opcode::TESTUI;
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
+                        } else {
+                            instruction.opcode = Opcode::Invalid;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOpcode);
                         }
                     }
                     0b110 => {
