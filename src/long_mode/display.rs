@@ -1291,6 +1291,11 @@ const MNEMONICS: &[&'static str] = &[
     "seamret",
     "seamops",
     "seamcall",
+
+    // WAITPKG
+    "tpause",
+    "umonitor",
+    "umwait",
 ];
 
 impl Opcode {
@@ -2233,6 +2238,9 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SEAMRET |
             Opcode::SEAMOPS |
             Opcode::SEAMCALL |
+            Opcode::TPAUSE |
+            Opcode::UMONITOR |
+            Opcode::UMWAIT |
             Opcode::LSL |
             Opcode::SLDT |
             Opcode::STR |
