@@ -9354,12 +9354,6 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
 }
 
 fn decode_one<'b, T: IntoIterator<Item=u8>>(decoder: &InstDecoder, bytes: T, instr: &'b mut Instruction) -> Result<(), DecodeError> {
-    instr.operands = [
-        OperandSpec::Nothing,
-        OperandSpec::Nothing,
-        OperandSpec::Nothing,
-        OperandSpec::Nothing,
-    ];
     let bytes_iter = bytes.into_iter();
     read_instr(decoder, bytes_iter, instr)
 }
