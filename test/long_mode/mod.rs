@@ -1550,6 +1550,7 @@ fn test_vex() {
     test_instr(&[0xc5, 0xe1, 0x55, 0x03], "vandnps xmm0, xmm3, [rbx]");
     test_instr(&[0xc5, 0xe0, 0x56, 0x03], "vorpd xmm0, xmm3, [rbx]");
     test_instr(&[0xc5, 0xe1, 0x56, 0x03], "vorps xmm0, xmm3, [rbx]");
+    test_instr(&[0xc4, 0xa2, 0x15, 0x3e, 0x14, 0xb9], "vpmaxuw ymm2, ymm13, [rcx + r15 * 4]");
 }
 
 #[test]

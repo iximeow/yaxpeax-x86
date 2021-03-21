@@ -909,6 +909,7 @@ const MNEMONICS: &[&'static str] = &[
     "vpmaxsd",
     "vpmaxsw",
     "vpmaxub",
+    "vpmaxuw",
     "vpmaxud",
     "vpminsw",
     "vpminsd",
@@ -2130,6 +2131,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPMAXSD |
             Opcode::VPMAXSW |
             Opcode::VPMAXUB |
+            Opcode::VPMAXUW |
             Opcode::VPMAXUD |
             Opcode::VPMINSW |
             Opcode::VPMINSD |
