@@ -366,6 +366,7 @@ enum SizeCode {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Operand {
     ImmediateI8(i8),
     ImmediateU8(u8),
@@ -782,6 +783,7 @@ const XSAVE: [Opcode; 10] = [
 // UMWAIT
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Opcode {
     Invalid,
     ADD,
@@ -1800,6 +1802,7 @@ impl yaxpeax_arch::Instruction for Instruction {
 }
 
 #[derive(Debug, PartialEq)]
+#[non_exhaustive]
 pub enum DecodeError {
     ExhaustedInput,
     InvalidOpcode,
