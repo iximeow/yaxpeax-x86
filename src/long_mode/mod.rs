@@ -6367,7 +6367,6 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
         OperandCode::ModRM_0x8f_Ev => 30
 
  */
-#[inline(always)]
 fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
     instruction.operands[0] = OperandSpec::RegRRR;
     instruction.operand_count = 2;
