@@ -1285,6 +1285,12 @@ const MNEMONICS: &[&'static str] = &[
     // CET
     "wruss",
     "wrss",
+
+    // TDX
+    "tdcall",
+    "seamret",
+    "seamops",
+    "seamcall",
 ];
 
 impl Opcode {
@@ -2223,6 +2229,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::SYSRET |
             Opcode::CLTS |
             Opcode::SYSCALL |
+            Opcode::TDCALL |
+            Opcode::SEAMRET |
+            Opcode::SEAMOPS |
+            Opcode::SEAMCALL |
             Opcode::LSL |
             Opcode::SLDT |
             Opcode::STR |

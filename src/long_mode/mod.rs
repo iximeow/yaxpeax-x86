@@ -1944,6 +1944,12 @@ pub enum Opcode {
     // CET
     WRUSS,
     WRSS,
+
+    // TDX
+    TDCALL,
+    SEAMRET,
+    SEAMOPS,
+    SEAMCALL,
 }
 
 #[derive(Debug)]
@@ -3995,6 +4001,7 @@ enum OperandCode {
 
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().special_case(40).bits(),
     ModRM_0x0f01 = OperandCodeBuilder::new().read_modrm().special_case(41).bits(),
+    ModRM_0x660f01 = OperandCodeBuilder::new().read_modrm().special_case(52).bits(),
     ModRM_0x0f0d = OperandCodeBuilder::new().read_modrm().special_case(42).bits(),
     ModRM_0x0f0f = OperandCodeBuilder::new().read_modrm().special_case(65).bits(), // 3dnow
     ModRM_0x0fae = OperandCodeBuilder::new().read_modrm().special_case(43).bits(),
@@ -4866,7 +4873,7 @@ fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     if prefixes.repnz() {
         match opcode {
             0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
-            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
+            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
             0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
             0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
             0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5143,7 +5150,7 @@ fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     } else if prefixes.rep() {
         match opcode {
             0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
-            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
+            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
             0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
             0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
             0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -5420,7 +5427,7 @@ fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     } else if prefixes.operand_size() {
         match opcode {
             0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
-            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
+            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x660f01),
             0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
             0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
             0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -8095,6 +8102,41 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 unreachable!("r <= 8");
             }
             instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+        }
+        OperandCode::ModRM_0x660f01 => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let r = (modrm >> 3) & 7;
+            if r == 1 {
+                let mod_bits = modrm >> 6;
+                let m = modrm & 7;
+                if mod_bits == 0b11 {
+                    instruction.operands[0] = OperandSpec::Nothing;
+                    instruction.operand_count = 0;
+                    match m {
+                        0b100 => {
+                            instruction.opcode = Opcode::TDCALL;
+                        }
+                        0b101 => {
+                            instruction.opcode = Opcode::SEAMRET;
+                        }
+                        0b110 => {
+                            instruction.opcode = Opcode::SEAMOPS;
+                        }
+                        0b111 => {
+                            instruction.opcode = Opcode::SEAMCALL;
+                        }
+                        _ => {
+                            instruction.opcode = Opcode::Invalid;
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                    }
+                    return Ok(());
+                } else {
+                    return Err(DecodeError::InvalidOpcode);
+                }
+            } else {
+                return Err(DecodeError::InvalidOpcode);
+            }
         }
         OperandCode::ModRM_0x0f01 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
