@@ -570,6 +570,10 @@ const MNEMONICS: &[&'static str] = &[
     "movnti",
     "movntps",
     "movntpd",
+    "extrq",
+    "insertq",
+    "movntss",
+    "movntsd",
     "movntq",
     "movntdq",
     "mulps",
@@ -842,6 +846,10 @@ const MNEMONICS: &[&'static str] = &[
     "vpaddusw",
     "vpaddw",
     "vpalignr",
+    "vandps",
+    "vandpd",
+    "vandnps",
+    "vandnpd",
     "vpand",
     "vpandn",
     "vpavgb",
@@ -1086,6 +1094,8 @@ const MNEMONICS: &[&'static str] = &[
     "vmsave",
     "vmrun",
     "invlpga",
+    "invlpgb",
+    "tlbsync",
     "movbe",
     "adcx",
     "adox",
@@ -1248,15 +1258,33 @@ const MNEMONICS: &[&'static str] = &[
     "pfacc",
     "pfcmpeq",
     "pfmul",
+    "pfmulhrw",
     "pfrcpit2",
     "pfnacc",
-    "pswapd",
     "pfpnacc",
+    "pswapd",
     "pavgusb",
 
     // ENQCMD
     "enqcmd",
     "enqcmds",
+
+    // INVPCID,
+    "invept",
+    "invvpid",
+    "invpcid",
+
+    // PTWRITE
+    "ptwrite",
+
+    // GFNI
+    "gf2p8affineqb",
+    "gf2p8affineinvqb",
+    "gf2p8mulb",
+
+    // CET
+    "wruss",
+    "wrss",
 ];
 
 impl Opcode {
@@ -1423,6 +1451,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VDPPD |
             Opcode::VDPPS |
             Opcode::VRCPPS |
+            Opcode::VANDPD |
+            Opcode::VANDPS |
+            Opcode::VANDNPD |
+            Opcode::VANDNPS |
             Opcode::VPAND |
             Opcode::VPANDN |
             Opcode::VPOR |
@@ -1480,10 +1512,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PFSUBR |
             Opcode::PFACC |
             Opcode::PFMUL |
+            Opcode::PFMULHRW |
             Opcode::PFRCPIT2 |
             Opcode::PFNACC |
-            Opcode::PSWAPD |
             Opcode::PFPNACC |
+            Opcode::PSWAPD |
             Opcode::PAVGUSB |
             Opcode::XADD|
             Opcode::DIV |
@@ -1845,9 +1878,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PEXTRB |
             Opcode::PEXTRD |
             Opcode::PEXTRQ |
+            Opcode::EXTRQ |
             Opcode::PINSRB |
             Opcode::PINSRD |
             Opcode::PINSRQ |
+            Opcode::INSERTQ |
             Opcode::VPINSRB |
             Opcode::VPINSRD |
             Opcode::VPINSRQ |
@@ -1899,6 +1934,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MOVNTI |
             Opcode::MOVNTPS |
             Opcode::MOVNTPD |
+            Opcode::MOVNTSS |
+            Opcode::MOVNTSD |
             Opcode::MOVNTQ |
             Opcode::MOVNTDQ |
             Opcode::MOVSD |
@@ -2173,8 +2210,13 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::LMSW |
             Opcode::SWAPGS |
             Opcode::RDTSCP |
+            Opcode::INVEPT |
+            Opcode::INVVPID |
+            Opcode::INVPCID |
             Opcode::INVLPG |
             Opcode::INVLPGA |
+            Opcode::INVLPGB |
+            Opcode::TLBSYNC |
             Opcode::CPUID |
             Opcode::WBINVD |
             Opcode::INVD |
@@ -2237,6 +2279,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CLZERO |
             Opcode::ENQCMD |
             Opcode::ENQCMDS |
+            Opcode::PTWRITE |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::CRC32 |
@@ -2253,6 +2296,9 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::FFREEP |
             Opcode::FDECSTP |
             Opcode::FINCSTP |
+            Opcode::GF2P8MULB |
+            Opcode::GF2P8AFFINEQB |
+            Opcode::GF2P8AFFINEINVQB |
             Opcode::AESDEC128KL |
             Opcode::AESDEC256KL |
             Opcode::AESDECWIDE128KL |
@@ -2264,6 +2310,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::ENCODEKEY128 |
             Opcode::ENCODEKEY256 |
             Opcode::LOADIWKEY |
+            Opcode::WRUSS |
+            Opcode::WRSS |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |

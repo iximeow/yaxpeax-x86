@@ -152,7 +152,8 @@ fn test_instructions_c() {
     test_display(&[0x3a, 0xc0], "rflags = flags(al - al)");
     test_display(&[0x3b, 0xc0], "rflags = flags(eax - eax)");
 
-    test_display(&[0x41, 0x0f, 0xbc, 0xd3], "edx = lsb(r11d)");
+    test_display(&[0x41, 0x0f, 0xbc, 0xd3], "edx = lsb(r11d) (x86 bsf)");
+    test_display(&[0xf3, 0x41, 0x0f, 0xbc, 0xd3], "edx = lsb(r11d)");
     // test_display(&[0x41, 0x0f, 0xbc, 0xd3], "edx = lsb(r11d) (x86 bsf"); // for non-bm1
     test_display(&[0x41, 0x0f, 0xbd, 0xd3], "edx = msb(r11d)");
     // test_display(&[0x41, 0x0f, 0xbc, 0xd3], "edx = lsb(r11d) (x86 bsr"); // for non-bm1
