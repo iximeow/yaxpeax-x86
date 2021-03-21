@@ -1311,6 +1311,10 @@ const MNEMONICS: &[&'static str] = &[
     "clui",
     "stui",
     "senduipi",
+
+    // TSXLDTRK
+    "xsusldtrk",
+    "xresldtrk",
 ];
 
 impl Opcode {
@@ -2321,6 +2325,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::CLUI |
             Opcode::STUI |
             Opcode::SENDUIPI |
+            Opcode::XSUSLDTRK |
+            Opcode::XRESLDTRK |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::CRC32 |

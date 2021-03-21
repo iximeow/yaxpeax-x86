@@ -1966,6 +1966,10 @@ pub enum Opcode {
     CLUI,
     STUI,
     SENDUIPI,
+
+    // TSXLDTRK
+    XSUSLDTRK,
+    XRESLDTRK,
 }
 
 #[derive(Debug)]
@@ -8326,12 +8330,27 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let m = modrm & 7;
                 match m {
                     0b000 => {
+                        if instruction.prefixes.repnz() {
+                            instruction.opcode = Opcode::XSUSLDTRK;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        }
                         if !instruction.prefixes.rep() || instruction.prefixes.repnz() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         instruction.opcode = Opcode::SETSSBSY;
                         instruction.operands[0] = OperandSpec::Nothing;
                         instruction.operand_count = 0;
+                    }
+                    0b001 => {
+                        if instruction.prefixes.repnz() {
+                            instruction.opcode = Opcode::XRESLDTRK;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        }
+                        return Err(DecodeError::InvalidOpcode);
                     }
                     0b010 => {
                         if !instruction.prefixes.rep() || instruction.prefixes.repnz() {
