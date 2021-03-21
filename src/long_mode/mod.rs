@@ -8326,7 +8326,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 let m = modrm & 7;
                 match m {
                     0b000 => {
-                        if !instruction.prefixes.rep() || instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
+                        if !instruction.prefixes.rep() || instruction.prefixes.repnz() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         instruction.opcode = Opcode::SETSSBSY;
@@ -8334,7 +8334,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         instruction.operand_count = 0;
                     }
                     0b010 => {
-                        if !instruction.prefixes.rep() || instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
+                        if !instruction.prefixes.rep() || instruction.prefixes.repnz() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         instruction.opcode = Opcode::SAVEPREVSSP;
