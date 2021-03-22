@@ -178,8 +178,8 @@ fn test_instructions_c() {
     test_display(&[0x66, 0x0f, 0x38, 0xf6, 0x01], "eax += [rcx] + rflags.cf");
     test_display(&[0xf3, 0x4f, 0x0f, 0x38, 0xf6, 0x01], "r8 += [r9] + rflags.of");
 
-    test_display(&[0xfe, 0x00], "[rax]++"); // TODO: byte
-    test_display(&[0xfe, 0x08], "[rax]--"); // TODO: byte
-    test_display(&[0xff, 0x00], "[rax]++"); // TODO: dword
-    test_display(&[0x48, 0xff, 0x00], "[rax]++"); // TODO: qword
+    test_display(&[0xfe, 0x00], "byte [rax]++");
+    test_display(&[0x66, 0xff, 0x08], "word [rax]--");
+    test_display(&[0xff, 0x00], "dword [rax]++");
+    test_display(&[0x48, 0xff, 0x00], "qword [rax]++");
 }

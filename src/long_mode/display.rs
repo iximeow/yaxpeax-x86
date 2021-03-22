@@ -2709,10 +2709,28 @@ fn contextualize_c<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(inst
             write!(out, "{} = movntq({})", instr.operand(0), instr.operand(1))?;
         }
         Opcode::INC => {
-            write!(out, "{}++", instr.operand(0))?;
+            if instr.operand(0).is_memory() {
+                match instr.mem_size {
+                    1 => { write!(out, "byte {}++", instr.operand(0))?; },
+                    2 => { write!(out, "word {}++", instr.operand(0))?; },
+                    4 => { write!(out, "dword {}++", instr.operand(0))?; },
+                    _ => { write!(out, "qword {}++", instr.operand(0))?; }, // sizes that are not 1, 2, or 4, *better* be 8.
+                }
+            } else {
+                write!(out, "{}++", instr.operand(0))?;
+            }
         }
         Opcode::DEC => {
-            write!(out, "{}--", instr.operand(0))?;
+            if instr.operand(0).is_memory() {
+                match instr.mem_size {
+                    1 => { write!(out, "byte {}--", instr.operand(0))?; },
+                    2 => { write!(out, "word {}--", instr.operand(0))?; },
+                    4 => { write!(out, "dword {}--", instr.operand(0))?; },
+                    _ => { write!(out, "qword {}--", instr.operand(0))?; }, // sizes that are not 1, 2, or 4, *better* be 8.
+                }
+            } else {
+                write!(out, "{}--", instr.operand(0))?;
+            }
         }
         Opcode::JG => {
             write!(out, "if greater(rflags) then jmp {}", instr.operand(0))?;
