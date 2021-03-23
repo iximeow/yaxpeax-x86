@@ -5,7 +5,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use crate::protected_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixVex, OperandSpec, DecodeError};
+use crate::protected_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixVex, OperandSpec};
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -2557,7 +2557,7 @@ fn contextualize_intel<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(
     Ok(())
 }
 
-fn contextualize_c<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+fn contextualize_c<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(instr: &Instruction, _colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     let mut brace_count = 0;
 
     if instr.prefixes.lock() {
