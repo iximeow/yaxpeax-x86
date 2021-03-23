@@ -1,3 +1,87 @@
+## 0.2.0
+### features!
+* fuzz against mishegos and fix many bugs that made obvious
+  - duplicate and redundant f2, f3, and 66 prefixes on 0f-type opcodes are now
+    handled "right", assuming xed as a source of truth. almost all of these cases
+    are undefined by the intel and AMD manuals, but it seems unlikely that
+    capstone is correct with respect to cpu interpretation while xed is
+    incorrect.
+* public `enum`s are now `#[non_exhaustive]`. these are `Operand`, `Opcode`, and `DecodeError`.
+  - `Operand` is not expected to vary, but might.
+  - `Opcode` will grow new variants for every extension.
+  - `DecodeError` will probably not change, but no guarantees.
+* add a notion of display styles for instructions, see `Instruction::display_with`. currently there are two styles:
+  - `DisplayStyle::Intel` produces intel-like syntax for instructions
+  - `DisplayStyle::C` produces C pseudocode-ish syntax for instructions
+    - as an example, `xor eax, [rax]` is rendered as `eax ^= [rax]`.
+  - `DisplayStyle::Att` is one potential future style, but not yet implemented
+* `fmt`-related code and the `display` module are now optional on the `fmt` feature
+  - this is to support minimal builds for decoders in non-formatting circumstances. `yaxpeax-x86` long mode is still 65kb there.
+* improved packaging of ffi-friendly bindings in `ffi/`
+  - architectures have standalone libraries for each of `long_mode`, `protected_mode`, and `real_mode` (last still to be implemented)
+  - improved `ffi/` build instructions to describe how to build minimal-size `.so` and `.a` archives for linking
+* `ffi/multiarch` is intended to be a single package for all architectures, but currently does not fulfil this role
+
+### decode fixes
+* segment prefixes (`cs`, `ds`, `ss`, `es`) are now properly ignored in long mode
+* `lock xchg` now decodes correctly (operands were in reversed order and so memory "destinations" were treated as memory sources)
+* some missing sse instructions are now supported (`blendps`, `blendpd`, `pclmulqdq`)
+* some missing avx instructions are now supported (`vorpd`, `vorps`, `vandpd`, `vandps`, `vandnpd`, `vandnps`, `vpmaxuw`)
+* prefetch instructions with register operand are interpreted as `nop`, not `#UD`
+* `mov` to control or debug registers that are statically known to `#UD` now produce `DecodeError::InvalidOperand`
+* `salc` is now rejected. it was accepted on a whim, and i am fickle.
+  - realistically, this should be behind a decoder flag and accepted by
+    default, but this makes fuzzing somewhat easier and isn't an instruction
+    you'd expect to see in a modern x86 binary. see the summary at the end of
+    this section for some thoughts on decoder flags...
+
+### new ISA extension support!
+* 3dnow is 3d-supported-now
+* `sse4a` is now supported
+* `gfni` extensions are now supported
+* `ptwrite` extensions are now supported
+* `cet` (`c`ontrol-flow `e`nforcement `t`echnology) extensions are now supported
+* `invpcid` extensions are now supported
+* `tdx` extensions are now supported
+* `waitpkg` extensions are now supported
+* `uintr` extensions are now supported
+* `tsxldtrk` extensions are now supported
+* `ud0`, `ud1`, and `ud2` are now supported - `ud2e` which was never real, is actually `ud1`
+* `movdir` extensions are now supported
+* `key locker` extensions are now supported
+* `enqcmd` extensions are now supported
+
+### architecture support
+* all above changes apply both to `long_mode` and `protected_mode`.
+  `protected_mode` may accept some 64bit-only instructions incorrectly. beware.
+
+### thoughts?
+folks, i'm out of feature bits in `InstDecoder`. there are too dang many x86
+extensions. in the happy case, rustc knows that the provided decoder always
+compares equal to `InstDecoder::default()` so it can be made an arbitrarily
+large byte array. but i continue to be in awe of how much they put in the
+computer. as things stand, new extensions are not categorized into
+`InstDecoder` flags, but since there is a way to implement additional bits
+without causing overhead in the happy path, this feature will probably continue
+being supported in the future.
+
+### unsafe
+there are still a handful of `unsafe {}` uses in `yaxpeax-x86` for performance
+reasons. i tried removing arms in matches by making the last meaningful arm,
+often something like:
+```
+8 => { /* handle 8-byte operand */ }
+```
+into a general catchall arm and deleting the `unreachable_unchecked`, like:
+```
+_ => { /* handle 8-byte operand */ }
+```
+but this also caused a ~5% regression in performance. this makes sense, since
+`unreachable_unchecked` is stronger in saying that other values (`3`, `5`, `6`,
+`7`, ...) will _not_ occur, but `_` doesn't disallow them and likely produces
+jump tables for no good reason. maybe this can be solved some other way, one
+day...
+
 ## 0.1.5
 * fix several issues around 0f01* opcode decoding;
   - AMD-only `monitorx`, `mwaitx`, `clzero`, and `rdpru` are now supported
