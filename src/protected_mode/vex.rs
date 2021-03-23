@@ -923,6 +923,21 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         } else {
                             VEXOperandCode::G_E_xmm
                         }),
+                        0x54 => (Opcode::VANDPS, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
+                        0x55 => (Opcode::VANDNPS, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
+                        0x56 => (Opcode::VORPS, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
                         0x57 => (Opcode::VXORPS, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
@@ -987,8 +1002,8 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                 },
                 VEXOpcodePrefix::Prefix66 => {
                     match opc {
-                        0x0a => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xmm_imm8),
-                        0x0b => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xmm_imm8),
+//                        0x0a => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xmm_imm8),
+//                        0x0b => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xmm_imm8),
                         0x10 => (Opcode::VMOVUPD, if L {
                             VEXOperandCode::G_E_ymm
                         } else {
@@ -1059,6 +1074,21 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                             VEXOperandCode::G_E_ymm
                         } else {
                             VEXOperandCode::G_E_xmm
+                        }),
+                        0x54 => (Opcode::VANDPD, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
+                        0x55 => (Opcode::VANDNPD, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
+                        }),
+                        0x56 => (Opcode::VORPD, if L {
+                            VEXOperandCode::G_V_E_ymm
+                        } else {
+                            VEXOperandCode::G_V_E_xmm
                         }),
                         0x57 => (Opcode::VXORPD, if L {
                             VEXOperandCode::G_V_E_ymm
@@ -1617,7 +1647,7 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         0x5e => (Opcode::VDIVSS, VEXOperandCode::G_V_E_xmm),
                         0x5f => (Opcode::VMAXSS, VEXOperandCode::G_V_E_xmm),
                         0x6f => (Opcode::VMOVDQU, if L { VEXOperandCode::G_E_ymm } else { VEXOperandCode::G_E_xmm }),
-                        0x70 => (Opcode::VMOVSHDUP, if L { VEXOperandCode::G_E_ymm_imm8 } else { VEXOperandCode::G_E_xmm_imm8 }),
+//                        0x70 => (Opcode::VMOVSHDUP, if L { VEXOperandCode::G_E_ymm_imm8 } else { VEXOperandCode::G_E_xmm_imm8 }),
                         0x7e => (Opcode::VMOVQ, if L { instruction.opcode = Opcode::Invalid; return Err(DecodeError::InvalidOpcode); } else { VEXOperandCode::G_E_xmm }),
                         0x7f => (Opcode::VMOVDQU, if L { VEXOperandCode::E_G_ymm } else { VEXOperandCode::E_G_xmm }),
                         0xc2 => (Opcode::VCMPSS, VEXOperandCode::G_V_E_xmm_imm8),
@@ -1885,6 +1915,11 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         VEXOperandCode::G_V_E_xmm
                     }),
                     0x3D => (Opcode::VPMAXSD, if L {
+                        VEXOperandCode::G_V_E_ymm
+                    } else {
+                        VEXOperandCode::G_V_E_xmm
+                    }),
+                    0x3E => (Opcode::VPMAXUW, if L {
                         VEXOperandCode::G_V_E_ymm
                     } else {
                         VEXOperandCode::G_V_E_xmm

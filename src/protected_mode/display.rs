@@ -7,19 +7,6 @@ use yaxpeax_arch::display::*;
 
 use crate::protected_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixVex, OperandSpec, DecodeError};
 
-impl fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DecodeError::ExhaustedInput => { write!(f, "exhausted input") },
-            DecodeError::InvalidOpcode => { write!(f, "invalid opcode") },
-            DecodeError::InvalidOperand => { write!(f, "invalid operand") },
-            DecodeError::InvalidPrefixes => { write!(f, "invalid prefixes") },
-            DecodeError::TooLong => { write!(f, "too long") },
-            DecodeError::IncompleteDecoder => { write!(f, "the decoder is incomplete") },
-        }
-    }
-}
-
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self == &InstDecoder::default() {
@@ -424,6 +411,8 @@ const MNEMONICS: &[&'static str] = &[
     "setle",
     "setg",
     "cpuid",
+    "ud0",
+    "ud1",
     "ud2",
     "wbinvd",
     "invd",
@@ -572,6 +561,10 @@ const MNEMONICS: &[&'static str] = &[
     "movnti",
     "movntps",
     "movntpd",
+    "extrq",
+    "insertq",
+    "movntss",
+    "movntsd",
     "movntq",
     "movntdq",
     "mulps",
@@ -656,7 +649,6 @@ const MNEMONICS: &[&'static str] = &[
     "sysexit",
     "ucomisd",
     "ucomiss",
-    "ud2e",
     "vmread",
     "vmwrite",
     "xorps",
@@ -845,6 +837,12 @@ const MNEMONICS: &[&'static str] = &[
     "vpaddusw",
     "vpaddw",
     "vpalignr",
+    "vandps",
+    "vandpd",
+    "vorps",
+    "vorpd",
+    "vandnps",
+    "vandnpd",
     "vpand",
     "vpandn",
     "vpavgb",
@@ -902,6 +900,7 @@ const MNEMONICS: &[&'static str] = &[
     "vpmaxsd",
     "vpmaxsw",
     "vpmaxub",
+    "vpmaxuw",
     "vpmaxud",
     "vpminsw",
     "vpminsd",
@@ -1089,6 +1088,8 @@ const MNEMONICS: &[&'static str] = &[
     "vmsave",
     "vmrun",
     "invlpga",
+    "invlpgb",
+    "tlbsync",
     "movbe",
     "adcx",
     "adox",
@@ -1225,6 +1226,95 @@ const MNEMONICS: &[&'static str] = &[
     "daa",
     "amx",
     "adx",
+    "movdir64b",
+    "movdiri",
+    "aesdec128kl",
+    "aesdec256kl",
+    "aesdecwide128kl",
+    "aesdecwide256kl",
+    "aesenc128kl",
+    "aesenc256kl",
+    "aesencwide128kl",
+    "aesencwide256kl",
+    "encodekey128",
+    "encodekey256",
+    "loadiwkey",
+
+    // 3dnow
+    "femms",
+    "pi2fw",
+    "pi2fd",
+    "pi2iw",
+    "pi2id",
+    "pmulhrw",
+    "pfcmpge",
+    "pfmin",
+    "pfrcp",
+    "pfrsqrt",
+    "pfsub",
+    "pfadd",
+    "pfcmpgt",
+    "pfmax",
+    "pfrcpit1",
+    "pfrsqit1",
+    "pfsubr",
+    "pfacc",
+    "pfcmpeq",
+    "pfmul",
+    "pfmulhrw",
+    "pfrcpit2",
+    "pfnacc",
+    "pfpnacc",
+    "pswapd",
+    "pavgusb",
+
+    // ENQCMD
+    "enqcmd",
+    "enqcmds",
+
+    // INVPCID,
+    "invept",
+    "invvpid",
+    "invpcid",
+
+    // PTWRITE
+    "ptwrite",
+
+    // GFNI
+    "gf2p8affineqb",
+    "gf2p8affineinvqb",
+    "gf2p8mulb",
+
+    // CET
+    "wruss",
+    "wrss",
+    "incssp",
+    "saveprevssp",
+    "setssbsy",
+    "clrssbsy",
+    "rstorssp",
+
+    // TDX
+    "tdcall",
+    "seamret",
+    "seamops",
+    "seamcall",
+
+    // WAITPKG
+    "tpause",
+    "umonitor",
+    "umwait",
+
+    // UINTR
+    "uiret",
+    "testui",
+    "clui",
+    "stui",
+    "senduipi",
+
+    // TSXLDTRK
+    "xsusldtrk",
+    "xresldtrk",
 ];
 
 impl Opcode {
@@ -1391,6 +1481,12 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VDPPD |
             Opcode::VDPPS |
             Opcode::VRCPPS |
+            Opcode::VORPD |
+            Opcode::VORPS |
+            Opcode::VANDPD |
+            Opcode::VANDPS |
+            Opcode::VANDNPD |
+            Opcode::VANDNPS |
             Opcode::VPAND |
             Opcode::VPANDN |
             Opcode::VPOR |
@@ -1438,6 +1534,22 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::HADDPS |
             Opcode::HSUBPS |
             Opcode::ADDSUBPS |
+            Opcode::PMULHRW |
+            Opcode::PFRCP |
+            Opcode::PFRSQRT |
+            Opcode::PFSUB |
+            Opcode::PFADD |
+            Opcode::PFRCPIT1 |
+            Opcode::PFRSQIT1 |
+            Opcode::PFSUBR |
+            Opcode::PFACC |
+            Opcode::PFMUL |
+            Opcode::PFMULHRW |
+            Opcode::PFRCPIT2 |
+            Opcode::PFNACC |
+            Opcode::PFPNACC |
+            Opcode::PSWAPD |
+            Opcode::PAVGUSB |
             Opcode::XADD|
             Opcode::DIV |
             Opcode::IDIV |
@@ -1652,6 +1764,10 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::JG => { write!(out, "{}", colors.control_flow_op(self)) }
 
             /* Data transfer */
+            Opcode::PI2FW |
+            Opcode::PI2FD |
+            Opcode::PF2ID |
+            Opcode::PF2IW |
             Opcode::VCVTDQ2PD |
             Opcode::VCVTDQ2PS |
             Opcode::VCVTPD2DQ |
@@ -1719,6 +1835,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VMOVNTDQA |
             Opcode::VMOVNTPD |
             Opcode::VMOVNTPS |
+            Opcode::MOVDIR64B |
+            Opcode::MOVDIRI |
             Opcode::MOVNTDQA |
             Opcode::VMOVQ |
             Opcode::VMOVSHDUP |
@@ -1800,9 +1918,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PEXTRB |
             Opcode::PEXTRD |
             Opcode::PEXTRQ |
+            Opcode::EXTRQ |
             Opcode::PINSRB |
             Opcode::PINSRD |
             Opcode::PINSRQ |
+            Opcode::INSERTQ |
             Opcode::VPINSRB |
             Opcode::VPINSRD |
             Opcode::VPINSRQ |
@@ -1854,6 +1974,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::MOVNTI |
             Opcode::MOVNTPS |
             Opcode::MOVNTPD |
+            Opcode::MOVNTSS |
+            Opcode::MOVNTSD |
             Opcode::MOVNTQ |
             Opcode::MOVNTDQ |
             Opcode::MOVSD |
@@ -2021,6 +2143,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VPMAXSD |
             Opcode::VPMAXSW |
             Opcode::VPMAXUB |
+            Opcode::VPMAXUW |
             Opcode::VPMAXUD |
             Opcode::VPMINSW |
             Opcode::VPMINSD |
@@ -2061,6 +2184,11 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::PMINUB |
             Opcode::PMINUD |
             Opcode::PMINUW |
+            Opcode::PFCMPGE |
+            Opcode::PFMIN |
+            Opcode::PFCMPGT |
+            Opcode::PFMAX |
+            Opcode::PFCMPEQ |
             Opcode::CMPS |
             Opcode::SCAS |
             Opcode::TEST |
@@ -2125,14 +2253,26 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::LMSW |
             Opcode::SWAPGS |
             Opcode::RDTSCP |
+            Opcode::INVEPT |
+            Opcode::INVVPID |
+            Opcode::INVPCID |
             Opcode::INVLPG |
             Opcode::INVLPGA |
+            Opcode::INVLPGB |
+            Opcode::TLBSYNC |
             Opcode::CPUID |
             Opcode::WBINVD |
             Opcode::INVD |
             Opcode::SYSRET |
             Opcode::CLTS |
             Opcode::SYSCALL |
+            Opcode::TDCALL |
+            Opcode::SEAMRET |
+            Opcode::SEAMOPS |
+            Opcode::SEAMCALL |
+            Opcode::TPAUSE |
+            Opcode::UMONITOR |
+            Opcode::UMWAIT |
             Opcode::LSL |
             Opcode::SLDT |
             Opcode::STR |
@@ -2142,6 +2282,7 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VERW |
             Opcode::JMPE |
             Opcode::EMMS |
+            Opcode::FEMMS |
             Opcode::GETSEC |
             Opcode::LFS |
             Opcode::LGS |
@@ -2149,7 +2290,6 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::RSM |
             Opcode::SYSENTER |
             Opcode::SYSEXIT |
-            Opcode::UD2E |
             Opcode::VMREAD |
             Opcode::VMWRITE |
             Opcode::VMCLEAR |
@@ -2187,6 +2327,16 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::WRPKRU |
             Opcode::RDPRU |
             Opcode::CLZERO |
+            Opcode::ENQCMD |
+            Opcode::ENQCMDS |
+            Opcode::PTWRITE |
+            Opcode::UIRET |
+            Opcode::TESTUI |
+            Opcode::CLUI |
+            Opcode::STUI |
+            Opcode::SENDUIPI |
+            Opcode::XSUSLDTRK |
+            Opcode::XRESLDTRK |
             Opcode::ARPL |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
@@ -2204,6 +2354,27 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::FFREEP |
             Opcode::FDECSTP |
             Opcode::FINCSTP |
+            Opcode::GF2P8MULB |
+            Opcode::GF2P8AFFINEQB |
+            Opcode::GF2P8AFFINEINVQB |
+            Opcode::AESDEC128KL |
+            Opcode::AESDEC256KL |
+            Opcode::AESDECWIDE128KL |
+            Opcode::AESDECWIDE256KL |
+            Opcode::AESENC128KL |
+            Opcode::AESENC256KL |
+            Opcode::AESENCWIDE128KL |
+            Opcode::AESENCWIDE256KL |
+            Opcode::ENCODEKEY128 |
+            Opcode::ENCODEKEY256 |
+            Opcode::LOADIWKEY |
+            Opcode::WRUSS |
+            Opcode::WRSS |
+            Opcode::INCSSP |
+            Opcode::SAVEPREVSSP |
+            Opcode::SETSSBSY |
+            Opcode::CLRSSBSY |
+            Opcode::RSTORSSP |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |
@@ -2217,6 +2388,8 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
             Opcode::VAESIMC |
             Opcode::VAESKEYGENASSIST => { write!(out, "{}", colors.misc_op(self)) }
 
+            Opcode::UD0 |
+            Opcode::UD1 |
             Opcode::UD2 |
             Opcode::Invalid => { write!(out, "{}", colors.invalid_op(self)) }
         }
@@ -2225,8 +2398,38 @@ impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color
 
 impl fmt::Display for Instruction {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        self.display_with(DisplayStyle::Intel).colorize(&NoColors, fmt)
+    }
+}
+
+impl<'instr> fmt::Display for InstructionDisplayer<'instr> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         self.colorize(&NoColors, fmt)
     }
+}
+
+/// enum controlling how `Instruction::display_with` renders instructions. `Intel` is more or less
+/// intel syntax, though memory operand sizes are elided if they can be inferred from other
+/// operands.
+#[derive(Copy, Clone)]
+pub enum DisplayStyle {
+    /// intel-style syntax for instructions, like
+    /// `add eax, [edx + ecx * 2 + 0x1234]`
+    Intel,
+    /// C-style syntax for instructions, like
+    /// `eax += [edx + ecx * 2 + 0x1234]`
+    C,
+    // one might imagine an ATT style here, which is mostly interesting for reversing operand
+    // order.
+    // well.
+    // it also complicates memory operands in an offset-only operand, and is just kind of awful, so
+    // it's just not implemented yet.
+    // ATT,
+}
+
+pub struct InstructionDisplayer<'instr> {
+    pub(crate) instr: &'instr Instruction,
+    pub(crate) style: DisplayStyle,
 }
 
 /*
@@ -2242,7 +2445,7 @@ impl fmt::Display for Instruction {
  * so write to some Write thing i guess. bite me. i really just want to
  * stop thinking about how to support printing instructions...
  */
-impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for Instruction {
+impl <'instr, T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for InstructionDisplayer<'instr> {
     fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         // TODO: I DONT LIKE THIS, there is no address i can give contextualize here,
         // the address operand maybe should be optional..
@@ -2255,104 +2458,338 @@ struct NoContext;
 
 impl Instruction {
     pub fn write_to<T: fmt::Write>(&self, out: &mut T) -> fmt::Result {
-        self.contextualize(&NoColors, 0, Some(&NoContext), out)
+        self.display_with(DisplayStyle::Intel).contextualize(&NoColors, 0, Some(&NoContext), out)
     }
 }
 
-impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u64, NoContext, Color, T, Y> for Instruction {
-    fn contextualize(&self, colors: &Y, _address: u64, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
-        if self.prefixes.lock() {
-            write!(out, "lock ")?;
-        }
+fn contextualize_intel<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+    if instr.prefixes.lock() {
+        write!(out, "lock ")?;
+    }
 
-        if self.prefixes.rep_any() {
-            if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&self.opcode) {
-                // only a few of you actually use the prefix...
-                if self.prefixes.rep() {
-                    write!(out, "rep ")?;
-                } else if self.prefixes.repz() {
-                    write!(out, "repz ")?;
-                } else if self.prefixes.repnz() {
-                    write!(out, "repnz ")?;
-                }
+    if instr.prefixes.rep_any() {
+        if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&instr.opcode) {
+            // only a few of you actually use the prefix...
+            if instr.prefixes.rep() {
+                write!(out, "rep ")?;
+            } else if instr.prefixes.repz() {
+                write!(out, "repz ")?;
+            } else if instr.prefixes.repnz() {
+                write!(out, "repnz ")?;
             }
         }
+    }
 
-        out.write_str(self.opcode.name())?;
+    out.write_str(instr.opcode.name())?;
 
-        if self.opcode == Opcode::XBEGIN {
-            return write!(out, " $+{}", colors.number(signed_i32_hex(self.imm as i32)));
+    if instr.opcode == Opcode::XBEGIN {
+        return write!(out, " $+{}", colors.number(signed_i32_hex(instr.imm as i32)));
+    }
+
+    if instr.operand_count > 0 {
+        out.write_str(" ")?;
+
+        if let Some(prefix) = instr.segment_override_for_op(0) {
+            write!(out, "{}:", prefix)?;
         }
 
-        if self.operand_count > 0 {
-            out.write_str(" ")?;
+        let x = Operand::from_spec(instr, instr.operands[0]);
+        x.colorize(colors, out)?;
 
-            if let Some(prefix) = self.segment_override_for_op(0) {
-                write!(out, "{}:", prefix)?;
-            }
-
-            let x = Operand::from_spec(self, self.operands[0]);
-            x.colorize(colors, out)?;
-
-            for i in 1..self.operand_count {
-                match self.opcode {
-                    Opcode::MOVSX_b |
-                    Opcode::MOVZX_b => {
-                        match &self.operands[i as usize] {
-                            &OperandSpec::Nothing => {
-                                return Ok(());
-                            },
-                            &OperandSpec::RegMMM => {
-                                out.write_str(", ")?;
-                            }
-                            _ => {
-                                out.write_str(", byte ")?;
-                                if let Some(prefix) = self.segment_override_for_op(i) {
-                                    write!(out, "{}:", prefix)?;
-                                }
+        for i in 1..instr.operand_count {
+            match instr.opcode {
+                Opcode::MOVSX_b |
+                Opcode::MOVZX_b => {
+                    match &instr.operands[i as usize] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        &OperandSpec::RegMMM => {
+                            out.write_str(", ")?;
+                        }
+                        _ => {
+                            out.write_str(", byte ")?;
+                            if let Some(prefix) = instr.segment_override_for_op(i) {
+                                write!(out, "{}:", prefix)?;
                             }
                         }
-                        let x = Operand::from_spec(self, self.operands[i as usize]);
-                        x.colorize(colors, out)?
-                    },
-                    Opcode::MOVSX_w |
-                    Opcode::MOVZX_w => {
-                        match &self.operands[i as usize] {
-                            &OperandSpec::Nothing => {
-                                return Ok(());
-                            },
-                            &OperandSpec::RegMMM => {
-                                out.write_str(", ")?;
-                            }
-                            _ => {
-                                out.write_str(", word ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
-                                }
+                    }
+                    let x = Operand::from_spec(instr, instr.operands[i as usize]);
+                    x.colorize(colors, out)?
+                },
+                Opcode::MOVSX_w |
+                Opcode::MOVZX_w => {
+                    match &instr.operands[i as usize] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        &OperandSpec::RegMMM => {
+                            out.write_str(", ")?;
+                        }
+                        _ => {
+                            out.write_str(", word ")?;
+                            if let Some(prefix) = instr.segment_override_for_op(i) {
+                                write!(out, "{}:", prefix)?;
                             }
                         }
-                        let x = Operand::from_spec(self, self.operands[i as usize]);
-                        x.colorize(colors, out)?
-                    },
-                    _ => {
-                        match &self.operands[i as usize] {
-                            &OperandSpec::Nothing => {
-                                return Ok(());
-                            },
-                            _ => {
-                                out.write_str(", ")?;
-                                if let Some(prefix) = self.segment_override_for_op(1) {
-                                    write!(out, "{}:", prefix)?;
-                                }
-                                let x = Operand::from_spec(self, self.operands[i as usize]);
-                                x.colorize(colors, out)?
+                    }
+                    let x = Operand::from_spec(instr, instr.operands[i as usize]);
+                    x.colorize(colors, out)?
+                },
+                _ => {
+                    match &instr.operands[i as usize] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        _ => {
+                            out.write_str(", ")?;
+                            if let Some(prefix) = instr.segment_override_for_op(i) {
+                                write!(out, "{}:", prefix)?;
                             }
+                            let x = Operand::from_spec(instr, instr.operands[i as usize]);
+                            x.colorize(colors, out)?
                         }
                     }
                 }
             }
         }
-        Ok(())
+    }
+    Ok(())
+}
+
+fn contextualize_c<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+    let mut brace_count = 0;
+
+    if instr.prefixes.lock() {
+        out.write_str("lock { ")?;
+        brace_count += 1;
+    }
+
+    if instr.prefixes.rep_any() {
+        if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&instr.opcode) {
+            let word_str = match instr.mem_size {
+                1 => "byte",
+                2 => "word",
+                4 => "dword",
+                8 => "qword",
+                _ => { unreachable!("invalid word size") }
+            };
+
+            // only a few of you actually use the prefix...
+            if instr.prefixes.rep() {
+                out.write_str("rep ")?;
+            } else if instr.prefixes.repz() {
+                out.write_str("repz ")?;
+            } else if instr.prefixes.repnz() {
+                out.write_str("repnz ")?;
+            } // TODO: other rep kinds?
+
+            out.write_str(word_str)?;
+            out.write_str(" { ")?;
+            brace_count += 1;
+        }
+    }
+
+    match instr.opcode {
+        Opcode::Invalid => { out.write_str("invalid")?; },
+        Opcode::MOVS => {
+            out.write_str("es:[edi++] = ds:[esi++]")?;
+        },
+        Opcode::CMPS => {
+            out.write_str("eflags = flags(ds:[esi++] - es:[edi++])")?;
+        },
+        Opcode::LODS => {
+            // TODO: size
+            out.write_str("rax = ds:[esi++]")?;
+        },
+        Opcode::STOS => {
+            // TODO: size
+            out.write_str("es:[edi++] = rax")?;
+        },
+        Opcode::INS => {
+            // TODO: size
+            out.write_str("es:[edi++] = port(dx)")?;
+        },
+        Opcode::OUTS => {
+            // TODO: size
+            out.write_str("port(dx) = ds:[esi++]")?;
+        }
+        Opcode::ADD => {
+            write!(out, "{} += {}", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::OR => {
+            write!(out, "{} |= {}", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::ADC => {
+            write!(out, "{} += {} + eflags.cf", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::ADCX => {
+            write!(out, "{} += {} + eflags.cf", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::ADOX => {
+            write!(out, "{} += {} + eflags.of", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SBB => {
+            write!(out, "{} -= {} + eflags.cf", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::AND => {
+            write!(out, "{} &= {}", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::XOR => {
+            write!(out, "{} ^= {}", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SUB => {
+            write!(out, "{} -= {}", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::CMP => {
+            write!(out, "eflags = flags({} - {})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::TEST => {
+            write!(out, "eflags = flags({} & {})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::XADD => {
+            write!(out, "({}, {}) = ({} + {}, {})", instr.operand(0), instr.operand(1), instr.operand(0), instr.operand(1), instr.operand(0))?;
+        }
+        Opcode::BT => {
+            write!(out, "bt")?;
+        }
+        Opcode::BTS => {
+            write!(out, "bts")?;
+        }
+        Opcode::BTC => {
+            write!(out, "btc")?;
+        }
+        Opcode::BSR => {
+            write!(out, "{} = msb({})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::BSF => {
+            write!(out, "{} = lsb({}) (x86 bsf)", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::TZCNT => {
+            write!(out, "{} = lsb({})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::MOV => {
+            write!(out, "{} = {}", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SAR => {
+            write!(out, "{} = {} >>> {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SAL => {
+            write!(out, "{} = {} <<< {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SHR => {
+            write!(out, "{} = {} >> {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SHRX => {
+            write!(out, "{} = {} >> {} (x86 shrx)", instr.operand(0), instr.operand(1), instr.operand(2))?;
+        }
+        Opcode::SHL => {
+            write!(out, "{} = {} << {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::SHLX => {
+            write!(out, "{} = {} << {} (x86 shlx)", instr.operand(0), instr.operand(1), instr.operand(2))?;
+        }
+        Opcode::ROR => {
+            write!(out, "{} = {} ror {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::RORX => {
+            write!(out, "{} = {} ror {} (x86 rorx)", instr.operand(0), instr.operand(1), instr.operand(2))?;
+        }
+        Opcode::ROL => {
+            write!(out, "{} = {} rol {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::RCR => {
+            write!(out, "{} = {} rcr {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::RCL => {
+            write!(out, "{} = {} rcl {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::PUSH => {
+            write!(out, "push({})", instr.operand(0))?;
+        }
+        Opcode::POP => {
+            write!(out, "{} = pop()", instr.operand(0))?;
+        }
+        Opcode::MOVD => {
+            write!(out, "{} = movd({})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::MOVQ => {
+            write!(out, "{} = movq({})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::MOVNTQ => {
+            write!(out, "{} = movntq({})", instr.operand(0), instr.operand(1))?;
+        }
+        Opcode::INC => {
+            if instr.operand(0).is_memory() {
+                match instr.mem_size {
+                    1 => { write!(out, "byte {}++", instr.operand(0))?; },
+                    2 => { write!(out, "word {}++", instr.operand(0))?; },
+                    4 => { write!(out, "dword {}++", instr.operand(0))?; },
+                    _ => { write!(out, "qword {}++", instr.operand(0))?; }, // sizes that are not 1, 2, or 4, *better* be 8.
+                }
+            } else {
+                write!(out, "{}++", instr.operand(0))?;
+            }
+        }
+        Opcode::DEC => {
+            if instr.operand(0).is_memory() {
+                match instr.mem_size {
+                    1 => { write!(out, "byte {}--", instr.operand(0))?; },
+                    2 => { write!(out, "word {}--", instr.operand(0))?; },
+                    4 => { write!(out, "dword {}--", instr.operand(0))?; },
+                    _ => { write!(out, "qword {}--", instr.operand(0))?; }, // sizes that are not 1, 2, or 4, *better* be 8.
+                }
+            } else {
+                write!(out, "{}--", instr.operand(0))?;
+            }
+        }
+        Opcode::JG => {
+            write!(out, "if greater(eflags) then jmp {}", instr.operand(0))?;
+        }
+        Opcode::NOP => {
+            write!(out, "nop")?;
+        }
+        _ => {
+            if instr.operand_count() == 0 {
+                write!(out, "{}()", instr.opcode())?;
+            } else {
+                write!(out, "{} = {}({}", instr.operand(0), instr.opcode(), instr.operand(0))?;
+                let mut comma = true;
+                for i in 1..instr.operand_count() {
+                    if comma {
+                        write!(out, ", ")?;
+                    }
+                    write!(out, "{}", instr.operand(i))?;
+                    comma = true;
+                }
+                write!(out, ")")?;
+            }
+        }
+    }
+
+    while brace_count > 0 {
+        out.write_str(" }")?;
+        brace_count -= 1;
+    }
+
+    Ok(())
+}
+
+impl <'instr, T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u32, NoContext, Color, T, Y> for InstructionDisplayer<'instr> {
+    fn contextualize(&self, colors: &Y, address: u32, context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+        let InstructionDisplayer {
+            instr,
+            style,
+        } = self;
+
+        match style {
+            DisplayStyle::Intel => {
+                contextualize_intel(instr, colors, address, context, out)
+            }
+            DisplayStyle::C => {
+                contextualize_c(instr, colors, address, context, out)
+            }
+        }
     }
 }
 
