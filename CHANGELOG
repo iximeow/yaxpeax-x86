@@ -1,3 +1,8 @@
+## 0.2.1
+* update `yaxpeax-arch` dep to 0.0.5
+  - no external-facing changes for this, but `yaxpeax-arch 0.0.5` uses `crossterm` for cross-platform terminal coloring
+* clean up a few warnings that made it into 0.2.0?
+
 ## 0.2.0
 ### features!
 * fuzz against mishegos and fix many bugs that made obvious
