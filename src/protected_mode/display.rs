@@ -139,7 +139,7 @@ impl fmt::Display for Operand {
     }
 }
 
-impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for Operand {
+impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
     fn colorize(&self, colors: &Y, f: &mut T) -> fmt::Result {
         match self {
             &Operand::ImmediateU8(imm) => {
@@ -1325,7 +1325,7 @@ impl Opcode {
     }
 }
 
-impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for Opcode {
+impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
     fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         match self {
             Opcode::VHADDPS |
@@ -2445,7 +2445,7 @@ pub struct InstructionDisplayer<'instr> {
  * so write to some Write thing i guess. bite me. i really just want to
  * stop thinking about how to support printing instructions...
  */
-impl <'instr, T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> Colorize<T, Color, Y> for InstructionDisplayer<'instr> {
+impl <'instr, T: fmt::Write, Y: YaxColors> Colorize<T, Y> for InstructionDisplayer<'instr> {
     fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         // TODO: I DONT LIKE THIS, there is no address i can give contextualize here,
         // the address operand maybe should be optional..
@@ -2462,7 +2462,7 @@ impl Instruction {
     }
 }
 
-fn contextualize_intel<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     if instr.prefixes.lock() {
         write!(out, "lock ")?;
     }
@@ -2557,7 +2557,7 @@ fn contextualize_intel<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(
     Ok(())
 }
 
-fn contextualize_c<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(instr: &Instruction, _colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+fn contextualize_c<T: fmt::Write, Y: YaxColors>(instr: &Instruction, _colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     let mut brace_count = 0;
 
     if instr.prefixes.lock() {
@@ -2775,7 +2775,7 @@ fn contextualize_c<T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>>(inst
     Ok(())
 }
 
-impl <'instr, T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u32, NoContext, Color, T, Y> for InstructionDisplayer<'instr> {
+impl <'instr, T: fmt::Write, Y: YaxColors> ShowContextual<u32, NoContext, T, Y> for InstructionDisplayer<'instr> {
     fn contextualize(&self, colors: &Y, address: u32, context: Option<&NoContext>, out: &mut T) -> fmt::Result {
         let InstructionDisplayer {
             instr,
@@ -2794,7 +2794,7 @@ impl <'instr, T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowConte
 }
 
 #[cfg(feature="std")]
-impl <T: fmt::Write, Color: fmt::Display, Y: YaxColors<Color>> ShowContextual<u64, [Option<alloc::string::String>], Color, T, Y> for Instruction {
+impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::String>], T, Y> for Instruction {
     fn contextualize(&self, colors: &Y, _address: u64, context: Option<&[Option<alloc::string::String>]>, out: &mut T) -> fmt::Result {
         if self.prefixes.lock() {
             write!(out, "lock ")?;
