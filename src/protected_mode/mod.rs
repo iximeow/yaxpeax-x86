@@ -419,7 +419,6 @@ impl OperandSpec {
             OperandSpec::ImmI32 |
             OperandSpec::ImmU8 |
             OperandSpec::ImmU16 |
-            OperandSpec::ImmU32 |
             OperandSpec::RegRRR |
             OperandSpec::RegMMM |
             OperandSpec::RegVex |
@@ -456,7 +455,6 @@ impl Operand {
             OperandSpec::ImmI16 => Operand::ImmediateI16(inst.imm as i16),
             OperandSpec::ImmU16 => Operand::ImmediateU16(inst.imm as u16),
             OperandSpec::ImmI32 => Operand::ImmediateI32(inst.imm as i32),
-            OperandSpec::ImmU32 => Operand::ImmediateU32(inst.imm as u32),
             OperandSpec::ImmInDispField => Operand::ImmediateU16(inst.disp as u16),
             OperandSpec::DispU16 => Operand::DisplacementU16(inst.disp as u16),
             OperandSpec::DispU32 => Operand::DisplacementU32(inst.disp),
@@ -1948,7 +1946,6 @@ enum OperandSpec {
     ImmI32,
     ImmU8,
     ImmU16,
-    ImmU32,
     // ENTER is a two-immediate instruction, where the first immediate is stored in the disp field.
     // for this case, a second immediate-style operand is needed.
     // turns out `insertq` and `extrq` are also two-immediate instructions, so this is generalized

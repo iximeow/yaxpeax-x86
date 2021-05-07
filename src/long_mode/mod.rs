@@ -463,8 +463,6 @@ impl OperandSpec {
             OperandSpec::Deref_rdi |
             OperandSpec::RegDisp |
             OperandSpec::RegScale |
-            OperandSpec::RegIndexBase |
-            OperandSpec::RegIndexBaseDisp |
             OperandSpec::RegScaleDisp |
             OperandSpec::RegIndexBaseScale |
             OperandSpec::RegIndexBaseScaleDisp => {
@@ -476,8 +474,6 @@ impl OperandSpec {
             OperandSpec::ImmI64 |
             OperandSpec::ImmU8 |
             OperandSpec::ImmU16 |
-            OperandSpec::ImmU32 |
-            OperandSpec::ImmU64 |
             OperandSpec::RegRRR |
             OperandSpec::RegMMM |
             OperandSpec::RegVex |
@@ -514,9 +510,7 @@ impl Operand {
             OperandSpec::ImmI16 => Operand::ImmediateI16(inst.imm as i16),
             OperandSpec::ImmU16 => Operand::ImmediateU16(inst.imm as u16),
             OperandSpec::ImmI32 => Operand::ImmediateI32(inst.imm as i32),
-            OperandSpec::ImmU32 => Operand::ImmediateU32(inst.imm as u32),
             OperandSpec::ImmI64 => Operand::ImmediateI64(inst.imm as i64),
-            OperandSpec::ImmU64 => Operand::ImmediateU64(inst.imm as u64),
             OperandSpec::ImmInDispField => Operand::ImmediateU16(inst.disp as u16),
             OperandSpec::DispU32 => Operand::DisplacementU32(inst.disp as u32),
             OperandSpec::DispU64 => Operand::DisplacementU64(inst.disp as u64),
@@ -534,12 +528,6 @@ impl Operand {
             }
             OperandSpec::RegScale => {
                 Operand::RegScale(inst.sib_index, inst.scale)
-            }
-            OperandSpec::RegIndexBase => {
-                Operand::RegIndexBase(inst.modrm_mmm, inst.sib_index)
-            }
-            OperandSpec::RegIndexBaseDisp => {
-                Operand::RegIndexBaseDisp(inst.modrm_mmm, inst.sib_index, inst.disp as i32)
             }
             OperandSpec::RegScaleDisp => {
                 Operand::RegScaleDisp(inst.sib_index, inst.scale, inst.disp as i32)
@@ -2034,8 +2022,6 @@ enum OperandSpec {
     ImmI64,
     ImmU8,
     ImmU16,
-    ImmU32,
-    ImmU64,
     // ENTER is a two-immediate instruction, where the first immediate is stored in the disp field.
     // for this case, a second immediate-style operand is needed.
     // turns out `insertq` and `extrq` are also two-immediate instructions, so this is generalized
@@ -2048,8 +2034,6 @@ enum OperandSpec {
     Deref_rdi,
     RegDisp,
     RegScale,
-    RegIndexBase,
-    RegIndexBaseDisp,
     RegScaleDisp,
     RegIndexBaseScale,
     RegIndexBaseScaleDisp
