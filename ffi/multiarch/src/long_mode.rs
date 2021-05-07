@@ -34,10 +34,18 @@ mod fmt {
     use core::fmt::Write;
 
     #[no_mangle]
-    pub unsafe extern "C" fn yaxpeax_instr_fmt(inst: *mut amd64::Instruction, text: *mut u8, len: usize) {
+    pub unsafe extern "C" fn yaxpeax_x86_64_instr_fmt_intel(inst: *mut amd64::Instruction, text: *mut u8, len: usize) {
         let inst: &mut amd64::Instruction = core::mem::transmute(inst);
         let res = core::slice::from_raw_parts_mut(text, len);
 
-        write!(InstructionSink { buf: res, offs: 0 }, "{}", inst).unwrap();
+        write!(InstructionSink { buf: res, offs: 0 }, "{}", inst.display_with(DisplayStyle::Intel)).unwrap();
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn yaxpeax_x86_64_instr_fmt_c(inst: *mut amd64::Instruction, text: *mut u8, len: usize) {
+        let inst: &mut amd64::Instruction = core::mem::transmute(inst);
+        let res = core::slice::from_raw_parts_mut(text, len);
+
+        write!(InstructionSink { buf: res, offs: 0 }, "{}", inst.display_with(DisplayStyle::C)).unwrap();
     }
 }
