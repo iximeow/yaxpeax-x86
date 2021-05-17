@@ -2820,7 +2820,8 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
                 x.colorize(colors, out)?;
             }
         };
-        for i in 1..4 {
+        for i in 1..self.operand_count {
+            let i = i as usize;
             match self.opcode {
                 Opcode::MOVSX_b |
                 Opcode::MOVZX_b => {

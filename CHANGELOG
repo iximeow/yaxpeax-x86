@@ -1,3 +1,8 @@
+## 0.2.2
+* fix rendering error in `ShowContextual` impl with `&[Option<String>]` overrides
+  - would in some circumstances incorrectly print stale data if an `Instruction` was reused for decoding.
+    no impact on logical correctness, but certainly made for awkward disassembly in some cases.
+
 ## 0.2.1
 * update `yaxpeax-arch` dep to 0.0.5
   - no external-facing changes for this, but `yaxpeax-arch 0.0.5` uses `crossterm` for cross-platform terminal coloring
