@@ -219,7 +219,7 @@ pub mod intel {
     }
 
     /// `Kaby Lake` was the successor to `Sky Lake`, launched in 2016. it adds no extensions to
-    /// x86_64 implementaiton beyond `skylake`.
+    /// x86_64 implementation beyond `skylake`.
     pub fn kabylake() -> InstDecoder {
         skylake()
     }
