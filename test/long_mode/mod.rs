@@ -1430,12 +1430,29 @@ fn test_vex() {
     }
 
     // prefix 03
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_001, 0x00, 0b11_001_010, 0x77]);
+    test_invalid(&[0xc4, 0b000_00011, 0b0_1111_101, 0x00, 0b11_001_010, 0x77]);
+    test_avx2(&[0xc4, 0b000_00011, 0b1_1111_101, 0x00, 0b11_001_010, 0x77], "vpermq ymm9, ymm10, 0x77");
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_001, 0x01, 0b11_001_010, 0x77]);
+    test_invalid(&[0xc4, 0b000_00011, 0b0_1111_101, 0x01, 0b11_001_010, 0x77]);
+    test_avx2(&[0xc4, 0b000_00011, 0b1_1111_101, 0x01, 0b11_001_010, 0x77], "vpermpd ymm9, ymm10, 0x77");
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_001, 0x02, 0b11_001_010, 0x77]);
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x02, 0b11_001_010, 0x77]);
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_001, 0x02, 0b11_001_010, 0x77], "vpblendd xmm9, xmm0, xmm10, 0x77");
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_001, 0x02, 0b00_001_010, 0x77], "vpblendd xmm9, xmm0, [r10], 0x77");
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_101, 0x02, 0b11_001_010, 0x77], "vpblendd ymm9, ymm0, ymm10, 0x77");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_101, 0x02, 0b00_001_010, 0x77], "vpblendd ymm9, ymm0, [r10], 0x77");
+
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_001, 0x04, 0b11_001_010, 0x77], "vpermilps xmm9, xmm10, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_101, 0x04, 0b11_001_010, 0x77], "vpermilps ymm9, ymm10, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_001, 0x05, 0b11_001_010, 0x77], "vpermilpd xmm9, xmm10, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_101, 0x05, 0b11_001_010, 0x77], "vpermilpd ymm9, ymm10, 0x77");
     test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x06, 0b11_001_010, 0x77]);
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_101, 0x06, 0b11_001_010, 0x77], "vperm2f128 ymm9, ymm0, ymm10, 0x77");
+    // TODO: ymmword ptr
+    test_instr(&[0xc4, 0b000_00011, 0b0_1111_101, 0x06, 0b00_001_010, 0x77], "vperm2f128 ymm9, ymm0, [r10], 0x77");
 
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x0c, 0b11_001_010, 0x77], "vblendps xmm9, xmm8, xmm10, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x0c, 0b11_001_010, 0x77], "vblendps ymm9, ymm8, ymm10, 0x77");
@@ -1487,6 +1504,13 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x19, 0b11_001_010, 0x77]);
     test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x19, 0b11_001_010, 0x77]);
 
+    test_invalid(&[0xc4, 0b000_00011, 0b1_0111_001, 0x18, 0b11_001_010, 0x77]);
+    test_avx2(&[0xc4, 0b000_00011, 0b0_0111_101, 0x38, 0b11_001_010, 0x77], "vinserti128 ymm9, ymm8, xmm10, 0x77");
+    test_invalid(&[0xc4, 0b000_00011, 0b1_0111_101, 0x18, 0b11_001_010, 0x77]);
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_101, 0x39, 0b11_001_010, 0x77], "vextracti128 xmm10, ymm9, 0x77");
+    test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x19, 0b11_001_010, 0x77]);
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x19, 0b11_001_010, 0x77]);
+
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x20, 0b11_001_010, 0x77], "vpinsrb xmm9, xmm8, r10d, 0x77");
     // TODO: byte ptr
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x20, 0b00_001_010, 0x77], "vpinsrb xmm9, xmm8, [r10], 0x77");
@@ -1508,6 +1532,13 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00011, 0b0_0111_101, 0x41, 0b11_001_010, 0x77]);
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x42, 0b11_001_010, 0x77], "vmpsadbw xmm9, xmm8, xmm10, 0x77");
     test_avx2(&[0xc4, 0b000_00011, 0b0_0111_101, 0x42, 0b11_001_010, 0x77], "vmpsadbw ymm9, ymm8, ymm10, 0x77");
+
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_101, 0x46, 0b11_001_010, 0x77], "vperm2i128 ymm9, ymm0, ymm10, 0x77");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00011, 0b0_1111_101, 0x46, 0b00_001_010, 0x77], "vperm2i128 ymm9, ymm0, [r10], 0x77");
+    test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x46, 0b11_001_010, 0x77]);
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x46, 0b11_001_010, 0x77]);
+
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x4c, 0b11_001_010, 0x77], "vpblendvb xmm9, xmm8, xmm10, xmm7");
     test_avx2(&[0xc4, 0b000_00011, 0b0_0111_101, 0x4c, 0b11_001_010, 0x77], "vpblendvb ymm9, ymm8, ymm10, ymm7");
     test_invalid(&[0xc4, 0b000_00011, 0b1_0111_001, 0x4c, 0b11_001_010, 0x77]);
@@ -1570,6 +1601,12 @@ fn test_vex() {
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_001, 0x0f, 0b11_001_010], "vtestpd xmm9, xmm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x0f, 0b11_001_010], "vtestpd ymm9, ymm10");
 
+    test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x16, 0b11_001_010], "vpermps ymm9, ymm0, ymm10");
+    // TODO: ymmword ptr
+    test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x16, 0b00_001_010], "vpermps ymm9, ymm0, [r10]");
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_001, 0x16, 0b00_011_010]);
+    test_invalid(&[0xc4, 0b000_00010, 0b1_1111_101, 0x16, 0b00_011_010]);
+
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_001, 0x17, 0b11_001_010], "vptest xmm9, xmm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x17, 0b11_001_010], "vptest ymm9, ymm10");
     test_invalid(&[0xc4, 0b000_00010, 0b0_0111_001, 0x17, 0b11_001_010]);
@@ -1589,12 +1626,18 @@ fn test_vex() {
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x1a, 0b00_001_010], "vbroadcastf128 ymm9, [r10]");
     test_invalid(&[0xc4, 0b000_00010, 0b1_0111_101, 0x1a, 0b00_001_010]);
     test_invalid(&[0xc4, 0b000_00010, 0b1_0111_001, 0x1a, 0b00_001_010]);
-    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x18, 0b11_001_010], "vbroadcastss xmm9, xmm10");
+    // TODO: xmmword ptr
+    test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x5a, 0b00_001_010], "vbroadcasti128 ymm9, [r10]");
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_101, 0x5a, 0b11_001_010]);
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_001, 0x5a, 0b00_001_010]);
+    test_invalid(&[0xc4, 0b000_00010, 0b1_1111_101, 0x5a, 0b00_001_010]);
+    test_instr(&[0xc4, 0b000_00010, 0b0_1111_001, 0x18, 0b11_001_010], "vbroadcastss xmm9, xmm10");
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x18, 0b11_001_010], "vbroadcastss ymm9, xmm10");
     // TODO: dword ptr
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x18, 0b00_001_010], "vbroadcastss ymm9, [r10]");
     test_invalid(&[0xc4, 0b000_00010, 0b1_0111_001, 0x18, 0b11_001_010]);
     test_invalid(&[0xc4, 0b000_00010, 0b1_0111_101, 0x18, 0b11_001_010]);
-    test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x19, 0b11_001_010], "vbroadcastsd ymm9, ymm10");
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x19, 0b11_001_010], "vbroadcastsd ymm9, xmm10");
     // TODO: qword ptr
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x19, 0b00_001_010], "vbroadcastsd ymm9, [r10]");
     test_invalid(&[0xc4, 0b000_00010, 0b1_1111_101, 0x19, 0b11_001_010]);
@@ -1675,6 +1718,8 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00010, 0b0_0111_001, 0x35, 0b11_001_010]);
     test_invalid(&[0xc4, 0b000_00010, 0b0_0111_101, 0x35, 0b11_001_010]);
 
+    test_invalid(&[0xc4, 0b000_00010, 0b0_0111_001, 0x36, 0b11_001_010]);
+    test_avx2(&[0xc4, 0b000_00010, 0b0_0111_101, 0x36, 0b11_001_010], "vpermd ymm9, ymm8, ymm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_0111_001, 0x37, 0b11_001_010], "vpcmpgtq xmm9, xmm8, xmm10");
     test_avx2(&[0xc4, 0b000_00010, 0b0_0111_101, 0x37, 0b11_001_010], "vpcmpgtq ymm9, ymm8, ymm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_0111_001, 0x38, 0b11_001_010], "vpminsb xmm9, xmm8, xmm10");
@@ -1702,6 +1747,97 @@ fn test_vex() {
 // TODO: should something be at opcode 42 here?
 //    test_instr(&[0xc4, 0b000_00010, 0b1_0111_001, 0x42, 0b11_001_010], "vphminposuw xmm");
 //    test_invalid(&[0xc4, 0b000_00010, 0b1_0111_101, 0x41, 0b11_001_010]);
+
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x45, 0b00_001_010], "vpsrlvd xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x45, 0b00_001_010], "vpsrlvd ymm9, ymm0, [r10]");
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x45, 0b11_001_010], "vpsrlvd xmm9, xmm0, xmm10");
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x45, 0b11_001_010], "vpsrlvd ymm9, ymm0, ymm10");
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x45, 0b00_001_010], "vpsrlvq xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x45, 0b00_001_010], "vpsrlvq ymm9, ymm0, [r10]");
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x45, 0b11_001_010], "vpsrlvq xmm9, xmm0, xmm10");
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x45, 0b11_001_010], "vpsrlvq ymm9, ymm0, ymm10");
+
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x46, 0b00_001_010], "vpsravd xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x46, 0b00_001_010], "vpsravd ymm9, ymm0, [r10]");
+    test_invalid(&[0xc4, 0b000_00010, 0b1_1111_001, 0x46, 0b00_001_010]);
+    test_invalid(&[0xc4, 0b000_00010, 0b1_1111_101, 0x46, 0b00_001_010]);
+
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x47, 0b00_001_010], "vpsllvd xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x47, 0b00_001_010], "vpsllvd ymm9, ymm0, [r10]");
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x47, 0b11_001_010], "vpsllvd xmm9, xmm0, xmm10");
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x47, 0b11_001_010], "vpsllvd ymm9, ymm0, ymm10");
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x47, 0b00_001_010], "vpsllvq xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x47, 0b00_001_010], "vpsllvq ymm9, ymm0, [r10]");
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x47, 0b11_001_010], "vpsllvq xmm9, xmm0, xmm10");
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x47, 0b11_001_010], "vpsllvq ymm9, ymm0, ymm10");
+
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x8c, 0b00_001_010], "vpmaskmovd xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x8c, 0b00_001_010], "vpmaskmovd ymm9, ymm0, [r10]");
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_001, 0x8c, 0b11_001_010]);
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x8c, 0b00_001_010], "vpmaskmovq xmm9, xmm0, [r10]");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x8c, 0b00_001_010], "vpmaskmovq ymm9, ymm0, [r10]");
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_001, 0x8c, 0b11_001_010]);
+
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x8e, 0b00_001_010], "vpmaskmovd [r10], xmm0, xmm9");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x8e, 0b00_001_010], "vpmaskmovd [r10], ymm0, ymm9");
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_001, 0x8e, 0b11_001_010]);
+    // TODO: xmmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x8e, 0b00_001_010], "vpmaskmovq [r10], xmm0, xmm9");
+    // TODO: ymmword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x8e, 0b00_001_010], "vpmaskmovq [r10], ymm0, ymm9");
+    test_invalid(&[0xc4, 0b000_00010, 0b0_1111_001, 0x8e, 0b11_001_010]);
+
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x90, 0b00_000_100, 0xa1], "vpgatherdd xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x90, 0b00_000_100, 0xa1], "vpgatherdd ymm8, [r9 + ymm12 * 4], ymm0");
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x90, 0b00_000_100, 0xa1], "vpgatherdq xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x90, 0b00_000_100, 0xa1], "vpgatherdq ymm8, [r9 + ymm12 * 4], ymm0");
+
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x91, 0b00_000_100, 0xa1], "vpgatherqd xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x91, 0b00_000_100, 0xa1], "vpgatherqd ymm8, [r9 + ymm12 * 4], ymm0");
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x91, 0b00_000_100, 0xa1], "vpgatherqq xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x91, 0b00_000_100, 0xa1], "vpgatherqq ymm8, [r9 + ymm12 * 4], ymm0");
+
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x92, 0b00_000_100, 0xa1], "vgatherdps xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x92, 0b00_000_100, 0xa1], "vgatherdps ymm8, [r9 + ymm12 * 4], ymm0");
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x92, 0b00_000_100, 0xa1], "vgatherdpd xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x92, 0b00_000_100, 0xa1], "vgatherdpd ymm8, [r9 + ymm12 * 4], ymm0");
+
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_001, 0x93, 0b00_000_100, 0xa1], "vgatherqps xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b0_1111_101, 0x93, 0b00_000_100, 0xa1], "vgatherqps ymm8, [r9 + ymm12 * 4], ymm0");
+    // TODO: dword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_001, 0x93, 0b00_000_100, 0xa1], "vgatherqpd xmm8, [r9 + xmm12 * 4], xmm0");
+    // TODO: qword ptr
+    test_avx2(&[0xc4, 0b000_00010, 0b1_1111_101, 0x93, 0b00_000_100, 0xa1], "vgatherqpd ymm8, [r9 + ymm12 * 4], ymm0");
 
     test_instr_vex_aesni(&[0xc4, 0b000_00010, 0b0_1111_001, 0xdb, 0b11_001_010], "vaesimc xmm9, xmm10");
     test_invalid(&[0xc4, 0b000_00010, 0b0_0111_101, 0xdb, 0b11_001_010]);

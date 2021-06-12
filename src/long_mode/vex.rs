@@ -74,6 +74,7 @@ enum VEXOperandCode {
     G_xmm_E_xmm,
     G_xmm_E_ymm,
     G_ymm_E_xmm,
+    G_ymm_M_xmm,
     G_ymm_E_ymm,
     G_V_ymm_E_xmm,
     M_V_G_xmm,
@@ -913,12 +914,18 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 2;
             Ok(())
         }
-        _op @ VEXOperandCode::G_ymm_E_xmm => {
+        op @ VEXOperandCode::G_ymm_M_xmm |
+        op @ VEXOperandCode::G_ymm_E_xmm => {
             if instruction.vex_reg.num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(bytes, length)?;
+            if modrm & 0xc0 == 0xc0 {
+                if let VEXOperandCode::G_ymm_M_xmm = op {
+                    return Err(DecodeError::InvalidOperand);
+                }
+            }
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
@@ -1001,9 +1008,14 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 2;
             Ok(())
         }
-        _op @ VEXOperandCode::G_V_E_ymm |
-        _op @ VEXOperandCode::G_V_M_ymm => {
+        op @ VEXOperandCode::G_V_E_ymm |
+        op @ VEXOperandCode::G_V_M_ymm => {
             let modrm = read_modrm(bytes, length)?;
+            if let VEXOperandCode::G_V_M_ymm = op {
+                if modrm & 0xc0 == 0xc0 {
+                    return Err(DecodeError::InvalidOperand);
+                }
+            }
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             instruction.vex_reg.bank = RegisterBank::Y;
@@ -1028,9 +1040,14 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 4;
             Ok(())
         }
-        _op @ VEXOperandCode::E_V_G_ymm |
-        _op @ VEXOperandCode::M_V_G_ymm => {
+        op @ VEXOperandCode::E_V_G_ymm |
+        op @ VEXOperandCode::M_V_G_ymm => {
             let modrm = read_modrm(bytes, length)?;
+            if let VEXOperandCode::M_V_G_ymm = op {
+                if modrm & 0xc0 == 0xc0 {
+                    return Err(DecodeError::InvalidOperand);
+                }
+            }
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             instruction.vex_reg.bank = RegisterBank::Y;
@@ -1043,6 +1060,9 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
         }
         VEXOperandCode::G_V_M_xmm => {
             let modrm = read_modrm(bytes, length)?;
+            if modrm & 0xc0 == 0xc0 {
+                return Err(DecodeError::InvalidOperand);
+            }
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
@@ -1129,9 +1149,14 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 4;
             Ok(())
         }
-        _op @ VEXOperandCode::E_V_G_xmm |
-        _op @ VEXOperandCode::M_V_G_xmm => {
+        op @ VEXOperandCode::E_V_G_xmm |
+        op @ VEXOperandCode::M_V_G_xmm => {
             let modrm = read_modrm(bytes, length)?;
+            if let VEXOperandCode::M_V_G_xmm = op {
+                if modrm & 0xc0 == 0xc0 {
+                    return Err(DecodeError::InvalidOperand);
+                }
+            }
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
@@ -2288,7 +2313,10 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         VEXOperandCode::G_E_xmm
                     }),
                     0x16 => (Opcode::VPERMPS, if L {
-                        VEXOperandCode::G_V_E_xmm
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                        VEXOperandCode::G_V_E_ymm
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
@@ -2303,7 +2331,7 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         return Err(DecodeError::InvalidOpcode);
                     } else {
                         (Opcode::VBROADCASTSS, if L {
-                            VEXOperandCode::G_E_ymm
+                            VEXOperandCode::G_ymm_E_xmm
                         } else {
                             VEXOperandCode::G_E_xmm
                         })
@@ -2313,13 +2341,13 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         return Err(DecodeError::InvalidOpcode);
                     } else {
                         (Opcode::VBROADCASTSD, if L {
-                            VEXOperandCode::G_E_ymm
+                            VEXOperandCode::G_ymm_E_xmm
                         } else {
                             VEXOperandCode::G_E_xmm
                         })
                     }
                     0x1A => (Opcode::VBROADCASTF128, if L {
-                        VEXOperandCode::G_M_ymm
+                        VEXOperandCode::G_ymm_M_xmm
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
@@ -2515,8 +2543,14 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         })
                     },
                     0x46 => (Opcode::VPSRAVD, if L {
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         VEXOperandCode::G_V_E_ymm
                     } else {
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         VEXOperandCode::G_V_E_xmm
                     }),
                     0x47 => if instruction.prefixes.vex().w() {
@@ -2543,7 +2577,10 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         VEXOperandCode::G_E_xmm
                     }),
                     0x5A => (Opcode::VBROADCASTI128, if L {
-                        VEXOperandCode::G_E_ymm
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                        VEXOperandCode::G_ymm_M_xmm
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
@@ -2560,31 +2597,31 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                     }),
                     0x8C => {
                         if instruction.prefixes.vex().w() {
-                            (Opcode::VPMASKMOVD, if L {
-                                VEXOperandCode::G_V_E_ymm
+                            (Opcode::VPMASKMOVQ, if L {
+                                VEXOperandCode::G_V_M_ymm
                             } else {
-                                VEXOperandCode::G_V_E_ymm
+                                VEXOperandCode::G_V_M_xmm
                             })
                         } else {
-                            (Opcode::VPMASKMOVQ, if L {
-                                VEXOperandCode::G_V_E_ymm
+                            (Opcode::VPMASKMOVD, if L {
+                                VEXOperandCode::G_V_M_ymm
                             } else {
-                                VEXOperandCode::G_V_E_ymm
+                                VEXOperandCode::G_V_M_xmm
                             })
                         }
                     },
                     0x8E => {
                         if instruction.prefixes.vex().w() {
-                            (Opcode::VPMASKMOVD, if L {
-                                VEXOperandCode::E_V_G_ymm
+                            (Opcode::VPMASKMOVQ, if L {
+                                VEXOperandCode::M_V_G_ymm
                             } else {
-                                VEXOperandCode::E_V_G_xmm
+                                VEXOperandCode::M_V_G_xmm
                             })
                         } else {
-                            (Opcode::VPMASKMOVQ, if L {
-                                VEXOperandCode::E_V_G_ymm
+                            (Opcode::VPMASKMOVD, if L {
+                                VEXOperandCode::M_V_G_ymm
                             } else {
-                                VEXOperandCode::E_V_G_xmm
+                                VEXOperandCode::M_V_G_xmm
                             })
                         }
                     },
@@ -2621,30 +2658,30 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                     0x92 => {
                         if instruction.prefixes.vex().w() {
                             (Opcode::VGATHERDPD, if L {
-                                VEXOperandCode::G_E_ymm_imm8
+                                VEXOperandCode::G_Ey_V_ymm
                             } else {
-                                VEXOperandCode::G_E_xmm_imm8
+                                VEXOperandCode::G_Ex_V_xmm
                             })
                         } else {
                             (Opcode::VGATHERDPS, if L {
-                                VEXOperandCode::G_E_ymm_imm8
+                                VEXOperandCode::G_Ey_V_ymm
                             } else {
-                                VEXOperandCode::G_E_xmm_imm8
+                                VEXOperandCode::G_Ex_V_xmm
                             })
                         }
                     },
                     0x93 => {
                         if instruction.prefixes.vex().w() {
                             (Opcode::VGATHERQPD, if L {
-                                VEXOperandCode::G_E_ymm_imm8
+                                VEXOperandCode::G_Ey_V_ymm
                             } else {
-                                VEXOperandCode::G_E_xmm_imm8
+                                VEXOperandCode::G_Ex_V_xmm
                             })
                         } else {
                             (Opcode::VGATHERQPS, if L {
-                                VEXOperandCode::G_E_ymm_imm8
+                                VEXOperandCode::G_Ey_V_ymm
                             } else {
-                                VEXOperandCode::G_E_xmm_imm8
+                                VEXOperandCode::G_Ex_V_xmm
                             })
                         }
                     },
@@ -3097,21 +3134,33 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                 // possibly valid!
                 match opc {
                     0x00 => (Opcode::VPERMQ, if L {
+                        if !instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         VEXOperandCode::G_E_ymm_imm8
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     }),
                     0x01 => (Opcode::VPERMPD, if L {
+                        if !instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         VEXOperandCode::G_E_ymm_imm8
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     }),
                     0x02 => (Opcode::VPBLENDD, if L {
-                        VEXOperandCode::G_V_E_ymm
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                        VEXOperandCode::G_V_E_ymm_imm8
                     } else {
-                        VEXOperandCode::G_V_E_xmm
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
+                        VEXOperandCode::G_V_E_xmm_imm8
                     }),
                     0x04 => (Opcode::VPERMILPS, if L {
                         VEXOperandCode::G_E_ymm_imm8
@@ -3124,6 +3173,9 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         VEXOperandCode::G_E_xmm_imm8
                     }),
                     0x06 => (Opcode::VPERM2F128, if L {
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         VEXOperandCode::G_V_E_ymm_imm8
                     } else {
                         instruction.opcode = Opcode::Invalid;
@@ -3264,7 +3316,7 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         return Err(DecodeError::InvalidOpcode);
                     }),
                     0x39 => (Opcode::VEXTRACTI128, if L {
-                        VEXOperandCode::V_xmm_G_ymm_E_ymm_imm8
+                        VEXOperandCode::E_xmm_G_ymm_imm8
                     } else {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
@@ -3292,6 +3344,9 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                         VEXOperandCode::G_V_E_xmm_imm8
                     }),
                     0x46 => (Opcode::VPERM2I128, if L {
+                        if instruction.prefixes.vex().w() {
+                            return Err(DecodeError::InvalidOpcode);
+                        }
                         VEXOperandCode::G_V_E_ymm_imm8
                     } else {
                         instruction.opcode = Opcode::Invalid;
