@@ -664,6 +664,7 @@ const MNEMONICS: &[&'static str] = &[
     "xorpd",
     "vmovddup",
     "vpshuflw",
+    "vpshufhw",
     "vhaddps",
     "vhsubps",
     "vaddsubps",
@@ -835,6 +836,7 @@ const MNEMONICS: &[&'static str] = &[
     "vpabsd",
     "vpabsw",
     "vpackssdw",
+    "vpackusdw",
     "vpacksswb",
     "vpackuswb",
     "vpaddb",
@@ -846,12 +848,12 @@ const MNEMONICS: &[&'static str] = &[
     "vpaddusw",
     "vpaddw",
     "vpalignr",
-    "vandps",
     "vandpd",
-    "vorps",
+    "vandps",
     "vorpd",
-    "vandnps",
+    "vorps",
     "vandnpd",
+    "vandnps",
     "vpand",
     "vpandn",
     "vpavgb",
@@ -872,6 +874,8 @@ const MNEMONICS: &[&'static str] = &[
     "vpcmpgtd",
     "vpcmpgtq",
     "vpcmpgtw",
+    "vpcmpestri",
+    "vpcmpestrm",
     "vpcmpistri",
     "vpcmpistrm",
     "vperm2f128",
@@ -893,7 +897,7 @@ const MNEMONICS: &[&'static str] = &[
     "vphaddd",
     "vphaddsw",
     "vphaddw",
-    "vphaddubsw",
+    "vpmaddubsw",
     "vphminposuw",
     "vphsubd",
     "vphsubsw",
@@ -911,8 +915,11 @@ const MNEMONICS: &[&'static str] = &[
     "vpmaxub",
     "vpmaxuw",
     "vpmaxud",
+    "vpminsb",
     "vpminsw",
     "vpminsd",
+    "vpminub",
+    "vpminuw",
     "vpminud",
     "vpmovmskb",
     "vpmovsxbd",
@@ -1001,6 +1008,9 @@ const MNEMONICS: &[&'static str] = &[
     "vxorpd",
     "vxorps",
     "vzeroupper",
+    "vzeroall",
+    "vldmxcsr",
+    "vstmxcsr",
     "pclmulqdq",
     "aeskeygenassist",
     "aesimc",
@@ -1315,6 +1325,287 @@ const MNEMONICS: &[&'static str] = &[
     // TSXLDTRK
     "xsusldtrk",
     "xresldtrk",
+
+    // AVX512F
+    "valignd",
+    "valignq",
+    "vblendmpd",
+    "vblendmps",
+    "vcompresspd",
+    "vcompressps",
+    "vcvtpd2udq",
+    "vcvttpd2udq",
+    "vcvtps2udq",
+    "vcvttps2udq",
+    "vcvtqq2pd",
+    "vcvtqq2ps",
+    "vcvtsd2usi",
+    "vcvttsd2usi",
+    "vcvtss2usi",
+    "vcvttss2usi",
+    "vcvtudq2pd",
+    "vcvtudq2ps",
+    "vcvtusi2usd",
+    "vcvtusi2uss",
+    "vexpandpd",
+    "vexpandps",
+    "vextractf32x4",
+    "vextractf64x4",
+    "vextracti32x4",
+    "vextracti64x4",
+    "vfixupimmpd",
+    "vfixupimmps",
+    "vfixupimmsd",
+    "vfixupimmss",
+    "vgetexppd",
+    "vgetexpps",
+    "vgetexpsd",
+    "vgetexpss",
+    "vgetmantpd",
+    "vgetmantps",
+    "vgetmantsd",
+    "vgetmantss",
+    "vinsertf32x4",
+    "vinsertf64x4",
+    "vmovdqa32",
+    "vmovdqa64",
+    "vmovdqu32",
+    "vmovdqu64",
+    "vpblendmd",
+    "vpblendmq",
+    "vpcmpd",
+    "vpcmpud",
+    "vpcmpq",
+    "vpcmpuq",
+    "vpcompressq",
+    "vpcompressd",
+    "vpermi2d",
+    "vpermi2q",
+    "vpermi2pd",
+    "vpermi2ps",
+    "vpermt2d",
+    "vpermt2q",
+    "vpermt2pd",
+    "vpermt2ps",
+    "vpmaxsq",
+    "vpmaxuq",
+    "vpminsq",
+    "vpminuq",
+    "vpmovsqb",
+    "vpmovusqb",
+    "vpmovsqw",
+    "vpmovusqw",
+    "vpmovsqd",
+    "vpmovusqd",
+    "vpmovsdb",
+    "vpmovusdb",
+    "vpmovsdw",
+    "vpmovusdw",
+    "vprold",
+    "vprolq",
+    "vprolvd",
+    "vprolvq",
+    "vprord",
+    "vprorq",
+    "vprorrd",
+    "vprorrq",
+    "vpscatterdd",
+    "vpscatterdq",
+    "vpscatterqd",
+    "vpscatterqq",
+    "vpsraq",
+    "vpsravq",
+    "vptestnmd",
+    "vptestnmq",
+    "vpterlogd",
+    "vpterlogq",
+    "vptestmd",
+    "vptestmq",
+    "vrcp14pd",
+    "vrcp14ps",
+    "vrcp14sd",
+    "vrcp14ss",
+    "vrndscalepd",
+    "vrndscaleps",
+    "vrndcsalesd",
+    "vrndscaless",
+    "vrsqrt14pd",
+    "vrsqrt14ps",
+    "vrsqrt14sd",
+    "vrsqrt14ss",
+    "vscaledpd",
+    "vscaledps",
+    "vscaledsd",
+    "vscaledss",
+    "vscatterdd",
+    "vscatterdq",
+    "vscatterqd",
+    "vscatterqq",
+    "vshuff32x4",
+    "vshuff64x2",
+    "vshufi32x4",
+    "vshufi64x2",
+
+    // AVX512DQ
+    "vcvttpd2qq",
+    "vcvtpd2qq",
+    "vcvttpd2uqq",
+    "vcvtpd2uqq",
+    "vcvttps2qq",
+    "vcvtps2qq",
+    "vcvttps2uqq",
+    "vcvtps2uqq",
+    "vcvtuqq2pd",
+    "vcvtuqq2ps",
+    "vextractf64x2",
+    "vextracti64x2",
+    "vfpclasspd",
+    "vfpclassps",
+    "vfpclasssd",
+    "vfpclassss",
+    "vinsertf64x2",
+    "vinserti64x2",
+    "vpmovm2d",
+    "vpmovm2q",
+    "vpmovb2d",
+    "vpmovq2m",
+    "vpmulllq",
+    "vrangepd",
+    "vrangeps",
+    "vrangesd",
+    "vrangess",
+    "vreducepd",
+    "vreduceps",
+    "vreducesd",
+    "vreducess",
+
+    // AVX512BW
+    "vdbpsadbw",
+    "vmovdqu8",
+    "vmovdqu16",
+    "vpblendmb",
+    "vpblendmw",
+    "vpcmpb",
+    "vpcmpub",
+    "vpcmpw",
+    "vpcmpuw",
+    "vpermw",
+    "vpermi2b",
+    "vpermi2w",
+    "vpmovm2b",
+    "vpmovm2w",
+    "vpmovb2m",
+    "vpmovw2m",
+    "vpmovswb",
+    "vpmovuswb",
+    "vpsllvw",
+    "vpsravw",
+    "vpsrlvw",
+    "vptestnmb",
+    "vptestnmw",
+    "vptestmb",
+    "vptestmw",
+
+    // AVX512CD
+    "vpbroadcastm",
+    "vpconflictd",
+    "vpconflictq",
+    "vplzcntd",
+    "vplzcntq",
+
+    "kunpckbw",
+    "kunpckwd",
+    "kunpckdq",
+
+    "kaddb",
+    "kandb",
+    "kandnb",
+    "kmovb",
+    "knotb",
+    "korb",
+    "kortestb",
+    "kshiftlb",
+    "kshiftrb",
+    "ktestb",
+    "kxnorb",
+    "kxorb",
+    "kaddw",
+    "kandw",
+    "kandnw",
+    "kmovw",
+    "knotw",
+    "korw",
+    "kortestw",
+    "kshiftlw",
+    "kshiftrw",
+    "ktestw",
+    "kxnorw",
+    "kxorw",
+    "kaddd",
+    "kandd",
+    "kandnd",
+    "kmovd",
+    "knotd",
+    "kord",
+    "kortestd",
+    "kshiftld",
+    "kshiftrd",
+    "ktestd",
+    "kxnord",
+    "kxord",
+    "kaddq",
+    "kandq",
+    "kandnq",
+    "kmovq",
+    "knotq",
+    "korq",
+    "kortestq",
+    "kshiftlq",
+    "kshiftrq",
+    "ktestq",
+    "kxnorq",
+    "kxorq",
+
+    // AVX512ER
+    "vexp2pd",
+    "vexp2ps",
+    "vexp2sd",
+    "vexp2ss",
+    "vrcp28pd",
+    "vrcp28ps",
+    "vrcp28sd",
+    "vrcp28ss",
+    "vrsqrt28pd",
+    "vrsqrt28ps",
+    "vrsqrt28sd",
+    "vrsqrt28ss",
+
+    // AVX512PF
+    "vgatherpf0dpd",
+    "vgatherpf0dps",
+    "vgatherpf0qpd",
+    "vgatherpf0qps",
+    "vgatherpf1dpd",
+    "vgatherpf1dps",
+    "vgatherpf1qpd",
+    "vgatherpf1qps",
+    "vscatterpf0dpd",
+    "vscatterpf0dps",
+    "vscatterpf0qpd",
+    "vscatterpf0qps",
+    "vscatterpf1dpd",
+    "vscatterpf1dps",
+    "vscatterpf1qpd",
+    "vscatterpf1qps",
+
+    // MPX
+    "bndmk",
+    "bndcl",
+    "bndcu",
+    "bndcn",
+    "bndmov",
+    "bndldx",
+    "bndstx",
 ];
 
 impl Opcode {
@@ -1324,6 +1615,11 @@ impl Opcode {
         }
     }
 }
+
+    // AVX512CD
+
+
+    // MPX
 
 impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
     fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
@@ -1408,6 +1704,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VMULPS |
             Opcode::VMULSD |
             Opcode::VMULSS |
+            Opcode::VPMULLLQ |
             Opcode::VPABSB |
             Opcode::VPABSD |
             Opcode::VPABSW |
@@ -1451,6 +1748,34 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPSUBW |
             Opcode::VROUNDPD |
             Opcode::VROUNDPS |
+            Opcode::VEXP2PD |
+            Opcode::VEXP2PS |
+            Opcode::VEXP2SD |
+            Opcode::VEXP2SS |
+            Opcode::VRCP28PD |
+            Opcode::VRCP28PS |
+            Opcode::VRCP28SD |
+            Opcode::VRCP28SS |
+            Opcode::VRCP14PD |
+            Opcode::VRCP14PS |
+            Opcode::VRCP14SD |
+            Opcode::VRCP14SS |
+            Opcode::VRNDSCALEPD |
+            Opcode::VRNDSCALEPS |
+            Opcode::VRNDCSALESD |
+            Opcode::VRNDSCALESS |
+            Opcode::VRSQRT14PD |
+            Opcode::VRSQRT14PS |
+            Opcode::VRSQRT14SD |
+            Opcode::VRSQRT14SS |
+            Opcode::VSCALEDPD |
+            Opcode::VSCALEDPS |
+            Opcode::VSCALEDSD |
+            Opcode::VSCALEDSS |
+            Opcode::VRSQRT28PD |
+            Opcode::VRSQRT28PS |
+            Opcode::VRSQRT28SD |
+            Opcode::VRSQRT28SS |
             Opcode::VRSQRTPS |
             Opcode::VSQRTPD |
             Opcode::VSQRTPS |
@@ -1470,13 +1795,14 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VSQRTSS |
             Opcode::VPSADBW |
             Opcode::VMPSADBW |
+            Opcode::VDBPSADBW |
             Opcode::VPHADDD |
             Opcode::VPHADDSW |
             Opcode::VPHADDW |
             Opcode::VPHSUBD |
             Opcode::VPHSUBSW |
             Opcode::VPHSUBW |
-            Opcode::VPHADDUBSW |
+            Opcode::VPMADDUBSW |
             Opcode::VPMADDWD |
             Opcode::VDPPD |
             Opcode::VDPPS |
@@ -1499,6 +1825,19 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPSLLVD |
             Opcode::VPSLLVQ |
             Opcode::VPSLLW |
+            Opcode::VPROLD |
+            Opcode::VPROLQ |
+            Opcode::VPROLVD |
+            Opcode::VPROLVQ |
+            Opcode::VPRORD |
+            Opcode::VPRORQ |
+            Opcode::VPRORRD |
+            Opcode::VPRORRQ |
+            Opcode::VPSLLVW |
+            Opcode::VPSRAQ |
+            Opcode::VPSRAVQ |
+            Opcode::VPSRAVW |
+            Opcode::VPSRLVW |
             Opcode::VPSRAD |
             Opcode::VPSRAVD |
             Opcode::VPSRAW |
@@ -1584,6 +1923,8 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::SUB |
             Opcode::POPCNT |
             Opcode::LZCNT |
+            Opcode::VPLZCNTD |
+            Opcode::VPLZCNTQ |
             Opcode::BT |
             Opcode::BTS |
             Opcode::BTR |
@@ -1702,6 +2043,42 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::FXTRACT |
             Opcode::FYL2X |
             Opcode::FYL2XP1 |
+            Opcode::KADDB |
+            Opcode::KANDB |
+            Opcode::KANDNB |
+            Opcode::KNOTB |
+            Opcode::KORB |
+            Opcode::KSHIFTLB |
+            Opcode::KSHIFTRB |
+            Opcode::KXNORB |
+            Opcode::KXORB |
+            Opcode::KADDW |
+            Opcode::KANDW |
+            Opcode::KANDNW |
+            Opcode::KNOTW |
+            Opcode::KORW |
+            Opcode::KSHIFTLW |
+            Opcode::KSHIFTRW |
+            Opcode::KXNORW |
+            Opcode::KXORW |
+            Opcode::KADDD |
+            Opcode::KANDD |
+            Opcode::KANDND |
+            Opcode::KNOTD |
+            Opcode::KORD |
+            Opcode::KSHIFTLD |
+            Opcode::KSHIFTRD |
+            Opcode::KXNORD |
+            Opcode::KXORD |
+            Opcode::KADDQ |
+            Opcode::KANDQ |
+            Opcode::KANDNQ |
+            Opcode::KNOTQ |
+            Opcode::KORQ |
+            Opcode::KSHIFTLQ |
+            Opcode::KSHIFTRQ |
+            Opcode::KXNORQ |
+            Opcode::KXORQ |
             Opcode::IMUL => { write!(out, "{}", colors.arithmetic_op(self)) }
             Opcode::POPF |
             Opcode::PUSHF |
@@ -1778,12 +2155,43 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VCVTSS2SI |
             Opcode::VCVTTSD2SI |
             Opcode::VCVTTSS2SI |
+            Opcode::VCVTPD2UDQ |
+            Opcode::VCVTTPD2UDQ |
+            Opcode::VCVTPS2UDQ |
+            Opcode::VCVTTPS2UDQ |
+            Opcode::VCVTQQ2PD |
+            Opcode::VCVTQQ2PS |
+            Opcode::VCVTSD2USI |
+            Opcode::VCVTTSD2USI |
+            Opcode::VCVTSS2USI |
+            Opcode::VCVTTSS2USI |
+            Opcode::VCVTUDQ2PD |
+            Opcode::VCVTUDQ2PS |
+            Opcode::VCVTUSI2USD |
+            Opcode::VCVTUSI2USS |
+            Opcode::VCVTTPD2QQ |
+            Opcode::VCVTPD2QQ |
+            Opcode::VCVTTPD2UQQ |
+            Opcode::VCVTPD2UQQ |
+            Opcode::VCVTTPS2QQ |
+            Opcode::VCVTPS2QQ |
+            Opcode::VCVTTPS2UQQ |
+            Opcode::VCVTPS2UQQ |
+            Opcode::VCVTUQQ2PD |
+            Opcode::VCVTUQQ2PS |
             Opcode::VMOVDDUP |
             Opcode::VPSHUFLW |
+            Opcode::VPSHUFHW |
+            Opcode::VBLENDMPD |
+            Opcode::VBLENDMPS |
+            Opcode::VPBLENDMD |
+            Opcode::VPBLENDMQ |
             Opcode::VBLENDPD |
             Opcode::VBLENDPS |
             Opcode::VBLENDVPD |
             Opcode::VBLENDVPS |
+            Opcode::VPBLENDMB |
+            Opcode::VPBLENDMW |
             Opcode::PBLENDVB |
             Opcode::PBLENDW |
             Opcode::BLENDPD |
@@ -1795,6 +2203,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VBROADCASTI128 |
             Opcode::VBROADCASTSD |
             Opcode::VBROADCASTSS |
+            Opcode::VPBROADCASTM |
             Opcode::VEXTRACTF128 |
             Opcode::VEXTRACTI128 |
             Opcode::VEXTRACTPS |
@@ -1803,10 +2212,48 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VGATHERDPS |
             Opcode::VGATHERQPD |
             Opcode::VGATHERQPS |
+            Opcode::VGATHERPF0DPD |
+            Opcode::VGATHERPF0DPS |
+            Opcode::VGATHERPF0QPD |
+            Opcode::VGATHERPF0QPS |
+            Opcode::VGATHERPF1DPD |
+            Opcode::VGATHERPF1DPS |
+            Opcode::VGATHERPF1QPD |
+            Opcode::VGATHERPF1QPS |
+            Opcode::VSCATTERDD |
+            Opcode::VSCATTERDQ |
+            Opcode::VSCATTERQD |
+            Opcode::VSCATTERQQ |
+            Opcode::VPSCATTERDD |
+            Opcode::VPSCATTERDQ |
+            Opcode::VPSCATTERQD |
+            Opcode::VPSCATTERQQ |
+            Opcode::VSCATTERPF0DPD |
+            Opcode::VSCATTERPF0DPS |
+            Opcode::VSCATTERPF0QPD |
+            Opcode::VSCATTERPF0QPS |
+            Opcode::VSCATTERPF1DPD |
+            Opcode::VSCATTERPF1DPS |
+            Opcode::VSCATTERPF1QPD |
+            Opcode::VSCATTERPF1QPS |
             Opcode::VINSERTF128 |
             Opcode::VINSERTI128 |
             Opcode::VINSERTPS |
             Opcode::INSERTPS |
+            Opcode::VEXTRACTF32X4 |
+            Opcode::VEXTRACTF64X2 |
+            Opcode::VEXTRACTF64X4 |
+            Opcode::VEXTRACTI32X4 |
+            Opcode::VEXTRACTI64X2 |
+            Opcode::VEXTRACTI64X4 |
+            Opcode::VINSERTF32X4 |
+            Opcode::VINSERTF64X2 |
+            Opcode::VINSERTF64X4 |
+            Opcode::VINSERTI64X2 |
+            Opcode::VSHUFF32X4 |
+            Opcode::VSHUFF64X2 |
+            Opcode::VSHUFI32X4 |
+            Opcode::VSHUFI64X2 |
             Opcode::VMASKMOVDQU |
             Opcode::VMASKMOVPD |
             Opcode::VMASKMOVPS |
@@ -1837,6 +2284,32 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VMOVUPS |
             Opcode::VMOVSD |
             Opcode::VMOVSS |
+            Opcode::VMOVDQA32 |
+            Opcode::VMOVDQA64 |
+            Opcode::VMOVDQU32 |
+            Opcode::VMOVDQU64 |
+            Opcode::VPMOVM2B |
+            Opcode::VPMOVM2W |
+            Opcode::VPMOVB2M |
+            Opcode::VPMOVW2M |
+            Opcode::VPMOVSWB |
+            Opcode::VPMOVUSWB |
+            Opcode::VPMOVSQB |
+            Opcode::VPMOVUSQB |
+            Opcode::VPMOVSQW |
+            Opcode::VPMOVUSQW |
+            Opcode::VPMOVSQD |
+            Opcode::VPMOVUSQD |
+            Opcode::VPMOVSDB |
+            Opcode::VPMOVUSDB |
+            Opcode::VPMOVSDW |
+            Opcode::VPMOVUSDW |
+            Opcode::VPMOVM2D |
+            Opcode::VPMOVM2Q |
+            Opcode::VPMOVB2D |
+            Opcode::VPMOVQ2M |
+            Opcode::VMOVDQU8 |
+            Opcode::VMOVDQU16 |
 
             Opcode::VPBLENDD |
             Opcode::VPBLENDVB |
@@ -1875,6 +2348,9 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::PMOVZXDQ |
             Opcode::PMOVZXWD |
             Opcode::PMOVZXWQ |
+            Opcode::KUNPCKBW |
+            Opcode::KUNPCKWD |
+            Opcode::KUNPCKDQ |
             Opcode::VUNPCKHPD |
             Opcode::VUNPCKHPS |
             Opcode::VUNPCKLPD |
@@ -1890,9 +2366,12 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VSHUFPD |
             Opcode::VSHUFPS |
             Opcode::VPACKSSDW |
+            Opcode::VPACKUSDW |
             Opcode::PACKUSDW |
             Opcode::VPACKSSWB |
             Opcode::VPACKUSWB |
+            Opcode::VALIGND |
+            Opcode::VALIGNQ |
             Opcode::VPALIGNR |
             Opcode::PALIGNR |
             Opcode::VPERM2F128 |
@@ -1903,6 +2382,17 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPERMPD |
             Opcode::VPERMPS |
             Opcode::VPERMQ |
+            Opcode::VPERMI2D |
+            Opcode::VPERMI2Q |
+            Opcode::VPERMI2PD |
+            Opcode::VPERMI2PS |
+            Opcode::VPERMT2D |
+            Opcode::VPERMT2Q |
+            Opcode::VPERMT2PD |
+            Opcode::VPERMT2PS |
+            Opcode::VPERMI2B |
+            Opcode::VPERMI2W |
+            Opcode::VPERMW |
             Opcode::VPEXTRB |
             Opcode::VPEXTRD |
             Opcode::VPEXTRQ |
@@ -1921,11 +2411,34 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPINSRW |
             Opcode::VPMASKMOVD |
             Opcode::VPMASKMOVQ |
+            Opcode::VCOMPRESSPD |
+            Opcode::VCOMPRESSPS |
+            Opcode::VPCOMPRESSQ |
+            Opcode::VPCOMPRESSD |
+            Opcode::VEXPANDPD |
+            Opcode::VEXPANDPS |
             Opcode::VPSHUFB |
             Opcode::VPSHUFD |
             Opcode::VPHMINPOSUW |
             Opcode::PHMINPOSUW |
             Opcode::VZEROUPPER |
+            Opcode::VZEROALL |
+            Opcode::VFIXUPIMMPD |
+            Opcode::VFIXUPIMMPS |
+            Opcode::VFIXUPIMMSD |
+            Opcode::VFIXUPIMMSS |
+            Opcode::VREDUCEPD |
+            Opcode::VREDUCEPS |
+            Opcode::VREDUCESD |
+            Opcode::VREDUCESS |
+            Opcode::VGETEXPPD |
+            Opcode::VGETEXPPS |
+            Opcode::VGETEXPSD |
+            Opcode::VGETEXPSS |
+            Opcode::VGETMANTPD |
+            Opcode::VGETMANTPS |
+            Opcode::VGETMANTSD |
+            Opcode::VGETMANTSS |
             Opcode::VLDDQU |
             Opcode::BSWAP |
             Opcode::CVTDQ2PD |
@@ -1993,6 +2506,11 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::SHUFPD |
             Opcode::SHUFPS |
             Opcode::PMOVMSKB |
+            Opcode::KMOVB |
+            Opcode::KMOVW |
+            Opcode::KMOVD |
+            Opcode::KMOVQ |
+            Opcode::BNDMOV |
             Opcode::LDDQU |
             Opcode::CMC |
             Opcode::CLC |
@@ -2109,6 +2627,32 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VCOMISS |
             Opcode::VUCOMISD |
             Opcode::VUCOMISS |
+            Opcode::KORTESTB |
+            Opcode::KTESTB |
+            Opcode::KORTESTW |
+            Opcode::KTESTW |
+            Opcode::KORTESTD |
+            Opcode::KTESTD |
+            Opcode::KORTESTQ |
+            Opcode::KTESTQ |
+            Opcode::VPTESTNMD |
+            Opcode::VPTESTNMQ |
+            Opcode::VPTERLOGD |
+            Opcode::VPTERLOGQ |
+            Opcode::VPTESTMD |
+            Opcode::VPTESTMQ |
+            Opcode::VPTESTNMB |
+            Opcode::VPTESTNMW |
+            Opcode::VPTESTMB |
+            Opcode::VPTESTMW |
+            Opcode::VPCMPD |
+            Opcode::VPCMPUD |
+            Opcode::VPCMPQ |
+            Opcode::VPCMPUQ |
+            Opcode::VPCMPB |
+            Opcode::VPCMPUB |
+            Opcode::VPCMPW |
+            Opcode::VPCMPUW |
             Opcode::VCMPPD |
             Opcode::VCMPPS |
             Opcode::VCMPSD |
@@ -2117,6 +2661,10 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VMAXPS |
             Opcode::VMAXSD |
             Opcode::VMAXSS |
+            Opcode::VPMAXSQ |
+            Opcode::VPMAXUQ |
+            Opcode::VPMINSQ |
+            Opcode::VPMINUQ |
             Opcode::VMINPD |
             Opcode::VMINPS |
             Opcode::VMINSD |
@@ -2129,6 +2677,8 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPCMPGTD |
             Opcode::VPCMPGTQ |
             Opcode::VPCMPGTW |
+            Opcode::VPCMPESTRI |
+            Opcode::VPCMPESTRM |
             Opcode::VPCMPISTRI |
             Opcode::VPCMPISTRM |
             Opcode::VPMAXSB |
@@ -2137,9 +2687,22 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPMAXUB |
             Opcode::VPMAXUW |
             Opcode::VPMAXUD |
+            Opcode::VPMINSB |
             Opcode::VPMINSW |
             Opcode::VPMINSD |
+            Opcode::VPMINUB |
+            Opcode::VPMINUW |
             Opcode::VPMINUD |
+            Opcode::VFPCLASSPD |
+            Opcode::VFPCLASSPS |
+            Opcode::VFPCLASSSD |
+            Opcode::VFPCLASSSS |
+            Opcode::VRANGEPD |
+            Opcode::VRANGEPS |
+            Opcode::VRANGESD |
+            Opcode::VRANGESS |
+            Opcode::VPCONFLICTD |
+            Opcode::VPCONFLICTQ |
             Opcode::VPTEST |
             Opcode::VTESTPD |
             Opcode::VTESTPS |
@@ -2220,6 +2783,8 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::FXRSTOR |
             Opcode::LDMXCSR |
             Opcode::STMXCSR |
+            Opcode::VLDMXCSR |
+            Opcode::VSTMXCSR |
             Opcode::XSAVE |
             Opcode::XSAVEC |
             Opcode::XSAVES |
@@ -2327,6 +2892,12 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::SENDUIPI |
             Opcode::XSUSLDTRK |
             Opcode::XRESLDTRK |
+            Opcode::BNDMK |
+            Opcode::BNDCL |
+            Opcode::BNDCU |
+            Opcode::BNDCN |
+            Opcode::BNDLDX |
+            Opcode::BNDSTX |
             Opcode::LAR => { write!(out, "{}", colors.platform_op(self)) }
 
             Opcode::CRC32 |

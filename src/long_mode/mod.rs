@@ -1293,6 +1293,7 @@ pub enum Opcode {
 
     VMOVDDUP,
     VPSHUFLW,
+    VPSHUFHW,
     VHADDPS,
     VHSUBPS,
     VADDSUBPS,
@@ -1465,6 +1466,7 @@ pub enum Opcode {
     VPABSD,
     VPABSW,
     VPACKSSDW,
+    VPACKUSDW,
     VPACKSSWB,
     VPACKUSWB,
     VPADDB,
@@ -1502,6 +1504,8 @@ pub enum Opcode {
     VPCMPGTD,
     VPCMPGTQ,
     VPCMPGTW,
+    VPCMPESTRI,
+    VPCMPESTRM,
     VPCMPISTRI,
     VPCMPISTRM,
     VPERM2F128,
@@ -1523,7 +1527,7 @@ pub enum Opcode {
     VPHADDD,
     VPHADDSW,
     VPHADDW,
-    VPHADDUBSW,
+    VPMADDUBSW,
     VPHMINPOSUW,
     VPHSUBD,
     VPHSUBSW,
@@ -1541,8 +1545,11 @@ pub enum Opcode {
     VPMAXUB,
     VPMAXUW,
     VPMAXUD,
+    VPMINSB,
     VPMINSW,
     VPMINSD,
+    VPMINUB,
+    VPMINUW,
     VPMINUD,
     VPMOVMSKB,
     VPMOVSXBD,
@@ -1631,6 +1638,9 @@ pub enum Opcode {
     VXORPD,
     VXORPS,
     VZEROUPPER,
+    VZEROALL,
+    VLDMXCSR,
+    VSTMXCSR,
 
     PCLMULQDQ,
     AESKEYGENASSIST,
@@ -1960,6 +1970,287 @@ pub enum Opcode {
     // TSXLDTRK
     XSUSLDTRK,
     XRESLDTRK,
+
+    // AVX512F
+    VALIGND,
+    VALIGNQ,
+    VBLENDMPD,
+    VBLENDMPS,
+    VCOMPRESSPD,
+    VCOMPRESSPS,
+    VCVTPD2UDQ,
+    VCVTTPD2UDQ,
+    VCVTPS2UDQ,
+    VCVTTPS2UDQ,
+    VCVTQQ2PD,
+    VCVTQQ2PS,
+    VCVTSD2USI,
+    VCVTTSD2USI,
+    VCVTSS2USI,
+    VCVTTSS2USI,
+    VCVTUDQ2PD,
+    VCVTUDQ2PS,
+    VCVTUSI2USD,
+    VCVTUSI2USS,
+    VEXPANDPD,
+    VEXPANDPS,
+    VEXTRACTF32X4,
+    VEXTRACTF64X4,
+    VEXTRACTI32X4,
+    VEXTRACTI64X4,
+    VFIXUPIMMPD,
+    VFIXUPIMMPS,
+    VFIXUPIMMSD,
+    VFIXUPIMMSS,
+    VGETEXPPD,
+    VGETEXPPS,
+    VGETEXPSD,
+    VGETEXPSS,
+    VGETMANTPD,
+    VGETMANTPS,
+    VGETMANTSD,
+    VGETMANTSS,
+    VINSERTF32X4,
+    VINSERTF64X4,
+    VMOVDQA32,
+    VMOVDQA64,
+    VMOVDQU32,
+    VMOVDQU64,
+    VPBLENDMD,
+    VPBLENDMQ,
+    VPCMPD,
+    VPCMPUD,
+    VPCMPQ,
+    VPCMPUQ,
+    VPCOMPRESSQ,
+    VPCOMPRESSD,
+    VPERMI2D,
+    VPERMI2Q,
+    VPERMI2PD,
+    VPERMI2PS,
+    VPERMT2D,
+    VPERMT2Q,
+    VPERMT2PD,
+    VPERMT2PS,
+    VPMAXSQ,
+    VPMAXUQ,
+    VPMINSQ,
+    VPMINUQ,
+    VPMOVSQB,
+    VPMOVUSQB,
+    VPMOVSQW,
+    VPMOVUSQW,
+    VPMOVSQD,
+    VPMOVUSQD,
+    VPMOVSDB,
+    VPMOVUSDB,
+    VPMOVSDW,
+    VPMOVUSDW,
+    VPROLD,
+    VPROLQ,
+    VPROLVD,
+    VPROLVQ,
+    VPRORD,
+    VPRORQ,
+    VPRORRD,
+    VPRORRQ,
+    VPSCATTERDD,
+    VPSCATTERDQ,
+    VPSCATTERQD,
+    VPSCATTERQQ,
+    VPSRAQ,
+    VPSRAVQ,
+    VPTESTNMD,
+    VPTESTNMQ,
+    VPTERLOGD,
+    VPTERLOGQ,
+    VPTESTMD,
+    VPTESTMQ,
+    VRCP14PD,
+    VRCP14PS,
+    VRCP14SD,
+    VRCP14SS,
+    VRNDSCALEPD,
+    VRNDSCALEPS,
+    VRNDCSALESD,
+    VRNDSCALESS,
+    VRSQRT14PD,
+    VRSQRT14PS,
+    VRSQRT14SD,
+    VRSQRT14SS,
+    VSCALEDPD,
+    VSCALEDPS,
+    VSCALEDSD,
+    VSCALEDSS,
+    VSCATTERDD,
+    VSCATTERDQ,
+    VSCATTERQD,
+    VSCATTERQQ,
+    VSHUFF32X4,
+    VSHUFF64X2,
+    VSHUFI32X4,
+    VSHUFI64X2,
+
+    // AVX512DQ
+    VCVTTPD2QQ,
+    VCVTPD2QQ,
+    VCVTTPD2UQQ,
+    VCVTPD2UQQ,
+    VCVTTPS2QQ,
+    VCVTPS2QQ,
+    VCVTTPS2UQQ,
+    VCVTPS2UQQ,
+    VCVTUQQ2PD,
+    VCVTUQQ2PS,
+    VEXTRACTF64X2,
+    VEXTRACTI64X2,
+    VFPCLASSPD,
+    VFPCLASSPS,
+    VFPCLASSSD,
+    VFPCLASSSS,
+    VINSERTF64X2,
+    VINSERTI64X2,
+    VPMOVM2D,
+    VPMOVM2Q,
+    VPMOVB2D,
+    VPMOVQ2M,
+    VPMULLLQ,
+    VRANGEPD,
+    VRANGEPS,
+    VRANGESD,
+    VRANGESS,
+    VREDUCEPD,
+    VREDUCEPS,
+    VREDUCESD,
+    VREDUCESS,
+
+    // AVX512BW
+    VDBPSADBW,
+    VMOVDQU8,
+    VMOVDQU16,
+    VPBLENDMB,
+    VPBLENDMW,
+    VPCMPB,
+    VPCMPUB,
+    VPCMPW,
+    VPCMPUW,
+    VPERMW,
+    VPERMI2B,
+    VPERMI2W,
+    VPMOVM2B,
+    VPMOVM2W,
+    VPMOVB2M,
+    VPMOVW2M,
+    VPMOVSWB,
+    VPMOVUSWB,
+    VPSLLVW,
+    VPSRAVW,
+    VPSRLVW,
+    VPTESTNMB,
+    VPTESTNMW,
+    VPTESTMB,
+    VPTESTMW,
+
+    // AVX512CD
+    VPBROADCASTM,
+    VPCONFLICTD,
+    VPCONFLICTQ,
+    VPLZCNTD,
+    VPLZCNTQ,
+
+    KUNPCKBW,
+    KUNPCKWD,
+    KUNPCKDQ,
+
+    KADDB,
+    KANDB,
+    KANDNB,
+    KMOVB,
+    KNOTB,
+    KORB,
+    KORTESTB,
+    KSHIFTLB,
+    KSHIFTRB,
+    KTESTB,
+    KXNORB,
+    KXORB,
+    KADDW,
+    KANDW,
+    KANDNW,
+    KMOVW,
+    KNOTW,
+    KORW,
+    KORTESTW,
+    KSHIFTLW,
+    KSHIFTRW,
+    KTESTW,
+    KXNORW,
+    KXORW,
+    KADDD,
+    KANDD,
+    KANDND,
+    KMOVD,
+    KNOTD,
+    KORD,
+    KORTESTD,
+    KSHIFTLD,
+    KSHIFTRD,
+    KTESTD,
+    KXNORD,
+    KXORD,
+    KADDQ,
+    KANDQ,
+    KANDNQ,
+    KMOVQ,
+    KNOTQ,
+    KORQ,
+    KORTESTQ,
+    KSHIFTLQ,
+    KSHIFTRQ,
+    KTESTQ,
+    KXNORQ,
+    KXORQ,
+
+    // AVX512ER
+    VEXP2PD,
+    VEXP2PS,
+    VEXP2SD,
+    VEXP2SS,
+    VRCP28PD,
+    VRCP28PS,
+    VRCP28SD,
+    VRCP28SS,
+    VRSQRT28PD,
+    VRSQRT28PS,
+    VRSQRT28SD,
+    VRSQRT28SS,
+
+    // AVX512PF
+    VGATHERPF0DPD,
+    VGATHERPF0DPS,
+    VGATHERPF0QPD,
+    VGATHERPF0QPS,
+    VGATHERPF1DPD,
+    VGATHERPF1DPS,
+    VGATHERPF1QPD,
+    VGATHERPF1QPS,
+    VSCATTERPF0DPD,
+    VSCATTERPF0DPS,
+    VSCATTERPF0QPD,
+    VSCATTERPF0QPS,
+    VSCATTERPF1DPD,
+    VSCATTERPF1DPS,
+    VSCATTERPF1QPD,
+    VSCATTERPF1QPS,
+
+    // MPX
+    BNDMK,
+    BNDCL,
+    BNDCU,
+    BNDCN,
+    BNDMOV,
+    BNDLDX,
+    BNDSTX,
 }
 
 #[derive(Debug)]
@@ -2936,6 +3227,7 @@ impl InstDecoder {
             // AVX...
             Opcode::VMOVDDUP |
             Opcode::VPSHUFLW |
+            Opcode::VPSHUFHW |
             Opcode::VHADDPS |
             Opcode::VHSUBPS |
             Opcode::VADDSUBPS |
@@ -3099,6 +3391,7 @@ impl InstDecoder {
             Opcode::VPABSD |
             Opcode::VPABSW |
             Opcode::VPACKSSDW |
+            Opcode::VPACKUSDW |
             Opcode::VPACKSSWB |
             Opcode::VPACKUSWB |
             Opcode::VPADDB |
@@ -3136,6 +3429,8 @@ impl InstDecoder {
             Opcode::VPCMPGTD |
             Opcode::VPCMPGTQ |
             Opcode::VPCMPGTW |
+            Opcode::VPCMPESTRI |
+            Opcode::VPCMPESTRM |
             Opcode::VPCMPISTRI |
             Opcode::VPCMPISTRM |
             Opcode::VPERM2F128 |
@@ -3157,7 +3452,7 @@ impl InstDecoder {
             Opcode::VPHADDD |
             Opcode::VPHADDSW |
             Opcode::VPHADDW |
-            Opcode::VPHADDUBSW |
+            Opcode::VPMADDUBSW |
             Opcode::VPHMINPOSUW |
             Opcode::VPHSUBD |
             Opcode::VPHSUBSW |
@@ -3175,8 +3470,11 @@ impl InstDecoder {
             Opcode::VPMAXUB |
             Opcode::VPMAXUW |
             Opcode::VPMAXUD |
+            Opcode::VPMINSB |
             Opcode::VPMINSW |
             Opcode::VPMINSD |
+            Opcode::VPMINUB |
+            Opcode::VPMINUW |
             Opcode::VPMINUD |
             Opcode::VPMOVMSKB |
             Opcode::VPMOVSXBD |
@@ -3264,7 +3562,10 @@ impl InstDecoder {
             Opcode::VUNPCKLPS |
             Opcode::VXORPD |
             Opcode::VXORPS |
-            Opcode::VZEROUPPER => {
+            Opcode::VZEROUPPER |
+            Opcode::VZEROALL |
+            Opcode::VLDMXCSR |
+            Opcode::VSTMXCSR => {
                 // TODO: check a table for these
                 if !self.avx() {
                     inst.opcode = Opcode::Invalid;
