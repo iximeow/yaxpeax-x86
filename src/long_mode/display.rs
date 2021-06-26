@@ -5,7 +5,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use crate::long_mode::{RegSpec, Opcode, Operand, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
+use crate::long_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, SaeMode, Segment, PrefixRex, OperandSpec};
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -177,6 +177,44 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
             &Operand::Register(ref spec) => {
                 f.write_str(regspec_label(spec))
             }
+            &Operand::RegisterMaskMerge(ref spec, ref mask, merge_mode) => {
+                f.write_str(regspec_label(spec))?;
+                if mask.num != 0 {
+                    f.write_str("{")?;
+                    f.write_str(regspec_label(mask))?;
+                    f.write_str("}")?;
+                }
+                if let MergeMode::Zero = merge_mode {
+                    f.write_str("{z}")?;
+                }
+                Ok(())
+            }
+            &Operand::RegisterMaskMergeSae(ref spec, ref mask, merge_mode, sae_mode) => {
+                f.write_str(regspec_label(spec))?;
+                if mask.num != 0 {
+                    f.write_str("{")?;
+                    f.write_str(regspec_label(mask))?;
+                    f.write_str("}")?;
+                }
+                if let MergeMode::Zero = merge_mode {
+                    f.write_str("{z}")?;
+                }
+                f.write_str(sae_mode.label())?;
+                Ok(())
+            }
+            &Operand::RegisterMaskMergeSaeNoround(ref spec, ref mask, merge_mode) => {
+                f.write_str(regspec_label(spec))?;
+                if mask.num != 0 {
+                    f.write_str("{")?;
+                    f.write_str(regspec_label(mask))?;
+                    f.write_str("}")?;
+                }
+                if let MergeMode::Zero = merge_mode {
+                    f.write_str("{z}")?;
+                }
+                f.write_str("{sae}")?;
+                Ok(())
+            }
             &Operand::DisplacementU32(imm) => {
                 write!(f, "[{}]", colors.address(u32_hex(imm)))
             }
@@ -237,6 +275,69 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 )?;
                 format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
                 write!(f, "]")
+            },
+            &Operand::RegDispMasked(ref spec, disp, ref mask_reg) => {
+                write!(f, "[{} ", regspec_label(spec))?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            },
+            &Operand::RegDerefMasked(ref spec, ref mask_reg) => {
+                f.write_str("[")?;
+                f.write_str(regspec_label(spec))?;
+                f.write_str("]")?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            },
+            &Operand::RegScaleMasked(ref spec, scale, ref mask_reg) => {
+                write!(f, "[{} * {}]",
+                    regspec_label(spec),
+                    colors.number(scale)
+                )?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            },
+            &Operand::RegScaleDispMasked(ref spec, scale, disp, ref mask_reg) => {
+                write!(f, "[{} * {} ",
+                    regspec_label(spec),
+                    colors.number(scale),
+                )?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            },
+            &Operand::RegIndexBaseMasked(ref base, ref index, ref mask_reg) => {
+                f.write_str("[")?;
+                f.write_str(regspec_label(base))?;
+                f.write_str(" + ")?;
+                f.write_str(regspec_label(index))?;
+                f.write_str("]")?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            }
+            &Operand::RegIndexBaseDispMasked(ref base, ref index, disp, ref mask_reg) => {
+                write!(f, "[{} + {} ",
+                    regspec_label(base),
+                    regspec_label(index),
+                )?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            },
+            &Operand::RegIndexBaseScaleMasked(ref base, ref index, scale, ref mask_reg) => {
+                write!(f, "[{} + {} * {}]",
+                    regspec_label(base),
+                    regspec_label(index),
+                    colors.number(scale)
+                )?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
+            }
+            &Operand::RegIndexBaseScaleDispMasked(ref base, ref index, scale, disp, ref mask_reg) => {
+                write!(f, "[{} + {} * {} ",
+                    regspec_label(base),
+                    regspec_label(index),
+                    colors.number(scale),
+                )?;
+                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
+                write!(f, "]")?;
+                write!(f, "{{{}}}", regspec_label(mask_reg))
             },
             &Operand::Nothing => { Ok(()) },
         }
@@ -938,6 +1039,7 @@ const MNEMONICS: &[&'static str] = &[
     "vpmulhrsw",
     "vpmulhuw",
     "vpmulhw",
+    "vpmullq",
     "vpmulld",
     "vpmullw",
     "vpmuludq",
@@ -1367,6 +1469,7 @@ const MNEMONICS: &[&'static str] = &[
     "vgetmantss",
     "vinsertf32x4",
     "vinsertf64x4",
+    "vinserti64x4",
     "vmovdqa32",
     "vmovdqa64",
     "vmovdqu32",
@@ -1417,8 +1520,8 @@ const MNEMONICS: &[&'static str] = &[
     "vpsravq",
     "vptestnmd",
     "vptestnmq",
-    "vpterlogd",
-    "vpterlogq",
+    "vpternlogd",
+    "vpternlogq",
     "vptestmd",
     "vptestmq",
     "vrcp14pd",
@@ -1427,7 +1530,7 @@ const MNEMONICS: &[&'static str] = &[
     "vrcp14ss",
     "vrndscalepd",
     "vrndscaleps",
-    "vrndcsalesd",
+    "vrndscalesd",
     "vrndscaless",
     "vrsqrt14pd",
     "vrsqrt14ps",
@@ -1469,7 +1572,6 @@ const MNEMONICS: &[&'static str] = &[
     "vpmovm2q",
     "vpmovb2d",
     "vpmovq2m",
-    "vpmulllq",
     "vrangepd",
     "vrangeps",
     "vrangesd",
@@ -1606,6 +1708,97 @@ const MNEMONICS: &[&'static str] = &[
     "bndmov",
     "bndldx",
     "bndstx",
+
+
+
+    "vgf2p8affineqb",
+    "vgf2p8affineinvqb",
+    "vpshrdq",
+    "vpshrdd",
+    "vpshrdw",
+    "vpshldq",
+    "vpshldd",
+    "vpshldw",
+    "vbroadcastf32x8",
+    "vbroadcastf64x4",
+    "vbroadcastf32x4",
+    "vbroadcastf64x2",
+    "vbroadcastf32x2",
+    "vbroadcasti32x8",
+    "vbroadcasti64x4",
+    "vbroadcasti32x4",
+    "vbroadcasti64x2",
+    "vbroadcasti32x2",
+    "vextracti32x8",
+    "vextractf32x8",
+    "vinserti32x8",
+    "vinsertf32x8",
+    "vinserti32x4",
+    "v4fnmaddss",
+    "v4fnmaddps",
+    "vcvtneps2bf16",
+    "v4fmaddss",
+    "v4fmaddps",
+    "vcvtne2ps2bf16",
+    "vp2intersectd",
+    "vp2intersectq",
+    "vp4dpwssds",
+    "vp4dpwssd",
+    "vpdpwssds",
+    "vpdpwssd",
+    "vpdpbusds",
+    "vdpbf16ps",
+    "vpbroadcastmw2d",
+    "vpbroadcastmb2q",
+    "vpmovd2m",
+    "vpmovqd",
+    "vpmovwb",
+    "vpmovdb",
+    "vpmovdw",
+    "vpmovqb",
+    "vpmovqw",
+    "vgf2p8mulb",
+    "vpmadd52huq",
+    "vpmadd52luq",
+    "vpshufbitqmb",
+    "vpermb",
+    "vpexpandd",
+    "vpexpandq",
+    "vpabsq",
+    "vprorvd",
+    "vprorvq",
+    "vpmultishiftqb",
+    "vpermt2b",
+    "vpermt2w",
+    "vpshrdvq",
+    "vpshrdvd",
+    "vpshrdvw",
+    "vpshldvq",
+    "vpshldvd",
+    "vpshldvw",
+    "vpcompressb",
+    "vpcompressw",
+    "vpexpandb",
+    "vpexpandw",
+    "vpopcntd",
+    "vpopcntq",
+    "vpopcntb",
+    "vpopcntw",
+    "vscalefss",
+    "vscalefsd",
+    "vscalefps",
+    "vscalefpd",
+    "vpdpbusd",
+    "vcvtusi2sd",
+    "vcvtusi2ss",
+    "vpxord",
+    "vpxorq",
+    "vpord",
+    "vporq",
+    "vpandnd",
+    "vpandnq",
+    "vpandd",
+    "vpandq",
 ];
 
 impl Opcode {
@@ -1624,6 +1817,95 @@ impl Opcode {
 impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
     fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         match self {
+            Opcode::VGF2P8AFFINEQB |
+            Opcode::VGF2P8AFFINEINVQB |
+            Opcode::VPSHRDQ |
+            Opcode::VPSHRDD |
+            Opcode::VPSHRDW |
+            Opcode::VPSHLDQ |
+            Opcode::VPSHLDD |
+            Opcode::VPSHLDW |
+            Opcode::VBROADCASTF32X8 |
+            Opcode::VBROADCASTF64X4 |
+            Opcode::VBROADCASTF32X4 |
+            Opcode::VBROADCASTF64X2 |
+            Opcode::VBROADCASTF32X2 |
+            Opcode::VBROADCASTI32X8 |
+            Opcode::VBROADCASTI64X4 |
+            Opcode::VBROADCASTI32X4 |
+            Opcode::VBROADCASTI64X2 |
+            Opcode::VBROADCASTI32X2 |
+            Opcode::VEXTRACTI32X8 |
+            Opcode::VEXTRACTF32X8 |
+            Opcode::VINSERTI32X8 |
+            Opcode::VINSERTF32X8 |
+            Opcode::VINSERTI32X4 |
+            Opcode::V4FNMADDSS |
+            Opcode::V4FNMADDPS |
+            Opcode::VCVTNEPS2BF16 |
+            Opcode::V4FMADDSS |
+            Opcode::V4FMADDPS |
+            Opcode::VCVTNE2PS2BF16 |
+            Opcode::VP2INTERSECTD |
+            Opcode::VP2INTERSECTQ |
+            Opcode::VP4DPWSSDS |
+            Opcode::VP4DPWSSD |
+            Opcode::VPDPWSSDS |
+            Opcode::VPDPWSSD |
+            Opcode::VPDPBUSDS |
+            Opcode::VDPBF16PS |
+            Opcode::VPBROADCASTMW2D |
+            Opcode::VPBROADCASTMB2Q |
+            Opcode::VPMOVD2M |
+            Opcode::VPMOVQD |
+            Opcode::VPMOVWB |
+            Opcode::VPMOVDB |
+            Opcode::VPMOVDW |
+            Opcode::VPMOVQB |
+            Opcode::VPMOVQW |
+            Opcode::VGF2P8MULB |
+            Opcode::VPMADD52HUQ |
+            Opcode::VPMADD52LUQ |
+            Opcode::VPSHUFBITQMB |
+            Opcode::VPERMB |
+            Opcode::VPEXPANDD |
+            Opcode::VPEXPANDQ |
+            Opcode::VPABSQ |
+            Opcode::VPRORVD |
+            Opcode::VPRORVQ |
+            Opcode::VPMULTISHIFTQB |
+            Opcode::VPERMT2B |
+            Opcode::VPERMT2W |
+            Opcode::VPSHRDVQ |
+            Opcode::VPSHRDVD |
+            Opcode::VPSHRDVW |
+            Opcode::VPSHLDVQ |
+            Opcode::VPSHLDVD |
+            Opcode::VPSHLDVW |
+            Opcode::VPCOMPRESSB |
+            Opcode::VPCOMPRESSW |
+            Opcode::VPEXPANDB |
+            Opcode::VPEXPANDW |
+            Opcode::VPOPCNTD |
+            Opcode::VPOPCNTQ |
+            Opcode::VPOPCNTB |
+            Opcode::VPOPCNTW |
+            Opcode::VSCALEFSS |
+            Opcode::VSCALEFSD |
+            Opcode::VSCALEFPS |
+            Opcode::VSCALEFPD |
+            Opcode::VPDPBUSD |
+            Opcode::VCVTUSI2SD |
+            Opcode::VCVTUSI2SS |
+            Opcode::VPXORD |
+            Opcode::VPXORQ |
+            Opcode::VPORD |
+            Opcode::VPORQ |
+            Opcode::VPANDND |
+            Opcode::VPANDNQ |
+            Opcode::VPANDD |
+            Opcode::VPANDQ |
+
             Opcode::VHADDPS |
             Opcode::VHSUBPS |
             Opcode::VADDSUBPS |
@@ -1704,7 +1986,6 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VMULPS |
             Opcode::VMULSD |
             Opcode::VMULSS |
-            Opcode::VPMULLLQ |
             Opcode::VPABSB |
             Opcode::VPABSD |
             Opcode::VPABSW |
@@ -1731,6 +2012,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VPMULHRSW |
             Opcode::VPMULHUW |
             Opcode::VPMULHW |
+            Opcode::VPMULLQ |
             Opcode::VPMULLD |
             Opcode::VPMULLW |
             Opcode::VPMULUDQ |
@@ -1762,7 +2044,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VRCP14SS |
             Opcode::VRNDSCALEPD |
             Opcode::VRNDSCALEPS |
-            Opcode::VRNDCSALESD |
+            Opcode::VRNDSCALESD |
             Opcode::VRNDSCALESS |
             Opcode::VRSQRT14PD |
             Opcode::VRSQRT14PS |
@@ -2250,6 +2532,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VINSERTF64X2 |
             Opcode::VINSERTF64X4 |
             Opcode::VINSERTI64X2 |
+            Opcode::VINSERTI64X4 |
             Opcode::VSHUFF32X4 |
             Opcode::VSHUFF64X2 |
             Opcode::VSHUFI32X4 |
@@ -2637,8 +2920,8 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::KTESTQ |
             Opcode::VPTESTNMD |
             Opcode::VPTESTNMQ |
-            Opcode::VPTERLOGD |
-            Opcode::VPTERLOGQ |
+            Opcode::VPTERNLOGD |
+            Opcode::VPTERNLOGQ |
             Opcode::VPTESTMD |
             Opcode::VPTESTMQ |
             Opcode::VPTESTNMB |
@@ -3022,6 +3305,17 @@ impl Instruction {
     }
 }
 
+const MEM_SIZE_STRINGS: [&'static str; 64] = [
+    "byte", "word", "BUG", "dword", "BUG", "BUG", "BUG", "qword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "zmmword",
+];
+
 fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y, _address: u64, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     if instr.prefixes.lock() {
         write!(out, "lock ")?;
@@ -3054,6 +3348,10 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
         }
 
         let x = Operand::from_spec(instr, instr.operands[0]);
+        if x.is_memory() {
+            out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
+            out.write_str(" ")?;
+        }
         x.colorize(colors, out)?;
 
         for i in 1..instr.operand_count {
@@ -3094,7 +3392,7 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                         }
                     }
                     let x = Operand::from_spec(instr, instr.operands[i as usize]);
-                    x.colorize(colors, out)?
+                    x.colorize(colors, out)?;
                 },
                 _ => {
                     match &instr.operands[i as usize] {
@@ -3107,7 +3405,53 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                                 write!(out, "{}:", prefix)?;
                             }
                             let x = Operand::from_spec(instr, instr.operands[i as usize]);
-                            x.colorize(colors, out)?
+                            if x.is_memory() {
+                                out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
+                                out.write_str(" ")?;
+                            }
+                            x.colorize(colors, out)?;
+                            if let Some(evex) = instr.prefixes.evex() {
+                                if evex.broadcast() && x.is_memory() {
+                                    let scale = if instr.opcode == Opcode::VCVTPD2PS || instr.opcode == Opcode::VCVTTPD2UDQ || instr.opcode == Opcode::VCVTPD2UDQ || instr.opcode == Opcode::VCVTUDQ2PD || instr.opcode == Opcode::VCVTPS2PD || instr.opcode == Opcode::VCVTQQ2PS || instr.opcode == Opcode::VCVTDQ2PD || instr.opcode == Opcode::VCVTTPD2DQ || instr.opcode == Opcode::VFPCLASSPS || instr.opcode == Opcode::VFPCLASSPD || instr.opcode == Opcode::VCVTNEPS2BF16 || instr.opcode == Opcode::VCVTUQQ2PS || instr.opcode == Opcode::VCVTPD2DQ || instr.opcode == Opcode::VCVTTPS2UQQ || instr.opcode == Opcode::VCVTPS2UQQ || instr.opcode == Opcode::VCVTTPS2QQ || instr.opcode == Opcode::VCVTPS2QQ {
+                                        if instr.opcode == Opcode::VFPCLASSPS || instr.opcode ==  Opcode::VCVTNEPS2BF16 {
+                                            if evex.vex().l() {
+                                                8
+                                            } else if evex.lp() {
+                                                16
+                                            } else {
+                                                4
+                                            }
+                                        } else if instr.opcode == Opcode::VFPCLASSPD {
+                                            if evex.vex().l() {
+                                                4
+                                            } else if evex.lp() {
+                                                8
+                                            } else {
+                                                2
+                                            }
+                                        } else {
+                                            // vcvtpd2ps is "cool": in broadcast mode, it can read a
+                                            // double-precision float (qword), resize to single-precision,
+                                            // then broadcast that to the whole destination register. this
+                                            // means we need to show `xmm, qword [addr]{1to4}` if vector
+                                            // size is 256. likewise, scale of 8 for the same truncation
+                                            // reason if vector size is 512.
+                                            // vcvtudq2pd is the same story.
+                                            // vfpclassp{s,d} is a mystery to me.
+                                            if evex.vex().l() {
+                                                4
+                                            } else if evex.lp() {
+                                                8
+                                            } else {
+                                                2
+                                            }
+                                        }
+                                    } else {
+                                        Operand::from_spec(instr, instr.operands[i as usize - 1]).width() / instr.mem_size
+                                    };
+                                    write!(out, "{{1to{}}}", scale)?;
+                                }
+                            }
                         }
                     }
                 }
