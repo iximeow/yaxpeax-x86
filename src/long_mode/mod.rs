@@ -25,13 +25,7 @@ impl fmt::Display for DecodeError {
     }
 }
 
-#[cfg(feature="use-serde")]
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RegSpec {
-    num: u8,
-    bank: RegisterBank
-}
-#[cfg(not(feature="use-serde"))]
+#[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub struct RegSpec {
     num: u8,
@@ -812,13 +806,7 @@ fn operand_size() {
     // assert_eq!(core::mem::size_of::<Instruction>(), 40);
 }
 
-#[cfg(feature="use-serde")]
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct RegisterClass {
-    kind: RegisterBank,
-}
-
-#[cfg(not(feature="use-serde"))]
+#[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct RegisterClass {
     kind: RegisterBank,
@@ -1008,18 +996,7 @@ impl RegisterClass {
 }
 
 #[allow(non_camel_case_types)]
-#[cfg(feature="use-serde")]
-#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
-enum RegisterBank {
-    Q = 0, D = 2, W = 4, B = 6, rB = 8, // Quadword, Dword, Word, Byte
-    CR = 10, DR = 12, S = 14, EIP = 30, RIP = 31, EFlags = 32, RFlags = 33,  // Control reg, Debug reg, Selector, ...
-    X = 15, Y = 19, Z = 23,    // XMM, YMM, ZMM
-    ST = 27, MM = 28,     // ST, MM regs (x87, mmx)
-    K = 29, // AVX512 mask registers
-}
-
-#[allow(non_camel_case_types)]
-#[cfg(not(feature="use-serde"))]
+#[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 enum RegisterBank {
     Q = 0, D = 2, W = 4, B = 6, rB = 8, // Quadword, Dword, Word, Byte
@@ -2643,12 +2620,7 @@ enum OperandSpec {
 // Foo<T> for T == x86_64. This is only to access associated types
 // which themselves are bounded, but their #[derive] require T to
 // implement these traits.
-#[cfg(feature="use-serde")]
-#[derive(Hash, Eq, PartialEq, Debug, Serialize, Deserialize)]
-#[allow(non_camel_case_types)]
-pub struct Arch;
-
-#[cfg(not(feature="use-serde"))]
+#[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Hash, Eq, PartialEq, Debug)]
 #[allow(non_camel_case_types)]
 pub struct Arch;
