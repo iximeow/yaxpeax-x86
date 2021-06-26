@@ -3,6 +3,7 @@ use std::fmt::Write;
 use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
 use yaxpeax_x86::long_mode::InstDecoder;
 
+#[allow(dead_code)]
 fn test_invalid(data: &[u8]) {
     test_invalid_under(&InstDecoder::default(), data);
 }
@@ -15,6 +16,7 @@ fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     }
 }
 
+#[allow(dead_code)]
 fn test_display(data: &[u8], expected: &'static str) {
     test_display_under(&InstDecoder::default(), data, expected);
 }
@@ -54,6 +56,7 @@ fn test_avx_full(bytes: &[u8], text: &'static str) {
     test_invalid_under(&InstDecoder::minimal(), bytes);
 }
 
+#[allow(non_snake_case)]
 #[test]
 fn tests_None_0f() {
     test_avx_full(&[0x62, 0xf1, 0x7c, 0xad, 0x10, 0xca], "vmovups ymm1{k5}{z}, ymm2"); // VMOVUPS_YMMf32_MASKmskw_YMMf32_AVX512, extension: AVX512EVEX

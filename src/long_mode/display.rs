@@ -5,7 +5,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use crate::long_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, SaeMode, Segment, PrefixRex, OperandSpec};
+use crate::long_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
