@@ -7,6 +7,7 @@ pub mod uarch;
 #[cfg(feature = "fmt")]
 pub use self::display::DisplayStyle;
 
+use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, LengthedInstruction};
@@ -436,7 +437,7 @@ enum SizeCode {
     vqp
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Operand {
     ImmediateI8(i8),
@@ -2518,7 +2519,39 @@ pub enum Opcode {
     VPANDQ,
 }
 
-#[derive(Debug)]
+impl PartialEq for Instruction {
+    fn eq(&self, other: &Self) -> bool {
+        if self.prefixes != other.prefixes {
+            return false;
+        }
+
+        if self.opcode != other.opcode {
+            return false;
+        }
+
+        if self.operand_count != other.operand_count {
+            return false;
+        }
+
+        if self.mem_size != other.mem_size {
+            return false;
+        }
+
+        for i in 0..self.operand_count {
+            if self.operands[i as usize] != other.operands[i as usize] {
+                return false;
+            }
+
+            if self.operand(i) != other.operand(i) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+#[derive(Debug, Clone, Eq)]
 pub struct Instruction {
     pub prefixes: Prefixes,
     modrm_rrr: RegSpec,
@@ -2560,7 +2593,7 @@ impl yaxpeax_arch::DecodeError for DecodeError {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OperandSpec {
     Nothing,
     // the register in modrm_rrr
@@ -4256,13 +4289,13 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct EvexData {
     // data: present, z, b, Lp, Rp. aaa
     bits: u8,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Prefixes {
     bits: u8,
     rex: PrefixRex,
@@ -4270,7 +4303,7 @@ pub struct Prefixes {
     evex_data: EvexData,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrefixEvex {
     vex: PrefixVex,
     evex_data: EvexData,
@@ -4300,7 +4333,7 @@ impl PrefixEvex {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrefixVex {
     bits: u8,
 }
@@ -4321,12 +4354,11 @@ impl PrefixVex {
     fn compressed_disp(&self) -> bool { (self.bits & 0x20) == 0x20 }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrefixRex {
     bits: u8
 }
 
-#[allow(dead_code)]
 impl Prefixes {
     fn new(bits: u8) -> Prefixes {
         Prefixes {
@@ -4367,15 +4399,9 @@ impl Prefixes {
     #[inline]
     pub fn cs(&mut self) { self.segment = Segment::CS }
     #[inline]
-    fn set_cs(&mut self) { self.segment = Segment::CS }
-    #[inline]
     pub fn ds(&self) -> bool { self.segment == Segment::DS }
     #[inline]
-    fn set_ds(&mut self) { self.segment = Segment::DS }
-    #[inline]
     pub fn es(&self) -> bool { self.segment == Segment::ES }
-    #[inline]
-    fn set_es(&mut self) { self.segment = Segment::ES }
     #[inline]
     pub fn fs(&self) -> bool { self.segment == Segment::FS }
     #[inline]
@@ -4386,8 +4412,6 @@ impl Prefixes {
     fn set_gs(&mut self) { self.segment = Segment::GS }
     #[inline]
     pub fn ss(&self) -> bool { self.segment == Segment::SS }
-    #[inline]
-    fn set_ss(&mut self) { self.segment = Segment::SS }
     #[inline]
     fn rex(&self) -> &PrefixRex { &self.rex }
     #[inline]
