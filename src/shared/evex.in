@@ -1,11 +1,20 @@
 use super::OperandSpec;
 
+// `evex_byte_one` is an option because the caller *may* have already read it,
+// but may have not. `long_mode` can decide immediately that `0x62` should be read
+// as an `EVEX` instruction, but for other modes we can only make this
+// determination when reading a `bound`'s `modrm` byte.
 #[inline(never)]
-pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, mut length: u8) -> Result<(), DecodeError> {
-    let evex_byte_one = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
+pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, mut length: u8, evex_byte_one: Option<u8>) -> Result<(), DecodeError> {
+    let evex_byte_one = if let Some(b) = evex_byte_one {
+      b
+    } else {
+      length += 1;
+      bytes.next().ok_or(DecodeError::ExhaustedInput)?
+    };
     let evex_byte_two = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
     let evex_byte_three = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
-    length += 3;
+    length += 2;
     let p = evex_byte_two & 0x03;
     let m = evex_byte_one & 0x03;
     if m == 0 {
@@ -58,7 +67,26 @@ pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut I
       instruction.opcode = opcode;
       read_evex_operands(bytes, instruction, operand_code, &mut length)?;
       if instruction.prefixes.evex_unchecked().vex().compressed_disp() {
-        instruction.disp *= instruction.mem_size as u64;
+        let overridden_size = match instruction.opcode {
+          Opcode::VPEXPANDB => Some(1),
+          Opcode::VPEXPANDW => Some(2),
+          Opcode::VPEXPANDD => Some(4),
+          Opcode::VPEXPANDQ => Some(8),
+          Opcode::VPCOMPRESSB => Some(1),
+          Opcode::VPCOMPRESSW => Some(2),
+          Opcode::VPCOMPRESSD => Some(4),
+          Opcode::VPCOMPRESSQ => Some(8),
+          Opcode::VEXPANDPS => Some(4),
+          Opcode::VEXPANDPD => Some(8),
+          Opcode::VCOMPRESSPS => Some(4),
+          Opcode::VCOMPRESSPD => Some(8),
+          _ => None
+        };
+        if let Some(size) = overridden_size {
+          instruction.disp *= size;
+        } else {
+          apply_disp_scale(instruction);
+        }
         instruction.prefixes.apply_compressed_disp(false);
       }
       // TODO: apply rp and bp?
@@ -593,7 +621,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_z(instruction)?;
 
       let (sz, bank) = if instruction.prefixes.evex_unchecked().vex().w() {
-        (8, RegisterBank::Q)
+        (DEFAULT_EVEX_REGISTER_WIDTH, DEFAULT_EVEX_REGISTER_SIZE)
       } else {
         (4, RegisterBank::D)
       };
@@ -626,8 +654,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
 
       let (sz, bank) = if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.opcode = Opcode::VPINSRQ;
-        (8, RegisterBank::Q)
+        if isa_has_qwords() {
+          instruction.opcode = Opcode::VPINSRQ;
+        }
+        (DEFAULT_EVEX_REGISTER_WIDTH, DEFAULT_EVEX_REGISTER_SIZE)
       } else {
         (4, RegisterBank::D)
       };
@@ -2363,11 +2393,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.opcode = Opcode::VMOVQ;
+        if isa_has_qwords() {
+          instruction.opcode = Opcode::VMOVQ;
+        }
         if mem_oper == OperandSpec::RegMMM {
-          instruction.modrm_mmm.bank = RegisterBank::Q;
+          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
-          instruction.mem_size = 8;
+          instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         }
       } else {
         if mem_oper == OperandSpec::RegMMM {
@@ -2391,11 +2423,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.opcode = Opcode::VMOVQ;
+        if isa_has_qwords() {
+          instruction.opcode = Opcode::VMOVQ;
+        }
         if mem_oper == OperandSpec::RegMMM {
-          instruction.modrm_mmm.bank = RegisterBank::Q;
+          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
-          instruction.mem_size = 8;
+          instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         }
       } else {
         if mem_oper == OperandSpec::RegMMM {
@@ -2822,7 +2856,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      if instruction.prefixes.evex_unchecked().vex().w() {
+      if instruction.prefixes.evex_unchecked().vex().w() && isa_has_qwords() {
         if instruction.opcode == Opcode::VPBROADCASTD {
           instruction.opcode = Opcode::VPBROADCASTQ;
         }
@@ -2843,7 +2877,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.modrm_mmm.bank = RegisterBank::Q;
+          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
           instruction.modrm_mmm.bank = RegisterBank::D;
         }
@@ -3036,7 +3070,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_rrr(instruction, modrm);
 
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.modrm_rrr.bank = RegisterBank::Q;
+        instruction.modrm_rrr.bank = DEFAULT_EVEX_REGISTER_SIZE;
       } else {
         instruction.modrm_rrr.bank = RegisterBank::D;
       }
@@ -4409,11 +4443,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operand_count = 3;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.opcode = Opcode::VPEXTRQ;
-        if let OperandSpec::RegMMM = mem_oper {
-          instruction.modrm_mmm.bank = RegisterBank::Q;
+        if isa_has_qwords() {
+          instruction.opcode = Opcode::VPEXTRQ;
         } else {
-          instruction.mem_size = 8;
+          instruction.opcode = Opcode::VPEXTRD;
+        }
+        if let OperandSpec::RegMMM = mem_oper {
+          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+        } else {
+          instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         }
       } else {
         instruction.opcode = Opcode::VPEXTRD;
@@ -4438,13 +4476,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[2] = mem_oper;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.modrm_mmm.bank = RegisterBank::Q;
+          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
           instruction.modrm_mmm.bank = RegisterBank::D;
         }
         if instruction.prefixes.evex_unchecked().vex().w() {
           if instruction.prefixes.evex_unchecked().broadcast() {
-            instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
+            if isa_has_qwords() {
+              instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
+            }
           } else {
             if instruction.prefixes.evex_unchecked().lp() || !instruction.prefixes.evex_unchecked().vex().l() {
               return Err(DecodeError::InvalidOpcode);
@@ -4456,7 +4496,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           return Err(DecodeError::InvalidOpcode);
         }
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.mem_size = 8;
+          instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         } else {
           instruction.mem_size = 4;
         }
@@ -4725,7 +4765,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() && mem_oper == OperandSpec::RegMMM {
-        if !instruction.prefixes.evex_unchecked().vex().w() && instruction.opcode == Opcode::VCVTSI2SD {
+        if (!instruction.prefixes.evex_unchecked().vex().w() || !isa_has_qwords()) && instruction.opcode == Opcode::VCVTSI2SD {
           instruction.operands[0] = OperandSpec::RegRRR;
         } else {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
@@ -4742,13 +4782,21 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.modrm_mmm.bank = RegisterBank::Q;
+          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
           instruction.modrm_mmm.bank = RegisterBank::D;
         }
       } else {
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.mem_size = 8;
+          if isa_has_qwords() {
+            instruction.mem_size = 8;
+          } else {
+            if [Opcode::VCVTSI2SS, Opcode::VCVTSI2SD].contains(&instruction.opcode) {
+              instruction.mem_size = 4;
+            } else {
+              instruction.mem_size = 8;
+            }
+          }
         } else {
           instruction.mem_size = 4;
         }
@@ -4767,7 +4815,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.modrm_rrr.bank = RegisterBank::Q;
+        instruction.modrm_rrr.bank = DEFAULT_EVEX_REGISTER_SIZE;
       } else {
         instruction.modrm_rrr.bank = RegisterBank::D;
       }
@@ -4794,7 +4842,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.modrm_rrr.bank = RegisterBank::Q;
+        instruction.modrm_rrr.bank = DEFAULT_EVEX_REGISTER_SIZE;
       } else {
         instruction.modrm_rrr.bank = RegisterBank::D;
       }

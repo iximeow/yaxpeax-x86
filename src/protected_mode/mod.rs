@@ -1,4 +1,5 @@
 mod vex;
+mod evex;
 #[cfg(feature = "fmt")]
 mod display;
 pub mod uarch;
@@ -128,6 +129,19 @@ impl RegSpec {
         RegSpec {
             num,
             bank: RegisterBank::Z
+        }
+    }
+
+    /// construct a `RegSpec` for mask reg `num`
+    #[inline]
+    pub fn mask(num: u8) -> RegSpec {
+        if num >= 32 {
+            panic!("invalid x86 mask reg {}", num);
+        }
+
+        RegSpec {
+            num,
+            bank: RegisterBank::K
         }
     }
 
@@ -378,6 +392,9 @@ pub enum Operand {
     ImmediateU32(u32),
     ImmediateI32(i32),
     Register(RegSpec),
+    RegisterMaskMerge(RegSpec, RegSpec, MergeMode),
+    RegisterMaskMergeSae(RegSpec, RegSpec, MergeMode, SaeMode),
+    RegisterMaskMergeSaeNoround(RegSpec, RegSpec, MergeMode),
     DisplacementU16(u16),
     DisplacementU32(u32),
     RegDeref(RegSpec),
@@ -388,10 +405,32 @@ pub enum Operand {
     RegScaleDisp(RegSpec, u8, i32),
     RegIndexBaseScale(RegSpec, RegSpec, u8),
     RegIndexBaseScaleDisp(RegSpec, RegSpec, u8, i32),
+    RegDerefMasked(RegSpec, RegSpec),
+    RegDispMasked(RegSpec, i32, RegSpec),
+    RegScaleMasked(RegSpec, u8, RegSpec),
+    RegIndexBaseMasked(RegSpec, RegSpec, RegSpec),
+    RegIndexBaseDispMasked(RegSpec, RegSpec, i32, RegSpec),
+    RegScaleDispMasked(RegSpec, u8, i32, RegSpec),
+    RegIndexBaseScaleMasked(RegSpec, RegSpec, u8, RegSpec),
+    RegIndexBaseScaleDispMasked(RegSpec, RegSpec, u8, i32, RegSpec),
     Nothing,
 }
 
 impl OperandSpec {
+    fn masked(self) -> Self {
+        match self {
+            OperandSpec::RegRRR => OperandSpec::RegRRR_maskmerge,
+            OperandSpec::RegMMM => OperandSpec::RegMMM_maskmerge,
+            OperandSpec::RegVex => OperandSpec::RegVex_maskmerge,
+            OperandSpec::Deref => OperandSpec::Deref_mask,
+            OperandSpec::RegDisp => OperandSpec::RegDisp_mask,
+            OperandSpec::RegScale => OperandSpec::RegScale_mask,
+            OperandSpec::RegScaleDisp => OperandSpec::RegScaleDisp_mask,
+            OperandSpec::RegIndexBaseScale => OperandSpec::RegIndexBaseScale_mask,
+            OperandSpec::RegIndexBaseScaleDisp => OperandSpec::RegIndexBaseScaleDisp_mask,
+            o => o,
+        }
+    }
     pub fn is_memory(&self) -> bool {
         match self {
             OperandSpec::DispU16 |
@@ -405,7 +444,13 @@ impl OperandSpec {
             OperandSpec::RegIndexBaseDisp |
             OperandSpec::RegScaleDisp |
             OperandSpec::RegIndexBaseScale |
-            OperandSpec::RegIndexBaseScaleDisp => {
+            OperandSpec::RegIndexBaseScaleDisp |
+            OperandSpec::Deref_mask |
+            OperandSpec::RegDisp_mask |
+            OperandSpec::RegScale_mask |
+            OperandSpec::RegScaleDisp_mask |
+            OperandSpec::RegIndexBaseScale_mask |
+            OperandSpec::RegIndexBaseScaleDisp_mask => {
                 true
             },
             OperandSpec::ImmI8 |
@@ -414,14 +459,68 @@ impl OperandSpec {
             OperandSpec::ImmU8 |
             OperandSpec::ImmU16 |
             OperandSpec::RegRRR |
+            OperandSpec::RegRRR_maskmerge |
+            OperandSpec::RegRRR_maskmerge_sae |
+            OperandSpec::RegRRR_maskmerge_sae_noround |
             OperandSpec::RegMMM |
+            OperandSpec::RegMMM_maskmerge |
+            OperandSpec::RegMMM_maskmerge_sae_noround |
             OperandSpec::RegVex |
+            OperandSpec::RegVex_maskmerge |
             OperandSpec::Reg4 |
             OperandSpec::ImmInDispField |
             OperandSpec::Nothing => {
                 false
             }
         }
+    }
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MergeMode {
+    Merge,
+    Zero,
+}
+impl From<bool> for MergeMode {
+    fn from(b: bool) -> Self {
+        if b {
+            MergeMode::Zero
+        } else {
+            MergeMode::Merge
+        }
+    }
+}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum SaeMode {
+    RoundNearest,
+    RoundDown,
+    RoundUp,
+    RoundZero,
+}
+const SAE_MODES: [SaeMode; 4] = [
+    SaeMode::RoundNearest,
+    SaeMode::RoundDown,
+    SaeMode::RoundUp,
+    SaeMode::RoundZero,
+];
+impl SaeMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            SaeMode::RoundNearest => "{rne-sae}",
+            SaeMode::RoundDown => "{rd-sae}",
+            SaeMode::RoundUp => "{ru-sae}",
+            SaeMode::RoundZero => "{rz-sae}",
+        }
+    }
+
+    fn from(l: bool, lp: bool) -> Self {
+        let mut idx = 0;
+        if l {
+            idx |= 1;
+        }
+        if lp {
+            idx |= 2;
+        }
+        SAE_MODES[idx]
     }
 }
 impl Operand {
@@ -434,12 +533,55 @@ impl Operand {
             OperandSpec::RegRRR => {
                 Operand::Register(inst.modrm_rrr)
             }
+            OperandSpec::RegRRR_maskmerge => {
+                Operand::RegisterMaskMerge(
+                    inst.modrm_rrr,
+                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                )
+            }
+            OperandSpec::RegRRR_maskmerge_sae => {
+                Operand::RegisterMaskMergeSae(
+                    inst.modrm_rrr,
+                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                    SaeMode::from(inst.prefixes.evex_unchecked().vex().l(), inst.prefixes.evex_unchecked().lp()),
+                )
+            }
+            OperandSpec::RegRRR_maskmerge_sae_noround => {
+                Operand::RegisterMaskMergeSaeNoround(
+                    inst.modrm_rrr,
+                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                )
+            }
             // the register in modrm_mmm (eg modrm mod bits were 11)
             OperandSpec::RegMMM => {
                 Operand::Register(inst.modrm_mmm)
             }
+            OperandSpec::RegMMM_maskmerge => {
+                Operand::RegisterMaskMerge(
+                    inst.modrm_mmm,
+                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                )
+            }
+            OperandSpec::RegMMM_maskmerge_sae_noround => {
+                Operand::RegisterMaskMergeSaeNoround(
+                    inst.modrm_mmm,
+                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                )
+            }
             OperandSpec::RegVex => {
                 Operand::Register(inst.vex_reg)
+            }
+            OperandSpec::RegVex_maskmerge => {
+                Operand::RegisterMaskMerge(
+                    inst.vex_reg,
+                    RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
+                    MergeMode::from(inst.prefixes.evex_unchecked().merge()),
+                )
             }
             OperandSpec::Reg4 => {
                 Operand::Register(RegSpec { num: inst.imm as u8, bank: inst.vex_reg.bank })
@@ -482,6 +624,48 @@ impl Operand {
             OperandSpec::RegIndexBaseScaleDisp => {
                 Operand::RegIndexBaseScaleDisp(inst.modrm_mmm, inst.sib_index, inst.scale, inst.disp as i32)
             }
+            OperandSpec::Deref_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegDerefMasked(inst.modrm_mmm, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegDeref(inst.modrm_mmm)
+                }
+            }
+            OperandSpec::RegDisp_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegDispMasked(inst.modrm_mmm, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegDisp(inst.modrm_mmm, inst.disp as i32)
+                }
+            }
+            OperandSpec::RegScale_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegScaleMasked(inst.sib_index, inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegScale(inst.sib_index, inst.scale)
+                }
+            }
+            OperandSpec::RegScaleDisp_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegScaleDispMasked(inst.sib_index, inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegScaleDisp(inst.sib_index, inst.scale, inst.disp as i32)
+                }
+            }
+            OperandSpec::RegIndexBaseScale_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegIndexBaseScaleMasked(inst.modrm_mmm, inst.sib_index, inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegIndexBaseScale(inst.modrm_mmm, inst.sib_index, inst.scale)
+                }
+            }
+            OperandSpec::RegIndexBaseScaleDisp_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegIndexBaseScaleDispMasked(inst.modrm_mmm, inst.sib_index, inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegIndexBaseScaleDisp(inst.modrm_mmm, inst.sib_index, inst.scale, inst.disp as i32)
+                }
+            }
         }
     }
     pub fn is_memory(&self) -> bool {
@@ -495,7 +679,15 @@ impl Operand {
             Operand::RegIndexBaseDisp(_, _, _) |
             Operand::RegScaleDisp(_, _, _) |
             Operand::RegIndexBaseScale(_, _, _) |
-            Operand::RegIndexBaseScaleDisp(_, _, _, _) => {
+            Operand::RegIndexBaseScaleDisp(_, _, _, _) |
+            Operand::RegDerefMasked(_, _) |
+            Operand::RegDispMasked(_, _, _) |
+            Operand::RegScaleMasked(_, _, _) |
+            Operand::RegIndexBaseMasked(_, _, _) |
+            Operand::RegIndexBaseDispMasked(_, _, _, _) |
+            Operand::RegScaleDispMasked(_, _, _, _) |
+            Operand::RegIndexBaseScaleMasked(_, _, _, _) |
+            Operand::RegIndexBaseScaleDispMasked(_, _, _, _, _) => {
                 true
             },
             Operand::ImmediateI8(_) |
@@ -505,6 +697,9 @@ impl Operand {
             Operand::ImmediateU32(_) |
             Operand::ImmediateI32(_) |
             Operand::Register(_) |
+            Operand::RegisterMaskMerge(_, _, _) |
+            Operand::RegisterMaskMergeSae(_, _, _, _) |
+            Operand::RegisterMaskMergeSaeNoround(_, _, _) |
             Operand::Nothing => {
                 false
             }
@@ -521,6 +716,9 @@ impl Operand {
                 panic!("non-operand does not have a size");
             }
             Operand::Register(reg) => {
+                reg.width()
+            }
+            Operand::RegisterMaskMerge(reg, _, _) => {
                 reg.width()
             }
             Operand::ImmediateI8(_) |
@@ -1186,6 +1384,7 @@ pub enum Opcode {
 
     VMOVDDUP,
     VPSHUFLW,
+    VPSHUFHW,
     VHADDPS,
     VHSUBPS,
     VADDSUBPS,
@@ -1358,6 +1557,7 @@ pub enum Opcode {
     VPABSD,
     VPABSW,
     VPACKSSDW,
+    VPACKUSDW,
     VPACKSSWB,
     VPACKUSWB,
     VPADDB,
@@ -1395,6 +1595,8 @@ pub enum Opcode {
     VPCMPGTD,
     VPCMPGTQ,
     VPCMPGTW,
+    VPCMPESTRI,
+    VPCMPESTRM,
     VPCMPISTRI,
     VPCMPISTRM,
     VPERM2F128,
@@ -1416,7 +1618,7 @@ pub enum Opcode {
     VPHADDD,
     VPHADDSW,
     VPHADDW,
-    VPHADDUBSW,
+    VPMADDUBSW,
     VPHMINPOSUW,
     VPHSUBD,
     VPHSUBSW,
@@ -1434,8 +1636,11 @@ pub enum Opcode {
     VPMAXUB,
     VPMAXUW,
     VPMAXUD,
+    VPMINSB,
     VPMINSW,
     VPMINSD,
+    VPMINUB,
+    VPMINUW,
     VPMINUD,
     VPMOVMSKB,
     VPMOVSXBD,
@@ -1454,6 +1659,7 @@ pub enum Opcode {
     VPMULHRSW,
     VPMULHUW,
     VPMULHW,
+    VPMULLQ,
     VPMULLD,
     VPMULLW,
     VPMULUDQ,
@@ -1524,6 +1730,9 @@ pub enum Opcode {
     VXORPD,
     VXORPS,
     VZEROUPPER,
+    VZEROALL,
+    VLDMXCSR,
+    VSTMXCSR,
 
     PCLMULQDQ,
     AESKEYGENASSIST,
@@ -1763,6 +1972,7 @@ pub enum Opcode {
 
     PUSHA,
     POPA,
+    BOUND,
     ARPL,
     AAS,
     AAA,
@@ -1863,6 +2073,376 @@ pub enum Opcode {
     // TSXLDTRK
     XSUSLDTRK,
     XRESLDTRK,
+
+    // AVX512F
+    VALIGND,
+    VALIGNQ,
+    VBLENDMPD,
+    VBLENDMPS,
+    VCOMPRESSPD,
+    VCOMPRESSPS,
+    VCVTPD2UDQ,
+    VCVTTPD2UDQ,
+    VCVTPS2UDQ,
+    VCVTTPS2UDQ,
+    VCVTQQ2PD,
+    VCVTQQ2PS,
+    VCVTSD2USI,
+    VCVTTSD2USI,
+    VCVTSS2USI,
+    VCVTTSS2USI,
+    VCVTUDQ2PD,
+    VCVTUDQ2PS,
+    VCVTUSI2USD,
+    VCVTUSI2USS,
+    VEXPANDPD,
+    VEXPANDPS,
+    VEXTRACTF32X4,
+    VEXTRACTF64X4,
+    VEXTRACTI32X4,
+    VEXTRACTI64X4,
+    VFIXUPIMMPD,
+    VFIXUPIMMPS,
+    VFIXUPIMMSD,
+    VFIXUPIMMSS,
+    VGETEXPPD,
+    VGETEXPPS,
+    VGETEXPSD,
+    VGETEXPSS,
+    VGETMANTPD,
+    VGETMANTPS,
+    VGETMANTSD,
+    VGETMANTSS,
+    VINSERTF32X4,
+    VINSERTF64X4,
+    VINSERTI64X4,
+    VMOVDQA32,
+    VMOVDQA64,
+    VMOVDQU32,
+    VMOVDQU64,
+    VPBLENDMD,
+    VPBLENDMQ,
+    VPCMPD,
+    VPCMPUD,
+    VPCMPQ,
+    VPCMPUQ,
+    VPCOMPRESSQ,
+    VPCOMPRESSD,
+    VPERMI2D,
+    VPERMI2Q,
+    VPERMI2PD,
+    VPERMI2PS,
+    VPERMT2D,
+    VPERMT2Q,
+    VPERMT2PD,
+    VPERMT2PS,
+    VPMAXSQ,
+    VPMAXUQ,
+    VPMINSQ,
+    VPMINUQ,
+    VPMOVSQB,
+    VPMOVUSQB,
+    VPMOVSQW,
+    VPMOVUSQW,
+    VPMOVSQD,
+    VPMOVUSQD,
+    VPMOVSDB,
+    VPMOVUSDB,
+    VPMOVSDW,
+    VPMOVUSDW,
+    VPROLD,
+    VPROLQ,
+    VPROLVD,
+    VPROLVQ,
+    VPRORD,
+    VPRORQ,
+    VPRORRD,
+    VPRORRQ,
+    VPSCATTERDD,
+    VPSCATTERDQ,
+    VPSCATTERQD,
+    VPSCATTERQQ,
+    VPSRAQ,
+    VPSRAVQ,
+    VPTESTNMD,
+    VPTESTNMQ,
+    VPTERNLOGD,
+    VPTERNLOGQ,
+    VPTESTMD,
+    VPTESTMQ,
+    VRCP14PD,
+    VRCP14PS,
+    VRCP14SD,
+    VRCP14SS,
+    VRNDSCALEPD,
+    VRNDSCALEPS,
+    VRNDSCALESD,
+    VRNDSCALESS,
+    VRSQRT14PD,
+    VRSQRT14PS,
+    VRSQRT14SD,
+    VRSQRT14SS,
+    VSCALEDPD,
+    VSCALEDPS,
+    VSCALEDSD,
+    VSCALEDSS,
+    VSCATTERDD,
+    VSCATTERDQ,
+    VSCATTERQD,
+    VSCATTERQQ,
+    VSHUFF32X4,
+    VSHUFF64X2,
+    VSHUFI32X4,
+    VSHUFI64X2,
+
+    // AVX512DQ
+    VCVTTPD2QQ,
+    VCVTPD2QQ,
+    VCVTTPD2UQQ,
+    VCVTPD2UQQ,
+    VCVTTPS2QQ,
+    VCVTPS2QQ,
+    VCVTTPS2UQQ,
+    VCVTPS2UQQ,
+    VCVTUQQ2PD,
+    VCVTUQQ2PS,
+    VEXTRACTF64X2,
+    VEXTRACTI64X2,
+    VFPCLASSPD,
+    VFPCLASSPS,
+    VFPCLASSSD,
+    VFPCLASSSS,
+    VINSERTF64X2,
+    VINSERTI64X2,
+    VPMOVM2D,
+    VPMOVM2Q,
+    VPMOVB2D,
+    VPMOVQ2M,
+    VRANGEPD,
+    VRANGEPS,
+    VRANGESD,
+    VRANGESS,
+    VREDUCEPD,
+    VREDUCEPS,
+    VREDUCESD,
+    VREDUCESS,
+
+    // AVX512BW
+    VDBPSADBW,
+    VMOVDQU8,
+    VMOVDQU16,
+    VPBLENDMB,
+    VPBLENDMW,
+    VPCMPB,
+    VPCMPUB,
+    VPCMPW,
+    VPCMPUW,
+    VPERMW,
+    VPERMI2B,
+    VPERMI2W,
+    VPMOVM2B,
+    VPMOVM2W,
+    VPMOVB2M,
+    VPMOVW2M,
+    VPMOVSWB,
+    VPMOVUSWB,
+    VPSLLVW,
+    VPSRAVW,
+    VPSRLVW,
+    VPTESTNMB,
+    VPTESTNMW,
+    VPTESTMB,
+    VPTESTMW,
+
+    // AVX512CD
+    VPBROADCASTM,
+    VPCONFLICTD,
+    VPCONFLICTQ,
+    VPLZCNTD,
+    VPLZCNTQ,
+
+    KUNPCKBW,
+    KUNPCKWD,
+    KUNPCKDQ,
+
+    KADDB,
+    KANDB,
+    KANDNB,
+    KMOVB,
+    KNOTB,
+    KORB,
+    KORTESTB,
+    KSHIFTLB,
+    KSHIFTRB,
+    KTESTB,
+    KXNORB,
+    KXORB,
+    KADDW,
+    KANDW,
+    KANDNW,
+    KMOVW,
+    KNOTW,
+    KORW,
+    KORTESTW,
+    KSHIFTLW,
+    KSHIFTRW,
+    KTESTW,
+    KXNORW,
+    KXORW,
+    KADDD,
+    KANDD,
+    KANDND,
+    KMOVD,
+    KNOTD,
+    KORD,
+    KORTESTD,
+    KSHIFTLD,
+    KSHIFTRD,
+    KTESTD,
+    KXNORD,
+    KXORD,
+    KADDQ,
+    KANDQ,
+    KANDNQ,
+    KMOVQ,
+    KNOTQ,
+    KORQ,
+    KORTESTQ,
+    KSHIFTLQ,
+    KSHIFTRQ,
+    KTESTQ,
+    KXNORQ,
+    KXORQ,
+
+    // AVX512ER
+    VEXP2PD,
+    VEXP2PS,
+    VEXP2SD,
+    VEXP2SS,
+    VRCP28PD,
+    VRCP28PS,
+    VRCP28SD,
+    VRCP28SS,
+    VRSQRT28PD,
+    VRSQRT28PS,
+    VRSQRT28SD,
+    VRSQRT28SS,
+
+    // AVX512PF
+    VGATHERPF0DPD,
+    VGATHERPF0DPS,
+    VGATHERPF0QPD,
+    VGATHERPF0QPS,
+    VGATHERPF1DPD,
+    VGATHERPF1DPS,
+    VGATHERPF1QPD,
+    VGATHERPF1QPS,
+    VSCATTERPF0DPD,
+    VSCATTERPF0DPS,
+    VSCATTERPF0QPD,
+    VSCATTERPF0QPS,
+    VSCATTERPF1DPD,
+    VSCATTERPF1DPS,
+    VSCATTERPF1QPD,
+    VSCATTERPF1QPS,
+
+    // MPX
+    BNDMK,
+    BNDCL,
+    BNDCU,
+    BNDCN,
+    BNDMOV,
+    BNDLDX,
+    BNDSTX,
+
+    VGF2P8AFFINEQB,
+    VGF2P8AFFINEINVQB,
+    VPSHRDQ,
+    VPSHRDD,
+    VPSHRDW,
+    VPSHLDQ,
+    VPSHLDD,
+    VPSHLDW,
+    VBROADCASTF32X8,
+    VBROADCASTF64X4,
+    VBROADCASTF32X4,
+    VBROADCASTF64X2,
+    VBROADCASTF32X2,
+    VBROADCASTI32X8,
+    VBROADCASTI64X4,
+    VBROADCASTI32X4,
+    VBROADCASTI64X2,
+    VBROADCASTI32X2,
+    VEXTRACTI32X8,
+    VEXTRACTF32X8,
+    VINSERTI32X8,
+    VINSERTF32X8,
+    VINSERTI32X4,
+    V4FNMADDSS,
+    V4FNMADDPS,
+    VCVTNEPS2BF16,
+    V4FMADDSS,
+    V4FMADDPS,
+    VCVTNE2PS2BF16,
+    VP2INTERSECTD,
+    VP2INTERSECTQ,
+    VP4DPWSSDS,
+    VP4DPWSSD,
+    VPDPWSSDS,
+    VPDPWSSD,
+    VPDPBUSDS,
+    VDPBF16PS,
+    VPBROADCASTMW2D,
+    VPBROADCASTMB2Q,
+    VPMOVD2M,
+    VPMOVQD,
+    VPMOVWB,
+    VPMOVDB,
+    VPMOVDW,
+    VPMOVQB,
+    VPMOVQW,
+    VGF2P8MULB,
+    VPMADD52HUQ,
+    VPMADD52LUQ,
+    VPSHUFBITQMB,
+    VPERMB,
+    VPEXPANDD,
+    VPEXPANDQ,
+    VPABSQ,
+    VPRORVD,
+    VPRORVQ,
+    VPMULTISHIFTQB,
+    VPERMT2B,
+    VPERMT2W,
+    VPSHRDVQ,
+    VPSHRDVD,
+    VPSHRDVW,
+    VPSHLDVQ,
+    VPSHLDVD,
+    VPSHLDVW,
+    VPCOMPRESSB,
+    VPCOMPRESSW,
+    VPEXPANDB,
+    VPEXPANDW,
+    VPOPCNTD,
+    VPOPCNTQ,
+    VPOPCNTB,
+    VPOPCNTW,
+    VSCALEFSS,
+    VSCALEFSD,
+    VSCALEFPS,
+    VSCALEFPD,
+    VPDPBUSD,
+    VCVTUSI2SD,
+    VCVTUSI2SS,
+    VPXORD,
+    VPXORQ,
+    VPORD,
+    VPORQ,
+    VPANDND,
+    VPANDNQ,
+    VPANDD,
+    VPANDQ,
 }
 
 #[derive(Debug)]
@@ -1889,7 +2469,7 @@ impl yaxpeax_arch::Instruction for Instruction {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[non_exhaustive]
 pub enum DecodeError {
     ExhaustedInput,
@@ -1912,10 +2492,24 @@ enum OperandSpec {
     Nothing,
     // the register in modrm_rrr
     RegRRR,
+    // the register in modrm_rrr and is EVEX-encoded (may have a mask register, is merged or
+    // zeroed)
+    RegRRR_maskmerge,
+    // the register in modrm_rrr and is EVEX-encoded (may have a mask register, is merged or
+    // zeroed). additionally, this instruction has exceptions suppressed with a potentially
+    // custom rounding mode.
+    RegRRR_maskmerge_sae,
+    // the register in modrm_rrr and is EVEX-encoded (may have a mask register, is merged or
+    // zeroed). additionally, this instruction has exceptions suppressed.
+    RegRRR_maskmerge_sae_noround,
     // the register in modrm_mmm (eg modrm mod bits were 11)
     RegMMM,
+    // same as `RegRRR`: the register is modrm's `mmm` bits, and may be masekd.
+    RegMMM_maskmerge,
+    RegMMM_maskmerge_sae_noround,
     // the register selected by vex-vvvv bits
     RegVex,
+    RegVex_maskmerge,
     // the register selected by a handful of avx2 vex-coded instructions,
     // stuffed in imm4.
     Reg4,
@@ -1940,7 +2534,13 @@ enum OperandSpec {
     RegIndexBaseDisp,
     RegScaleDisp,
     RegIndexBaseScale,
-    RegIndexBaseScaleDisp
+    RegIndexBaseScaleDisp,
+    Deref_mask,
+    RegDisp_mask,
+    RegScale_mask,
+    RegScaleDisp_mask,
+    RegIndexBaseScale_mask,
+    RegIndexBaseScaleDisp_mask,
 }
 
 // the Hash, Eq, and PartialEq impls here are possibly misleading.
@@ -2460,6 +3060,47 @@ impl InstDecoder {
         self
     }
 
+    pub fn avx512(&self) -> bool {
+        let avx512_mask =
+            (1 << 19) |
+            (1 << 20) |
+            (1 << 23) |
+            (1 << 27) |
+            (1 << 28) |
+            (1 << 29) |
+            (1 << 31) |
+            (1 << 32) |
+            (1 << 34) |
+            (1 << 35) |
+            (1 << 40) |
+            (1 << 41) |
+            (1 << 42) |
+            (1 << 43);
+
+        (self.flags & avx512_mask) == avx512_mask
+    }
+
+    pub fn with_avx512(mut self) -> Self {
+        let avx512_mask =
+            (1 << 19) |
+            (1 << 20) |
+            (1 << 23) |
+            (1 << 27) |
+            (1 << 28) |
+            (1 << 29) |
+            (1 << 31) |
+            (1 << 32) |
+            (1 << 34) |
+            (1 << 35) |
+            (1 << 40) |
+            (1 << 41) |
+            (1 << 42) |
+            (1 << 43);
+
+        self.flags |= avx512_mask;
+        self
+    }
+
     pub fn cx8(&self) -> bool {
         self.flags & (1 << 44) != 0
     }
@@ -2659,6 +3300,13 @@ impl InstDecoder {
     /// Optionally reject or reinterpret instruction according to the decoder's
     /// declared extensions.
     fn revise_instruction(&self, inst: &mut Instruction) -> Result<(), DecodeError> {
+        if inst.prefixes.evex().is_some() {
+            if !self.avx512() {
+                return Err(DecodeError::InvalidOpcode);
+            } else {
+                return Ok(());
+            }
+        }
         match inst.opcode {
             Opcode::TZCNT => {
                 if !self.bmi1() {
@@ -2835,6 +3483,7 @@ impl InstDecoder {
             // AVX...
             Opcode::VMOVDDUP |
             Opcode::VPSHUFLW |
+            Opcode::VPSHUFHW |
             Opcode::VHADDPS |
             Opcode::VHSUBPS |
             Opcode::VADDSUBPS |
@@ -2998,6 +3647,7 @@ impl InstDecoder {
             Opcode::VPABSD |
             Opcode::VPABSW |
             Opcode::VPACKSSDW |
+            Opcode::VPACKUSDW |
             Opcode::VPACKSSWB |
             Opcode::VPACKUSWB |
             Opcode::VPADDB |
@@ -3056,7 +3706,7 @@ impl InstDecoder {
             Opcode::VPHADDD |
             Opcode::VPHADDSW |
             Opcode::VPHADDW |
-            Opcode::VPHADDUBSW |
+            Opcode::VPMADDUBSW |
             Opcode::VPHMINPOSUW |
             Opcode::VPHSUBD |
             Opcode::VPHSUBSW |
@@ -3094,6 +3744,7 @@ impl InstDecoder {
             Opcode::VPMULHRSW |
             Opcode::VPMULHUW |
             Opcode::VPMULHW |
+            Opcode::VPMULLQ |
             Opcode::VPMULLD |
             Opcode::VPMULLW |
             Opcode::VPMULUDQ |
@@ -3525,15 +4176,51 @@ impl Instruction {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct EvexData {
+    // data: present, z, b, Lp, Rp. aaa
+    bits: u8,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Prefixes {
     bits: u8,
     vex: PrefixVex,
     segment: Segment,
-    _pad: u8,
+    evex_data: EvexData,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct PrefixEvex {
+    vex: PrefixVex,
+    evex_data: EvexData,
+}
+
+impl PrefixEvex {
+    fn present(&self) -> bool {
+        self.evex_data.present()
+    }
+    fn vex(&self) -> &PrefixVex {
+        &self.vex
+    }
+    fn mask_reg(&self) -> u8 {
+        self.evex_data.aaa()
+    }
+    fn broadcast(&self) -> bool {
+        self.evex_data.b()
+    }
+    fn merge(&self) -> bool {
+        self.evex_data.z()
+    }
+    fn lp(&self) -> bool {
+        self.evex_data.lp()
+    }
+    fn rp(&self) -> bool {
+        self.evex_data.rp()
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrefixVex {
     bits: u8,
 }
@@ -3552,6 +4239,8 @@ impl PrefixVex {
     fn l(&self) -> bool { (self.bits & 0x10) == 0x10 }
     #[inline]
     fn present(&self) -> bool { (self.bits & 0x80) == 0x80 }
+    #[inline]
+    fn compressed_disp(&self) -> bool { (self.bits & 0x20) == 0x20 }
 }
 
 #[allow(dead_code)]
@@ -3561,7 +4250,7 @@ impl Prefixes {
             bits: bits,
             vex: PrefixVex { bits: 0 },
             segment: Segment::DS,
-            _pad: 0,
+            evex_data: EvexData { bits: 0 },
         }
     }
     fn vex_from(&mut self, bits: u8) {
@@ -3623,6 +4312,26 @@ impl Prefixes {
     fn set_ss(&mut self) { self.segment = Segment::SS }
     #[inline]
     fn vex(&self) -> PrefixVex { PrefixVex { bits: self.vex.bits } }
+    #[inline]
+    fn evex_unchecked(&self) -> PrefixEvex { PrefixEvex { vex: PrefixVex { bits: self.vex.bits }, evex_data: self.evex_data } }
+    #[inline]
+    fn evex(&self) -> Option<PrefixEvex> {
+        let evex = self.evex_unchecked();
+        if evex.present() {
+            Some(evex)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn apply_compressed_disp(&mut self, state: bool) {
+        if state {
+            self.vex.bits |= 0x20;
+        } else {
+            self.vex.bits &= 0xdf;
+        }
+    }
 
     #[inline]
     fn vex_from_c5(&mut self, bits: u8) {
@@ -3640,8 +4349,65 @@ impl Prefixes {
         let rxb = (high >> 5) ^ 0x07;
         let wrxb = rxb | w >> 4;
         let l = (low & 0x04) << 2;
-        let synthetic_rex = wrxb | l | 0x80;
-        self.vex = PrefixVex { bits: synthetic_rex };
+        let synthetic_vex = wrxb | l | 0x80;
+        self.vex = PrefixVex { bits: synthetic_vex };
+    }
+
+    #[inline]
+    fn evex_from(&mut self, b1: u8, b2: u8, b3: u8) {
+        let w = b2 & 0x80;
+        let rxb = ((b1 >> 5) & 0b111) ^ 0b111; // `rxb` is provided in inverted form
+        let wrxb = rxb | (w >> 4);
+        let l = (b3 & 0x20) >> 1;
+        let synthetic_vex = wrxb | l | 0x80;
+        self.vex_from(synthetic_vex);
+
+        // R' is provided in inverted form
+        let rp = ((b1 & 0x10) >> 4) ^ 1;
+        let lp = (b3 & 0x40) >> 6;
+        let aaa = b3 & 0b111;
+        let z = (b3 & 0x80) >> 7;
+        let b = (b3 & 0x10) >> 4;
+        self.evex_data.from(rp, lp, z, b, aaa);
+    }
+}
+
+impl EvexData {
+    fn from(&mut self, rp: u8, lp: u8, z: u8, b: u8, aaa: u8) {
+        let mut bits = 0;
+        bits |= aaa;
+        bits |= b << 3;
+        bits |= z << 4;
+        bits |= lp << 5;
+        bits |= rp << 6;
+        bits |= 0x80;
+        self.bits = bits;
+    }
+}
+
+impl EvexData {
+    pub(crate) fn present(&self) -> bool {
+        self.bits & 0b1000_0000 != 0
+    }
+
+    pub(crate) fn aaa(&self) -> u8 {
+        self.bits & 0b111
+    }
+
+    pub(crate) fn b(&self) -> bool {
+        (self.bits & 0b0000_1000) != 0
+    }
+
+    pub(crate) fn z(&self) -> bool {
+        (self.bits & 0b0001_0000) != 0
+    }
+
+    pub(crate) fn lp(&self) -> bool {
+        (self.bits & 0b0010_0000) != 0
+    }
+
+    pub(crate) fn rp(&self) -> bool {
+        (self.bits & 0b0100_0000) != 0
     }
 }
 
@@ -4179,6 +4945,7 @@ enum OperandCode {
     CS = OperandCodeBuilder::new().special_case(104).bits(),
     SS = OperandCodeBuilder::new().special_case(105).bits(),
     DS = OperandCodeBuilder::new().special_case(106).bits(),
+    ModRM_0x62 = OperandCodeBuilder::new().special_case(107).bits(),
 }
 
 const LOCKABLE_INSTRUCTIONS: &[Opcode] = &[
@@ -4345,7 +5112,7 @@ const OPCODES: [OpcodeRecord; 256] = [
 // 0x60
     OpcodeRecord(Interpretation::Instruction(Opcode::PUSHA), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::POPA), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::BOUND), OperandCode::ModRM_0x62),
     OpcodeRecord(Interpretation::Instruction(Opcode::ARPL), OperandCode::Ew_Gw),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
     OpcodeRecord(Interpretation::Prefix, OperandCode::Nothing),
@@ -4565,6 +5332,18 @@ pub(self) fn read_E_ymm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut In
         read_modrm_reg(instr, modrm, RegisterBank::Y)
     } else {
         read_M(bytes_iter, instr, modrm, length)
+    }
+}
+#[allow(non_snake_case)]
+pub(self) fn read_E_vex<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8, bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
+    if modrm >= 0b11000000 {
+        read_modrm_reg(instr, modrm, bank)
+    } else {
+        let res = read_M(bytes_iter, instr, modrm, length)?;
+        if (modrm & 0b01_000_000) == 0b01_000_000 {
+            instr.prefixes.apply_compressed_disp(true);
+        }
+        Ok(res)
     }
 }
 
@@ -8678,6 +9457,35 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             let temp = instruction.operands[1];
             instruction.operands[1] = instruction.operands[0];
             instruction.operands[0] = temp;
+        }
+        OperandCode::ModRM_0x62 => {
+            let modrm = read_modrm(&mut bytes_iter, length)?;
+
+            if modrm < 0xc0 {
+                instruction.modrm_rrr =
+                    RegSpec { bank: RegisterBank::D, num: (modrm >> 3) & 7 };
+                if instruction.prefixes.operand_size() {
+                    instruction.modrm_rrr.bank = RegisterBank::W;
+                    instruction.mem_size = 4;
+                } else {
+                    instruction.mem_size = 8;
+                }
+
+                instruction.operands[0] = OperandSpec::RegRRR;
+                instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                instruction.operand_count = 2;
+            } else {
+                let prefixes = &instruction.prefixes;
+                if prefixes.lock() || prefixes.operand_size() || prefixes.rep_any() {
+                    return Err(DecodeError::InvalidPrefixes);
+                } else {
+                    evex::read_evex(&mut bytes_iter, instruction, *length, Some(modrm))?;
+                    // there's an unavoidable `instruction.length = *length;` after
+                    // `unlikely_operands`. the current length is correct, so store it back to
+                    // length to make the reassignment store a correct length.
+                    *length = instruction.length;
+                }
+            }
         }
         _ => {
             // TODO: this should be unreachable - safe to panic now?

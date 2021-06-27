@@ -7047,7 +7047,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    evex::read_evex(&mut bytes_iter, instruction, length)?;
+                    evex::read_evex(&mut bytes_iter, instruction, length, None)?;
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
                     }

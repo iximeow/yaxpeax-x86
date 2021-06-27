@@ -1685,7 +1685,7 @@ fn read_vex_instruction<T: Iterator<Item=u8>>(opcode_map: VEXOpcodeMap, bytes: &
                     } else {
                         VEXOperandCode::G_V_E_xmm
                     }),
-                    0x04 => (Opcode::VPHADDUBSW, if L {
+                    0x04 => (Opcode::VPMADDUBSW, if L {
                         VEXOperandCode::G_V_E_ymm
                     } else {
                         VEXOperandCode::G_V_E_xmm
