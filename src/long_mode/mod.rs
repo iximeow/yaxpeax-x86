@@ -4317,6 +4317,8 @@ impl PrefixVex {
     fn w(&self) -> bool { (self.bits & 0x08) == 0x08 }
     #[inline]
     fn l(&self) -> bool { (self.bits & 0x10) == 0x10 }
+    #[inline]
+    fn compressed_disp(&self) -> bool { (self.bits & 0x20) == 0x20 }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -4399,6 +4401,15 @@ impl Prefixes {
             Some(evex)
         } else {
             None
+        }
+    }
+
+    #[inline]
+    fn apply_compressed_disp(&mut self, state: bool) {
+        if state {
+            self.rex.bits |= 0x20;
+        } else {
+            self.rex.bits &= 0xdf;
         }
     }
 
@@ -5427,11 +5438,15 @@ pub(self) fn read_E_ymm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut In
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_zmm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_vex<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8, bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
-        read_modrm_reg(instr, modrm, RegisterBank::Z)
+        read_modrm_reg(instr, modrm, bank)
     } else {
-        read_M(bytes_iter, instr, modrm, length)
+        let res = read_M(bytes_iter, instr, modrm, length)?;
+        if (modrm & 0b01_000_000) == 0b01_000_000 {
+            instr.prefixes.apply_compressed_disp(true);
+        }
+        Ok(res)
     }
 }
 
