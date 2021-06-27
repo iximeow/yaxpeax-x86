@@ -3323,11 +3323,8 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
 
     if instr.prefixes.rep_any() {
         if [Opcode::MOVS, Opcode::CMPS, Opcode::LODS, Opcode::STOS, Opcode::INS, Opcode::OUTS].contains(&instr.opcode) {
-            // only a few of you actually use the prefix...
             if instr.prefixes.rep() {
                 write!(out, "rep ")?;
-            } else if instr.prefixes.repz() {
-                write!(out, "repz ")?;
             } else if instr.prefixes.repnz() {
                 write!(out, "repnz ")?;
             }
@@ -3444,8 +3441,6 @@ fn contextualize_c<T: fmt::Write, Y: YaxColors>(instr: &Instruction, _colors: &Y
             // only a few of you actually use the prefix...
             if instr.prefixes.rep() {
                 out.write_str("rep ")?;
-            } else if instr.prefixes.repz() {
-                out.write_str("repz ")?;
             } else if instr.prefixes.repnz() {
                 out.write_str("repnz ")?;
             } // TODO: other rep kinds?
@@ -3670,8 +3665,6 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
             // only a few of you actually use the prefix...
             if self.prefixes.rep() {
                 write!(out, "rep ")?;
-            } else if self.prefixes.repz() {
-                write!(out, "repz ")?;
             } else if self.prefixes.repnz() {
                 write!(out, "repnz ")?;
             }

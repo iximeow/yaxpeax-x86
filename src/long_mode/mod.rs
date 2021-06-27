@@ -4373,10 +4373,6 @@ impl Prefixes {
     #[inline]
     fn set_rep(&mut self) { self.bits = (self.bits & 0xcf) | 0x10; }
     #[inline]
-    pub fn repz(&self) -> bool { self.bits & 0x30 == 0x20 }
-    #[inline]
-    fn set_repz(&mut self) { self.bits = (self.bits & 0xcf) | 0x20; }
-    #[inline]
     pub fn repnz(&self) -> bool { self.bits & 0x30 == 0x30 }
     #[inline]
     fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30; }
