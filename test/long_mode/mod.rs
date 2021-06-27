@@ -1,7 +1,10 @@
+extern crate rand;
+
 mod regspec;
 mod operand;
 mod display;
 mod evex_generated;
+mod reuse_test;
 
 use std::fmt::Write;
 
