@@ -3307,13 +3307,13 @@ impl Instruction {
 
 const MEM_SIZE_STRINGS: [&'static str; 64] = [
     "byte", "word", "BUG", "dword", "BUG", "BUG", "BUG", "qword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
+    "far", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "zmmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
 ];
 
 fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y, _address: u64, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
@@ -3343,57 +3343,19 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
     if instr.operand_count > 0 {
         out.write_str(" ")?;
 
-        if let Some(prefix) = instr.segment_override_for_op(0) {
-            write!(out, "{}:", prefix)?;
-        }
-
         let x = Operand::from_spec(instr, instr.operands[0]);
         if x.is_memory() {
             out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
             out.write_str(" ")?;
         }
+
+        if let Some(prefix) = instr.segment_override_for_op(0) {
+            write!(out, "{}:", prefix)?;
+        }
         x.colorize(colors, out)?;
 
         for i in 1..instr.operand_count {
             match instr.opcode {
-                Opcode::MOVSX_b |
-                Opcode::MOVZX_b => {
-                    match &instr.operands[i as usize] {
-                        &OperandSpec::Nothing => {
-                            return Ok(());
-                        },
-                        &OperandSpec::RegMMM => {
-                            out.write_str(", ")?;
-                        }
-                        _ => {
-                            out.write_str(", byte ")?;
-                            if let Some(prefix) = instr.segment_override_for_op(i) {
-                                write!(out, "{}:", prefix)?;
-                            }
-                        }
-                    }
-                    let x = Operand::from_spec(instr, instr.operands[i as usize]);
-                    x.colorize(colors, out)?
-                },
-                Opcode::MOVSX_w |
-                Opcode::MOVZX_w => {
-                    match &instr.operands[i as usize] {
-                        &OperandSpec::Nothing => {
-                            return Ok(());
-                        },
-                        &OperandSpec::RegMMM => {
-                            out.write_str(", ")?;
-                        }
-                        _ => {
-                            out.write_str(", word ")?;
-                            if let Some(prefix) = instr.segment_override_for_op(i) {
-                                write!(out, "{}:", prefix)?;
-                            }
-                        }
-                    }
-                    let x = Operand::from_spec(instr, instr.operands[i as usize]);
-                    x.colorize(colors, out)?;
-                },
                 _ => {
                     match &instr.operands[i as usize] {
                         &OperandSpec::Nothing => {
@@ -3401,13 +3363,13 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                         },
                         _ => {
                             out.write_str(", ")?;
-                            if let Some(prefix) = instr.segment_override_for_op(i) {
-                                write!(out, "{}:", prefix)?;
-                            }
                             let x = Operand::from_spec(instr, instr.operands[i as usize]);
                             if x.is_memory() {
                                 out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
                                 out.write_str(" ")?;
+                            }
+                            if let Some(prefix) = instr.segment_override_for_op(i) {
+                                write!(out, "{}:", prefix)?;
                             }
                             x.colorize(colors, out)?;
                             if let Some(evex) = instr.prefixes.evex() {
