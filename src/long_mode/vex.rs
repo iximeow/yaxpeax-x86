@@ -420,6 +420,7 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.opcode = if modrm & 0xc0 == 0xc0 {
                 Opcode::VMOVHLPS
             } else {
+                instruction.mem_size = 4;
                 Opcode::VMOVLPS
             };
             instruction.modrm_rrr =
@@ -427,7 +428,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = read_E_xmm(bytes, instruction, modrm, length)?;
-            instruction.mem_size = 4;
             instruction.operand_count = 3;
             Ok(())
         }
@@ -436,6 +436,7 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.opcode = if modrm & 0xc0 == 0xc0 {
                 Opcode::VMOVLHPS
             } else {
+                instruction.mem_size = 8;
                 Opcode::VMOVHPS
             };
             instruction.modrm_rrr =
@@ -443,7 +444,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = read_E_xmm(bytes, instruction, modrm, length)?;
-            instruction.mem_size = 8;
             instruction.operand_count = 3;
             Ok(())
         }
@@ -537,7 +537,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operands[2] = mem_oper;
             instruction.imm = read_imm_unsigned(bytes, 1, length)?;
             instruction.operands[3] = OperandSpec::ImmU8;
-            instruction.mem_size = 1;
             if mem_oper != OperandSpec::RegMMM {
                 instruction.mem_size = 1;
             }
@@ -555,7 +554,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operands[2] = mem_oper;
             instruction.imm = read_imm_unsigned(bytes, 1, length)?;
             instruction.operands[3] = OperandSpec::ImmU8;
-            instruction.mem_size = 4;
             if mem_oper != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
             }

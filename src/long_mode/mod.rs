@@ -7479,9 +7479,6 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             let modrm = read_modrm(&mut bytes_iter, length)?;
 
             instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 1, length)?;
-            if instruction.operands[1] != OperandSpec::RegMMM {
-                instruction.mem_size = 1;
-            }
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -9747,7 +9744,6 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.opcode = opcode;
                 instruction.mem_size = mem_size;
                 instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
-                instruction.mem_size = mem_size;
             }
         }
         OperandCode::ModRM_0x0fba => {
