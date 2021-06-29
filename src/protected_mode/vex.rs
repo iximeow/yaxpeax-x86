@@ -108,7 +108,6 @@ pub(crate) fn three_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, vex_byte_one: 
         _ => { unreachable!("p is two bits"); }
     };
     let m = vex_byte_one & 0b11111;
-//    println!("m: {:05b}", m);
     let m = match m {
         0b00001 => VEXOpcodeMap::Map0F,
         0b00010 => VEXOpcodeMap::Map0F38,
@@ -141,11 +140,12 @@ pub(crate) fn two_byte_vex<T: Iterator<Item=u8>>(bytes: &mut T, vex_byte: u8, in
     };
     instruction.vex_reg = RegSpec {
         bank: RegisterBank::X,
-        num: ((vex_byte >> 3) & 0b0111) ^ 0b0111,
+        num: ((vex_byte >> 3) & 0b1111) ^ 0b1111,
     };
     instruction.prefixes.vex_from_c5(vex_byte);
 
     read_vex_instruction(VEXOpcodeMap::Map0F, bytes, instruction, &mut length, p)?;
+    instruction.vex_reg.num &= 0b0111; // ignore bit 4 in 32-bit mode
     instruction.length = length;
     Ok(())
 }
@@ -1349,7 +1349,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             }
             instruction.operand_count = 4;
             Ok(())
-
         }
 
     }
