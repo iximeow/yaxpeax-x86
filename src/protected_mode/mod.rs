@@ -3685,6 +3685,8 @@ impl InstDecoder {
             Opcode::VPCMPGTD |
             Opcode::VPCMPGTQ |
             Opcode::VPCMPGTW |
+            Opcode::VPCMPESTRI |
+            Opcode::VPCMPESTRM |
             Opcode::VPCMPISTRI |
             Opcode::VPCMPISTRM |
             Opcode::VPERM2F128 |
@@ -7583,10 +7585,10 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 return Err(DecodeError::InvalidOperand);
             }
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
-                if instruction.prefixes.vex().w() {
-                    instruction.mem_size = 6;
-                } else {
+                if instruction.prefixes.operand_size() {
                     instruction.mem_size = 4;
+                } else {
+                    instruction.mem_size = 6;
                 }
             } else if [Opcode::ENQCMD, Opcode::ENQCMDS].contains(&instruction.opcode) {
                 instruction.mem_size = 64;
@@ -7616,6 +7618,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_rrr = RegSpec::from_parts((modrm >> 3) & 7, if instruction.prefixes.operand_size() { RegisterBank::W } else { RegisterBank::D });
                 instruction.operands[0] = OperandSpec::RegRRR;
                 instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                if instruction.prefixes.operand_size() {
+                    instruction.mem_size = 4;
+                } else {
+                    instruction.mem_size = 6;
+                }
             }
         },
         OperandCode::ModRM_0xc5 => {
@@ -7640,6 +7647,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_rrr = RegSpec::from_parts((modrm >> 3) & 7, if instruction.prefixes.operand_size() { RegisterBank::W } else { RegisterBank::D });
                 instruction.operands[0] = OperandSpec::RegRRR;
                 instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                if instruction.prefixes.operand_size() {
+                    instruction.mem_size = 4;
+                } else {
+                    instruction.mem_size = 6;
+                }
             }
         },
         OperandCode::G_U_xmm_Ub => {

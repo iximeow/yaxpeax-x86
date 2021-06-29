@@ -1036,14 +1036,14 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             let mem_oper = read_E_ymm(bytes, instruction, modrm, length)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
+            instruction.operands[2] = mem_oper;
             if mem_oper != OperandSpec::RegMMM {
                 instruction.mem_size = 32;
             }
-            instruction.operands[2] = mem_oper;
             instruction.operand_count = 3;
             Ok(())
         }
-        _op @ VEXOperandCode::G_V_E_ymm_imm8 => {
+        VEXOperandCode::G_V_E_ymm_imm8 => {
             let modrm = read_modrm(bytes, length)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
@@ -1086,10 +1086,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(bytes, instruction, modrm, length)?;
-            if mem_oper == OperandSpec::RegMMM {
-                instruction.opcode = Opcode::Invalid;
-                return Err(DecodeError::InvalidOpcode);
-            }
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = mem_oper;
@@ -1151,7 +1147,7 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 3;
             Ok(())
         }
-        _op @ VEXOperandCode::G_V_E_xmm_imm8 => {
+        VEXOperandCode::G_V_E_xmm_imm8 => {
             let modrm = read_modrm(bytes, length)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
@@ -1167,7 +1163,7 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.operand_count = 4;
             Ok(())
         }
-        _op @ VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8 => {
+        VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8 => {
             let modrm = read_modrm(bytes, length)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);

@@ -3314,7 +3314,7 @@ impl Instruction {
 }
 
 const MEM_SIZE_STRINGS: [&'static str; 64] = [
-    "byte", "word", "BUG", "dword", "far", "BUG", "BUG", "qword",
+    "byte", "word", "BUG", "dword", "far", "ptr", "BUG", "qword",
     "BUG", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
