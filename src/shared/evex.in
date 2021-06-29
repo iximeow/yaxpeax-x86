@@ -4927,9 +4927,6 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
     }
     generated::EVEXOperandCode::Nothing => {}
-    o => {
-      panic!("unhandled operand code {:?}. opcode={}", o, instruction.opcode);
-    }
   }
   Ok(())
 }
