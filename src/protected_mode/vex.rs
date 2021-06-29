@@ -82,10 +82,8 @@ enum VEXOperandCode {
     G_V_M_ymm,
     G_ymm_V_ymm_E_xmm_imm8,
     G_V_xmm_Ev_imm8,
-    Eq_G_xmm,
     Ed_G_xmm,
     G_xmm_Ed,
-    G_xmm_Eq,
     G_E_V,
     G_V_E,
     G_E_Ib,
@@ -475,23 +473,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             instruction.imm = read_imm_unsigned(bytes, 1, length)?;
             Ok(())
         },
-        VEXOperandCode::G_xmm_Eq => {
-            if instruction.vex_reg.num != 0 {
-                instruction.opcode = Opcode::Invalid;
-                return Err(DecodeError::InvalidOperand);
-            }
-            let modrm = read_modrm(bytes, length)?;
-            instruction.modrm_rrr =
-                RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
-            let mem_oper = read_E(bytes, instruction, modrm, 4, length)?;
-            instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = mem_oper;
-            if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = 8;
-            }
-            instruction.operand_count = 2;
-            Ok(())
-        }
         VEXOperandCode::G_xmm_Ed => {
             if instruction.vex_reg.num != 0 {
                 instruction.opcode = Opcode::Invalid;
@@ -503,23 +484,6 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             let mem_oper = read_E(bytes, instruction, modrm, 4, length)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
-            if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = 4;
-            }
-            instruction.operand_count = 2;
-            Ok(())
-        }
-        VEXOperandCode::Eq_G_xmm => {
-            if instruction.vex_reg.num != 0 {
-                instruction.opcode = Opcode::Invalid;
-                return Err(DecodeError::InvalidOperand);
-            }
-            let modrm = read_modrm(bytes, length)?;
-            instruction.modrm_rrr =
-                RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
-            let mem_oper = read_E(bytes, instruction, modrm, 4, length)?;
-            instruction.operands[0] = mem_oper;
-            instruction.operands[1] = OperandSpec::RegRRR;
             if mem_oper != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
             }
