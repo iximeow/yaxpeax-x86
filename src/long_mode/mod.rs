@@ -7970,6 +7970,8 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             // lsl is weird. the full register width is written, but only the low 16 bits are used.
             if instruction.operands[1] == OperandSpec::RegMMM {
                 instruction.modrm_mmm.bank = RegisterBank::D;
+            } else {
+                instruction.mem_size = 2;
             }
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
@@ -8165,6 +8167,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_rrr.bank = RegisterBank::MM;
                 instruction.modrm_rrr.num &= 0b111;
                 instruction.opcode = Opcode::MOVD;
+            }
+            if instruction.operands[1] != OperandSpec::RegMMM {
+                if instruction.prefixes.rex().w() {
+                    instruction.mem_size = 4;
+                } else {
+                    instruction.mem_size = 8;
+                }
             }
         }
         OperandCode::ModRM_0x0f0d => {
@@ -9138,6 +9147,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 unreachable!("r <= 8");
             }
             instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            if instruction.operands[0] != OperandSpec::RegMMM {
+                instruction.mem_size = 2;
+            }
         }
         OperandCode::ModRM_0x0f01 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
@@ -9770,6 +9782,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
 
             instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            if instruction.operands[0] != OperandSpec::RegMMM {
+                instruction.mem_size = opwidth;
+            }
 
             instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
             instruction.operands[1] = OperandSpec::ImmI8;
@@ -9912,12 +9927,18 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
+            instruction.mem_size = 1;
         }
         OperandCode::Yv_DX => {
             instruction.modrm_rrr = RegSpec::dx();
             instruction.modrm_mmm = RegSpec::rdi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
+            if instruction.prefixes.operand_size() {
+                instruction.mem_size = 2;
+            } else {
+                instruction.mem_size = 4;
+            }
             instruction.operand_count = 2;
         }
         OperandCode::DX_Xb => {
@@ -9926,6 +9947,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
             instruction.operand_count = 2;
+            instruction.mem_size = 1;
         }
         OperandCode::AH => {
             instruction.operands[0] = OperandSpec::Nothing;
@@ -9936,6 +9958,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm = RegSpec::rsi();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
+            if instruction.prefixes.operand_size() {
+                instruction.mem_size = 2;
+            } else {
+                instruction.mem_size = 4;
+            }
             instruction.operand_count = 2;
         }
         OperandCode::x87_d8 |

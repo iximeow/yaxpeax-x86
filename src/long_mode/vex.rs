@@ -442,6 +442,7 @@ fn read_vex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Inst
             Ok(())
         }
         VEXOperandCode::Nothing => {
+            instruction.operand_count = 0;
             Ok(())
         },
         VEXOperandCode::Ev_G_xmm_imm8 => {

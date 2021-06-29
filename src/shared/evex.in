@@ -53,7 +53,7 @@ pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut I
     let table_idx = ((m << 2) | p) as usize;
     let table = generated::TABLES[table_idx];
     if table as *const [_]  == &generated::DUMMY[..] as *const [_] {
-        panic!("no table for m={}, p={}", m, p);
+        return Err(DecodeError::InvalidOpcode);
     }
     let mut index_lower = 0;
     if instruction.prefixes.evex_unchecked().vex().l() {
