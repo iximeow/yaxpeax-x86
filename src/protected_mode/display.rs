@@ -394,9 +394,6 @@ const MNEMONICS: &[&'static str] = &[
     "cvtss2sd",
     "cvtdq2pd",
     "lddqu",
-    "movsx",
-    "movsx",
-    "movzx",
     "movzx",
     "movsx",
     "movsxd",
@@ -2834,10 +2831,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::IN |
             Opcode::OUTS |
             Opcode::OUT |
-            Opcode::MOVSX_b |
-            Opcode::MOVSX_w |
-            Opcode::MOVZX_b |
-            Opcode::MOVZX_w |
+            Opcode::MOVZX |
             Opcode::MOVSX |
             Opcode::MOVSXD |
             Opcode::FILD |
@@ -3700,72 +3694,20 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
         };
         for i in 1..self.operand_count {
             let i = i as usize;
-            match self.opcode {
-                Opcode::MOVSX_b |
-                Opcode::MOVZX_b => {
-                    match context.and_then(|xs| xs[i].as_ref()) {
-                        Some(s) => { write!(out, ", {}", s)? }
-                        None => {
-                            match &self.operands[i] {
-                                &OperandSpec::Nothing => {
-                                    return Ok(());
-                                },
-                                &OperandSpec::RegMMM => {
-                                    write!(out, ", ")?;
-                                }
-                                _ => {
-                                    write!(out, ", byte ")?;
-                                    if let Some(prefix) = self.segment_override_for_op(1) {
-                                        write!(out, "{}:", prefix)?;
-                                    }
-                                }
+            match context.and_then(|xs| xs[i].as_ref()) {
+                Some(s) => { write!(out, ", {}", s)? }
+                None => {
+                    match &self.operands[i] {
+                        &OperandSpec::Nothing => {
+                            return Ok(());
+                        },
+                        _ => {
+                            write!(out, ", ")?;
+                            if let Some(prefix) = self.segment_override_for_op(1) {
+                                write!(out, "{}:", prefix)?;
                             }
                             let x = Operand::from_spec(self, self.operands[i]);
                             x.colorize(colors, out)?
-                        }
-                    }
-                },
-                Opcode::MOVSX_w |
-                Opcode::MOVZX_w => {
-                    match context.and_then(|xs| xs[i].as_ref()) {
-                        Some(s) => { write!(out, ", {}", s)? }
-                        None => {
-                            match &self.operands[i] {
-                                &OperandSpec::Nothing => {
-                                    return Ok(());
-                                },
-                                &OperandSpec::RegMMM => {
-                                    write!(out, ", ")?;
-                                }
-                                _ => {
-                                    write!(out, ", word ")?;
-                                    if let Some(prefix) = self.segment_override_for_op(1) {
-                                        write!(out, "{}:", prefix)?;
-                                    }
-                                }
-                            }
-                            let x = Operand::from_spec(self, self.operands[i]);
-                            x.colorize(colors, out)?
-                        }
-                    }
-                },
-                _ => {
-                    match context.and_then(|xs| xs[i].as_ref()) {
-                        Some(s) => { write!(out, ", {}", s)? }
-                        None => {
-                            match &self.operands[i] {
-                                &OperandSpec::Nothing => {
-                                    return Ok(());
-                                },
-                                _ => {
-                                    write!(out, ", ")?;
-                                    if let Some(prefix) = self.segment_override_for_op(1) {
-                                        write!(out, "{}:", prefix)?;
-                                    }
-                                    let x = Operand::from_spec(self, self.operands[i]);
-                                    x.colorize(colors, out)?
-                                }
-                            }
                         }
                     }
                 }
