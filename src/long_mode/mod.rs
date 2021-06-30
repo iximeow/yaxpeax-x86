@@ -10,7 +10,7 @@ pub use self::display::DisplayStyle;
 use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
-use yaxpeax_arch::{AddressDiff, Decoder, LengthedInstruction};
+use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
 
 use core::fmt;
 impl fmt::Display for DecodeError {
@@ -2657,6 +2657,7 @@ pub struct Arch;
 
 impl yaxpeax_arch::Arch for Arch {
     type Address = u64;
+    type Word = u8;
     type Instruction = Instruction;
     type DecodeError = DecodeError;
     type Decoder = InstDecoder;
@@ -4095,16 +4096,14 @@ impl Default for InstDecoder {
     }
 }
 
-impl Decoder<Instruction> for InstDecoder {
-    type Error = DecodeError;
-
-    fn decode<T: IntoIterator<Item=u8>>(&self, bytes: T) -> Result<Instruction, Self::Error> {
+impl Decoder<Arch> for InstDecoder {
+    fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        decode_one(self, bytes, &mut instr)
+        read_instr(self, words, &mut instr)
             .map(|_: ()| instr)
     }
-    fn decode_into<T: IntoIterator<Item=u8>>(&self, instr: &mut Instruction, bytes: T) -> Result<(), Self::Error> {
-        decode_one(self, bytes, instr)
+    fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
+        read_instr(self, words, instr)
     }
 }
 
@@ -5412,46 +5411,46 @@ const OPCODES: [OpcodeRecord; 256] = [
 ];
 
 #[allow(non_snake_case)]
-pub(self) fn read_E<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, width: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8, width: u8) -> Result<OperandSpec, DecodeError> {
     let bank = width_to_gp_reg_bank(width, instr.prefixes.rex().present());
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
     } else {
-        read_M(bytes_iter, instr, modrm, length)
+        read_M(words, instr, modrm)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_mm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_mm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         instr.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
         Ok(OperandSpec::RegMMM)
     } else {
-        read_M(bytes_iter, instr, modrm, length)
+        read_M(words, instr, modrm)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_st<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_st<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         instr.modrm_mmm = RegSpec { bank: RegisterBank::ST, num: modrm & 7 };
         Ok(OperandSpec::RegMMM)
     } else {
-        read_M(bytes_iter, instr, modrm, length)
+        read_M(words, instr, modrm)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_xmm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_xmm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, RegisterBank::X)
     } else {
-        read_M(bytes_iter, instr, modrm, length)
+        read_M(words, instr, modrm)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_ymm<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_ymm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, RegisterBank::Y)
     } else {
-        read_M(bytes_iter, instr, modrm, length)
+        read_M(words, instr, modrm)
     }
 }
 #[allow(non_snake_case)]
@@ -5459,7 +5458,7 @@ pub(self) fn read_E_vex<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut In
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
     } else {
-        let res = read_M(bytes_iter, instr, modrm, length)?;
+        let res = read_M(bytes_iter, instr, modrm)?;
         if (modrm & 0b01_000_000) == 0b01_000_000 {
             instr.prefixes.apply_compressed_disp(true);
         }
@@ -5474,24 +5473,20 @@ fn read_modrm_reg(instr: &mut Instruction, modrm: u8, reg_bank: RegisterBank) ->
 }
 
 #[allow(non_snake_case)]
-fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     let modbits = modrm >> 6;
-    let sibbyte = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
-    *length += 1;
+    let sibbyte = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
 
     let disp = if modbits == 0b00 {
         if (sibbyte & 7) == 0b101 {
-            *length += 4;
-            read_num(bytes_iter, 4)? as i32
+            read_num(words, 4)? as i32
         } else {
             0
         }
     } else if modbits == 0b01 {
-        *length += 1;
-        read_num(bytes_iter, 1)? as i8 as i32
+        read_num(words, 1)? as i8 as i32
     } else {
-        *length += 4;
-        read_num(bytes_iter, 4)? as i32
+        read_num(words, 4)? as i32
     };
     instr.disp = disp as u32 as u64;
 
@@ -5594,7 +5589,7 @@ fn read_sib<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, m
 }
 
 #[allow(non_snake_case)]
-fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8) -> Result<OperandSpec, DecodeError> {
+fn read_M<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
     if instr.prefixes.rex().b() {
@@ -5608,10 +5603,9 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
         instr.sib_index.num = 0;
     }
     let op_spec = if mmm == 4 {
-        return read_sib(bytes_iter, instr, modrm, length);
+        return read_sib(words, instr, modrm);
     } else if mmm == 5 && modbits == 0b00 {
-        *length += 4;
-        let disp = read_num(bytes_iter, 4)? as i32;
+        let disp = read_num(words, 4)? as i32;
         instr.modrm_mmm =
             if !instr.prefixes.address_size() { RegSpec::rip() } else { RegSpec::eip() };
         if disp == 0 {
@@ -5627,11 +5621,9 @@ fn read_M<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, mod
             OperandSpec::Deref
         } else {
             let disp = if modbits == 0b01 {
-                *length += 1;
-                read_num(bytes_iter, 1)? as i8 as i32
+                read_num(words, 1)? as i8 as i32
             } else {
-                *length += 4;
-                read_num(bytes_iter, 4)? as i32
+                read_num(words, 4)? as i32
             };
             if disp == 0 {
                 OperandSpec::Deref
@@ -6958,8 +6950,8 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     };
 }
 
-fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction) -> Result<(), DecodeError> {
-    let mut length = 0u8;
+fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
+    words.mark();
 //    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
 
@@ -6970,24 +6962,20 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     instruction.mem_size = 0;
 
     let record: OpcodeRecord = loop {
-        let b = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
-        length += 1;
-        if length >= 15 {
+        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+        if words.offset() >= 15 {
             return Err(DecodeError::TooLong);
         }
         let record = OPCODES[b as usize];
         if (b & 0xf0) == 0x40 {
             prefixes.rex_from(b);
         } else if b == 0x0f {
-            let b = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
-            length += 1;
+            let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
             if b == 0x38 {
-                let b = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
-                length += 1;
+                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                 break read_0f38_opcode(b, &mut prefixes);
             } else if b == 0x3a {
-                let b = bytes_iter.next().ok_or(DecodeError::ExhaustedInput)?;
-                length += 1;
+                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                 break read_0f3a_opcode(b, &mut prefixes);
             } else {
                 break read_0f_opcode(b, &mut prefixes);
@@ -7017,7 +7005,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    vex::two_byte_vex(&mut bytes_iter, instruction, length)?;
+                    vex::two_byte_vex(words, instruction)?;
 
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
@@ -7031,7 +7019,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    vex::three_byte_vex(&mut bytes_iter, instruction, length)?;
+                    vex::three_byte_vex(words, instruction)?;
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
                     }
@@ -7044,7 +7032,7 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    evex::read_evex(&mut bytes_iter, instruction, length, None)?;
+                    evex::read_evex(words, instruction, length, None)?;
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
                     }
@@ -7098,7 +7086,6 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
     if length > 15 {
         return Err(DecodeError::TooLong);
     }
-    instruction.length = length;
 
     if instruction.prefixes.lock() {
         if !LOCKABLE_INSTRUCTIONS.contains(&instruction.opcode) || !instruction.operands[0].is_memory() {
@@ -7147,7 +7134,8 @@ fn read_instr<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, in
         OperandCode::ModRM_0x8f_Ev => 30
 
  */
-fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
+#[inline(always)]
+fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
     instruction.operands[0] = OperandSpec::RegRRR;
     instruction.operand_count = 2;
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
@@ -7192,7 +7180,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                         instruction.modrm_rrr =
                             RegSpec::gp_from_parts(reg, instruction.prefixes.rex().b(), 1, instruction.prefixes.rex().present());
                         instruction.imm =
-                            read_imm_unsigned(&mut bytes_iter, 1, length)?;
+                            read_imm_unsigned(words, 1)?;
                         instruction.operands[1] = OperandSpec::ImmU8;
                     }
                     3 => {
@@ -7208,7 +7196,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                         instruction.modrm_rrr =
                             RegSpec::from_parts(reg, instruction.prefixes.rex().b(), bank);
                         instruction.imm =
-                            read_imm_ivq(&mut bytes_iter, opwidth, length)?;
+                            read_imm_ivq(words, opwidth)?;
                         instruction.operands[1] = match opwidth {
                             2 => OperandSpec::ImmI16,
                             4 => OperandSpec::ImmI32,
@@ -7253,7 +7241,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 bank = RegisterBank::B;
             }
         };
-        modrm = read_modrm(&mut bytes_iter, length)?;
+        modrm = read_modrm(words)?;
         instruction.modrm_rrr.bank = bank;
         instruction.modrm_rrr.num = ((modrm >> 3) & 7) + if instruction.prefixes.rex().r() { 0b1000 } else { 0 };
 
@@ -7267,14 +7255,14 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             }
             read_modrm_reg(instruction, modrm, bank)?
         } else {
-            read_M(&mut bytes_iter, instruction, modrm, length)?
+            read_M(words, instruction, modrm)?
         };
         instruction.operands[1] = mem_oper;
     }
 
     if let Some((only_imm, immsz)) = operand_code.has_imm() {
         instruction.imm =
-            read_imm_signed(&mut bytes_iter, 1 << (immsz * 2), length)? as u64;
+            read_imm_signed(words, 1 << (immsz * 2))? as u64;
         if only_imm {
             if immsz == 0 {
                 instruction.operands[0] = OperandSpec::ImmI8;
@@ -7307,7 +7295,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         2 => {
             instruction.operands[0] = mem_oper;
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
-            instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
+            instruction.imm = read_imm_signed(words, numwidth)? as u64;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
             instruction.operands[1] = match opwidth {
                 2 => OperandSpec::ImmI16,
@@ -7322,16 +7310,16 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             if modrm == 0xf8 {
                 if op == 3 {
                     instruction.opcode = Opcode::XABORT;
-                    instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+                    instruction.imm = read_imm_signed(words, 1)? as u64;
                     instruction.operands[0] = OperandSpec::ImmI8;
                     instruction.operand_count = 1;
                     return Ok(());
                 } else {
                     instruction.opcode = Opcode::XBEGIN;
                     instruction.imm = if opwidth == 2 {
-                        read_imm_signed(&mut bytes_iter, 2, length)? as i16 as i64 as u64
+                        read_imm_signed(words, 2)? as i16 as i64 as u64
                     } else {
-                        read_imm_signed(&mut bytes_iter, 4, length)? as i32 as i64 as u64
+                        read_imm_signed(words, 4)? as i32 as i64 as u64
                     };
                     instruction.operands[0] = OperandSpec::ImmI32;
                     instruction.operand_count = 1;
@@ -7346,7 +7334,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.operands[0] = mem_oper;
             instruction.opcode = Opcode::MOV;
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
-            instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
+            instruction.imm = read_imm_signed(words, numwidth)? as u64;
             instruction.operands[1] = match opwidth {
                 1 => OperandSpec::ImmI8,
                 2 => OperandSpec::ImmI16,
@@ -7374,8 +7362,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 let num = match op {
                     5 |
                     6 => {
-                        *length += 1;
-                        read_num(&mut bytes_iter, 1)?
+                        read_num(words, 1)?
                     }
                     _ => {
                         // these are the _1 variants, everything else is unreachable
@@ -7395,7 +7382,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
                 0 | 1 => {
                     instruction.opcode = Opcode::TEST;
                     let numwidth = if opwidth == 8 { 4 } else { opwidth };
-                    instruction.imm = read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
+                    instruction.imm = read_imm_signed(words, numwidth)? as u64;
                     instruction.operands[1] = match opwidth {
                         1 => OperandSpec::ImmI8,
                         2 => OperandSpec::ImmI16,
@@ -7473,9 +7460,9 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         }
         15 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 1, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 1)?;
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -7485,9 +7472,9 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         },
         16 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -7497,9 +7484,9 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         },
         17 => {
             let opwidth = 8;
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4 /* opwidth */, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4 /* opwidth */)?;
             instruction.mem_size = 4;
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), opwidth, instruction.prefixes.rex().present());
@@ -7542,14 +7529,13 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             }
         },
         22 => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
+                read_num(words, 1)? as u8 as u64;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 if instruction.opcode == Opcode::CMPSS {
                     instruction.mem_size = 4;
@@ -7574,7 +7560,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts(0, false, opwidth, false);
             instruction.imm =
-                read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
+                read_imm_signed(words, numwidth)? as u64;
             instruction.operands[1] = match opwidth {
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
@@ -7586,7 +7572,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         25 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
             instruction.imm =
-                read_imm_unsigned(&mut bytes_iter, opwidth, length)?;
+                read_imm_unsigned(words, opwidth)?;
             instruction.operands[0] = match opwidth {
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
@@ -7654,7 +7640,7 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
         },
         _ => {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
-            unlikely_operands(decoder, bytes_iter, instruction, operand_code, mem_oper, length)?;
+            unlikely_operands(decoder, bytes_iter, instruction, operand_code, mem_oper)?;
         }
     };
     }
@@ -7664,14 +7650,13 @@ fn read_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T,
 fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), DecodeError> {
     match operand_code {
         OperandCode::G_E_mm_Ib => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_mm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_mm(words, instruction, modrm)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, false, RegisterBank::MM);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
+                read_num(words, 1)? as u8 as u64;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
             }
@@ -7679,14 +7664,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operand_count = 3;
         }
         OperandCode::G_Ev_xmm_Ib => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
+                read_num(words, 1)? as u8 as u64;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = match instruction.opcode {
                     Opcode::PEXTRB => 1,
@@ -7704,12 +7688,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operand_count = 3;
         }
         OperandCode::PMOVX_E_G_xmm => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.operands[0] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[0] = read_E_xmm(words, instruction, modrm)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 if [].contains(&instruction.opcode) {
                     instruction.mem_size = 2;
@@ -7723,12 +7707,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::PMOVX_G_E_xmm => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 if [Opcode::PMOVSXBQ, Opcode::PMOVZXBQ].contains(&instruction.opcode) {
                     instruction.mem_size = 2;
@@ -7744,12 +7728,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::INV_Gv_M => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::Q);
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_M(words, instruction, modrm)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -7766,24 +7750,23 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::G_U_xmm_Ub => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::D);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
+                read_num(words, 1)? as u8 as u64;
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
         }
         OperandCode::ModRM_0xf20f78 => {
             instruction.opcode = Opcode::INSERTQ;
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             if modrm < 0b11_000_000 {
                 return Err(DecodeError::InvalidOperand);
@@ -7796,10 +7779,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
+                read_num(words, 1)? as u8 as u64;
             instruction.disp =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 2;
+                read_num(words, 1)? as u8 as u64;
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operands[3] = OperandSpec::ImmInDispField;
             instruction.operand_count = 4;
@@ -7807,7 +7789,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::ModRM_0x660f78 => {
             instruction.opcode = Opcode::EXTRQ;
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             if modrm < 0b11_000_000 {
                 return Err(DecodeError::InvalidOperand);
@@ -7821,24 +7803,22 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.modrm_mmm =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
+                read_num(words, 1)? as u8 as u64;
             instruction.disp =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 2;
+                read_num(words, 1)? as u8 as u64;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operands[2] = OperandSpec::ImmInDispField;
             instruction.operand_count = 3;
 
         }
         OperandCode::G_E_xmm_Ub => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
+                read_num(words, 1)? as u8 as u64;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 16;
             }
@@ -7897,7 +7877,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             instruction.imm =
-                read_imm_signed(&mut bytes_iter, numwidth, length)? as u64;
+                read_imm_signed(words, numwidth)? as u64;
             instruction.operands[2] = match opwidth {
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
@@ -7910,7 +7890,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm =
-                read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+                read_imm_signed(words, 1)? as u64;
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         }
@@ -7922,9 +7902,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operand_count = 3;
         }
         OperandCode::G_mm_Ew_Ib => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, false, RegisterBank::MM);
             if instruction.operands[1] == OperandSpec::RegMMM {
@@ -7933,8 +7913,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.mem_size = 2;
             }
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u8 as u64;
-            *length += 1;
+                read_num(words, 1)? as u8 as u64;
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         }
@@ -7964,9 +7943,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         },
         OperandCode::Gv_Ew_LSL => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
             // lsl is weird. the full register width is written, but only the low 16 bits are used.
             if instruction.operands[1] == OperandSpec::RegMMM {
                 instruction.modrm_mmm.bank = RegisterBank::D;
@@ -7979,9 +7958,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         },
         OperandCode::Gdq_Ev => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, opwidth)?;
             // `opwidth` can be 2, 4, or 8 here. if opwidth is 2, the first operand is a dword.
             // if opwidth is 4, both registers are dwords. and if opwidth is 8, both registers are
             // qword.
@@ -8010,8 +7989,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             };
             instruction.mem_size = opwidth;
             let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
-            let imm = read_num(&mut bytes_iter, addr_width)?;
-            *length += addr_width;
+            let imm = read_num(words, addr_width)?;
             instruction.modrm_rrr =
                 RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth, instruction.prefixes.rex().present());
             instruction.disp = imm;
@@ -8035,8 +8013,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             };
             instruction.mem_size = opwidth;
             let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
-            let imm = read_num(&mut bytes_iter, addr_width)?;
-            *length += addr_width;
+            let imm = read_num(words, addr_width)?;
             instruction.disp = imm;
             instruction.operands[0] = if instruction.prefixes.address_size() {
                 OperandSpec::DispU32
@@ -8059,12 +8036,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         */
         OperandCode::Iw_Ib => {
-            instruction.disp = read_num(&mut bytes_iter, 2)? as u64;
-            instruction.imm = read_num(&mut bytes_iter, 1)? as u64;
+            instruction.disp = read_num(words, 2)? as u64;
+            instruction.imm = read_num(words, 1)? as u64;
             instruction.operands[0] = OperandSpec::ImmInDispField;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
-            *length += 3;
         }
         OperandCode::Fw => {
             if instruction.prefixes.rex().w() {
@@ -8078,10 +8054,10 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::Mdq_Gdq => {
             let opwidth = if instruction.prefixes.rex().w() { 8 } else { 4 };
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             instruction.operands[1] = instruction.operands[0];
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8107,9 +8083,9 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 return Err(DecodeError::InvalidOpcode);
             }
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 8)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::Q);
@@ -8123,12 +8099,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 return Err(DecodeError::InvalidOpcode);
             }
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::Q);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 8)?;
             instruction.operand_count = 2;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
@@ -8155,10 +8131,10 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             //
             // anyway, there are two operands, and the primary concern here is "what are they?".
             instruction.operand_count = 2;
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             instruction.modrm_rrr =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::X);
-            instruction.operands[1] = read_E_xmm(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             if instruction.prefixes.rex().w() {
                 let op = instruction.operands[0];
                 instruction.operands[0] = instruction.operands[1];
@@ -8177,7 +8153,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0x0f0d => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 0b111;
 
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
@@ -8190,7 +8166,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     instruction.opcode = Opcode::NOP;
                 }
             }
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 64;
             }
@@ -8200,15 +8176,15 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             // 3dnow instructions are WILD, the opcode is encoded as an imm8 trailing the
             // instruction.
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
-            instruction.operands[1] = read_E_mm(&mut bytes_iter, instruction, modrm, length)?;
+            let modrm = read_modrm(words)?;
+            instruction.operands[1] = read_E_mm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
             }
 
-            let opcode = read_modrm(&mut bytes_iter, length)?;
+            let opcode = read_modrm(words)?;
             match opcode {
                 0x0c => {
                     instruction.opcode = Opcode::PI2FW;
@@ -8289,7 +8265,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::ModRM_0x0fc7 => {
             if instruction.prefixes.repnz() {
-                let modrm = read_modrm(&mut bytes_iter, length)?;
+                let modrm = read_modrm(words)?;
                 let is_reg = (modrm & 0xc0) == 0xc0;
 
                 let r = (modrm >> 3) & 7;
@@ -8308,7 +8284,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             }
                             instruction.operand_count = 1;
                             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         }
                         return Ok(());
                     }
@@ -8319,7 +8295,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
             if instruction.prefixes.operand_size() {
                 let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                let modrm = read_modrm(&mut bytes_iter, length)?;
+                let modrm = read_modrm(words)?;
                 let is_reg = (modrm & 0xc0) == 0xc0;
 
                 let r = (modrm >> 3) & 7;
@@ -8338,13 +8314,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             }
                             instruction.operand_count = 1;
                             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         }
                         return Ok(());
                     }
                     6 => {
                         instruction.opcode = Opcode::VMCLEAR;
-                        instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
@@ -8358,7 +8334,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         return Ok(());
                     }
                     7 => {
-                        instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
@@ -8379,7 +8355,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
 
             if instruction.prefixes.rep() {
                 let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                let modrm = read_modrm(&mut bytes_iter, length)?;
+                let modrm = read_modrm(words)?;
                 let is_reg = (modrm & 0xc0) == 0xc0;
 
                 let r = (modrm >> 3) & 7;
@@ -8398,12 +8374,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             }
                             instruction.operand_count = 1;
                             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         }
                     }
                     6 => {
                         instruction.opcode = Opcode::VMXON;
-                        instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // invalid as `vmxon`, reg-form is `senduipi`
                             instruction.opcode = Opcode::SENDUIPI;
@@ -8416,7 +8392,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     }
                     7 => {
                         instruction.opcode = Opcode::RDPID;
-                        instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                         if instruction.operands[0] != OperandSpec::RegMMM {
                             return Err(DecodeError::InvalidOperand);
                         }
@@ -8429,7 +8405,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 return Ok(());
             }
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let is_reg = (modrm & 0xc0) == 0xc0;
 
             let r = (modrm >> 3) & 0b111;
@@ -8513,7 +8489,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.opcode = opcode;
             instruction.operand_count = 1;
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
         },
         OperandCode::ModRM_0x0f71 => {
             if instruction.prefixes.rep() || instruction.prefixes.repnz() {
@@ -8522,7 +8498,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
 
             instruction.operand_count = 2;
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             if modrm & 0xc0 != 0xc0 {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -8549,7 +8525,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             }
             instruction.operands[0] = OperandSpec::RegMMM;
-            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.imm = read_imm_signed(words, 1)? as u64;
             instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0x0f72 => {
@@ -8559,7 +8535,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
 
             instruction.operand_count = 2;
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             if modrm & 0xc0 != 0xc0 {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -8586,7 +8562,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             }
             instruction.operands[0] = OperandSpec::RegMMM;
-            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.imm = read_imm_signed(words, 1)? as u64;
             instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0x0f73 => {
@@ -8596,7 +8572,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
 
             instruction.operand_count = 2;
 
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             if modrm & 0xc0 != 0xc0 {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -8632,11 +8608,11 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             }
             instruction.operands[0] = OperandSpec::RegMMM;
-            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.imm = read_imm_signed(words, 1)? as u64;
             instruction.operands[1] = OperandSpec::ImmU8;
         },
         OperandCode::ModRM_0xf30f38d8 => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             match r {
                 0b000 => {
@@ -8644,7 +8620,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         return Err(DecodeError::InvalidOperand);
                     }
                     instruction.opcode = Opcode::AESENCWIDE128KL;
-                    instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
                 }
                 0b001 => {
@@ -8652,7 +8628,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         return Err(DecodeError::InvalidOperand);
                     }
                     instruction.opcode = Opcode::AESDECWIDE128KL;
-                    instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
                 }
                 0b010 => {
@@ -8660,7 +8636,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         return Err(DecodeError::InvalidOperand);
                     }
                     instruction.opcode = Opcode::AESENCWIDE256KL;
-                    instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
                 }
                 0b011 => {
@@ -8668,7 +8644,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         return Err(DecodeError::InvalidOperand);
                     }
                     instruction.opcode = Opcode::AESDECWIDE256KL;
-                    instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
                 }
                 _ => {
@@ -8677,7 +8653,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38dc => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm, length)?;
+            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 instruction.opcode = Opcode::LOADIWKEY;
             } else {
@@ -8685,7 +8661,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38dd => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm, length)?;
+            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8693,7 +8669,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38de => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm, length)?;
+            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8701,7 +8677,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38df => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm, length)?;
+            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8710,13 +8686,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::ModRM_0xf30f38fa => {
             instruction.opcode = Opcode::ENCODEKEY128;
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_U_xmm, length)?;
+            read_operands(decoder, bytes_iter, instruction, OperandCode::G_U_xmm)?;
             instruction.modrm_rrr.bank = RegisterBank::D;
             instruction.modrm_mmm.bank = RegisterBank::D;
         }
         OperandCode::ModRM_0xf30f38fb => {
             instruction.opcode = Opcode::ENCODEKEY256;
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_U_xmm, length)?;
+            read_operands(decoder, bytes_iter, instruction, OperandCode::G_U_xmm)?;
             instruction.modrm_rrr.bank = RegisterBank::D;
             instruction.modrm_mmm.bank = RegisterBank::D;
         }
@@ -8816,8 +8792,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u64;
-            *length += 1;
+                read_num(words, 1)? as u64;
             instruction.modrm_rrr.bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
                 instruction.modrm_mmm.bank = RegisterBank::D;
@@ -8864,8 +8839,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
             instruction.imm =
-                read_num(&mut bytes_iter, 1)? as u64;
-            *length += 1;
+                read_num(words, 1)? as u64;
             instruction.modrm_rrr.bank = RegisterBank::D;
             if mem_oper == OperandSpec::RegMMM {
                 instruction.modrm_mmm.bank = RegisterBank::MM;
@@ -9027,7 +9001,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::Ew_Sw => {
             let opwidth = 2;
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             // check r
             if ((modrm >> 3) & 7) > 5 {
@@ -9046,12 +9020,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[0] = OperandSpec::RegMMM;
             } else {
-                instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                 instruction.mem_size = 2;
             }
         },
         OperandCode::Sw_Ew => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
 
             // check r
             if ((modrm >> 3) & 7) > 5 {
@@ -9080,7 +9054,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[1] = OperandSpec::RegMMM;
             } else {
-                instruction.operands[1] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                instruction.operands[1] = read_M(words, instruction, modrm)?;
                 instruction.mem_size = 2;
             }
         },
@@ -9112,13 +9086,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::Iw => {
             instruction.imm =
-                read_imm_unsigned(&mut bytes_iter, 2, length)?;
+                read_imm_unsigned(words, 2)?;
             instruction.operands[0] = OperandSpec::ImmU16;
             instruction.operand_count = 1;
         }
         OperandCode::ModRM_0x0f00 => {
             instruction.operand_count = 1;
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             if r == 0 {
                 instruction.opcode = Opcode::SLDT;
@@ -9146,14 +9120,14 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             } else {
                 unreachable!("r <= 8");
             }
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
         }
         OperandCode::ModRM_0x0f01 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             if r == 0 {
                 let mod_bits = modrm >> 6;
@@ -9186,7 +9160,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     instruction.opcode = Opcode::SGDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                 }
             } else if r == 1 {
                 let mod_bits = modrm >> 6;
@@ -9243,7 +9217,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     instruction.opcode = Opcode::SIDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                 }
             } else if r == 2 {
                 let mod_bits = modrm >> 6;
@@ -9279,7 +9253,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     instruction.opcode = Opcode::LGDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                 }
             } else if r == 3 {
                 let mod_bits = modrm >> 6;
@@ -9344,7 +9318,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     instruction.opcode = Opcode::LIDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                 }
             } else if r == 4 {
                 // TODO: this permits storing only to word-size registers
@@ -9352,7 +9326,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.opcode = Opcode::SMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
             } else if r == 5 {
                 let mod_bits = modrm >> 6;
                 if mod_bits != 0b11 {
@@ -9360,7 +9334,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         return Err(DecodeError::InvalidOpcode);
                     }
                     instruction.opcode = Opcode::RSTORSSP;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, 8)?;
                     instruction.mem_size = 8;
                     instruction.operand_count = 1;
                     return Ok(());
@@ -9464,7 +9438,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 instruction.opcode = Opcode::LMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
             } else if r == 7 {
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
@@ -9514,14 +9488,14 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     instruction.opcode = Opcode::INVLPG;
                     instruction.operand_count = 1;
                     instruction.mem_size = 1;
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                 }
             } else {
                 unreachable!("r <= 8");
             }
         }
         OperandCode::ModRM_0x0fae => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             let m = modrm & 7;
 
@@ -9540,7 +9514,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                             return Err(DecodeError::InvalidOpcode);
                         }
                     };
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 1 /* opwidth */, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, 1 /* opwidth */)?;
                     instruction.mem_size = 64;
                     instruction.operand_count = 1;
                 } else {
@@ -9554,7 +9528,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                         }
                     };
                     let opwidth = if instruction.prefixes.rex().w() { 8 } else { 4 };
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                     instruction.operand_count = 1;
                 }
 
@@ -9595,7 +9569,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     } else {
                         4
                     };
-                    instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
                     if instruction.operands[0] != OperandSpec::RegMMM {
                         instruction.mem_size = opwidth;
                     }
@@ -9676,7 +9650,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                     match r {
                         6 => {
                             instruction.opcode = Opcode::CLRSSBSY;
-                            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 8, length)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, 8)?;
                             instruction.operand_count = 1;
                             instruction.mem_size = 8;
                             return Ok(());
@@ -9752,12 +9726,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 ][r as usize];
                 instruction.opcode = opcode;
                 instruction.mem_size = mem_size;
-                instruction.operands[0] = read_M(&mut bytes_iter, instruction, modrm, length)?;
+                instruction.operands[0] = read_M(words, instruction, modrm)?;
             }
         }
         OperandCode::ModRM_0x0fba => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             match r {
                 0 | 1 | 2 | 3 => {
@@ -9781,12 +9755,12 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
                 }
             }
 
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, opwidth, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = opwidth;
             }
 
-            instruction.imm = read_imm_signed(&mut bytes_iter, 1, length)? as u64;
+            instruction.imm = read_imm_signed(words, 1)? as u64;
             instruction.operands[1] = OperandSpec::ImmI8;
             instruction.operand_count = 2;
         }
@@ -9794,7 +9768,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         op @ OperandCode::Rq_Dq_0 |
         op @ OperandCode::Cq_Rq_0 |
         op @ OperandCode::Dq_Rq_0 => {
-            let modrm = read_modrm(&mut bytes_iter, length)?;
+            let modrm = read_modrm(words)?;
             let mut m = modrm & 7;
             let mut r = (modrm >> 3) & 7;
             if instruction.prefixes.rex().r() {
@@ -9973,7 +9947,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::x87_dd |
         OperandCode::x87_de |
         OperandCode::x87_df => {
-            return decode_x87(decoder, bytes_iter, instruction, operand_code, length);
+            return decode_x87(decoder, bytes_iter, instruction, operand_code);
         }
         OperandCode::MOVDIR64B => {
             // at this point we've done a read as if it was Gv_M (`lea` operands). because the
@@ -10043,7 +10017,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
     }
 
     // every x87 instruction is conditional on rrr bits
-    let modrm = read_modrm(&mut bytes_iter, length)?;
+    let modrm = read_modrm(words)?;
     let r = (modrm >> 3) & 0b111;
 
     let (opcode, x87_operands) = match operand_code {
@@ -10364,19 +10338,19 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
 
     match x87_operands {
         OperandCodeX87::Est => {
-            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operand_count = 1;
         }
         OperandCodeX87::St_Est => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_st(words, instruction, modrm)?;
             instruction.operand_count = 2;
         }
         OperandCodeX87::St_Edst => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_st(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
             }
@@ -10385,7 +10359,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         OperandCodeX87::St_Eqst => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[1] = read_E_st(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
             }
@@ -10394,7 +10368,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         OperandCodeX87::St_Ew => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
@@ -10403,7 +10377,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         OperandCodeX87::St_Mm => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10413,7 +10387,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         OperandCodeX87::St_Mq => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10423,7 +10397,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         OperandCodeX87::St_Md => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10433,7 +10407,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
         OperandCodeX87::St_Mw => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[1] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10441,20 +10415,20 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ew => {
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 2, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
             instruction.operand_count = 1;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
         }
         OperandCodeX87::Est_St => {
-            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Edst_St => {
-            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
             instruction.operand_count = 2;
@@ -10463,7 +10437,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             }
         }
         OperandCodeX87::Eqst_St => {
-            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
             instruction.operand_count = 2;
@@ -10472,7 +10446,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             }
         }
         OperandCodeX87::Ed_St => {
-            instruction.operands[0] = read_E_st(&mut bytes_iter, instruction, modrm, length)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.modrm_rrr = RegSpec::st(0);
             if instruction.operands[0] != OperandSpec::RegMMM {
@@ -10481,7 +10455,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mm_St => {
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10491,7 +10465,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mq_St => {
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10501,7 +10475,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operand_count = 2;
         }
         OperandCodeX87::Md_St => {
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10511,7 +10485,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mw_St => {
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10521,7 +10495,7 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ex87S => {
-            instruction.operands[0] = read_E(&mut bytes_iter, instruction, modrm, 4, length)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
             instruction.operand_count = 1;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
@@ -10536,39 +10510,24 @@ fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, i
     Ok(())
 }
 
-fn decode_one<'b, T: IntoIterator<Item=u8>>(decoder: &InstDecoder, bytes: T, instr: &'b mut Instruction) -> Result<(), DecodeError> {
-    let bytes_iter = bytes.into_iter();
-    read_instr(decoder, bytes_iter, instr)
-}
-
 #[inline]
-fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
+fn read_num<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
     match width {
-        1 => { bytes.next().map(|x| x as u64).ok_or(DecodeError::ExhaustedInput) }
+        1 => { bytes.next().ok().ok_or(DecodeError::ExhaustedInput).map(|x| x as u64) }
         2 => {
-            bytes.next().and_then(|b0| {
-                bytes.next().map(|b1| u16::from_le_bytes([b0, b1]) as u64)
-            }).ok_or(DecodeError::ExhaustedInput)
+            let mut buf = [0u8; 2];
+            bytes.next_n(&mut buf).ok().ok_or(DecodeError::ExhaustedInput)?;
+            Ok(u16::from_le_bytes(buf) as u64)
         }
         4 => {
-            bytes.next()
-                .and_then(|b0| bytes.next().map(|b1| (b0, b1)))
-                .and_then(|(b0, b1)| bytes.next().map(|b2| (b0, b1, b2)))
-                .and_then(|(b0, b1, b2)| bytes.next().map(|b3| u32::from_le_bytes([b0, b1, b2, b3]) as u64))
-                .ok_or(DecodeError::ExhaustedInput)
+            let mut buf = [0u8; 4];
+            bytes.next_n(&mut buf).ok().ok_or(DecodeError::ExhaustedInput)?;
+            Ok(u32::from_le_bytes(buf) as u64)
         }
         8 => {
-            bytes.next()
-                .and_then(|b0| bytes.next().map(|b1| (b0, b1)))
-                .and_then(|(b0, b1)| bytes.next().map(|b2| (b0, b1, b2)))
-                .and_then(|(b0, b1, b2)| bytes.next().map(|b3| (b0, b1, b2, b3)))
-                .and_then(|(b0, b1, b2, b3)| bytes.next().map(|b4| (b0, b1, b2, b3, b4)))
-                .and_then(|(b0, b1, b2, b3, b4)| bytes.next().map(|b5| (b0, b1, b2, b3, b4, b5)))
-                .and_then(|(b0, b1, b2, b3, b4, b5)| bytes.next().map(|b6| (b0, b1, b2, b3, b4, b5, b6)))
-                .and_then(|(b0, b1, b2, b3, b4, b5, b6)| {
-                    bytes.next().map(|b7| u64::from_le_bytes([b0, b1, b2, b3, b4, b5, b6, b7]) as u64)
-                })
-                .ok_or(DecodeError::ExhaustedInput)
+            let mut buf = [0u8; 8];
+            bytes.next_n(&mut buf).ok().ok_or(DecodeError::ExhaustedInput)?;
+            Ok(u64::from_le_bytes(buf))
         }
         _ => {
             panic!("unsupported read size");
@@ -10577,18 +10536,15 @@ fn read_num<T: Iterator<Item=u8>>(bytes: &mut T, width: u8) -> Result<u64, Decod
 }
 
 #[inline]
-fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8) -> Result<u64, DecodeError> {
+fn read_imm_ivq<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
     match width {
         2 => {
-            *length += 2;
             Ok(read_num(bytes, 2)? as u16 as u64)
         },
         4 => {
-            *length += 4;
             Ok(read_num(bytes, 4)? as u32 as u64)
         },
         8 => {
-            *length += 8;
             Ok(read_num(bytes, 8)? as u64)
         },
         _ => {
@@ -10598,26 +10554,20 @@ fn read_imm_ivq<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8)
 }
 
 #[inline(always)]
-fn read_imm_signed<T: Iterator<Item=u8>>(bytes: &mut T, num_width: u8, length: &mut u8) -> Result<i64, DecodeError> {
+fn read_imm_signed<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, num_width: u8) -> Result<i64, DecodeError> {
     if num_width == 1 {
-        *length += 1;
         Ok(read_num(bytes, 1)? as i8 as i64)
     } else if num_width == 2 {
-        *length += 2;
         Ok(read_num(bytes, 2)? as i16 as i64)
     } else {
-        *length += 4;
         // this is for 4 and 8, the only values for num_width may be 1, 2, 4, and 8.
         Ok(read_num(bytes, 4)? as i32 as i64)
     }
 }
 
 #[inline]
-fn read_imm_unsigned<T: Iterator<Item=u8>>(bytes: &mut T, width: u8, length: &mut u8) -> Result<u64, DecodeError> {
-    read_num(bytes, width).map(|res| {
-        *length += width;
-        res
-    })
+fn read_imm_unsigned<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
+    read_num(bytes, width)
 }
 
 #[inline]
@@ -10647,6 +10597,6 @@ fn imm_width_from_prefixes_64(interpretation: SizeCode, prefixes: Prefixes) -> u
 }
 
 #[inline]
-fn read_modrm<T: Iterator<Item=u8>>(bytes_iter: &mut T, length: &mut u8) -> Result<u8, DecodeError> {
-    bytes_iter.next().ok_or(DecodeError::ExhaustedInput).map(|b| { *length += 1; b })
+fn read_modrm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T) -> Result<u8, DecodeError> {
+    words.next().ok().ok_or(DecodeError::ExhaustedInput)
 }
