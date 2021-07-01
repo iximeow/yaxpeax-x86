@@ -1045,6 +1045,7 @@ const XSAVE: [Opcode; 10] = [
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+#[repr(u32)]
 pub enum Opcode {
     Invalid,
     ADD,
