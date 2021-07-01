@@ -761,39 +761,35 @@ impl Operand {
     }
 
     /// return the width of this operand, in bytes. register widths are determined by the
-    /// register's class.
-    ///
-    /// TODO: /!\ MEMORY WIDTHS ARE ALWAYS REPORTED AS 8 /!\
-    pub fn width(&self) -> u8 {
+    /// register's class. the widths of memory operands are recorded on the instruction this
+    /// `Operand` came from; `None` here mans the authoritative width is `instr.mem_size()`.
+    pub fn width(&self) -> Option<u8> {
         match self {
-            Operand::Nothing => {
-                panic!("non-operand does not have a size");
-            }
             Operand::Register(reg) => {
-                reg.width()
+                Some(reg.width())
             }
             Operand::RegisterMaskMerge(reg, _, _) => {
                 reg.width()
             }
             Operand::ImmediateI8(_) |
             Operand::ImmediateU8(_) => {
-                1
+                Some(1)
             }
             Operand::ImmediateI16(_) |
             Operand::ImmediateU16(_) => {
-                2
+                Some(2)
             }
             Operand::ImmediateI32(_) |
             Operand::ImmediateU32(_) => {
-                4
+                Some(4)
             }
             Operand::ImmediateI64(_) |
             Operand::ImmediateU64(_) => {
-                8
+                Some(8)
             }
-            // memory operands
+            // memory operands or `Nothing`
             _ => {
-                8
+                None
             }
         }
     }
@@ -4169,6 +4165,23 @@ impl Default for Instruction {
     }
 }
 
+pub struct MemoryAccessSize {
+    size: u8,
+}
+impl MemoryAccessSize {
+    pub fn bytes_size(&self) -> Option<u8> {
+        if self.size == 63 {
+            None
+        } else {
+            Some(self.size)
+        }
+    }
+
+    pub fn size_name(&self) -> &'static str {
+        "name_strings"
+    }
+}
+
 impl Instruction {
     pub fn opcode(&self) -> Opcode {
         self.opcode
@@ -4200,6 +4213,14 @@ impl Instruction {
             false
         } else {
             true
+        }
+    }
+
+    pub fn mem_size(&self) -> Option<MemoryAccessSize> {
+        if self.mem_size != 0 {
+            Some(MemoryAccessSize { size: self.mem_size })
+        } else {
+            None
         }
     }
 
@@ -5589,6 +5610,7 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
 }
 
 #[allow(non_snake_case)]
+#[inline(always)]
 fn read_M<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
@@ -7006,7 +7028,10 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 } else {
                     instruction.prefixes = prefixes;
                     vex::two_byte_vex(words, instruction)?;
-
+                    instruction.length = words.offset() as u8;
+                    if instruction.length > 15 {
+                        return Err(DecodeError::TooLong);
+                    }
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
                     }
@@ -7020,6 +7045,10 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 } else {
                     instruction.prefixes = prefixes;
                     vex::three_byte_vex(words, instruction)?;
+                    instruction.length = words.offset() as u8;
+                    if instruction.length > 15 {
+                        return Err(DecodeError::TooLong);
+                    }
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
                     }
@@ -7033,6 +7062,10 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 } else {
                     instruction.prefixes = prefixes;
                     evex::read_evex(words, instruction, length, None)?;
+                    instruction.length = words.offset() as u8;
+                    if instruction.length > 15 {
+                        return Err(DecodeError::TooLong);
+                    }
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
                     }
@@ -7082,8 +7115,9 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         unsafe { unreachable_unchecked(); }
     }
     instruction.prefixes = prefixes;
-    read_operands(decoder, bytes_iter, instruction, record.1, &mut length)?;
-    if length > 15 {
+    read_operands(decoder, words, instruction, record.1)?;
+    instruction.length = words.offset() as u8;
+    if words.offset() > 15 {
         return Err(DecodeError::TooLong);
     }
 
@@ -7135,7 +7169,7 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
 
  */
 #[inline(always)]
-fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
+fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
     instruction.operands[0] = OperandSpec::RegRRR;
     instruction.operand_count = 2;
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
@@ -7640,14 +7674,15 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
         },
         _ => {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
-            unlikely_operands(decoder, bytes_iter, instruction, operand_code, mem_oper)?;
+            unlikely_operands(decoder, words, instruction, operand_code, mem_oper)?;
         }
     };
     }
 
     Ok(())
 }
-fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, length: &mut u8) -> Result<(), DecodeError> {
+#[inline(never)]
+fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec) -> Result<(), DecodeError> {
     match operand_code {
         OperandCode::G_E_mm_Ib => {
             let modrm = read_modrm(words)?;
@@ -8653,7 +8688,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38dc => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 instruction.opcode = Opcode::LOADIWKEY;
             } else {
@@ -8661,7 +8696,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38dd => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8669,7 +8704,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38de => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8677,7 +8712,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
             }
         }
         OperandCode::ModRM_0xf30f38df => {
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8686,13 +8721,13 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         }
         OperandCode::ModRM_0xf30f38fa => {
             instruction.opcode = Opcode::ENCODEKEY128;
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_U_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
             instruction.modrm_rrr.bank = RegisterBank::D;
             instruction.modrm_mmm.bank = RegisterBank::D;
         }
         OperandCode::ModRM_0xf30f38fb => {
             instruction.opcode = Opcode::ENCODEKEY256;
-            read_operands(decoder, bytes_iter, instruction, OperandCode::G_U_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
             instruction.modrm_rrr.bank = RegisterBank::D;
             instruction.modrm_mmm.bank = RegisterBank::D;
         }
@@ -9947,7 +9982,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
         OperandCode::x87_dd |
         OperandCode::x87_de |
         OperandCode::x87_df => {
-            return decode_x87(decoder, bytes_iter, instruction, operand_code);
+            return decode_x87(words, instruction, operand_code);
         }
         OperandCode::MOVDIR64B => {
             // at this point we've done a read as if it was Gv_M (`lea` operands). because the
@@ -9991,7 +10026,7 @@ fn unlikely_operands<T: Iterator<Item=u8>>(decoder: &InstDecoder, mut bytes_iter
     Ok(())
 }
 
-fn decode_x87<T: Iterator<Item=u8>>(_decoder: &InstDecoder, mut bytes_iter: T, instruction: &mut Instruction, operand_code: OperandCode, length: &mut u8) -> Result<(), DecodeError> {
+fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
     #[allow(non_camel_case_types)]
     enum OperandCodeX87 {
         Est,

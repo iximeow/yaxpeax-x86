@@ -87,11 +87,11 @@ const DECODE_DATA: [u8; 130] = [
 
 fn do_decode_swathe() {
 //    let mut buf = [0u8; 128];
-    let mut iter = DECODE_DATA.iter().map(|x| *x);
     let mut result = yaxpeax_x86::long_mode::Instruction::invalid();
+    let mut reader = yaxpeax_arch::U8Reader::new(&DECODE_DATA[..]);
     let decoder = yaxpeax_x86::long_mode::InstDecoder::default();
     loop {
-        match decoder.decode_into(&mut result, &mut iter) {
+        match decoder.decode_into(&mut result, &mut reader) {
             Ok(()) => {
                 #[cfg(feature = "capstone_bench")]
                 test::black_box(write!(&mut buf[..], "{}", result));
