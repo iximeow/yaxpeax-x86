@@ -440,7 +440,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Nothing => {
-            instruction.mem_size = 1;
+            instruction.operand_count = 0;
             Ok(())
         },
         VEXOperandCode::Ev_G_xmm_imm8 => {
