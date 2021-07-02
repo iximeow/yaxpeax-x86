@@ -1989,17 +1989,21 @@ const INSTRUCTIONS: [&'static [u8]; 1982] = [
 #[test]
 fn test_against_leftover_data() {
     use super::rand::{thread_rng, Rng};
+    use yaxpeax_arch::U8Reader;
     let mut rng = thread_rng();
 
     let decoder = InstDecoder::default();
 
     for _ in 0..100000 {
         let first_vec = INSTRUCTIONS[rng.gen_range(0..INSTRUCTIONS.len())];
-        let first_decode = decoder.decode(first_vec.to_vec().iter().cloned()).unwrap();
+        let mut first_reader = U8Reader::new(first_vec);
+        let first_decode = decoder.decode(&mut first_reader).unwrap();
 
         let second_vec = INSTRUCTIONS[rng.gen_range(0..INSTRUCTIONS.len())];
-        let mut reused_decode = decoder.decode(second_vec.to_vec().iter().cloned()).unwrap();
-        decoder.decode_into(&mut reused_decode, first_vec.to_vec().iter().cloned()).unwrap();
+        let mut second_reader = U8Reader::new(second_vec);
+        let mut reused_decode = decoder.decode(&mut second_reader).unwrap();
+        let mut first_reader = U8Reader::new(first_vec);
+        decoder.decode_into(&mut reused_decode, &mut first_reader).unwrap();
 
         assert_eq!(first_decode, reused_decode);
     }

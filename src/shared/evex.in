@@ -5,16 +5,14 @@ use super::OperandSpec;
 // as an `EVEX` instruction, but for other modes we can only make this
 // determination when reading a `bound`'s `modrm` byte.
 #[inline(never)]
-pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, mut length: u8, evex_byte_one: Option<u8>) -> Result<(), DecodeError> {
+pub(crate) fn read_evex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, evex_byte_one: Option<u8>) -> Result<(), DecodeError> {
     let evex_byte_one = if let Some(b) = evex_byte_one {
       b
     } else {
-      length += 1;
-      bytes.next().ok_or(DecodeError::ExhaustedInput)?
+      words.next().ok().ok_or(DecodeError::ExhaustedInput)?
     };
-    let evex_byte_two = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
-    let evex_byte_three = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
-    length += 2;
+    let evex_byte_two = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+    let evex_byte_three = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let p = evex_byte_two & 0x03;
     let m = evex_byte_one & 0x03;
     if m == 0 {
@@ -41,15 +39,14 @@ pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut I
     let vp = ((evex_byte_three >> 3) & 1) << 4;
     let vvvvv = ((evex_byte_two >> 3) & 0b1111) | vp;
 
-    instruction.vex_reg = RegSpec {
+    instruction.regs[3] = RegSpec {
         bank: RegisterBank::X,
         num: vvvvv ^ 0b11111 // `vvvvv` is provided in inverted form
     };
 
     instruction.prefixes.evex_from(evex_byte_one, evex_byte_two, evex_byte_three);
 
-    let opc = bytes.next().ok_or(DecodeError::ExhaustedInput)?;
-    length += 1;
+    let opc = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let table_idx = ((m << 2) | p) as usize;
     let table = generated::TABLES[table_idx];
     if table as *const [_]  == &generated::DUMMY[..] as *const [_] {
@@ -65,7 +62,7 @@ pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut I
     if let Ok(entry) = table.binary_search_by_key(&opc, |x| x.0) {
       let (opcode, operand_code) = table[entry].1[index_lower];
       instruction.opcode = opcode;
-      read_evex_operands(bytes, instruction, operand_code, &mut length)?;
+      read_evex_operands(words, instruction, operand_code)?;
       if instruction.prefixes.evex_unchecked().vex().compressed_disp() {
         let overridden_size = match instruction.opcode {
           Opcode::VPEXPANDB => Some(1),
@@ -93,7 +90,6 @@ pub(crate) fn read_evex<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut I
     } else {
       return Err(DecodeError::InvalidOpcode);
     }
-    instruction.length = length;
     Ok(())
 }
 
@@ -114,7 +110,7 @@ fn deny_z(inst: &Instruction) -> Result<(), DecodeError> {
 }
 
 fn deny_vex_reg(inst: &Instruction) -> Result<(), DecodeError> {
-  if inst.vex_reg.num != 0 {
+  if inst.regs[3].num != 0 {
     Err(DecodeError::InvalidOperand)
   } else {
     Ok(())
@@ -157,21 +153,21 @@ fn apply_broadcast(inst: &mut Instruction, item_size: u8, reg_size: u8) {
 }
 
 fn set_rrr(inst: &mut Instruction, modrm: u8) {
-  inst.modrm_rrr.num = (modrm >> 3) & 7;
+  inst.regs[0].num = (modrm >> 3) & 7;
   if inst.prefixes.evex_unchecked().vex().r() {
-    inst.modrm_rrr.num |= 8;
+    inst.regs[0].num |= 8;
   }
   if inst.prefixes.evex_unchecked().rp() {
-    inst.modrm_rrr.num |= 16;
+    inst.regs[0].num |= 16;
   }
 }
 
 fn set_reg_sizes(inst: &mut Instruction, size: RegisterBank) {
-  inst.modrm_rrr.bank = size;
-  inst.vex_reg.bank = size;
+  inst.regs[0].bank = size;
+  inst.regs[3].bank = size;
   for i in 0..inst.operand_count {
     if [OperandSpec::RegMMM, OperandSpec::RegMMM_maskmerge, OperandSpec::RegMMM_maskmerge_sae_noround].contains(&inst.operands[i as usize]) {
-      inst.modrm_mmm.bank = size;
+      inst.regs[1].bank = size;
     }
   }
 }
@@ -200,20 +196,20 @@ fn set_reg_sizes_from_ll(inst: &mut Instruction) -> Result<(), DecodeError> {
   Ok(())
 }
 
-pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instruction: &mut Instruction, operand_code: generated::EVEXOperandCode, length: &mut u8) -> Result<(), DecodeError> {
+pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, operand_code: generated::EVEXOperandCode) -> Result<(), DecodeError> {
   match operand_code {
     generated::EVEXOperandCode::Gm_V_E_LL_imm8_sae_bcast => {
       deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
 
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -255,9 +251,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         return Err(DecodeError::InvalidOpcode);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -286,9 +282,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -312,9 +308,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -344,9 +340,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -403,9 +399,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -481,13 +477,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.opcode = Opcode::VREDUCEPD;
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
 
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -517,13 +513,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
 
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -549,13 +545,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
 
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -583,9 +579,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = 8;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -599,11 +595,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      instruction.vex_reg.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      instruction.regs[3].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -612,7 +608,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -626,13 +622,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         (4, RegisterBank::D)
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      instruction.vex_reg.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      instruction.regs[3].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
-        instruction.modrm_mmm.bank = bank;
+        instruction.regs[1].bank = bank;
         instruction.mem_size = 0;
       } else {
         instruction.mem_size = sz;
@@ -662,13 +658,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         (4, RegisterBank::D)
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      instruction.vex_reg.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      instruction.regs[3].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
-        instruction.modrm_mmm.bank = bank;
+        instruction.regs[1].bank = bank;
         instruction.mem_size = 0;
       } else {
         instruction.mem_size = sz;
@@ -676,20 +672,20 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
     generated::EVEXOperandCode::G_V_xmm_Ebd_imm8 => {
       deny_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      instruction.vex_reg.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      instruction.regs[3].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
-        instruction.modrm_mmm.bank = RegisterBank::D;
+        instruction.regs[1].bank = RegisterBank::D;
         instruction.mem_size = 0;
       } else {
         instruction.mem_size = 1;
@@ -697,7 +693,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -707,9 +703,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = 8;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -729,9 +725,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       // specifically for vunpcklpd!!! probably need to reconsider.
       apply_broadcast(instruction, 8, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -745,9 +741,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -764,9 +760,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -783,9 +779,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.operand_count = 2;
@@ -800,10 +796,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = 4;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
 
       // in specific support of vcomisd/vucomisd
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -822,10 +818,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = 8;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
 
       // in specific support of vcomisd/vucomisd
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -847,9 +843,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.mem_size = 8;
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -874,9 +870,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -888,10 +884,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
           set_reg_sizes_from_ll(instruction)?;
           if !instruction.prefixes.evex_unchecked().vex().w() {
-            if instruction.modrm_rrr.bank == RegisterBank::Z {
-              instruction.modrm_mmm.bank = RegisterBank::Y;
-            } else if instruction.modrm_rrr.bank == RegisterBank::Y {
-              instruction.modrm_mmm.bank = RegisterBank::X;
+            if instruction.regs[0].bank == RegisterBank::Z {
+              instruction.regs[1].bank = RegisterBank::Y;
+            } else if instruction.regs[0].bank == RegisterBank::Y {
+              instruction.regs[1].bank = RegisterBank::X;
             }
           }
         }
@@ -911,12 +907,12 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -933,8 +929,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 8, sz);
         set_reg_sizes_from_ll(instruction)?;
       }
-      instruction.modrm_rrr.bank = RegisterBank::K;
-      if instruction.modrm_rrr.num > 7 {
+      instruction.regs[0].bank = RegisterBank::K;
+      if instruction.regs[0].num > 7 {
         return Err(DecodeError::InvalidOperand);
       }
     }
@@ -945,9 +941,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -972,9 +968,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -1009,9 +1005,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1038,9 +1034,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1067,9 +1063,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1093,9 +1089,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1115,9 +1111,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.operand_count = 3;
@@ -1142,9 +1138,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.operand_count = 3;
@@ -1173,9 +1169,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.operand_count = 3;
@@ -1209,9 +1205,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 4, sz);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1273,9 +1269,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 4, sz);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1292,12 +1288,12 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, 4, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -1312,12 +1308,12 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, 8, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -1338,11 +1334,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 4, sz);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -1370,9 +1366,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -1399,9 +1395,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
@@ -1432,9 +1428,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -1462,9 +1458,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         if instruction.opcode == Opcode::VMINSS || instruction.opcode == Opcode::VMAXSS {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
@@ -1493,18 +1489,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           // sae sets this to `vcvtps2ph ymm, zmm, imm8`
-          instruction.modrm_mmm.bank = RegisterBank::Y;
-          instruction.modrm_rrr.bank = RegisterBank::Z;
+          instruction.regs[1].bank = RegisterBank::Y;
+          instruction.regs[0].bank = RegisterBank::Z;
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge_sae_noround;
         } else {
-          instruction.modrm_mmm.bank = RegisterBank::X;
-          instruction.modrm_rrr.bank = RegisterBank::X;
+          instruction.regs[1].bank = RegisterBank::X;
+          instruction.regs[0].bank = RegisterBank::X;
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge;
         }
       } else {
@@ -1512,12 +1508,12 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           return Err(DecodeError::InvalidOperand);
         } else {
           instruction.mem_size = 8;
-          instruction.modrm_rrr.bank = RegisterBank::X;
+          instruction.regs[0].bank = RegisterBank::X;
           instruction.operands[0] = mem_oper.masked();
         }
       }
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
     }
@@ -1526,30 +1522,30 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           // sae sets this to `vcvtps2ph ymm, zmm, imm8`
-          instruction.modrm_mmm.bank = RegisterBank::Y;
-          instruction.modrm_rrr.bank = RegisterBank::Z;
+          instruction.regs[1].bank = RegisterBank::Y;
+          instruction.regs[0].bank = RegisterBank::Z;
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge_sae_noround;
         } else {
-          instruction.modrm_mmm.bank = RegisterBank::X;
-          instruction.modrm_rrr.bank = RegisterBank::Y;
+          instruction.regs[1].bank = RegisterBank::X;
+          instruction.regs[0].bank = RegisterBank::Y;
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge;
         }
       } else {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOperand);
         } else {
-          instruction.modrm_rrr.bank = RegisterBank::Y;
+          instruction.regs[0].bank = RegisterBank::Y;
           instruction.operands[0] = mem_oper.masked();
         }
       }
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.mem_size = 16;
       instruction.operand_count = 3;
@@ -1559,10 +1555,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge_sae_noround;
@@ -1578,7 +1574,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
       instruction.mem_size = 32;
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
     }
@@ -1591,11 +1587,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         Opcode::VINSERTI32X4
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::Z;
-      instruction.vex_reg.bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
+      instruction.regs[3].bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1604,7 +1600,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[0] = OperandSpec::RegRRR.masked();
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -1617,11 +1613,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         Opcode::VINSERTI32X4
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::Y;
-      instruction.vex_reg.bank = RegisterBank::Y;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
+      instruction.regs[3].bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1630,7 +1626,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[0] = OperandSpec::RegRRR.masked();
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -1645,16 +1641,16 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::Z;
-      instruction.vex_reg.bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::Z;
+      instruction.regs[3].bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.mem_size = 32;
       instruction.operands[0] = OperandSpec::RegRRR.masked();
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -1670,14 +1666,14 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
       instruction.mem_size = 32;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
     }
@@ -1685,10 +1681,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1702,10 +1698,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1719,10 +1715,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1736,10 +1732,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1753,10 +1749,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1770,10 +1766,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1787,10 +1783,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1804,10 +1800,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1822,10 +1818,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1839,10 +1835,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1856,10 +1852,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1873,10 +1869,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1891,10 +1887,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       instruction.mem_size = 32;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1905,10 +1901,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1919,10 +1915,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1933,10 +1929,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       instruction.mem_size = 8;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1947,10 +1943,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       instruction.mem_size = 8;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1961,10 +1957,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       instruction.mem_size = 4;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1975,10 +1971,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       instruction.mem_size = 4;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1989,10 +1985,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       instruction.mem_size = 2;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -2003,10 +1999,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       instruction.mem_size = 8;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -2017,10 +2013,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -2035,10 +2031,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -2060,10 +2056,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       } else {
@@ -2085,10 +2081,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       } else {
@@ -2110,10 +2106,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       } else {
@@ -2131,10 +2127,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.opcode = Opcode::VBROADCASTSD;
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -2152,10 +2148,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.opcode = Opcode::VBROADCASTSD;
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -2170,10 +2166,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -2197,18 +2193,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       if instruction.prefixes.evex_unchecked().lp() {
-        instruction.modrm_rrr.bank = RegisterBank::Z;
+        instruction.regs[0].bank = RegisterBank::Z;
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::Y;
+        instruction.regs[0].bank = RegisterBank::Y;
       }
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
     }
@@ -2221,15 +2217,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         Opcode::VINSERTF32X4
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -2237,10 +2233,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2251,10 +2247,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2272,10 +2268,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         };
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2286,20 +2282,20 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::D;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::D;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if mem_oper == OperandSpec::RegMMM {
-        instruction.modrm_mmm.bank = RegisterBank::X;
+        instruction.regs[1].bank = RegisterBank::X;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
 
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
     }
@@ -2307,13 +2303,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if mem_oper == OperandSpec::RegMMM {
-        instruction.modrm_mmm.bank = RegisterBank::D;
+        instruction.regs[1].bank = RegisterBank::D;
       } else {
         instruction.mem_size = 2;
       }
@@ -2321,7 +2317,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
@@ -2330,10 +2326,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2350,10 +2346,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2370,10 +2366,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if mem_oper != OperandSpec::RegMMM {
         instruction.mem_size = 8;
@@ -2387,23 +2383,23 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if isa_has_qwords() {
           instruction.opcode = Opcode::VMOVQ;
         }
         if mem_oper == OperandSpec::RegMMM {
-          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+          instruction.regs[1].bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
           instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         }
       } else {
         if mem_oper == OperandSpec::RegMMM {
-          instruction.modrm_mmm.bank = RegisterBank::D;
+          instruction.regs[1].bank = RegisterBank::D;
         } else {
           instruction.mem_size = 4;
         }
@@ -2417,23 +2413,23 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if isa_has_qwords() {
           instruction.opcode = Opcode::VMOVQ;
         }
         if mem_oper == OperandSpec::RegMMM {
-          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+          instruction.regs[1].bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
           instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         }
       } else {
         if mem_oper == OperandSpec::RegMMM {
-          instruction.modrm_mmm.bank = RegisterBank::D;
+          instruction.regs[1].bank = RegisterBank::D;
         } else {
           instruction.mem_size = 4;
         }
@@ -2461,9 +2457,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 4, sz);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2473,10 +2469,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operand_count = 3;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_V_E_LL_bcast_W1 => {
@@ -2487,9 +2483,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, 8, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2499,10 +2495,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operand_count = 3;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_V_E_LL_bcast_W0 => {
@@ -2513,9 +2509,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, 4, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2525,10 +2521,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operand_count = 3;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Em_G_LL => {
@@ -2555,9 +2551,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2583,9 +2579,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2593,7 +2589,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
@@ -2614,9 +2610,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2624,7 +2620,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::K;
+        instruction.regs[1].bank = RegisterBank::K;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
@@ -2638,9 +2634,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2648,7 +2644,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::K;
+        instruction.regs[1].bank = RegisterBank::K;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
@@ -2662,9 +2658,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2672,7 +2668,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::K;
+        instruction.regs[1].bank = RegisterBank::K;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
@@ -2685,9 +2681,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2705,9 +2701,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2725,9 +2721,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2741,9 +2737,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2757,10 +2753,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         (false, true) => (RegisterBank::X, RegisterBank::Y, 32),
         (false, false) => (RegisterBank::X, RegisterBank::X, 16),
       };
-      instruction.modrm_rrr.bank = r_sz;
+      instruction.regs[0].bank = r_sz;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = m_sz;
+        instruction.regs[1].bank = m_sz;
       } else {
         apply_broadcast(instruction, 4, m_data_sz);
       }
@@ -2783,9 +2779,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
@@ -2811,9 +2807,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
@@ -2835,9 +2831,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
@@ -2866,9 +2862,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2877,9 +2873,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+          instruction.regs[1].bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
-          instruction.modrm_mmm.bank = RegisterBank::D;
+          instruction.regs[1].bank = RegisterBank::D;
         }
       } else {
         return Err(DecodeError::InvalidOperand);
@@ -2894,9 +2890,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2904,7 +2900,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::D;
+        instruction.regs[1].bank = RegisterBank::D;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
@@ -2923,9 +2919,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2933,7 +2929,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::X;
+        instruction.regs[1].bank = RegisterBank::X;
       } else {
         instruction.mem_size = 8;
       }
@@ -2947,9 +2943,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2957,7 +2953,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::X;
+        instruction.regs[1].bank = RegisterBank::X;
       } else {
         instruction.mem_size = 4;
       }
@@ -2971,9 +2967,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2981,7 +2977,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::X;
+        instruction.regs[1].bank = RegisterBank::X;
       } else {
         instruction.mem_size = 2;
       }
@@ -2995,9 +2991,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3005,7 +3001,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       set_reg_sizes_from_ll(instruction)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
-        instruction.modrm_mmm.bank = RegisterBank::X;
+        instruction.regs[1].bank = RegisterBank::X;
       } else {
         instruction.mem_size = 1;
       }
@@ -3019,9 +3015,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3047,15 +3043,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -3066,16 +3062,16 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
 
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.modrm_rrr.bank = DEFAULT_EVEX_REGISTER_SIZE;
+        instruction.regs[0].bank = DEFAULT_EVEX_REGISTER_SIZE;
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::D;
+        instruction.regs[0].bank = RegisterBank::D;
       }
 
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
 
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -3122,9 +3118,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3179,9 +3175,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3205,16 +3201,16 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 4, sz);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3228,9 +3224,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, 4, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3261,9 +3257,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3282,9 +3278,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = sz;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3294,10 +3290,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operand_count = 3;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_V_E_LL => {
@@ -3315,9 +3311,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3327,10 +3323,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       instruction.operand_count = 3;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Maskm_V_Eq_xmm_imm8_sae_W1 => {
@@ -3338,9 +3334,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       ensure_W(instruction, 1)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -3356,15 +3352,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
       set_reg_sizes(instruction, RegisterBank::X);
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Maskm_V_Ed_xmm_imm8_sae_W0 => {
@@ -3372,9 +3368,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       ensure_W(instruction, 0)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -3390,15 +3386,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
       set_reg_sizes(instruction, RegisterBank::X);
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_V_E_LL_imm8 => {
@@ -3418,24 +3414,24 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_Ed_xmm_imm8 => {
@@ -3451,9 +3447,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         };
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -3465,15 +3461,15 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
       set_reg_sizes(instruction, RegisterBank::X);
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_E_LL_imm8_bcast => {
@@ -3501,23 +3497,23 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_V_E_LL_imm8_sae_bcast_W0 => {
@@ -3540,13 +3536,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3561,10 +3557,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       } else {
         set_reg_sizes_from_ll(instruction)?;
       }
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Mask_V_E_LL_imm8_bcast => {
@@ -3592,24 +3588,24 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
       set_reg_sizes_from_ll(instruction)?;
-      if instruction.modrm_rrr.num >= 8 {
+      if instruction.regs[0].num >= 8 {
         return Err(DecodeError::InvalidOperand);
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::K;
+        instruction.regs[0].bank = RegisterBank::K;
       }
     }
     generated::EVEXOperandCode::Opcode_72_Gm_E_LL_imm8_bcast => {
@@ -3617,7 +3613,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       let sz = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       let rrr = (modrm >> 3) & 7;
 
       let item_size = if instruction.prefixes.evex_unchecked().vex().w() {
@@ -3648,10 +3644,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, item_size, sz);
 
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegVex_maskmerge;
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -3681,13 +3677,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       };
 */
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3718,13 +3714,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.opcode
       };
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3742,13 +3738,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.mem_size = sz;
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3766,13 +3762,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         apply_broadcast(instruction, 8, sz);
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3783,13 +3779,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3800,13 +3796,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = regs_size(instruction);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3820,13 +3816,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       apply_broadcast(instruction, 8, sz);
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -3837,10 +3833,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Z)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       instruction.operands[1] = mem_oper;
       if instruction.prefixes.evex_unchecked().broadcast() {
         if mem_oper != OperandSpec::RegMMM {
@@ -3860,10 +3856,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Y)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      instruction.regs[0].bank = RegisterBank::X;
       instruction.operands[1] = mem_oper;
       if instruction.prefixes.evex_unchecked().broadcast() {
         if mem_oper != OperandSpec::RegMMM {
@@ -3871,8 +3867,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           apply_broadcast(instruction, 8, 32);
         } else {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
-          instruction.modrm_rrr.bank = RegisterBank::Y;
-          instruction.modrm_mmm.bank = RegisterBank::Z;
+          instruction.regs[0].bank = RegisterBank::Y;
+          instruction.regs[1].bank = RegisterBank::Z;
         }
       } else {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -3885,10 +3881,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
-      instruction.modrm_rrr.bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
       instruction.operands[1] = mem_oper;
       if instruction.prefixes.evex_unchecked().broadcast() {
         if mem_oper != OperandSpec::RegMMM {
@@ -3896,8 +3892,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           apply_broadcast(instruction, 8, 16);
         } else {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
-          instruction.modrm_rrr.bank = RegisterBank::Y;
-          instruction.modrm_mmm.bank = RegisterBank::Z;
+          instruction.regs[0].bank = RegisterBank::Y;
+          instruction.regs[1].bank = RegisterBank::Z;
         }
       } else {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -3921,9 +3917,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3940,11 +3936,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           } else {
             instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
           }
-          instruction.modrm_rrr.bank = RegisterBank::Z;
+          instruction.regs[0].bank = RegisterBank::Z;
           if instruction.prefixes.evex_unchecked().vex().w() {
-            instruction.modrm_mmm.bank = RegisterBank::Z;
+            instruction.regs[1].bank = RegisterBank::Z;
           } else {
-            instruction.modrm_mmm.bank = RegisterBank::Y;
+            instruction.regs[1].bank = RegisterBank::Y;
           }
         } else {
           let (r_sz, m_sz) = if instruction.prefixes.evex_unchecked().vex().w() {
@@ -3962,8 +3958,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
               Err(DecodeError::InvalidOperand),
             ][lp]?
           };
-          instruction.modrm_rrr.bank = r_sz;
-          instruction.modrm_mmm.bank = m_sz;
+          instruction.regs[0].bank = r_sz;
+          instruction.regs[1].bank = m_sz;
         }
       } else {
         let (r_sz, m_sz) = if instruction.prefixes.evex_unchecked().vex().w() {
@@ -3981,7 +3977,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             Err(DecodeError::InvalidOperand),
           ][lp]?
         };
-        instruction.modrm_rrr.bank = r_sz;
+        instruction.regs[0].bank = r_sz;
         if instruction.prefixes.evex_unchecked().vex().w() {
           apply_broadcast(instruction, 8, m_sz);
         } else {
@@ -4001,9 +3997,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         instruction.opcode = Opcode::VCVTTPD2UQQ;
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4012,11 +4008,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
-          instruction.modrm_rrr.bank = RegisterBank::Z;
+          instruction.regs[0].bank = RegisterBank::Z;
           if instruction.opcode == Opcode::VCVTTPD2UQQ {
-            instruction.modrm_mmm.bank = RegisterBank::Z;
+            instruction.regs[1].bank = RegisterBank::Z;
           } else {
-            instruction.modrm_mmm.bank = RegisterBank::Y;
+            instruction.regs[1].bank = RegisterBank::Y;
           }
         } else {
           let (r_sz, m_sz) = match (
@@ -4028,8 +4024,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             (true, false) => (RegisterBank::Y, RegisterBank::X),
             (false, false) => (RegisterBank::X, RegisterBank::X),
           };
-          instruction.modrm_rrr.bank = r_sz;
-          instruction.modrm_mmm.bank = m_sz;
+          instruction.regs[0].bank = r_sz;
+          instruction.regs[1].bank = m_sz;
         }
       } else {
         let (r_sz, m_sz) = match (
@@ -4041,7 +4037,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           (false, true) => (RegisterBank::Z, 32),
           (false, false) => (RegisterBank::X, 8),
         };
-        instruction.modrm_rrr.bank = r_sz;
+        instruction.regs[0].bank = r_sz;
         if instruction.opcode == Opcode::VCVTPS2PD {
           apply_broadcast(instruction, 4, m_sz);
         } else {
@@ -4061,9 +4057,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4077,11 +4073,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         if instruction.prefixes.evex_unchecked().broadcast() {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
           if instruction.prefixes.evex_unchecked().vex().w() {
-            instruction.modrm_rrr.bank = RegisterBank::Y;
+            instruction.regs[0].bank = RegisterBank::Y;
           } else {
-            instruction.modrm_rrr.bank = RegisterBank::Z;
+            instruction.regs[0].bank = RegisterBank::Z;
           }
-          instruction.modrm_mmm.bank = RegisterBank::Z;
+          instruction.regs[1].bank = RegisterBank::Z;
         } else {
           let (r_sz, m_sz) = if instruction.prefixes.evex_unchecked().vex().w() {
             [
@@ -4098,8 +4094,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
               Err(DecodeError::InvalidOperand),
             ][lp]?
           };
-          instruction.modrm_rrr.bank = r_sz;
-          instruction.modrm_mmm.bank = m_sz;
+          instruction.regs[0].bank = r_sz;
+          instruction.regs[1].bank = m_sz;
         }
       } else {
         let (r_sz, m_sz, item_sz) = if instruction.prefixes.evex_unchecked().vex().w() {
@@ -4117,7 +4113,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             Err(DecodeError::InvalidOperand),
           ][lp]?
         };
-        instruction.modrm_rrr.bank = r_sz;
+        instruction.regs[0].bank = r_sz;
         apply_broadcast(instruction, item_sz, m_sz);
       }
     }
@@ -4125,9 +4121,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4149,11 +4145,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
           }
           if instruction.prefixes.evex_unchecked().vex().w() {
-            instruction.modrm_rrr.bank = RegisterBank::Y;
+            instruction.regs[0].bank = RegisterBank::Y;
           } else {
-            instruction.modrm_rrr.bank = RegisterBank::Z;
+            instruction.regs[0].bank = RegisterBank::Z;
           }
-          instruction.modrm_mmm.bank = RegisterBank::Z;
+          instruction.regs[1].bank = RegisterBank::Z;
         } else {
           let (r_sz, m_sz) = match (
             instruction.prefixes.evex_unchecked().vex().l(),
@@ -4164,8 +4160,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             (true, false) => (if instruction.prefixes.evex_unchecked().vex().w() { RegisterBank::X } else { RegisterBank::Y }, RegisterBank::Y),
             (false, false) => (RegisterBank::X, RegisterBank::X),
           };
-          instruction.modrm_rrr.bank = r_sz;
-          instruction.modrm_mmm.bank = m_sz;
+          instruction.regs[0].bank = r_sz;
+          instruction.regs[1].bank = m_sz;
         }
       } else {
         let (r_sz, m_sz) = match (
@@ -4178,7 +4174,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           (false, true) => (if instruction.prefixes.evex_unchecked().vex().w() { RegisterBank::Y } else { RegisterBank::Z }, 64),
           (false, false) => (RegisterBank::X, 16),
         };
-        instruction.modrm_rrr.bank = r_sz;
+        instruction.regs[0].bank = r_sz;
         if instruction.prefixes.evex_unchecked().vex().w() {
           apply_broadcast(instruction, 8, m_sz);
         } else {
@@ -4196,9 +4192,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4218,11 +4214,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
           }
           if instruction.opcode == Opcode::VCVTDQ2PS && !instruction.prefixes.evex_unchecked().vex().w() {
-            instruction.modrm_rrr.bank = RegisterBank::Z;
+            instruction.regs[0].bank = RegisterBank::Z;
           } else {
-            instruction.modrm_rrr.bank = RegisterBank::Y;
+            instruction.regs[0].bank = RegisterBank::Y;
           }
-          instruction.modrm_mmm.bank = RegisterBank::Z;
+          instruction.regs[1].bank = RegisterBank::Z;
         } else {
           let (r_sz, m_sz) = match (
             instruction.prefixes.evex_unchecked().vex().l(),
@@ -4233,8 +4229,8 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
             (true, false) => (RegisterBank::X, RegisterBank::Y),
             (false, false) => (RegisterBank::X, RegisterBank::X),
           };
-          instruction.modrm_rrr.bank = r_sz;
-          instruction.modrm_mmm.bank = m_sz;
+          instruction.regs[0].bank = r_sz;
+          instruction.regs[1].bank = m_sz;
         }
       } else {
         let (r_sz, m_sz) = match (
@@ -4246,7 +4242,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           (false, true) => (RegisterBank::Y, 64),
           (false, false) => (RegisterBank::X, 16),
         };
-        instruction.modrm_rrr.bank = r_sz;
+        instruction.regs[0].bank = r_sz;
         apply_broadcast(instruction, 8, m_sz);
       }
 
@@ -4261,10 +4257,10 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Z)?;
-      instruction.modrm_rrr.bank = RegisterBank::Y;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z)?;
+      instruction.regs[0].bank = RegisterBank::Y;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -4281,9 +4277,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -4317,9 +4313,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -4353,9 +4349,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         }
       }
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::Z)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z)?;
 
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4392,9 +4388,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -4410,9 +4406,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -4422,7 +4418,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
         return Err(DecodeError::InvalidOperand);
       }
       instruction.operands[1] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -4432,13 +4428,13 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
@@ -4449,14 +4445,14 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
           instruction.opcode = Opcode::VPEXTRD;
         }
         if let OperandSpec::RegMMM = mem_oper {
-          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+          instruction.regs[1].bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
           instruction.mem_size = DEFAULT_EVEX_REGISTER_WIDTH;
         }
       } else {
         instruction.opcode = Opcode::VPEXTRD;
         if let OperandSpec::RegMMM = mem_oper {
-          instruction.modrm_mmm.bank = RegisterBank::D;
+          instruction.regs[1].bank = RegisterBank::D;
         } else {
           instruction.mem_size = 4;
         }
@@ -4466,19 +4462,19 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      instruction.vex_reg.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      instruction.regs[3].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+          instruction.regs[1].bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
-          instruction.modrm_mmm.bank = RegisterBank::D;
+          instruction.regs[1].bank = RegisterBank::D;
         }
         if instruction.prefixes.evex_unchecked().vex().w() {
           if instruction.prefixes.evex_unchecked().broadcast() {
@@ -4507,18 +4503,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
       if let OperandSpec::RegMMM = mem_oper {
-        instruction.modrm_mmm.bank = RegisterBank::D;
+        instruction.regs[1].bank = RegisterBank::D;
       } else {
         instruction.mem_size = 4;
       }
@@ -4527,18 +4523,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
       if let OperandSpec::RegMMM = mem_oper {
-        instruction.modrm_mmm.bank = RegisterBank::D;
+        instruction.regs[1].bank = RegisterBank::D;
       } else {
         instruction.mem_size = 2;
       }
@@ -4547,18 +4543,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::X;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::X;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
       instruction.operand_count = 3;
 
       if let OperandSpec::RegMMM = mem_oper {
-        instruction.modrm_mmm.bank = RegisterBank::D;
+        instruction.regs[1].bank = RegisterBank::D;
       } else {
         instruction.mem_size = 1;
       }
@@ -4566,9 +4562,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
     generated::EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae => {
       check_mask_reg(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       let item_size = if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VRANGESS {
@@ -4605,16 +4601,16 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
       set_reg_sizes(instruction, RegisterBank::X);
     }
     generated::EVEXOperandCode::Gm_V_E_xmm_imm8_sae => {
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if let OperandSpec::RegMMM = mem_oper {
         /* no mem size */
       } else{
@@ -4627,7 +4623,7 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       }
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
-      instruction.imm = read_imm_unsigned(bytes, 1, length)?;
+      instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
 
@@ -4636,11 +4632,11 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
     generated::EVEXOperandCode::Gm_V_zmm_M_xmm_W0 => {
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      instruction.modrm_rrr.bank = RegisterBank::Z;
-      instruction.vex_reg.bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      instruction.regs[0].bank = RegisterBank::Z;
+      instruction.regs[3].bank = RegisterBank::Z;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if let OperandSpec::RegMMM = mem_oper {
         return Err(DecodeError::InvalidOperand);
       } else{
@@ -4656,9 +4652,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
 
       instruction.mem_size = 16;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -4673,9 +4669,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4695,9 +4691,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper.masked();
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4717,9 +4713,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4739,9 +4735,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper.masked();
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4761,9 +4757,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() && mem_oper == OperandSpec::RegMMM {
         if (!instruction.prefixes.evex_unchecked().vex().w() || !isa_has_qwords()) && instruction.opcode == Opcode::VCVTSI2SD {
           instruction.operands[0] = OperandSpec::RegRRR;
@@ -4782,9 +4778,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         if instruction.prefixes.evex_unchecked().vex().w() {
-          instruction.modrm_mmm.bank = DEFAULT_EVEX_REGISTER_SIZE;
+          instruction.regs[1].bank = DEFAULT_EVEX_REGISTER_SIZE;
         } else {
-          instruction.modrm_mmm.bank = RegisterBank::D;
+          instruction.regs[1].bank = RegisterBank::D;
         }
       } else {
         if instruction.prefixes.evex_unchecked().vex().w() {
@@ -4806,18 +4802,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.modrm_rrr.bank = DEFAULT_EVEX_REGISTER_SIZE;
+        instruction.regs[0].bank = DEFAULT_EVEX_REGISTER_SIZE;
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::D;
+        instruction.regs[0].bank = RegisterBank::D;
       }
 
       if mem_oper == OperandSpec::RegMMM {
@@ -4833,18 +4829,18 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       check_mask_reg(instruction)?;
       deny_z(instruction)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       if instruction.prefixes.evex_unchecked().vex().w() {
-        instruction.modrm_rrr.bank = DEFAULT_EVEX_REGISTER_SIZE;
+        instruction.regs[0].bank = DEFAULT_EVEX_REGISTER_SIZE;
       } else {
-        instruction.modrm_rrr.bank = RegisterBank::D;
+        instruction.regs[0].bank = RegisterBank::D;
       }
 
       if mem_oper == OperandSpec::RegMMM {
@@ -4861,9 +4857,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_z(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4886,9 +4882,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_z(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4911,9 +4907,9 @@ pub(crate) fn read_evex_operands<T: Iterator<Item=u8>>(bytes: &mut T, instructio
       deny_z(instruction)?;
       ensure_W(instruction, 0)?;
 
-      let modrm = read_modrm(bytes, length)?;
+      let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(bytes, instruction, modrm, length, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.operand_count = 2;

@@ -121,7 +121,7 @@ pub(crate) fn three_byte_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <A
             return Err(DecodeError::InvalidOpcode);
         }
     };
-    instruction.vex_reg = RegSpec {
+    instruction.regs[3] = RegSpec {
         bank: RegisterBank::X,
         num: ((vex_byte_two >> 3) & 0b1111) ^ 0b1111,
     };
@@ -140,7 +140,7 @@ pub(crate) fn two_byte_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arc
         0x03 => VEXOpcodePrefix::PrefixF2,
         _ => { unreachable!("p is two bits"); }
     };
-    instruction.vex_reg = RegSpec {
+    instruction.regs[3] = RegSpec {
         bank: RegisterBank::X,
         num: ((vex_byte >> 3) & 0b1111) ^ 0b1111,
     };
@@ -172,9 +172,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::X);
-            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.regs[3].bank = RegisterBank::X;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm = read_imm_unsigned(words, 1)?;
@@ -205,9 +205,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm = read_imm_unsigned(words, 1)?;
@@ -235,9 +235,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::X);
-            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.regs[3].bank = RegisterBank::X;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm = read_imm_unsigned(words, 1)?;
@@ -265,9 +265,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm = read_imm_unsigned(words, 1)?;
@@ -298,9 +298,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::X);
-            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.regs[3].bank = RegisterBank::X;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm = read_imm_unsigned(words, 1)?;
@@ -337,9 +337,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     unreachable!("r is only three bits");
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts(modrm & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.imm = read_imm_unsigned(words, 1)?;
@@ -350,7 +350,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         VEXOperandCode::VMOVSS_10 |
         VEXOperandCode::VMOVSD_10 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -361,7 +361,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     instruction.operand_count = 3;
                 },
                 other => {
-                    if instruction.vex_reg.num != 0 {
+                    if instruction.regs[3].num != 0 {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOperand);
                     }
@@ -379,7 +379,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         VEXOperandCode::VMOVSS_11 |
         VEXOperandCode::VMOVSD_11 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[2] = OperandSpec::RegRRR;
@@ -390,7 +390,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     instruction.operand_count = 3;
                 },
                 other => {
-                    if instruction.vex_reg.num != 0 {
+                    if instruction.regs[3].num != 0 {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOperand);
                     }
@@ -414,7 +414,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 instruction.mem_size = 4;
                 Opcode::VMOVLPS
             };
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -430,7 +430,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 instruction.mem_size = 8;
                 Opcode::VMOVHPS
             };
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -443,12 +443,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         },
         VEXOperandCode::Ev_G_xmm_imm8 => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             instruction.operands[0] = mem_oper;
@@ -471,19 +471,19 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                 }
             } else if instruction.opcode == Opcode::VPEXTRQ {
-                instruction.modrm_mmm.bank = RegisterBank::Q;
+                instruction.regs[1].bank = RegisterBank::Q;
             }
             instruction.operand_count = 3;
             instruction.imm = read_imm_unsigned(words, 1)?;
             Ok(())
         },
         VEXOperandCode::G_xmm_Eq => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 8)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -495,12 +495,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::G_xmm_Ed => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -512,12 +512,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Eq_G_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 8)?;
             instruction.operands[0] = mem_oper;
@@ -529,12 +529,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Ed_G_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             instruction.operands[0] = mem_oper;
@@ -546,16 +546,16 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::VCVT_Gd_Ed_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::D);
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             if let OperandSpec::RegMMM = mem_oper {
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.mem_size = 4;
             }
@@ -565,16 +565,16 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::VCVT_Gq_Eq_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Q);
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             if let OperandSpec::RegMMM = mem_oper {
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
                 if instruction.opcode == Opcode::VCVTSS2SI {
                     instruction.mem_size = 4;
@@ -589,12 +589,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         op @ VEXOperandCode::E_G_xmm |
         op @ VEXOperandCode::M_G_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             match (op, mem_oper) {
@@ -622,12 +622,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Ud_G_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::D);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             if mem_oper != OperandSpec::RegMMM {
@@ -639,12 +639,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Ud_G_ymm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::D);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             if mem_oper != OperandSpec::RegMMM {
@@ -656,12 +656,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Ud_G_xmm_imm8 => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::D);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             if mem_oper != OperandSpec::RegMMM {
@@ -675,12 +675,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::E_G_xmm_imm8 => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = mem_oper;
@@ -694,12 +694,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::E_xmm_G_ymm_imm8 => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = mem_oper;
@@ -714,12 +714,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
 
         VEXOperandCode::Gd_U_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::D);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             if mem_oper != OperandSpec::RegMMM {
@@ -731,12 +731,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Gd_U_ymm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::D);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             if mem_oper != OperandSpec::RegMMM {
@@ -751,7 +751,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         op @ VEXOperandCode::G_M_xmm |
         op @ VEXOperandCode::G_U_xmm |
         op @ VEXOperandCode::G_E_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
@@ -769,7 +769,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     /* and this is always accepted */
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -787,12 +787,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::G_xmm_E_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -804,12 +804,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::G_xmm_E_ymm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -822,7 +822,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         op @ VEXOperandCode::G_ymm_M_xmm |
         op @ VEXOperandCode::G_ymm_E_xmm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
@@ -832,7 +832,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOperand);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -850,12 +850,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::G_ymm_E_ymm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -869,7 +869,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
 
         op @ VEXOperandCode::E_G_ymm |
         op @ VEXOperandCode::M_G_ymm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
@@ -883,7 +883,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     /* and this is always accepted */
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = mem_oper;
@@ -897,7 +897,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
 
         op @ VEXOperandCode::G_M_ymm |
         op @ VEXOperandCode::G_E_ymm => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
@@ -911,7 +911,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     /* and this is always accepted */
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -930,9 +930,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     return Err(DecodeError::InvalidOperand);
                 }
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -945,9 +945,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_E_ymm_imm8 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -965,9 +965,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if modrm & 0xc0 == 0xc0 {
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -983,7 +983,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if modrm & 0xc0 == 0xc0 {
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1001,7 +1001,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_E_xmm => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1021,7 +1021,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_xmm_Ed => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1035,7 +1035,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_xmm_Eq => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E(words, instruction, modrm, 8)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1049,7 +1049,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_E_xmm_imm8 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1065,9 +1065,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -1086,7 +1086,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 return Err(DecodeError::InvalidOperand);
             }
 
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = mem_oper;
@@ -1101,10 +1101,10 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
 
         VEXOperandCode::G_Ex_V_xmm => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
-            instruction.sib_index.bank = RegisterBank::X;
+            instruction.regs[2].bank = RegisterBank::X;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             instruction.operands[2] = OperandSpec::RegVex;
@@ -1116,11 +1116,11 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_Ey_V_xmm => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
-            instruction.vex_reg.bank = RegisterBank::X;
-            instruction.sib_index.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::X;
+            instruction.regs[2].bank = RegisterBank::Y;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             instruction.operands[2] = OperandSpec::RegVex;
@@ -1132,11 +1132,11 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_Ey_V_ymm => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
-            instruction.vex_reg.bank = RegisterBank::Y;
-            instruction.sib_index.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
+            instruction.regs[2].bank = RegisterBank::Y;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             instruction.operands[2] = OperandSpec::RegVex;
@@ -1157,9 +1157,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             } else {
                 (4, RegisterBank::D)
             };
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), bank);
-            instruction.vex_reg.bank = bank;
+            instruction.regs[3].bank = bank;
             let mem_oper = read_E(words, instruction, modrm, opwidth)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -1177,9 +1177,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             } else {
                 (4, RegisterBank::D)
             };
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), bank);
-            instruction.vex_reg.bank = bank;
+            instruction.regs[3].bank = bank;
             let mem_oper = read_E(words, instruction, modrm, opwidth)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
@@ -1197,7 +1197,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             } else {
                 (4, RegisterBank::D)
             };
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), bank);
             let mem_oper = read_E(words, instruction, modrm, opwidth)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1232,7 +1232,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             } else {
                 (4, RegisterBank::D)
             };
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), bank);
             let mem_oper = read_E(words, instruction, modrm, opwidth)?;
             instruction.operands[0] = OperandSpec::RegVex;
@@ -1241,7 +1241,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if mem_oper != OperandSpec::RegMMM {
                 instruction.mem_size = opwidth;
             }
-            instruction.vex_reg.bank = bank;
+            instruction.regs[3].bank = bank;
             Ok(())
         }
         VEXOperandCode::MXCSR => {
@@ -1270,11 +1270,11 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::G_E_xmm_imm8 => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::X);
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1288,11 +1288,11 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::G_E_ymm_imm8 => {
-            if instruction.vex_reg.num != 0 {
+            if instruction.regs[3].num != 0 {
                 return Err(DecodeError::InvalidOperand);
             }
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex().r(), RegisterBank::Y);
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1307,9 +1307,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_E_ymm_ymm4 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             let mem_oper = read_E_ymm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -1324,9 +1324,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_E_xmm_xmm4 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), RegisterBank::X);
-            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.regs[3].bank = RegisterBank::X;
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -1341,9 +1341,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_ymm_E_xmm => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), RegisterBank::Y);
-            instruction.vex_reg.bank = RegisterBank::Y;
+            instruction.regs[3].bank = RegisterBank::Y;
             let mem_oper = read_E_xmm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
@@ -1356,9 +1356,9 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         VEXOperandCode::G_V_xmm_Ev_imm8 => {
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex().x(), RegisterBank::X);
-            instruction.vex_reg.bank = RegisterBank::X;
+            instruction.regs[3].bank = RegisterBank::X;
             // TODO: but the memory access is word-sized
             let mem_oper = read_E(words, instruction, modrm, 4)?;
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -1383,7 +1383,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                 }
             } else if instruction.opcode == Opcode::VPINSRQ {
-                instruction.modrm_mmm.bank = RegisterBank::Q;
+                instruction.regs[1].bank = RegisterBank::Q;
             }
             instruction.operand_count = 4;
             Ok(())

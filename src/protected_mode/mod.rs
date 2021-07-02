@@ -531,18 +531,18 @@ impl Operand {
             }
             // the register in modrm_rrr
             OperandSpec::RegRRR => {
-                Operand::Register(inst.modrm_rrr)
+                Operand::Register(inst.regs[0])
             }
             OperandSpec::RegRRR_maskmerge => {
                 Operand::RegisterMaskMerge(
-                    inst.modrm_rrr,
+                    inst.regs[0],
                     RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
                     MergeMode::from(inst.prefixes.evex_unchecked().merge()),
                 )
             }
             OperandSpec::RegRRR_maskmerge_sae => {
                 Operand::RegisterMaskMergeSae(
-                    inst.modrm_rrr,
+                    inst.regs[0],
                     RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
                     MergeMode::from(inst.prefixes.evex_unchecked().merge()),
                     SaeMode::from(inst.prefixes.evex_unchecked().vex().l(), inst.prefixes.evex_unchecked().lp()),
@@ -550,41 +550,41 @@ impl Operand {
             }
             OperandSpec::RegRRR_maskmerge_sae_noround => {
                 Operand::RegisterMaskMergeSaeNoround(
-                    inst.modrm_rrr,
+                    inst.regs[0],
                     RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
                     MergeMode::from(inst.prefixes.evex_unchecked().merge()),
                 )
             }
             // the register in modrm_mmm (eg modrm mod bits were 11)
             OperandSpec::RegMMM => {
-                Operand::Register(inst.modrm_mmm)
+                Operand::Register(inst.regs[1])
             }
             OperandSpec::RegMMM_maskmerge => {
                 Operand::RegisterMaskMerge(
-                    inst.modrm_mmm,
+                    inst.regs[1],
                     RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
                     MergeMode::from(inst.prefixes.evex_unchecked().merge()),
                 )
             }
             OperandSpec::RegMMM_maskmerge_sae_noround => {
                 Operand::RegisterMaskMergeSaeNoround(
-                    inst.modrm_mmm,
+                    inst.regs[1],
                     RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
                     MergeMode::from(inst.prefixes.evex_unchecked().merge()),
                 )
             }
             OperandSpec::RegVex => {
-                Operand::Register(inst.vex_reg)
+                Operand::Register(inst.regs[3])
             }
             OperandSpec::RegVex_maskmerge => {
                 Operand::RegisterMaskMerge(
-                    inst.vex_reg,
+                    inst.regs[3],
                     RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()),
                     MergeMode::from(inst.prefixes.evex_unchecked().merge()),
                 )
             }
             OperandSpec::Reg4 => {
-                Operand::Register(RegSpec { num: inst.imm as u8, bank: inst.vex_reg.bank })
+                Operand::Register(RegSpec { num: inst.imm as u8, bank: inst.regs[3].bank })
             }
             OperandSpec::ImmI8 => Operand::ImmediateI8(inst.imm as i8),
             OperandSpec::ImmU8 => Operand::ImmediateU8(inst.imm as u8),
@@ -595,7 +595,7 @@ impl Operand {
             OperandSpec::DispU16 => Operand::DisplacementU16(inst.disp as u16),
             OperandSpec::DispU32 => Operand::DisplacementU32(inst.disp),
             OperandSpec::Deref => {
-                Operand::RegDeref(inst.modrm_mmm)
+                Operand::RegDeref(inst.regs[1])
             }
             OperandSpec::Deref_esi => {
                 Operand::RegDeref(RegSpec::esi())
@@ -604,66 +604,66 @@ impl Operand {
                 Operand::RegDeref(RegSpec::edi())
             }
             OperandSpec::RegDisp => {
-                Operand::RegDisp(inst.modrm_mmm, inst.disp as i32)
+                Operand::RegDisp(inst.regs[1], inst.disp as i32)
             }
             OperandSpec::RegScale => {
-                Operand::RegScale(inst.sib_index, inst.scale)
+                Operand::RegScale(inst.regs[2], inst.scale)
             }
             OperandSpec::RegIndexBase => {
-                Operand::RegIndexBase(inst.modrm_mmm, inst.sib_index)
+                Operand::RegIndexBase(inst.regs[1], inst.regs[2])
             }
             OperandSpec::RegIndexBaseDisp => {
-                Operand::RegIndexBaseDisp(inst.modrm_mmm, inst.sib_index, inst.disp as i32)
+                Operand::RegIndexBaseDisp(inst.regs[1], inst.regs[2], inst.disp as i32)
             }
             OperandSpec::RegScaleDisp => {
-                Operand::RegScaleDisp(inst.sib_index, inst.scale, inst.disp as i32)
+                Operand::RegScaleDisp(inst.regs[2], inst.scale, inst.disp as i32)
             }
             OperandSpec::RegIndexBaseScale => {
-                Operand::RegIndexBaseScale(inst.modrm_mmm, inst.sib_index, inst.scale)
+                Operand::RegIndexBaseScale(inst.regs[1], inst.regs[2], inst.scale)
             }
             OperandSpec::RegIndexBaseScaleDisp => {
-                Operand::RegIndexBaseScaleDisp(inst.modrm_mmm, inst.sib_index, inst.scale, inst.disp as i32)
+                Operand::RegIndexBaseScaleDisp(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
             }
             OperandSpec::Deref_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegDerefMasked(inst.modrm_mmm, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegDerefMasked(inst.regs[1], RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegDeref(inst.modrm_mmm)
+                    Operand::RegDeref(inst.regs[1])
                 }
             }
             OperandSpec::RegDisp_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegDispMasked(inst.modrm_mmm, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegDispMasked(inst.regs[1], inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegDisp(inst.modrm_mmm, inst.disp as i32)
+                    Operand::RegDisp(inst.regs[1], inst.disp as i32)
                 }
             }
             OperandSpec::RegScale_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegScaleMasked(inst.sib_index, inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegScaleMasked(inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegScale(inst.sib_index, inst.scale)
+                    Operand::RegScale(inst.regs[2], inst.scale)
                 }
             }
             OperandSpec::RegScaleDisp_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegScaleDispMasked(inst.sib_index, inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegScaleDispMasked(inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegScaleDisp(inst.sib_index, inst.scale, inst.disp as i32)
+                    Operand::RegScaleDisp(inst.regs[2], inst.scale, inst.disp as i32)
                 }
             }
             OperandSpec::RegIndexBaseScale_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseScaleMasked(inst.modrm_mmm, inst.sib_index, inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegIndexBaseScaleMasked(inst.regs[1], inst.regs[2], inst.scale, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegIndexBaseScale(inst.modrm_mmm, inst.sib_index, inst.scale)
+                    Operand::RegIndexBaseScale(inst.regs[1], inst.regs[2], inst.scale)
                 }
             }
             OperandSpec::RegIndexBaseScaleDisp_mask => {
                 if inst.prefixes.evex_unchecked().mask_reg() != 0 {
-                    Operand::RegIndexBaseScaleDispMasked(inst.modrm_mmm, inst.sib_index, inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                    Operand::RegIndexBaseScaleDispMasked(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
-                    Operand::RegIndexBaseScaleDisp(inst.modrm_mmm, inst.sib_index, inst.scale, inst.disp as i32)
+                    Operand::RegIndexBaseScaleDisp(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
                 }
             }
         }
@@ -788,12 +788,12 @@ const REGISTER_CLASS_NAMES: &[&'static str] = &[
 /// extern crate yaxpeax_arch;
 /// use yaxpeax_x86::protected_mode::{self as amd64};
 /// use yaxpeax_x86::protected_mode::{Opcode, Operand, RegisterClass};
-/// use yaxpeax_arch::Decoder;
+/// use yaxpeax_arch::{Decoder, U8Reader};
 ///
 /// let movsx_eax_cl = &[0x0f, 0xbe, 0xc1];
 /// let decoder = amd64::InstDecoder::default();
 /// let instruction = decoder
-///     .decode(movsx_eax_cl.into_iter().cloned())
+///     .decode(&mut U8Reader::new(movsx_eax_cl))
 ///     .expect("can decode");
 ///
 /// assert_eq!(instruction.opcode(), Opcode::MOVSX);
@@ -2445,10 +2445,13 @@ pub enum Opcode {
 #[derive(Debug)]
 pub struct Instruction {
     pub prefixes: Prefixes,
+    /*
     modrm_rrr: RegSpec,
     modrm_mmm: RegSpec, // doubles as sib_base
     sib_index: RegSpec,
     vex_reg: RegSpec,
+    */
+    regs: [RegSpec; 4],
     scale: u8,
     length: u8,
     operand_count: u8,
@@ -4105,10 +4108,7 @@ impl Instruction {
             prefixes: Prefixes::new(0),
             opcode: Opcode::Invalid,
             mem_size: 0,
-            modrm_rrr: RegSpec::eax(),
-            modrm_mmm: RegSpec::eax(), // doubles as sib_base
-            sib_index: RegSpec::eax(),
-            vex_reg: RegSpec::eax(),
+            regs: [RegSpec::eax(); 4],
             scale: 0,
             length: 0,
             disp: 0,
@@ -5345,11 +5345,11 @@ pub(self) fn read_E_ymm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_vex<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut Instruction, modrm: u8, length: &mut u8, bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8, bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
     } else {
-        let res = read_M(bytes_iter, instr, modrm)?;
+        let res = read_M(words, instr, modrm)?;
         if (modrm & 0b01_000_000) == 0b01_000_000 {
             instr.prefixes.apply_compressed_disp(true);
         }
@@ -5359,7 +5359,7 @@ pub(self) fn read_E_vex<T: Iterator<Item=u8>>(bytes_iter: &mut T, instr: &mut In
 
 #[allow(non_snake_case)]
 fn read_modrm_reg(instr: &mut Instruction, modrm: u8, reg_bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
-    instr.modrm_mmm = RegSpec::from_parts(modrm & 7, reg_bank);
+    instr.regs[1] = RegSpec::from_parts(modrm & 7, reg_bank);
     Ok(OperandSpec::RegMMM)
 }
 
@@ -5386,7 +5386,7 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
             if modbits == 0b00 {
                 OperandSpec::DispU32
             } else {
-                instr.modrm_mmm.num |= 0b101;
+                instr.regs[1].num |= 0b101;
 
                 if disp == 0 {
                     OperandSpec::Deref
@@ -5395,8 +5395,8 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
                 }
             }
         } else {
-            instr.modrm_mmm.num |= 0b101;
-            instr.sib_index.num |= (sibbyte >> 3) & 7;
+            instr.regs[1].num |= 0b101;
+            instr.regs[2].num |= (sibbyte >> 3) & 7;
 
             let scale = 1u8 << (sibbyte >> 6);
             instr.scale = scale;
@@ -5416,7 +5416,7 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
             }
         }
     } else {
-        instr.modrm_mmm.num |= sibbyte & 7;
+        instr.regs[1].num |= sibbyte & 7;
 
         if ((sibbyte >> 3) & 7) == 0b100 {
             if disp == 0 {
@@ -5425,7 +5425,7 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
                 OperandSpec::RegDisp
             }
         } else {
-            instr.sib_index.num |= (sibbyte >> 3) & 7;
+            instr.regs[2].num |= (sibbyte >> 3) & 7;
 
             let scale = 1u8 << (sibbyte >> 6);
             instr.scale = scale;
@@ -5448,32 +5448,32 @@ fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpea
     }
     match mmm {
         0b000 => {
-            instr.modrm_mmm = RegSpec::bx();
-            instr.sib_index = RegSpec::si();
+            instr.regs[1] = RegSpec::bx();
+            instr.regs[2] = RegSpec::si();
         },
         0b001 => {
-            instr.modrm_mmm = RegSpec::bx();
-            instr.sib_index = RegSpec::di();
+            instr.regs[1] = RegSpec::bx();
+            instr.regs[2] = RegSpec::di();
         },
         0b010 => {
-            instr.modrm_mmm = RegSpec::bp();
-            instr.sib_index = RegSpec::si();
+            instr.regs[1] = RegSpec::bp();
+            instr.regs[2] = RegSpec::si();
         },
         0b011 => {
-            instr.modrm_mmm = RegSpec::bp();
-            instr.sib_index = RegSpec::di();
+            instr.regs[1] = RegSpec::bp();
+            instr.regs[2] = RegSpec::di();
         },
         0b100 => {
-            instr.modrm_mmm = RegSpec::si();
+            instr.regs[1] = RegSpec::si();
         },
         0b101 => {
-            instr.modrm_mmm = RegSpec::di();
+            instr.regs[1] = RegSpec::di();
         },
         0b110 => {
-            instr.modrm_mmm = RegSpec::bp();
+            instr.regs[1] = RegSpec::bp();
         },
         0b111 => {
-            instr.modrm_mmm = RegSpec::bx();
+            instr.regs[1] = RegSpec::bx();
         },
         _ => { unreachable!("impossible bit pattern"); }
     }
@@ -5512,7 +5512,7 @@ fn read_M<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch
     if instr.prefixes.address_size() {
         return read_M_16bit(words, instr, modrm);
     }
-    instr.modrm_mmm.bank = RegisterBank::D;
+    instr.regs[1].bank = RegisterBank::D;
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
     let op_spec = if mmm == 4 {
@@ -5521,7 +5521,7 @@ fn read_M<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch
         instr.disp = read_num(words, 4)?;
         OperandSpec::DispU32
     } else {
-        instr.modrm_mmm.num |= mmm;
+        instr.regs[1].num |= mmm;
 
         if modbits == 0b00 {
             OperandSpec::Deref
@@ -6854,6 +6854,12 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
 //    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
 
+    instruction.regs = unsafe { core::mem::transmute(0u64) };
+    instruction.mem_size = 0;
+    instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
+    instruction.operand_count = 2;
+
+
     let record: OpcodeRecord = loop {
         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
         if words.offset() >= 15 {
@@ -6989,7 +6995,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                         } else {
                             RegisterBank::W
                         };
-                        instruction.modrm_rrr =
+                        instruction.regs[0] =
                             RegSpec::from_parts(reg, bank);
                         instruction.operand_count = 1;
                     }
@@ -7000,16 +7006,16 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                         } else {
                             RegisterBank::W
                         };
-                        instruction.modrm_rrr =
+                        instruction.regs[0] =
                             RegSpec::from_parts(0, bank);
                         instruction.operands[1] = OperandSpec::RegMMM;
-                        instruction.modrm_mmm =
+                        instruction.regs[1] =
                             RegSpec::from_parts(reg, bank);
                         instruction.operand_count = 2;
                     }
                     2 => {
                         // these are Zb_Ib_R
-                        instruction.modrm_rrr =
+                        instruction.regs[0] =
                             RegSpec::from_parts(reg, RegisterBank::B);
                         instruction.imm =
                             read_imm_unsigned(words, 1)?;
@@ -7018,13 +7024,13 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                     3 => {
                         // category == 3, Zv_Iv_R
                         if !instruction.prefixes.operand_size() {
-                            instruction.modrm_rrr =
+                            instruction.regs[0] =
                                 RegSpec::from_parts(reg, RegisterBank::D);
                             instruction.imm =
                                 read_imm_unsigned(words, 4)?;
                             instruction.operands[1] = OperandSpec::ImmI32;
                         } else {
-                            instruction.modrm_rrr =
+                            instruction.regs[0] =
                                 RegSpec::from_parts(reg, RegisterBank::W);
                             instruction.imm =
                                 read_imm_unsigned(words, 2)?;
@@ -7063,8 +7069,8 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             bank = RegisterBank::B;
         };
         modrm = read_modrm(words)?;
-        instruction.modrm_rrr.bank = bank;
-        instruction.modrm_rrr.num = (modrm >> 3) & 7;
+        instruction.regs[0].bank = bank;
+        instruction.regs[0].num = (modrm >> 3) & 7;
 
         mem_oper = if modrm >= 0b11000000 {
             if operand_code.bits() == (OperandCode::Gv_M as u16) {
@@ -7180,10 +7186,10 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operands[0] = mem_oper;
             instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
             if op == 10 {
-                instruction.modrm_rrr = RegSpec::cl();
+                instruction.regs[0] = RegSpec::cl();
                 instruction.operands[1] = OperandSpec::RegRRR;
             } else if op == 9 {
-                instruction.modrm_rrr = RegSpec::cl();
+                instruction.regs[0] = RegSpec::cl();
                 instruction.operands[1] = OperandSpec::RegRRR;
             } else {
                 let num = match op {
@@ -7278,7 +7284,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             ][r as usize];
             if instruction.operands[0] == OperandSpec::RegMMM {
                 if opcode == Opcode::CALL || opcode == Opcode::JMP {
-                    instruction.modrm_mmm.bank = RegisterBank::D;
+                    instruction.regs[1].bank = RegisterBank::D;
                 } else if opcode == Opcode::CALLF || opcode == Opcode::JMPF {
                     return Err(DecodeError::InvalidOperand);
                 }
@@ -7296,7 +7302,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E(words, instruction, modrm, 1)?;
-            instruction.modrm_rrr = if instruction.prefixes.operand_size() {
+            instruction.regs[0] = if instruction.prefixes.operand_size() {
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::W)
             } else {
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D)
@@ -7310,7 +7316,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
-            instruction.modrm_rrr = if instruction.prefixes.operand_size() {
+            instruction.regs[0] = if instruction.prefixes.operand_size() {
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::W)
             } else {
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D)
@@ -7325,20 +7331,20 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operand_count = 1;
         },
         19 => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 // fix the register to XMM
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.mem_size = 16;
             }
         },
         op @ 20 |
         op @ 21 => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             instruction.operand_count = 2;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 if op == 20 {
@@ -7346,7 +7352,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                     return Err(DecodeError::InvalidOperand);
                 } else {
                     // fix the register to XMM
-                    instruction.modrm_mmm.bank = RegisterBank::X;
+                    instruction.regs[1].bank = RegisterBank::X;
                 }
             } else {
                 if instruction.opcode == Opcode::MOVDDUP {
@@ -7360,7 +7366,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
             instruction.imm =
                 read_num(words, 1)? as u8 as u32;
@@ -7377,18 +7383,18 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operand_count = 3;
         },
         23 => {
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::al();
             instruction.operands[1] = OperandSpec::ImmI8;
             instruction.operand_count = 2;
         }
         24 => {
             let opwidth = if instruction.prefixes.operand_size() {
-                instruction.modrm_rrr =
+                instruction.regs[0] =
                     RegSpec::from_parts(0, RegisterBank::W);
                 2
             } else {
-                instruction.modrm_rrr =
+                instruction.regs[0] =
                     RegSpec::from_parts(0, RegisterBank::D);
                 4
             };
@@ -7433,16 +7439,16 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             return Ok(());
         },
         29 => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 // fix the register to XMM
                 if instruction.opcode == Opcode::MOVD {
-                    instruction.modrm_mmm.bank = RegisterBank::D;
+                    instruction.regs[1].bank = RegisterBank::D;
                 } else {
-                    instruction.modrm_mmm.bank = RegisterBank::X;
+                    instruction.regs[1].bank = RegisterBank::X;
                 }
             } else {
                 instruction.mem_size = 4;
@@ -7460,11 +7466,11 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operand_count = 1;
         }
         31 => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             instruction.operand_count = 2;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 // fix the register to XMM
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.mem_size = 4;
             }
@@ -7484,14 +7490,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E_mm(words, instruction, modrm)?;
-            instruction.modrm_rrr = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
+            instruction.regs[0] = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
             if instruction.operands[1] == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::MM;
+                instruction.regs[1].bank = RegisterBank::MM;
             } else {
                 instruction.mem_size = 8;
             }
             instruction.imm = read_num(words, 1)? as u8 as u32;
-            *length += 1;
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         }
@@ -7499,9 +7504,8 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
-            instruction.modrm_rrr = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
+            instruction.regs[0] = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
             instruction.imm = read_num(words, 1)? as u8 as u32;
-            *length += 1;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = match instruction.opcode {
                     Opcode::PEXTRB => 1,
@@ -7521,7 +7525,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::PMOVX_E_G_xmm => {
             let modrm = read_modrm(words)?;
 
-            instruction.modrm_rrr = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
+            instruction.regs[0] = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operands[0] = read_E_xmm(words, instruction, modrm)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
@@ -7539,7 +7543,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::PMOVX_G_E_xmm => {
             let modrm = read_modrm(words)?;
 
-            instruction.modrm_rrr = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
+            instruction.regs[0] = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -7559,7 +7563,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::INV_Gv_M => {
             let modrm = read_modrm(words)?;
 
-            instruction.modrm_rrr = RegSpec { bank: RegisterBank::D, num: (modrm >> 3) & 7 };
+            instruction.regs[0] = RegSpec { bank: RegisterBank::D, num: (modrm >> 3) & 7 };
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = read_M(words, instruction, modrm)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
@@ -7595,7 +7599,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 }
             } else {
                 // LES
-                instruction.modrm_rrr = RegSpec::from_parts((modrm >> 3) & 7, if instruction.prefixes.operand_size() { RegisterBank::W } else { RegisterBank::D });
+                instruction.regs[0] = RegSpec::from_parts((modrm >> 3) & 7, if instruction.prefixes.operand_size() { RegisterBank::W } else { RegisterBank::D });
                 instruction.operands[0] = OperandSpec::RegRRR;
                 instruction.operands[1] = read_M(words, instruction, modrm)?;
                 if instruction.prefixes.operand_size() {
@@ -7623,7 +7627,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 }
             } else {
                 // LDS
-                instruction.modrm_rrr = RegSpec::from_parts((modrm >> 3) & 7, if instruction.prefixes.operand_size() { RegisterBank::W } else { RegisterBank::D });
+                instruction.regs[0] = RegSpec::from_parts((modrm >> 3) & 7, if instruction.prefixes.operand_size() { RegisterBank::W } else { RegisterBank::D });
                 instruction.operands[0] = OperandSpec::RegRRR;
                 instruction.operands[1] = read_M(words, instruction, modrm)?;
                 if instruction.prefixes.operand_size() {
@@ -7640,7 +7644,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if instruction.operands[1] != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D);
             instruction.imm =
                 read_num(words, 1)? as u8 as u32;
@@ -7657,10 +7661,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
 
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
             instruction.operands[1] = OperandSpec::RegMMM;
-            instruction.modrm_mmm =
+            instruction.regs[1] =
                 RegSpec::from_parts(modrm & 7, RegisterBank::X);
             instruction.imm =
                 read_num(words, 1)? as u8 as u32;
@@ -7684,7 +7688,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
 
             instruction.operands[0] = OperandSpec::RegMMM;
-            instruction.modrm_mmm =
+            instruction.regs[1] =
                 RegSpec::from_parts(modrm & 7, RegisterBank::X);
             instruction.imm =
                 read_num(words, 1)? as u8 as u32;
@@ -7699,7 +7703,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
             instruction.imm =
                 read_num(words, 1)? as u8 as u32;
@@ -7710,15 +7714,15 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 3;
         }
         OperandCode::Gd_Ed => {
-            instruction.modrm_rrr.bank = RegisterBank::D;
+            instruction.regs[0].bank = RegisterBank::D;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             }
             instruction.operands[1] = mem_oper;
             instruction.operand_count = 2;
         }
         OperandCode::Md_Gd => {
-            instruction.modrm_rrr.bank = RegisterBank::D;
+            instruction.regs[0].bank = RegisterBank::D;
             if mem_oper == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -7727,11 +7731,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 2;
         }
         OperandCode::G_U_xmm => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             if mem_oper != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_mmm.bank = RegisterBank::X;
+            instruction.regs[1].bank = RegisterBank::X;
             instruction.operand_count = 2;
         },
         OperandCode::Gv_Ev_Ib => {
@@ -7765,17 +7769,17 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operands[2] = OperandSpec::RegVex;
-            instruction.vex_reg = RegSpec::cl();
+            instruction.regs[3] = RegSpec::cl();
             instruction.operand_count = 3;
         }
         OperandCode::G_mm_Ew_Ib => {
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::MM);
             if instruction.operands[1] == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 2;
             }
@@ -7785,11 +7789,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 3;
         }
         OperandCode::G_E_mm => {
-            instruction.modrm_rrr.bank = RegisterBank::MM;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].bank = RegisterBank::MM;
+            instruction.regs[0].num &= 0b111;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::MM;
-                instruction.modrm_mmm.num &= 0b111;
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b111;
             } else {
                 if [Opcode::PACKSSWB, Opcode::PCMPGTB, Opcode::PCMPGTW, Opcode::PCMPGTD, Opcode::PACKUSWB, Opcode::PUNPCKHBW, Opcode::PUNPCKHWD, Opcode::PUNPCKHDQ, Opcode::PACKSSDW, Opcode::PSRLW, Opcode::PMULHW, Opcode::PSHUFB, Opcode::PHADDW, Opcode::PHADDD, Opcode::PHADDSW, Opcode::PMADDUBSW, Opcode::PHSUBW, Opcode::PHSUBD, Opcode::PHSUBSW, Opcode::PSIGNB, Opcode::PSIGNW, Opcode::PSIGND, Opcode::PMULHRSW, Opcode::PABSB, Opcode::PABSW, Opcode::PABSD].contains(&instruction.opcode) {
                     instruction.mem_size = 8;
@@ -7800,28 +7804,28 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 2;
         },
         OperandCode::G_U_mm => {
-            instruction.modrm_rrr.bank = RegisterBank::D;
+            instruction.regs[0].bank = RegisterBank::D;
             if mem_oper != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_mmm.bank = RegisterBank::MM;
-            instruction.modrm_mmm.num &= 0b111;
+            instruction.regs[1].bank = RegisterBank::MM;
+            instruction.regs[1].num &= 0b111;
             instruction.operand_count = 2;
         },
         OperandCode::Gv_Ew_LSL => {
             let modrm = read_modrm(words)?;
             if instruction.prefixes.operand_size() {
-                instruction.modrm_rrr =
+                instruction.regs[0] =
                     RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::W);
             } else {
-                instruction.modrm_rrr =
+                instruction.regs[0] =
                     RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D);
             };
 
             instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
             // lsl is weird. the full register width is written, but only the low 16 bits are used.
             if instruction.operands[1] == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 2;
             }
@@ -7836,7 +7840,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 4
             };
             instruction.operands[1] = read_E(words, instruction, modrm, opwidth)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D);
             instruction.operand_count = 2;
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -7845,7 +7849,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         },
         op @ OperandCode::AL_Ob |
         op @ OperandCode::AX_Ov => {
-            instruction.modrm_rrr = match op {
+            instruction.regs[0] = match op {
                 OperandCode::AL_Ob => {
                     instruction.mem_size = 1;
                     RegSpec::al()
@@ -7875,7 +7879,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         op @ OperandCode::Ob_AL |
         op @ OperandCode::Ov_AX => {
-            instruction.modrm_rrr = match op {
+            instruction.regs[0] = match op {
                 OperandCode::Ob_AL => {
                     instruction.mem_size = 1;
                     RegSpec::al()
@@ -7930,13 +7934,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 0;
         }
         OperandCode::G_mm_U_mm => {
-            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.regs[0].bank = RegisterBank::MM;
             if mem_oper != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_mmm.bank = RegisterBank::MM;
-            instruction.modrm_mmm.num &= 0b111;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[1].bank = RegisterBank::MM;
+            instruction.regs[1].num &= 0b111;
+            instruction.regs[0].num &= 0b111;
             instruction.operand_count = 2;
         },
         OperandCode::E_G_q => {
@@ -7948,7 +7952,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
 
             instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D);
             instruction.operand_count = 2;
             if instruction.operands[0] != OperandSpec::RegMMM {
@@ -7963,7 +7967,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
 
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::D);
             instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
@@ -7974,19 +7978,19 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::G_Mq_mm => {
             instruction.operands[1] = instruction.operands[0];
             instruction.operands[0] = mem_oper;
-            instruction.modrm_rrr.bank = RegisterBank::MM;
+            instruction.regs[0].bank = RegisterBank::MM;
             if mem_oper == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             } else {
                 instruction.mem_size = 8;
             }
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].num &= 0b111;
             instruction.operand_count = 2;
         },
         OperandCode::MOVQ_f30f => {
             instruction.operand_count = 2;
             let modrm = read_modrm(words)?;
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, RegisterBank::X);
             instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -8024,7 +8028,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
             instruction.operands[1] = read_E_mm(words, instruction, modrm)?;
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
+            instruction.regs[0] = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
             }
@@ -8162,7 +8166,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
                             // word-form operand:
-                            instruction.modrm_mmm = RegSpec { bank: RegisterBank::W, num: instruction.modrm_mmm.num };
+                            instruction.regs[1] = RegSpec { bank: RegisterBank::W, num: instruction.regs[1].num };
                             instruction.opcode = Opcode::RDRAND;
                         } else {
                             instruction.mem_size = 8;
@@ -8176,7 +8180,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
                             // word-form operand:
-                            instruction.modrm_mmm = RegSpec { bank: RegisterBank::W, num: instruction.modrm_mmm.num };
+                            instruction.regs[1] = RegSpec { bank: RegisterBank::W, num: instruction.regs[1].num };
                             instruction.opcode = Opcode::RDSEED;
                         } else {
                             return Err(DecodeError::InvalidOpcode);
@@ -8219,7 +8223,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                             // invalid as `vmxon`, reg-form is `senduipi`
                             instruction.opcode = Opcode::SENDUIPI;
                             // and the operand is always a dword register
-                            instruction.modrm_mmm.bank = RegisterBank::D;
+                            instruction.regs[1].bank = RegisterBank::D;
                         } else {
                             instruction.mem_size = 8;
                         }
@@ -8342,9 +8346,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
 
             if instruction.prefixes.operand_size() {
-                instruction.modrm_mmm = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+                instruction.regs[1] = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
             } else {
-                instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
+                instruction.regs[1] = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             }
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.imm = read_imm_signed(words, 1)? as u32;
@@ -8375,9 +8379,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
 
             if instruction.prefixes.operand_size() {
-                instruction.modrm_mmm = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+                instruction.regs[1] = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
             } else {
-                instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
+                instruction.regs[1] = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             }
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.imm = read_imm_signed(words, 1)? as u32;
@@ -8421,9 +8425,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
 
             if instruction.prefixes.operand_size() {
-                instruction.modrm_mmm = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+                instruction.regs[1] = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
             } else {
-                instruction.modrm_mmm = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
+                instruction.regs[1] = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
             }
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.imm = read_imm_signed(words, 1)? as u32;
@@ -8505,30 +8509,30 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::ModRM_0xf30f38fa => {
             instruction.opcode = Opcode::ENCODEKEY128;
             read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
-            instruction.modrm_rrr.bank = RegisterBank::D;
-            instruction.modrm_mmm.bank = RegisterBank::D;
+            instruction.regs[0].bank = RegisterBank::D;
+            instruction.regs[1].bank = RegisterBank::D;
         }
         OperandCode::ModRM_0xf30f38fb => {
             instruction.opcode = Opcode::ENCODEKEY256;
             read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
-            instruction.modrm_rrr.bank = RegisterBank::D;
-            instruction.modrm_mmm.bank = RegisterBank::D;
+            instruction.regs[0].bank = RegisterBank::D;
+            instruction.regs[1].bank = RegisterBank::D;
         }
         OperandCode::G_mm_Ed => {
-            instruction.modrm_rrr.bank = RegisterBank::MM;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].bank = RegisterBank::MM;
+            instruction.regs[0].num &= 0b111;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 4;
             }
         }
         OperandCode::G_mm_E => {
-            instruction.modrm_rrr.bank = RegisterBank::MM;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].bank = RegisterBank::MM;
+            instruction.regs[0].num &= 0b111;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::MM;
-                instruction.modrm_mmm.num &= 0b111;
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b111;
             } else {
                 instruction.mem_size = 8;
             }
@@ -8536,10 +8540,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::Ed_G_mm => {
             instruction.operands[1] = instruction.operands[0];
             instruction.operands[0] = mem_oper;
-            instruction.modrm_rrr.bank = RegisterBank::MM;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].bank = RegisterBank::MM;
+            instruction.regs[0].num &= 0b111;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 4;
             }
@@ -8547,9 +8551,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::Ed_G_xmm => {
             instruction.operands[1] = instruction.operands[0];
             instruction.operands[0] = mem_oper;
-            instruction.modrm_rrr.bank = RegisterBank::Y;
+            instruction.regs[0].bank = RegisterBank::Y;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 4;
             }
@@ -8557,11 +8561,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::E_G_mm => {
             instruction.operands[1] = instruction.operands[0];
             instruction.operands[0] = mem_oper;
-            instruction.modrm_rrr.bank = RegisterBank::MM;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].bank = RegisterBank::MM;
+            instruction.regs[0].num &= 0b111;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::MM;
-                instruction.modrm_mmm.num &= 0b111;
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b111;
             } else {
                 instruction.mem_size = 8;
             }
@@ -8571,36 +8575,36 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 3;
             instruction.imm =
                 read_num(words, 1)?;
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 2;
             }
         },
         OperandCode::G_xmm_Ed => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::D;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 4;
             }
         },
         OperandCode::G_mm_E_xmm => {
-            instruction.modrm_rrr.bank = RegisterBank::MM;
-            instruction.modrm_rrr.num &= 0b111;
+            instruction.regs[0].bank = RegisterBank::MM;
+            instruction.regs[0].num &= 0b111;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.mem_size = 16;
             }
         },
         op @ OperandCode::G_xmm_U_mm |
         op @ OperandCode::G_xmm_E_mm => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::MM;
-                instruction.modrm_mmm.num &= 0b111;
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b111;
             } else {
                 if op == OperandCode::G_xmm_U_mm {
                     return Err(DecodeError::InvalidOperand);
@@ -8614,27 +8618,27 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 3;
             instruction.imm =
                 read_num(words, 1)?;
-            instruction.modrm_rrr.bank = RegisterBank::D;
+            instruction.regs[0].bank = RegisterBank::D;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::MM;
-                instruction.modrm_mmm.num &= 0b111;
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b111;
             } else {
                 return Err(DecodeError::InvalidOperand);
             }
         }
         OperandCode::U_mm_G_xmm => {
-            instruction.modrm_mmm.bank = RegisterBank::X;
+            instruction.regs[1].bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
-                instruction.modrm_rrr.bank = RegisterBank::MM;
-                instruction.modrm_rrr.num &= 0b111;
+                instruction.regs[0].bank = RegisterBank::MM;
+                instruction.regs[0].num &= 0b111;
             } else {
                 return Err(DecodeError::InvalidOperand);
             }
         }
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
-            instruction.modrm_rrr = RegSpec::al();
-            instruction.modrm_mmm = RegSpec::esi();
+            instruction.regs[0] = RegSpec::al();
+            instruction.regs[1] = RegSpec::esi();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
             instruction.mem_size = 1;
@@ -8647,33 +8651,33 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 2;
         }
         OperandCode::Yb_AL => {
-            instruction.modrm_rrr = RegSpec::al();
-            instruction.modrm_mmm = RegSpec::esi();
+            instruction.regs[0] = RegSpec::al();
+            instruction.regs[1] = RegSpec::esi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::AX_Xv => {
-            instruction.modrm_rrr = if instruction.prefixes.operand_size() {
+            instruction.regs[0] = if instruction.prefixes.operand_size() {
                 instruction.mem_size = 2;
                 RegSpec::ax()
             } else {
                 instruction.mem_size = 4;
                 RegSpec::eax()
             };
-            instruction.modrm_mmm = RegSpec::esi();
+            instruction.regs[1] = RegSpec::esi();
             instruction.operands[1] = OperandSpec::Deref;
         }
         OperandCode::Yv_AX => {
-            instruction.modrm_rrr = if instruction.prefixes.operand_size() {
+            instruction.regs[0] = if instruction.prefixes.operand_size() {
                 instruction.mem_size = 2;
                 RegSpec::ax()
             } else {
                 instruction.mem_size = 4;
                 RegSpec::eax()
             };
-            instruction.modrm_mmm = RegSpec::edi();
+            instruction.regs[1] = RegSpec::edi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
         }
@@ -8687,13 +8691,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operands[1] = OperandSpec::Deref_esi;
         }
         OperandCode::ModRM_0x0f12 => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[1] = mem_oper;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 if instruction.prefixes.operand_size() {
                     return Err(DecodeError::InvalidOpcode);
                 }
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
                 instruction.opcode = Opcode::MOVHLPS;
             } else {
                 instruction.mem_size = 8;
@@ -8705,10 +8709,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0x0f16 => {
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[1] = mem_oper;
             if instruction.operands[1] == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
                 if instruction.prefixes.operand_size() {
                     return Err(DecodeError::InvalidOpcode);
                 }
@@ -8723,7 +8727,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0x0f18 => {
-            let rrr = instruction.modrm_rrr.num & 0b111;
+            let rrr = instruction.regs[0].num & 0b111;
             instruction.operands[0] = mem_oper;
             instruction.operand_count = 1;
             instruction.opcode = if mem_oper == OperandSpec::RegMMM && rrr < 4 {
@@ -8746,12 +8750,12 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 instruction.opcode = Opcode::Invalid;
                 return Err(DecodeError::InvalidOperand);
             }
-            instruction.modrm_rrr.bank = RegisterBank::D;
-            instruction.modrm_mmm.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::D;
+            instruction.regs[1].bank = RegisterBank::X;
         }
         OperandCode::Gv_E_xmm => {
             if instruction.operands[1] == OperandSpec::RegMMM {
-                instruction.modrm_mmm.bank = RegisterBank::X;
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.mem_size = 4;
             }
@@ -8771,12 +8775,12 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     instruction.mem_size = 8;
                 }
             }
-            instruction.modrm_rrr.bank = RegisterBank::X;
+            instruction.regs[0].bank = RegisterBank::X;
         }
         OperandCode::Ew_Gw => {
             let modrm = read_modrm(words)?;
 
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec { bank: RegisterBank::W, num: (modrm >> 3) & 7 };
             instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
             instruction.operands[1] = OperandSpec::RegRRR;
@@ -8793,14 +8797,14 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 return Err(DecodeError::InvalidOperand);
             }
 
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec { bank: RegisterBank::S, num: (modrm >> 3) & 7 };
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
 
             let mod_bits = modrm >> 6;
             if mod_bits == 0b11 {
-                instruction.modrm_mmm =
+                instruction.regs[1] =
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[0] = OperandSpec::RegMMM;
             } else {
@@ -8817,7 +8821,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 return Err(DecodeError::InvalidOperand);
             }
 
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec { bank: RegisterBank::S, num: (modrm >> 3) & 7 };
 
             // quoth the manual:
@@ -8826,7 +8830,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             // results in an invalid opcode excep-tion (#UD). To load the CS register, use the far
             // JMP, CALL, or RET instruction.
             // ```
-            if instruction.modrm_rrr.num == 1 {
+            if instruction.regs[0].num == 1 {
                 return Err(DecodeError::InvalidOperand);
             }
             instruction.operands[0] = OperandSpec::RegRRR;
@@ -8834,7 +8838,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
 
             let mod_bits = modrm >> 6;
             if mod_bits == 0b11 {
-                instruction.modrm_mmm =
+                instruction.regs[1] =
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[1] = OperandSpec::RegMMM;
             } else {
@@ -9047,7 +9051,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         0b000 => {
                             instruction.opcode = Opcode::VMRUN;
                             instruction.operand_count = 1;
-                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.regs[0] = RegSpec::eax();
                             instruction.operands[0] = OperandSpec::RegRRR;
                         },
                         0b001 => {
@@ -9058,13 +9062,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         0b010 => {
                             instruction.opcode = Opcode::VMLOAD;
                             instruction.operand_count = 1;
-                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.regs[0] = RegSpec::eax();
                             instruction.operands[0] = OperandSpec::RegRRR;
                         },
                         0b011 => {
                             instruction.opcode = Opcode::VMSAVE;
                             instruction.operand_count = 1;
-                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.regs[0] = RegSpec::eax();
                             instruction.operands[0] = OperandSpec::RegRRR;
                         },
                         0b100 => {
@@ -9081,15 +9085,15 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                             instruction.opcode = Opcode::SKINIT;
                             instruction.operand_count = 1;
                             instruction.operands[0] = OperandSpec::RegRRR;
-                            instruction.modrm_rrr = RegSpec::eax();
+                            instruction.regs[0] = RegSpec::eax();
                         },
                         0b111 => {
                             instruction.opcode = Opcode::INVLPGA;
                             instruction.operand_count = 2;
                             instruction.operands[0] = OperandSpec::RegRRR;
                             instruction.operands[1] = OperandSpec::RegMMM;
-                            instruction.modrm_rrr = RegSpec::eax();
-                            instruction.modrm_mmm = RegSpec::ecx();
+                            instruction.regs[0] = RegSpec::eax();
+                            instruction.regs[1] = RegSpec::ecx();
                         },
                         _ => {
                             instruction.opcode = Opcode::Invalid;
@@ -9250,7 +9254,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     } else if m == 5 {
                         instruction.opcode = Opcode::RDPRU;
                         instruction.operands[0] = OperandSpec::RegRRR;
-                        instruction.modrm_rrr = RegSpec::ecx();
+                        instruction.regs[0] = RegSpec::ecx();
                         instruction.operand_count = 1;
                     } else if m == 6 {
                         instruction.opcode = Opcode::INVLPGB;
@@ -9258,9 +9262,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         instruction.operands[0] = OperandSpec::RegRRR;
                         instruction.operands[1] = OperandSpec::RegMMM;
                         instruction.operands[2] = OperandSpec::RegVex;
-                        instruction.modrm_rrr = RegSpec::eax();
-                        instruction.modrm_mmm = RegSpec::edx();
-                        instruction.vex_reg = RegSpec::ecx();
+                        instruction.regs[0] = RegSpec::eax();
+                        instruction.regs[1] = RegSpec::edx();
+                        instruction.regs[3] = RegSpec::ecx();
                     } else if m == 7 {
                         instruction.opcode = Opcode::TLBSYNC;
                         instruction.operand_count = 0;
@@ -9323,7 +9327,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     match r {
                         6 => {
                             instruction.opcode = Opcode::UMWAIT;
-                            instruction.modrm_rrr = RegSpec {
+                            instruction.regs[0] = RegSpec {
                                 bank: RegisterBank::D,
                                 num: m,
                             };
@@ -9358,38 +9362,38 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     match r {
                         0 => {
                             instruction.opcode = Opcode::RDFSBASE;
-                            instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
                         1 => {
                             instruction.opcode = Opcode::RDGSBASE;
-                            instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
 
                         }
                         2 => {
                             instruction.opcode = Opcode::WRFSBASE;
-                            instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
                         3 => {
                             instruction.opcode = Opcode::WRGSBASE;
-                            instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
                         5 => {
                             instruction.opcode = Opcode::INCSSP;
-                            instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
                         6 => {
                             instruction.opcode = Opcode::UMONITOR;
-                            instruction.modrm_mmm = RegSpec::from_parts(m, RegisterBank::D);
+                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
@@ -9554,53 +9558,53 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 _ => unsafe { unreachable_unchecked() }
             };
 
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec { bank: bank, num: r };
-            instruction.modrm_mmm =
+            instruction.regs[1] =
                 RegSpec { bank: RegisterBank::D, num: m };
             instruction.operands[mmm] = OperandSpec::RegMMM;
             instruction.operands[rrr] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
         OperandCode::FS => {
-            instruction.modrm_rrr = RegSpec::fs();
+            instruction.regs[0] = RegSpec::fs();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
         }
         OperandCode::GS => {
-            instruction.modrm_rrr = RegSpec::gs();
+            instruction.regs[0] = RegSpec::gs();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
         }
         OperandCode::CS => {
-            instruction.modrm_rrr = RegSpec::cs();
+            instruction.regs[0] = RegSpec::cs();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
         }
         OperandCode::DS => {
-            instruction.modrm_rrr = RegSpec::ds();
+            instruction.regs[0] = RegSpec::ds();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
         }
         OperandCode::ES => {
-            instruction.modrm_rrr = RegSpec::es();
+            instruction.regs[0] = RegSpec::es();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
         }
         OperandCode::SS => {
-            instruction.modrm_rrr = RegSpec::ss();
+            instruction.regs[0] = RegSpec::ss();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
         }
         OperandCode::AL_Ib => {
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::al();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
         }
         OperandCode::AX_Ib => {
-            instruction.modrm_rrr = if !instruction.prefixes.operand_size() {
+            instruction.regs[0] = if !instruction.prefixes.operand_size() {
                RegSpec::eax()
             } else {
                RegSpec::ax()
@@ -9610,14 +9614,14 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 2;
         }
         OperandCode::Ib_AL => {
-            instruction.modrm_rrr =
+            instruction.regs[0] =
                 RegSpec::al();
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
         OperandCode::Ib_AX => {
-            instruction.modrm_rrr = if !instruction.prefixes.operand_size() {
+            instruction.regs[0] = if !instruction.prefixes.operand_size() {
                 RegSpec::eax()
             } else {
                 RegSpec::ax()
@@ -9627,52 +9631,52 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 2;
         }
         OperandCode::AX_DX => {
-            instruction.modrm_rrr = if !instruction.prefixes.operand_size() {
+            instruction.regs[0] = if !instruction.prefixes.operand_size() {
                 RegSpec::eax()
             } else {
                 RegSpec::ax()
             };
-            instruction.modrm_mmm = RegSpec::dx();
+            instruction.regs[1] = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegMMM;
             instruction.operand_count = 2;
         }
         OperandCode::AL_DX => {
-            instruction.modrm_rrr = RegSpec::al();
-            instruction.modrm_mmm = RegSpec::dx();
+            instruction.regs[0] = RegSpec::al();
+            instruction.regs[1] = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegMMM;
             instruction.operand_count = 2;
         }
         OperandCode::DX_AX => {
-            instruction.modrm_rrr = if !instruction.prefixes.operand_size() {
+            instruction.regs[0] = if !instruction.prefixes.operand_size() {
                 RegSpec::eax()
             } else {
                 RegSpec::ax()
             };
-            instruction.modrm_mmm = RegSpec::dx();
+            instruction.regs[1] = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
         OperandCode::DX_AL => {
-            instruction.modrm_rrr = RegSpec::al();
-            instruction.modrm_mmm = RegSpec::dx();
+            instruction.regs[0] = RegSpec::al();
+            instruction.regs[1] = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_DX => {
-            instruction.modrm_rrr = RegSpec::dl();
-            instruction.modrm_mmm = RegSpec::edi();
+            instruction.regs[0] = RegSpec::dl();
+            instruction.regs[1] = RegSpec::edi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
             instruction.mem_size = 1;
         }
         OperandCode::Yv_DX => {
-            instruction.modrm_rrr = RegSpec::dx();
-            instruction.modrm_mmm = RegSpec::edi();
+            instruction.regs[0] = RegSpec::dx();
+            instruction.regs[1] = RegSpec::edi();
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             if instruction.prefixes.operand_size() {
@@ -9683,8 +9687,8 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 2;
         }
         OperandCode::DX_Xb => {
-            instruction.modrm_rrr = RegSpec::dl();
-            instruction.modrm_mmm = RegSpec::esi();
+            instruction.regs[0] = RegSpec::dl();
+            instruction.regs[1] = RegSpec::esi();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
             instruction.operand_count = 2;
@@ -9695,8 +9699,8 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.operand_count = 0;
         }
         OperandCode::DX_Xv => {
-            instruction.modrm_rrr = RegSpec::dx();
-            instruction.modrm_mmm = RegSpec::esi();
+            instruction.regs[0] = RegSpec::dx();
+            instruction.regs[1] = RegSpec::esi();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
             if instruction.prefixes.operand_size() {
@@ -9731,10 +9735,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
 
             if modrm < 0xc0 {
-                instruction.modrm_rrr =
+                instruction.regs[0] =
                     RegSpec { bank: RegisterBank::D, num: (modrm >> 3) & 7 };
                 if instruction.prefixes.operand_size() {
-                    instruction.modrm_rrr.bank = RegisterBank::W;
+                    instruction.regs[0].bank = RegisterBank::W;
                     instruction.mem_size = 4;
                 } else {
                     instruction.mem_size = 8;
@@ -10120,13 +10124,13 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Est => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E_st(words, instruction, modrm)?;
             instruction.operand_count = 2;
         }
         OperandCodeX87::St_Edst => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E_st(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
@@ -10135,7 +10139,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Eqst => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E_st(words, instruction, modrm)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
@@ -10144,7 +10148,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Ew => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
@@ -10153,7 +10157,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Mm => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
@@ -10163,7 +10167,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Mq => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
@@ -10173,7 +10177,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Md => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
@@ -10183,8 +10187,8 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
         OperandCodeX87::St_Mw => {
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
-            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
+            instruction.regs[0] = RegSpec::st(0);
+            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10201,13 +10205,13 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::Est_St => {
             instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Edst_St => {
             instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
@@ -10216,7 +10220,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::Eqst_St => {
             instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
@@ -10225,7 +10229,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::Ed_St => {
             instruction.operands[0] = read_E_st(words, instruction, modrm)?;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
             }
@@ -10238,7 +10242,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
             instruction.mem_size = 10;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mq_St => {
@@ -10248,7 +10252,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
             instruction.mem_size = 8;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Md_St => {
@@ -10258,7 +10262,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
             instruction.mem_size = 4;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mw_St => {
@@ -10268,7 +10272,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
             instruction.mem_size = 2;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.modrm_rrr = RegSpec::st(0);
+            instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ex87S => {

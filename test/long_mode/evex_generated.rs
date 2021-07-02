@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
+use yaxpeax_arch::{AddressBase, Decoder, U8Reader, LengthedInstruction};
 use yaxpeax_x86::long_mode::InstDecoder;
 
 #[allow(dead_code)]
@@ -9,7 +9,8 @@ fn test_invalid(data: &[u8]) {
 }
 
 fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
-    if let Ok(inst) = decoder.decode(data.into_iter().cloned()) {
+    let mut reader = U8Reader::new(data);
+    if let Ok(inst) = decoder.decode(&mut reader) {
         panic!("decoded {:?} from {:02x?} under decoder {}", inst.opcode(), data, decoder);
     } else {
         // this is fine
@@ -26,7 +27,8 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
     for b in data {
         write!(hex, "{:02x}", b).unwrap();
     }
-    match decoder.decode(data.into_iter().map(|x| *x)) {
+    let mut reader = U8Reader::new(data);
+    match decoder.decode(&mut reader) {
         Ok(instr) => {
             let text = format!("{}", instr);
             assert!(

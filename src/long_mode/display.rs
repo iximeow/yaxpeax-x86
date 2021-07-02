@@ -3400,7 +3400,13 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                                             }
                                         }
                                     } else {
-                                        Operand::from_spec(instr, instr.operands[i as usize - 1]).width() / instr.mem_size
+                                        // this should never be `None` - that would imply two
+                                        // memory operands for a broadcasted operation.
+                                        if let Some(width) = Operand::from_spec(instr, instr.operands[i as usize - 1]).width() {
+                                            width / instr.mem_size
+                                        } else {
+                                            0
+                                        }
                                     };
                                     write!(out, "{{1to{}}}", scale)?;
                                 }

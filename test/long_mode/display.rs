@@ -12,7 +12,8 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
     for b in data {
         write!(hex, "{:02x}", b).unwrap();
     }
-    match decoder.decode(data.into_iter().map(|x| *x)) {
+    let mut reader = yaxpeax_arch::U8Reader::new(data);
+    match decoder.decode(&mut reader) {
         Ok(instr) => {
             let text = format!("{}", instr.display_with(DisplayStyle::C));
             assert!(
