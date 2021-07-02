@@ -4094,11 +4094,32 @@ impl Default for InstDecoder {
 impl Decoder<Arch> for InstDecoder {
     fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        read_instr(self, words, &mut instr)
-            .map(|_: ()| instr)
+        read_instr(self, words, &mut instr)?;
+
+        instr.length = words.offset() as u8;
+        if words.offset() > 15 {
+            return Err(DecodeError::TooLong);
+        }
+
+        if self != &InstDecoder::default() {
+            self.revise_instruction(&mut instr)?;
+        }
+
+        Ok(instr)
     }
     fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        read_instr(self, words, instr)
+        read_instr(self, words, instr)?;
+
+        instr.length = words.offset() as u8;
+        if words.offset() > 15 {
+            return Err(DecodeError::TooLong);
+        }
+
+        if self != &InstDecoder::default() {
+            self.revise_instruction(instr)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -7019,13 +7040,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 } else {
                     instruction.prefixes = prefixes;
                     vex::two_byte_vex(words, instruction)?;
-                    instruction.length = words.offset() as u8;
-                    if instruction.length > 15 {
-                        return Err(DecodeError::TooLong);
-                    }
-                    if decoder != &InstDecoder::default() {
-                        decoder.revise_instruction(instruction)?;
-                    }
                     return Ok(());
                 }
             } else if b == 0xc4 {
@@ -7035,13 +7049,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 } else {
                     instruction.prefixes = prefixes;
                     vex::three_byte_vex(words, instruction)?;
-                    instruction.length = words.offset() as u8;
-                    if instruction.length > 15 {
-                        return Err(DecodeError::TooLong);
-                    }
-                    if decoder != &InstDecoder::default() {
-                        decoder.revise_instruction(instruction)?;
-                    }
                     return Ok(());
                 }
             } else if b == 0x62 {
@@ -7052,13 +7059,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 } else {
                     instruction.prefixes = prefixes;
                     evex::read_evex(words, instruction, None)?;
-                    instruction.length = words.offset() as u8;
-                    if instruction.length > 15 {
-                        return Err(DecodeError::TooLong);
-                    }
-                    if decoder != &InstDecoder::default() {
-                        decoder.revise_instruction(instruction)?;
-                    }
                     return Ok(());
                 }
             }
@@ -7106,10 +7106,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
     }
     instruction.prefixes = prefixes;
     read_operands(decoder, words, instruction, record.1)?;
-    instruction.length = words.offset() as u8;
-    if words.offset() > 15 {
-        return Err(DecodeError::TooLong);
-    }
 
     if instruction.prefixes.lock() {
         if !LOCKABLE_INSTRUCTIONS.contains(&instruction.opcode) || !instruction.operands[0].is_memory() {
@@ -7117,11 +7113,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         }
     }
 
-    if decoder != &InstDecoder::default() {
-        // we might have to fix up or reject this instruction under whatever cpu features we need to
-        // pretend to have.
-        decoder.revise_instruction(instruction)?;
-    }
     Ok(())
 }
 /* likely cases
