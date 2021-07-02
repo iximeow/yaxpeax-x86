@@ -7163,9 +7163,9 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
 
     if operand_code.is_only_modrm_operands() {
-        let mut modrm = 0;
-        let mut opwidth = 0;
-        let mut mem_oper = OperandSpec::Nothing;
+        let modrm;
+        let opwidth;
+        let mem_oper;
         let mut bank = RegisterBank::Q;
         // cool! we can precompute opwidth and know we need to read_E.
         if !operand_code.has_byte_operands() {
