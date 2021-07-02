@@ -6980,22 +6980,23 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             return Err(DecodeError::TooLong);
         }
         let record = OPCODES[b as usize];
-        if (b & 0xf0) == 0x40 {
+        if b >= 0x40 && b < 0x50 {
             prefixes.rex_from(b);
-        } else if b == 0x0f {
-            let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            if b == 0x38 {
-                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                break read_0f38_opcode(b, &mut prefixes);
-            } else if b == 0x3a {
-                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                break read_0f3a_opcode(b, &mut prefixes);
-            } else {
-                break read_0f_opcode(b, &mut prefixes);
-            }
         } else if let Interpretation::Instruction(_) = record.0 {
             break record;
         } else {
+            if b == 0x0f {
+                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                if b == 0x38 {
+                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                    break read_0f38_opcode(b, &mut prefixes);
+                } else if b == 0x3a {
+                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                    break read_0f3a_opcode(b, &mut prefixes);
+                } else {
+                    break read_0f_opcode(b, &mut prefixes);
+                }
+            }
             // some prefix seen after we saw rex, but before the 0f escape or an actual
             // opcode. so we must forget the rex prefix!
             // this is to handle sequences like 41660f21cf
