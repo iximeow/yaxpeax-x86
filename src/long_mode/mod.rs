@@ -8610,6 +8610,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     if modrm >= 0b11_000_000 {
                         return Err(DecodeError::InvalidOperand);
                     }
+                    instruction.mem_size = 48;
                     instruction.opcode = Opcode::AESENCWIDE128KL;
                     instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
@@ -8618,6 +8619,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     if modrm >= 0b11_000_000 {
                         return Err(DecodeError::InvalidOperand);
                     }
+                    instruction.mem_size = 48;
                     instruction.opcode = Opcode::AESDECWIDE128KL;
                     instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
@@ -8626,6 +8628,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     if modrm >= 0b11_000_000 {
                         return Err(DecodeError::InvalidOperand);
                     }
+                    instruction.mem_size = 64;
                     instruction.opcode = Opcode::AESENCWIDE256KL;
                     instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
@@ -8634,6 +8637,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     if modrm >= 0b11_000_000 {
                         return Err(DecodeError::InvalidOperand);
                     }
+                    instruction.mem_size = 64;
                     instruction.opcode = Opcode::AESDECWIDE256KL;
                     instruction.operands[0] = read_M(words, instruction, modrm)?;
                     return Ok(());
@@ -8648,6 +8652,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 instruction.opcode = Opcode::LOADIWKEY;
             } else {
+                instruction.mem_size = 48;
                 instruction.opcode = Opcode::AESENC128KL;
             }
         }
@@ -8656,6 +8661,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
+                instruction.mem_size = 48;
                 instruction.opcode = Opcode::AESDEC128KL;
             }
         }
@@ -8664,6 +8670,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
+                instruction.mem_size = 64;
                 instruction.opcode = Opcode::AESENC256KL;
             }
         }
@@ -8672,6 +8679,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
+                instruction.mem_size = 64;
                 instruction.opcode = Opcode::AESDEC256KL;
             }
         }
