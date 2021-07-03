@@ -6984,6 +6984,8 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
 
 fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
     words.mark();
+    let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+    let mut next_rec = OPCODES[nextb as usize];
 //    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
 
@@ -6996,16 +6998,23 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
 
 
     let record: OpcodeRecord = loop {
-        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        if words.offset() >= 15 {
-            return Err(DecodeError::TooLong);
-        }
-        let record = OPCODES[b as usize];
-        if b >= 0x40 && b < 0x50 {
-            prefixes.rex_from(b);
+        let record = next_rec;
+        if nextb >= 0x40 && nextb < 0x50 {
+            if words.offset() >= 15 {
+                return Err(DecodeError::TooLong);
+            }
+            nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+            next_rec = unsafe {
+                core::ptr::read_volatile(&OPCODES[nextb as usize])
+            };
+            prefixes.rex_from(nextb);
         } else if let Interpretation::Instruction(_) = record.0 {
             break record;
         } else {
+            let b = nextb;
+            if words.offset() >= 15 {
+                return Err(DecodeError::TooLong);
+            }
             if b == 0x0f {
                 let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                 if b == 0x38 {
@@ -7063,6 +7072,10 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 }
             }
 
+            nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+            next_rec = unsafe {
+                core::ptr::read_volatile(&OPCODES[nextb as usize])
+            };
             prefixes.rex_from(0);
             match b {
                 0x26 |
@@ -7096,9 +7109,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
         }
     };
-    if record == OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing) {
-        return Err(DecodeError::InvalidOpcode);
-    }
     if let Interpretation::Instruction(opcode) = record.0 {
         instruction.opcode = opcode;
     } else {
