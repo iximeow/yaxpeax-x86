@@ -7562,13 +7562,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         OperandCode::INV_Gv_M => {
             let modrm = read_modrm(words)?;
+            if modrm >= 0xc0 {
+                return Err(DecodeError::InvalidOperand);
+            }
 
             instruction.regs[0] = RegSpec { bank: RegisterBank::D, num: (modrm >> 3) & 7 };
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = read_M(words, instruction, modrm)?;
-            if instruction.operands[1] == OperandSpec::RegMMM {
-                return Err(DecodeError::InvalidOperand);
-            }
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if instruction.prefixes.operand_size() {
                     instruction.mem_size = 4;

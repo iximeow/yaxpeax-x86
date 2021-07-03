@@ -1196,6 +1196,9 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::G_V_E_LL => {
       deny_mask_reg(instruction)?;
+      if [Opcode::VAESDECLAST, Opcode::VAESDEC, Opcode::VAESENC, Opcode::VAESENCLAST].contains(&instruction.opcode) {
+        deny_z(instruction)?;
+      }
 
       let sz = regs_size(instruction);
 
@@ -3151,6 +3154,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       }
     }
     generated::EVEXOperandCode::Gm_E_LL => {
+      deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
 
       let sz = regs_size(instruction);
@@ -4567,7 +4571,9 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
 
       let item_size = if instruction.prefixes.evex_unchecked().vex().w() {
-        if instruction.opcode == Opcode::VRANGESS {
+        if instruction.opcode == Opcode::VRNDSCALESS {
+          return Err(DecodeError::InvalidOpcode);
+        } else if instruction.opcode == Opcode::VRANGESS {
           instruction.opcode = Opcode::VRANGESD;
           8
         } else if instruction.opcode == Opcode::VFPCLASSSS {
@@ -4608,6 +4614,11 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_reg_sizes(instruction, RegisterBank::X);
     }
     generated::EVEXOperandCode::Gm_V_E_xmm_imm8_sae => {
+      if instruction.opcode == Opcode::VRNDSCALESD {
+        if instruction.prefixes.evex_unchecked().vex().w() {
+          return Err(DecodeError::InvalidOpcode);
+        }
+      }
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;

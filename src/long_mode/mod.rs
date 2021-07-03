@@ -7595,6 +7595,9 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operand_count = 1;
         }
         6 => {
+            if instruction.opcode == Opcode::Invalid {
+                return Err(DecodeError::InvalidOpcode);
+            }
             instruction.operands[0] = OperandSpec::Nothing;
             instruction.operand_count = 0;
             return Ok(());
@@ -7731,14 +7734,14 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         OperandCode::INV_Gv_M => {
             let modrm = read_modrm(words)?;
+            if modrm >= 0xc0 {
+                return Err(DecodeError::InvalidOperand);
+            }
 
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex().r(), RegisterBank::Q);
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = read_M(words, instruction, modrm)?;
-            if instruction.operands[1] == OperandSpec::RegMMM {
-                return Err(DecodeError::InvalidOperand);
-            }
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if instruction.prefixes.rex().w() {
                     instruction.mem_size = 10;
