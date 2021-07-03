@@ -1295,6 +1295,7 @@ pub enum Opcode {
     VMLAUNCH,
     VMRESUME,
     VMXOFF,
+    PCONFIG,
     MONITOR,
     MWAIT,
     MONITORX,
@@ -9156,6 +9157,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         },
                         0b100 => {
                             instruction.opcode = Opcode::VMXOFF;
+                        },
+                        0b101 => {
+                            instruction.opcode = Opcode::PCONFIG;
                         },
                         _ => {
                             return Err(DecodeError::InvalidOpcode);

@@ -1213,6 +1213,7 @@ pub enum Opcode {
     VMLAUNCH,
     VMRESUME,
     VMXOFF,
+    PCONFIG,
     MONITOR,
     MWAIT,
     MONITORX,

@@ -598,6 +598,7 @@ const MNEMONICS: &[&'static str] = &[
     "vmlaunch",
     "vmresume",
     "vmxoff",
+    "pconfig",
     "monitor",
     "mwait",
     "monitorx",
@@ -3131,6 +3132,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::VMSAVE |
             Opcode::VMRUN |
             Opcode::VMXOFF |
+            Opcode::PCONFIG |
             Opcode::MONITOR |
             Opcode::MWAIT |
             Opcode::MONITORX |
