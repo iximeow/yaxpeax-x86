@@ -7951,10 +7951,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 instruction.regs[1].bank = RegisterBank::MM;
                 instruction.regs[1].num &= 0b111;
             } else {
-                if [Opcode::PACKSSWB, Opcode::PCMPGTB, Opcode::PCMPGTW, Opcode::PCMPGTD, Opcode::PACKUSWB, Opcode::PUNPCKHBW, Opcode::PUNPCKHWD, Opcode::PUNPCKHDQ, Opcode::PACKSSDW, Opcode::PSRLW, Opcode::PMULHW, Opcode::PSHUFB, Opcode::PHADDW, Opcode::PHADDD, Opcode::PHADDSW, Opcode::PMADDUBSW, Opcode::PHSUBW, Opcode::PHSUBD, Opcode::PHSUBSW, Opcode::PSIGNB, Opcode::PSIGNW, Opcode::PSIGND, Opcode::PMULHRSW, Opcode::PABSB, Opcode::PABSW, Opcode::PABSD].contains(&instruction.opcode) {
-                    instruction.mem_size = 8;
-                } else {
+                if [Opcode::PUNPCKLBW, Opcode::PUNPCKLWD, Opcode::PUNPCKLDQ].contains(&instruction.opcode) {
                     instruction.mem_size = 4;
+                } else {
+                    instruction.mem_size = 8;
                 }
             }
         },
