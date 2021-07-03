@@ -11,6 +11,7 @@ extern crate alloc;
 extern crate yaxpeax_arch;
 
 pub mod long_mode;
+pub use long_mode as amd64;
 pub use long_mode::Arch as x86_64;
 
 pub mod protected_mode;
