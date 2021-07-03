@@ -7000,6 +7000,7 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
     let record: OpcodeRecord = loop {
         let record = next_rec;
         if nextb >= 0x40 && nextb < 0x50 {
+            let b = nextb;
             if words.offset() >= 15 {
                 return Err(DecodeError::TooLong);
             }
@@ -7007,7 +7008,7 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             next_rec = unsafe {
                 core::ptr::read_volatile(&OPCODES[nextb as usize])
             };
-            prefixes.rex_from(nextb);
+            prefixes.rex_from(b);
         } else if let Interpretation::Instruction(_) = record.0 {
             break record;
         } else {
