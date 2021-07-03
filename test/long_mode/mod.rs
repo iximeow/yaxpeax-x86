@@ -3315,3 +3315,9 @@ fn test_tsxldtrk() {
     test_display(&[0xf2, 0x0f, 0x01, 0xe8], "xsusldtrk");
     test_display(&[0xf2, 0x0f, 0x01, 0xe9], "xresldtrk");
 }
+
+// some test cases are best just lifted from llvm or gcc.
+#[test]
+fn from_llvm() {
+    test_display(&[0xf3, 0x0f, 0x3a, 0xf0, 0xc0, 0x01], "hreset 0x1");
+}

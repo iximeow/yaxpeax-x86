@@ -1351,6 +1351,9 @@ const MNEMONICS: &[&'static str] = &[
     "encodekey256",
     "loadiwkey",
 
+    // unsure
+    "hreset",
+
     // 3dnow
     "femms",
     "pi2fw",
@@ -3215,6 +3218,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::ENCODEKEY128 |
             Opcode::ENCODEKEY256 |
             Opcode::LOADIWKEY |
+            Opcode::HRESET |
             Opcode::WRUSS |
             Opcode::WRSS |
             Opcode::INCSSP |

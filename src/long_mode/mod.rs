@@ -585,7 +585,7 @@ impl Operand {
             OperandSpec::Nothing => {
                 Operand::Nothing
             }
-            // the register in regs[0]
+            // the register in modrm_rrr
             OperandSpec::RegRRR => {
                 Operand::Register(inst.regs[0])
             }
@@ -2066,6 +2066,9 @@ pub enum Opcode {
     ENCODEKEY128,
     ENCODEKEY256,
     LOADIWKEY,
+
+    // unsure
+    HRESET,
 
     // 3dnow
     FEMMS,
@@ -4828,6 +4831,7 @@ enum OperandCode {
     ModRM_0xf30f38df = OperandCodeBuilder::new().read_modrm().special_case(49).bits(),
     ModRM_0xf30f38fa = OperandCodeBuilder::new().read_modrm().special_case(50).bits(),
     ModRM_0xf30f38fb = OperandCodeBuilder::new().read_modrm().special_case(51).bits(),
+    ModRM_0xf30f3af0 = OperandCodeBuilder::new().read_modrm().special_case(52).bits(),
 //    ModRM_0x660f3a = OperandCodeBuilder::new().read_modrm().special_case(52).bits(),
 //    ModRM_0x0f38 = OperandCodeBuilder::new().read_modrm().special_case(53).bits(),
 //    ModRM_0x0f3a = OperandCodeBuilder::new().read_modrm().special_case(54).bits(),
@@ -6933,7 +6937,14 @@ fn read_0f38_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
 }
 
 fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
-    if prefixes.rep() || prefixes.repnz() {
+    if prefixes.rep() {
+        return match opcode {
+            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::HRESET), OperandCode::ModRM_0xf30f3af0),
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    }
+
+    if prefixes.repnz() {
         return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
     }
 
@@ -8706,6 +8717,16 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::D;
+        }
+        OperandCode::ModRM_0xf30f3af0 => {
+            let modrm = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+            if modrm & 0xc0 != 0xc0 {
+                return Err(DecodeError::InvalidOpcode);
+                // invalid
+            }
+            instruction.opcode = Opcode::HRESET;
+            instruction.imm = read_num(words, 1)?;
+            instruction.operands[0] = OperandSpec::ImmU8;
         }
         OperandCode::G_mm_Edq => {
             instruction.regs[0].bank = RegisterBank::MM;
