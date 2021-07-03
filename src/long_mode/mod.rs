@@ -7024,9 +7024,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             break record;
         } else {
             let b = nextb;
-            if words.offset() >= 15 {
-                return Err(DecodeError::TooLong);
-            }
             if b == 0x0f {
                 let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                 if b == 0x38 {
@@ -7088,6 +7085,9 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             next_rec = unsafe {
                 core::ptr::read_volatile(&OPCODES[nextb as usize])
             };
+            if words.offset() >= 15 {
+                return Err(DecodeError::TooLong);
+            }
             prefixes.rex_from(0);
             match b {
                 0x26 |
