@@ -1,5 +1,7 @@
 extern crate yaxpeax_arch;
 
+use MEM_SIZE_STRINGS;
+
 use core::fmt;
 
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
@@ -3320,17 +3322,6 @@ impl Instruction {
         self.display_with(DisplayStyle::Intel).contextualize(&NoColors, 0, Some(&NoContext), out)
     }
 }
-
-const MEM_SIZE_STRINGS: [&'static str; 64] = [
-    "byte", "word", "BUG", "dword", "far", "ptr", "BUG", "qword",
-    "BUG", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
-];
 
 fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     if instr.prefixes.lock() {

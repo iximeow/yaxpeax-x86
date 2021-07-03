@@ -18,3 +18,31 @@ pub use protected_mode::Arch as x86_32;
 
 mod real_mode;
 pub use real_mode::Arch as x86_16;
+
+const MEM_SIZE_STRINGS: [&'static str; 64] = [
+    "byte", "word", "BUG", "dword", "far", "ptr", "BUG", "qword",
+    "far", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
+];
+
+pub struct MemoryAccessSize {
+    size: u8,
+}
+impl MemoryAccessSize {
+    pub fn bytes_size(&self) -> Option<u8> {
+        if self.size == 63 {
+            None
+        } else {
+            Some(self.size)
+        }
+    }
+
+    pub fn size_name(&self) -> &'static str {
+        MEM_SIZE_STRINGS[self.size as usize - 1]
+    }
+}

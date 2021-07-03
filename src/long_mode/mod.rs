@@ -4,6 +4,8 @@ mod evex;
 mod display;
 pub mod uarch;
 
+use MemoryAccessSize;
+
 #[cfg(feature = "fmt")]
 pub use self::display::DisplayStyle;
 
@@ -4200,34 +4202,6 @@ impl Opcode {
 impl Default for Instruction {
     fn default() -> Self {
         Instruction::invalid()
-    }
-}
-
-const MEM_SIZE_STRINGS: [&'static str; 64] = [
-    "byte", "word", "BUG", "dword", "BUG", "BUG", "BUG", "qword",
-    "far", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
-];
-
-pub struct MemoryAccessSize {
-    size: u8,
-}
-impl MemoryAccessSize {
-    pub fn bytes_size(&self) -> Option<u8> {
-        if self.size == 63 {
-            None
-        } else {
-            Some(self.size)
-        }
-    }
-
-    pub fn size_name(&self) -> &'static str {
-        MEM_SIZE_STRINGS[self.size as usize - 1]
     }
 }
 
