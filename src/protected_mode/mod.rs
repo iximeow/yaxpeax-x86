@@ -8930,10 +8930,6 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0x0f01 => {
-            if instruction.prefixes.rep() || instruction.prefixes.repnz() {
-                return Err(DecodeError::InvalidOperand);
-            }
-
             let opwidth = if instruction.prefixes.operand_size() {
                 2
             } else {
@@ -8945,6 +8941,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                        return Err(DecodeError::InvalidOperand);
+                    }
+
                     instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
                     match m {
@@ -8979,6 +8979,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 if mod_bits == 0b11 {
                     instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
+                    if instruction.prefixes.rep() || instruction.prefixes.repnz() {
+                        return Err(DecodeError::InvalidOpcode);
+                    }
                     if instruction.prefixes.operand_size() {
                         match m {
                             0b100 => {
@@ -8998,9 +9001,6 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                             }
                         }
                     } else {
-                        if instruction.prefixes.rep() || instruction.prefixes.repnz() {
-                            return Err(DecodeError::InvalidOpcode);
-                        }
                         match m {
                             0b000 => {
                                 instruction.opcode = Opcode::MONITOR;
@@ -9032,6 +9032,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                        return Err(DecodeError::InvalidOperand);
+                    }
+
                     instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
                     match m {
@@ -9067,6 +9071,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                        return Err(DecodeError::InvalidOperand);
+                    }
+
                     match m {
                         0b000 => {
                             instruction.opcode = Opcode::VMRUN;
@@ -9271,6 +9279,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         instruction.regs[0] = RegSpec::ecx();
                         instruction.operand_count = 1;
                     } else if m == 6 {
+                        if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                            return Err(DecodeError::InvalidOperand);
+                        }
+
                         instruction.opcode = Opcode::INVLPGB;
                         instruction.operand_count = 3;
                         instruction.operands[0] = OperandSpec::RegRRR;
@@ -9280,6 +9292,10 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         instruction.regs[1] = RegSpec::edx();
                         instruction.regs[3] = RegSpec::ecx();
                     } else if m == 7 {
+                        if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                            return Err(DecodeError::InvalidOperand);
+                        }
+
                         instruction.opcode = Opcode::TLBSYNC;
                         instruction.operand_count = 0;
                     } else {
