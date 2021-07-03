@@ -1528,7 +1528,11 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
-                        0x16 => (Opcode::VMOVHPD, VEXOperandCode::G_V_M_xmm),
+                        0x16 => (Opcode::VMOVHPD, if L {
+                            return Err(DecodeError::InvalidOpcode);
+                        } else {
+                            VEXOperandCode::G_V_M_xmm
+                        }),
                         0x17 => (Opcode::VMOVHPD, if L {
                             instruction.opcode = Opcode::Invalid;
                             return Err(DecodeError::InvalidOpcode);

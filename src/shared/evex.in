@@ -1488,6 +1488,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
+        deny_broadcast(instruction)?;
         instruction.mem_size = 4;
       }
       set_reg_sizes(instruction, RegisterBank::X);
@@ -1588,6 +1589,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Gm_V_zmm_E_xmm_imm8 => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       instruction.opcode = if instruction.prefixes.evex_unchecked().vex().w() {
         Opcode::VINSERTI64X2
@@ -1614,6 +1616,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Gm_V_ymm_E_xmm_imm8 => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       instruction.opcode = if instruction.prefixes.evex_unchecked().vex().w() {
         Opcode::VINSERTI64X2
@@ -1640,6 +1643,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Gm_V_zmm_E_ymm_imm8 => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VINSERTF32X8 {
@@ -1665,6 +1669,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Em_ymm_G_zmm_imm8 => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VEXTRACTF32X8 {
@@ -1688,6 +1693,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_Eq_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1705,6 +1711,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_ymm_Ed_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1722,6 +1729,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_xmm_Ew_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1739,6 +1747,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_E_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1756,6 +1765,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_ymm_Eq_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1773,6 +1783,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_xmm_Ed_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1790,6 +1801,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_E_ymm_W0 => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1807,6 +1819,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_E_ymm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1825,6 +1838,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1842,6 +1856,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_ymm_E_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1859,6 +1874,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_xmm_Eq_xmm_W0 => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1876,6 +1892,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_xmm_Eq_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1894,6 +1911,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1908,6 +1926,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1922,6 +1941,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1936,6 +1956,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1950,6 +1971,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1964,6 +1986,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1978,6 +2001,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -1992,6 +2016,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2006,6 +2031,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2020,6 +2046,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2038,6 +2065,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2055,6 +2083,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_M_ymm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VBROADCASTF32X8 {
@@ -2080,6 +2109,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_M_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VBROADCASTF32X4 {
@@ -2105,6 +2135,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_ymm_M_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VBROADCASTF32X4 {
@@ -2130,6 +2161,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_zmm_Ed_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         instruction.opcode = Opcode::VBROADCASTSD;
@@ -2151,6 +2183,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::VBROADCASTF32X2_Gm_ymm_Ed_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         instruction.opcode = Opcode::VBROADCASTSD;
@@ -2173,6 +2206,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2190,6 +2224,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Em_xmm_G_LL_imm8 => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         instruction.opcode = if instruction.opcode == Opcode::VEXTRACTF32X4 {
@@ -2218,6 +2253,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Gm_V_LL_E_xmm_imm8 => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       instruction.opcode = if instruction.prefixes.evex_unchecked().vex().w() {
         Opcode::VINSERTF64X2
@@ -2240,6 +2276,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_V_LL_E_xmm_W0 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2254,6 +2291,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_V_LL_E_xmm_W1 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2267,6 +2305,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Gm_V_LL_E_xmm => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         instruction.opcode = if instruction.opcode == Opcode::VPSRAD {
@@ -2289,6 +2328,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::VPEXTRW => {
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2310,6 +2350,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::VPINSRW => {
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2333,6 +2374,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2353,6 +2395,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2373,6 +2416,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2390,6 +2434,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::VMOVD_7e => {
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2420,6 +2465,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::VMOVD_6e => {
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2538,6 +2584,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Em_G_LL => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2574,6 +2621,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Mask_U_LL => {
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2605,6 +2653,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::G_LL_Mask => {
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2637,6 +2686,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2661,6 +2711,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2684,6 +2735,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::G_E_LL_W0 => {
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2704,6 +2756,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::E_G_LL_W0 => {
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2724,6 +2777,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Em_G_LL_W0 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2916,6 +2970,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_LL_Eq_xmm => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         instruction.opcode = Opcode::VPBROADCASTQ;
@@ -2946,6 +3001,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2970,6 +3026,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2994,6 +3051,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3018,6 +3076,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3038,6 +3097,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_E_LL_imm8 => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3101,6 +3161,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
+        deny_broadcast(instruction)?;
         if instruction.opcode == Opcode::VCVTTSD2SI || instruction.opcode == Opcode::VCVTSD2SI || instruction.opcode == Opcode::VCVTTSD2USI || instruction.opcode == Opcode::VCVTSD2USI {
           instruction.mem_size = 8;
         } else {
@@ -3161,6 +3222,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_E_LL => {
       deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3214,6 +3276,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -3237,6 +3300,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -3282,6 +3346,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Mask_V_E_LL_W0 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3307,6 +3372,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Mask_V_E_LL => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3349,10 +3415,8 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
+        deny_broadcast(instruction)?;
         instruction.mem_size = 8;
-        if instruction.prefixes.evex_unchecked().broadcast() {
-          return Err(DecodeError::InvalidOperand);
-        }
       }
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
@@ -3384,9 +3448,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
         instruction.mem_size = 0;
       } else {
         instruction.mem_size = 4;
-        if instruction.prefixes.evex_unchecked().broadcast() {
-          return Err(DecodeError::InvalidOperand);
-        }
+        deny_broadcast(instruction)?;
       }
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
@@ -3408,9 +3470,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     }
     generated::EVEXOperandCode::Mask_V_E_LL_imm8 => {
       check_mask_reg(instruction)?;
-      if instruction.prefixes.evex_unchecked().broadcast() {
-        return Err(DecodeError::InvalidOperand);
-      }
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
       instruction.mem_size = sz;
@@ -3447,6 +3507,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         instruction.opcode = if instruction.opcode == Opcode::VFPCLASSSS {
@@ -3510,6 +3571,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -3601,6 +3663,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
       if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
         instruction.mem_size = 0;
       }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -3665,6 +3728,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
     generated::EVEXOperandCode::Gm_V_E_LL_imm8_W1 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
       instruction.mem_size = sz;
@@ -3726,6 +3790,9 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3741,15 +3808,14 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let sz = regs_size(instruction);
 
-      if instruction.prefixes.evex_unchecked().broadcast() {
-        return Err(DecodeError::InvalidOperand);
-      } else {
-        instruction.mem_size = sz;
-      }
-
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      } else {
+        instruction.mem_size = sz;
+      }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;

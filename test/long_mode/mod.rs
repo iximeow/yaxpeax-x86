@@ -1869,7 +1869,7 @@ fn test_vex() {
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_000, 0x16, 0b00_001_010], "vmovhps xmm9, xmm8, qword [r10]");
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_100, 0x16, 0b00_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_001, 0x16, 0b00_001_010], "vmovhpd xmm9, xmm8, qword [r10]");
-    test_instr(&[0xc4, 0b000_00001, 0b1_0111_101, 0x16, 0b00_001_010], "vmovhpd xmm9, xmm8, qword [r10]");
+    test_invalid(&[0xc4, 0b000_00001, 0b1_0111_101, 0x16, 0b00_001_010]);
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_001, 0x16, 0b11_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_000, 0x17, 0b00_001_010], "vmovhps qword [r10], xmm9");
     test_invalid(&[0xc4, 0b000_00001, 0b1_1111_100, 0x17, 0b00_001_010]);
@@ -3147,6 +3147,12 @@ fn test_x87() {
 
 #[test]
 fn test_mishegos_finds() {
+    test_invalid(&[0xc5, 0x4d, 0x16, 0x0f]);
+    test_invalid(&[0xf3, 0x67, 0x0f, 0x3a, 0xf0, 0xfb, 0xb4]);
+// XOP is still not supported
+//    test_display(&[0xc4, 0x63, 0x91, 0x7f, 0x2f, 0x2e], "vfnmsubsd xmm13, xmm13, xmm2, qword ptr [rdi]");
+    test_invalid(&[0x62, 0xf1, 0x56, 0xfe, 0x58, 0x04, 0xca]);
+    test_invalid(&[0x66, 0xf3, 0x36, 0x65, 0x0f, 0x3a, 0xf0, 0xee, 0x7a]);
     test_display(&[0x62, 0x42, 0xd5, 0x9d, 0x97, 0xf6], "vfmsubadd132pd zmm30{k5}{z}{rne-sae}, zmm5, zmm14");
     test_invalid(&[0x67, 0x66, 0x42, 0x0f, 0x01, 0xfe]);
     test_display(&[0x62, 0x52, 0x05, 0xff, 0xad, 0xfd], "vfnmadd213ss xmm15{k7}{z}{rz-sae}, xmm15, xmm13");

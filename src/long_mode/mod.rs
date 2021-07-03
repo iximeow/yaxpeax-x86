@@ -6943,7 +6943,7 @@ fn read_0f38_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
 
 fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     if prefixes.rep() {
-        if prefixes.operand_size() || prefixes.repnz() {
+        if prefixes != &Prefixes::new(0x10) {
             return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
         }
         return match opcode {

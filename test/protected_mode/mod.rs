@@ -1751,7 +1751,7 @@ fn test_vex() {
     test_instr(&[0xc4, 0b110_00001, 0b1_0111_000, 0x16, 0b00_001_010], "vmovhps xmm1, xmm0, qword [edx]");
     test_invalid(&[0xc4, 0b110_00001, 0b1_0111_100, 0x16, 0b00_001_010]);
     test_instr(&[0xc4, 0b110_00001, 0b1_0111_001, 0x16, 0b00_001_010], "vmovhpd xmm1, xmm0, qword [edx]");
-    test_instr(&[0xc4, 0b110_00001, 0b1_0111_101, 0x16, 0b00_001_010], "vmovhpd xmm1, xmm0, qword [edx]");
+    test_invalid(&[0xc4, 0b110_00001, 0b1_0111_101, 0x16, 0b00_001_010]);
     test_invalid(&[0xc4, 0b110_00001, 0b1_0111_001, 0x16, 0b11_001_010]);
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_000, 0x17, 0b00_001_010], "vmovhps qword [edx], xmm1");
     test_invalid(&[0xc4, 0b110_00001, 0b1_1111_100, 0x17, 0b00_001_010]);
