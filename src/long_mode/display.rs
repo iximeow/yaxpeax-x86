@@ -1806,11 +1806,6 @@ impl Opcode {
     }
 }
 
-    // AVX512CD
-
-
-    // MPX
-
 impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
     fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result {
         match self {

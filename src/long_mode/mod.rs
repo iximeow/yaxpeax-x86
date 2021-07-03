@@ -6967,7 +6967,7 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
             0x61 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPESTRI), OperandCode::G_E_xmm_Ib),
             0x62 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPISTRM), OperandCode::G_E_xmm_Ib),
             0x63 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPISTRI), OperandCode::G_E_xmm_Ib),
-            0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1RNDS4), OperandCode::G_E_xmm_Ib),
+//            0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1RNDS4), OperandCode::G_E_xmm_Ib),
             0xce => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8AFFINEQB), OperandCode::G_E_xmm_Ub),
             0xcf => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8AFFINEINVQB), OperandCode::G_E_xmm_Ub),
             0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::AESKEYGENASSIST), OperandCode::G_E_xmm_Ub),

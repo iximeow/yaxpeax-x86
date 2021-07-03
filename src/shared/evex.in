@@ -86,6 +86,9 @@ pub(crate) fn read_evex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
         }
         instruction.prefixes.apply_compressed_disp(false);
       }
+      if instruction.opcode == Opcode::Invalid {
+        return Err(DecodeError::InvalidOpcode);
+      }
       // TODO: apply rp and bp?
     } else {
       return Err(DecodeError::InvalidOpcode);
