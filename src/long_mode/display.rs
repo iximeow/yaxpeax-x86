@@ -3308,17 +3308,6 @@ impl Instruction {
     }
 }
 
-const MEM_SIZE_STRINGS: [&'static str; 64] = [
-    "byte", "word", "BUG", "dword", "BUG", "BUG", "BUG", "qword",
-    "far", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
-];
-
 fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y, _address: u64, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     if instr.prefixes.lock() {
         write!(out, "lock ")?;
@@ -3345,7 +3334,7 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
 
         let x = Operand::from_spec(instr, instr.operands[0]);
         if x.is_memory() {
-            out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
+            out.write_str(super::MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
             out.write_str(" ")?;
         }
 
@@ -3365,7 +3354,7 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                             out.write_str(", ")?;
                             let x = Operand::from_spec(instr, instr.operands[i as usize]);
                             if x.is_memory() {
-                                out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
+                                out.write_str(super::MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
                                 out.write_str(" ")?;
                             }
                             if let Some(prefix) = instr.segment_override_for_op(i) {

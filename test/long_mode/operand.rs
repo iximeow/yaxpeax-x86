@@ -1,4 +1,4 @@
-use yaxpeax_x86::long_mode::{Operand, RegSpec};
+use yaxpeax_x86::long_mode::{InstDecoder, MemoryAccessSize, Operand, RegSpec};
 
 #[test]
 fn register_widths() {
@@ -12,5 +12,18 @@ fn register_widths() {
 
 #[test]
 fn memory_widths() {
+    // the register operand directly doesn't report a size - it comes from the `Instruction` for
+    // which this is an operand.
     assert_eq!(Operand::RegDeref(RegSpec::rsp()).width(), None);
+
+    fn mem_size_of(data: &[u8]) -> MemoryAccessSize {
+        let decoder = InstDecoder::default();
+        decoder.decode_slice(data).unwrap().mem_size().unwrap()
+    }
+
+    // and checking the memory size direcly reports correct names
+    assert_eq!(mem_size_of(&[0x32, 0x00]).size_name(), "byte");
+    assert_eq!(mem_size_of(&[0x66, 0x33, 0x00]).size_name(), "word");
+    assert_eq!(mem_size_of(&[0x33, 0x00]).size_name(), "dword");
+    assert_eq!(mem_size_of(&[0x48, 0x33, 0x00]).size_name(), "qword");
 }

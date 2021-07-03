@@ -2684,14 +2684,23 @@ pub struct InstDecoder {
 }
 
 impl InstDecoder {
-    /// Instantiates an x86 decoder that decodes the bare minimum of protected-mode x86.
+    /// instantiates an x86 decoder that decodes the bare minimum of protected-mode x86.
     ///
-    /// Pedantic and only decodes what the spec says is well-defined, rejecting undefined sequences
+    /// pedantic and only decodes what the spec says is well-defined, rejecting undefined sequences
     /// and any instructions defined by extensions.
     pub fn minimal() -> Self {
         InstDecoder {
             flags: 0,
         }
+    }
+
+    /// helper to decode an instruction directly from a byte slice.
+    ///
+    /// this lets callers avoid the work of setting up a [`yaxpeax_arch::U8Reader`] for the slice
+    /// to decode.
+    pub fn decode_slice(&self, data: &[u8]) -> Result<Instruction, DecodeError> {
+        let mut reader = yaxpeax_arch::U8Reader::new(data);
+        self.decode(&mut reader)
     }
 
     pub fn sse3(&self) -> bool {
@@ -4103,6 +4112,17 @@ impl Default for Instruction {
     }
 }
 
+const MEM_SIZE_STRINGS: [&'static str; 64] = [
+    "byte", "word", "BUG", "dword", "far", "ptr", "BUG", "qword",
+    "BUG", "mword", "BUG", "BUG", "BUG", "BUG", "BUG", "xmmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
+];
+
 pub struct MemoryAccessSize {
     size: u8,
 }
@@ -4116,7 +4136,7 @@ impl MemoryAccessSize {
     }
 
     pub fn size_name(&self) -> &'static str {
-        "name_strings"
+        MEM_SIZE_STRINGS[self.size as usize - 1]
     }
 }
 
