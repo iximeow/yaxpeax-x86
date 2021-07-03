@@ -14,6 +14,14 @@ pub(crate) fn read_evex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
     let evex_byte_two = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let evex_byte_three = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let p = evex_byte_two & 0x03;
+    if evex_byte_one & 0x0c != 0 {
+        // the two bits above `m` are reserved and must be 0
+        return Err(DecodeError::InvalidOpcode);
+    }
+    if evex_byte_two & 0x04 == 0 {
+        // the one bit above `p` is reserved and must be 1
+        return Err(DecodeError::InvalidOpcode);
+    }
     let m = evex_byte_one & 0x03;
     if m == 0 {
         return Err(DecodeError::InvalidOpcode);
@@ -340,7 +348,6 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_reg_sizes(instruction, RegisterBank::X);
     }
     generated::EVEXOperandCode::Gm_V_Ed_LL_sae => {
-      deny_vex_reg(instruction)?;
       check_mask_reg(instruction)?;
 
       let modrm = read_modrm(words)?;
