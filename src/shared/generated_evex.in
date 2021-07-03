@@ -580,7 +580,7 @@ pub(crate) enum EVEXOperandCode {
   Gm_V_E_LL_sae_bcast,
   Gm_V_E_LL_sae_bcast_W0,
   Gm_V_E_LL_sae_bcast_W1,
-  Gm_V_E_xmm_imm8_sae,
+  Gm_V_E_xmm_imm8_sae_W1,
   Gm_V_E_xmm_sae,
   Gm_V_E_xmm_sae_W1,
   Gm_V_Ed_LL_bcast,
@@ -992,7 +992,7 @@ const EVEX_66_0f3a: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 51] = [
   (0x08, [(super::Opcode::VRNDSCALEPS, EVEXOperandCode::Gm_E_LL_imm8_sae_W0), (super::Opcode::VRNDSCALEPS, EVEXOperandCode::Gm_E_LL_imm8_sae_W0), (super::Opcode::VRNDSCALEPS, EVEXOperandCode::Gm_E_LL_imm8_sae_W0), (super::Opcode::VRNDSCALEPS, EVEXOperandCode::Gm_E_LL_imm8_sae_W0)]),
   (0x09, [(super::Opcode::VRNDSCALEPD, EVEXOperandCode::Gm_E_LL_imm8_sae_W1), (super::Opcode::VRNDSCALEPD, EVEXOperandCode::Gm_E_LL_imm8_sae_W1), (super::Opcode::VRNDSCALEPD, EVEXOperandCode::Gm_E_LL_imm8_sae_W1), (super::Opcode::VRNDSCALEPD, EVEXOperandCode::Gm_E_LL_imm8_sae_W1)]),
   (0x0a, [(super::Opcode::VRNDSCALESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae), (super::Opcode::VRNDSCALESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae), (super::Opcode::VRNDSCALESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae), (super::Opcode::VRNDSCALESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae)]),// W0
-  (0x0b, [(super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae), (super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae), (super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae), (super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae)]),// W1
+  (0x0b, [(super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae_W1), (super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae_W1), (super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae_W1), (super::Opcode::VRNDSCALESD, EVEXOperandCode::Gm_V_E_xmm_imm8_sae_W1)]),// W1
   (0x0f, [(super::Opcode::VPALIGNR, EVEXOperandCode::Gm_V_E_LL_imm8), (super::Opcode::VPALIGNR, EVEXOperandCode::Gm_V_E_LL_imm8), (super::Opcode::VPALIGNR, EVEXOperandCode::Gm_V_E_LL_imm8), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x14, [(super::Opcode::VPEXTRB, EVEXOperandCode::Ebd_G_xmm_imm8), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x15, [(super::Opcode::VPEXTRW, EVEXOperandCode::Ewd_G_xmm_imm8), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),

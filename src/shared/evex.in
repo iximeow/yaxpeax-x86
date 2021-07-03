@@ -4616,12 +4616,9 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       set_reg_sizes(instruction, RegisterBank::X);
     }
-    generated::EVEXOperandCode::Gm_V_E_xmm_imm8_sae => {
-      if instruction.opcode == Opcode::VRNDSCALESD {
-        if instruction.prefixes.evex_unchecked().vex().w() {
-          return Err(DecodeError::InvalidOpcode);
-        }
-      }
+    generated::EVEXOperandCode::Gm_V_E_xmm_imm8_sae_W1 => {
+      ensure_W(instruction, 1)?;
+
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
