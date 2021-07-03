@@ -21,7 +21,7 @@ the decoders provided by `yaxpeax-x86` are designed to be usable in a `no_std` s
 
 yaxpeax-x86 decodes long-mode (`amd64`/`x86_64`), protected-mode (`x86`/`x86_32`), and real-mode (`x86_16`) instructions. the most part, ISA extensions decode equivalently across modes; this is the full list of extensions that are supported:
 
-`3dnow`\*, `sse`\*, `sse2`\*, `sse3`, `ssse3`, `sse4.1`, `sse4.2`, `sse4a`, `avx`, `avx2`, `avx512`\*\*, `syscall`, `cmpxchg16b`, `fma3`, `aesni`, `popcnt`, `rdrand`, `xsave`, `sgx`, `monitor`, `movbe`, `sgx`, `bmi1`, `bmi2`, `invpcid`, `mpx`, `adx`, `clflushopt`, `pcommit`, `sha`, `gfni`, `pclmulqdq`, `rdtscp`, `abm`, `xop`, `skinit`, `tbm`, `svm`, `f16c`, `fma4`, `tsx`, `enqcmd`\*\*\*, `uintr`\*\*\*, `keylocker`\*\*\*, `store_direct`\*\*\*, `cet`\*\*\*
+`3dnow`\*, `sse`\*, `sse2`\*, `sse3`, `ssse3`, `sse4.1`, `sse4.2`, `sse4a`, `avx`, `avx2`, `avx512`\*\*, `syscall`, `cmpxchg16b`, `fma3`, `aesni`, `popcnt`, `rdrand`, `xsave`, `sgx`, `monitor`, `movbe`, `sgx`, `bmi1`, `bmi2`, `invpcid`, `mpx`, `adx`, `clflushopt`, `pcommit`, `sha`, `gfni`, `pclmulqdq`, `rdtscp`, `abm`, `xop`, `skinit`, `tbm`, `svm`, `f16c`, `fma4`, `tsx`, `enqcmd`\*\*\*, `uintr`\*\*\*, `keylocker`\*\*\*, `store_direct`\*\*\*, `cet`\*\*\*, `sev/snp`\*\*\*
 
 \*: `3dnow`, `sse`, and `sse2` are non-optional in `x86_64`, so it is not permitted to construct a decoder that rejects them. `x86_32` and `x86_16` could have features to reject these instructions for true `8086` and `i386` compatibility, but currently do not.
 

@@ -1800,6 +1800,10 @@ const MNEMONICS: &[&'static str] = &[
     "vpandnq",
     "vpandd",
     "vpandq",
+    "psmash",
+    "pvalidate",
+    "rmpadjust",
+    "rmpupdate",
 ];
 
 impl Opcode {
@@ -3091,6 +3095,10 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::INVLPGA |
             Opcode::INVLPGB |
             Opcode::TLBSYNC |
+            Opcode::PSMASH |
+            Opcode::PVALIDATE |
+            Opcode::RMPADJUST |
+            Opcode::RMPUPDATE |
             Opcode::CPUID |
             Opcode::WBINVD |
             Opcode::INVD |

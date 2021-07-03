@@ -2515,6 +2515,11 @@ pub enum Opcode {
     VPANDNQ,
     VPANDD,
     VPANDQ,
+
+    PSMASH,
+    PVALIDATE,
+    RMPADJUST,
+    RMPUPDATE,
 }
 
 impl PartialEq for Instruction {
@@ -9502,7 +9507,21 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         instruction.regs[0] = RegSpec::ecx();
                         instruction.operand_count = 1;
                     } else if m == 6 {
-                        if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                        if instruction.prefixes.rep() {
+                            if instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                                return Err(DecodeError::InvalidOperand);
+                            }
+                            instruction.opcode = Opcode::RMPADJUST;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        } else if instruction.prefixes.repnz() {
+                            if instruction.prefixes.rep() || instruction.prefixes.operand_size() {
+                                return Err(DecodeError::InvalidOperand);
+                            }
+                            instruction.opcode = Opcode::RMPUPDATE;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        } else if instruction.prefixes.operand_size() {
                             return Err(DecodeError::InvalidOperand);
                         }
 
@@ -9515,7 +9534,21 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         instruction.regs[1] = RegSpec::edx();
                         instruction.regs[3] = RegSpec::ecx();
                     } else if m == 7 {
-                        if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                        if instruction.prefixes.rep() {
+                            if instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                                return Err(DecodeError::InvalidOperand);
+                            }
+                            instruction.opcode = Opcode::PSMASH;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        } else if instruction.prefixes.repnz() {
+                            if instruction.prefixes.rep() || instruction.prefixes.operand_size() {
+                                return Err(DecodeError::InvalidOperand);
+                            }
+                            instruction.opcode = Opcode::PVALIDATE;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        } else if instruction.prefixes.operand_size() {
                             return Err(DecodeError::InvalidOperand);
                         }
 

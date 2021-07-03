@@ -3026,6 +3026,14 @@ fn test_tsxldtrk() {
     test_display(&[0xf2, 0x0f, 0x01, 0xe9], "xresldtrk");
 }
 
+#[test]
+fn test_sevsnp() {
+    test_display(&[0xf3, 0x0f, 0x01, 0xff], "psmash");
+    test_display(&[0xf2, 0x0f, 0x01, 0xff], "pvalidate");
+    test_display(&[0xf3, 0x0f, 0x01, 0xfe], "rmpadjust");
+    test_display(&[0xf2, 0x0f, 0x01, 0xfe], "rmpupdate");
+}
+
 // some test cases are best just lifted from llvm or gcc.
 #[test]
 fn from_llvm() {
