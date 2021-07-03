@@ -9154,14 +9154,14 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0x0f01 => {
-            if instruction.prefixes.rep() || instruction.prefixes.repnz() {
-                return Err(DecodeError::InvalidOperand);
-            }
-
             let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
             let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             if r == 0 {
+                if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                    return Err(DecodeError::InvalidOperand);
+                }
+
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {

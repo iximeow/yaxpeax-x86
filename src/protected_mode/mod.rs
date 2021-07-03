@@ -7,6 +7,7 @@ pub mod uarch;
 #[cfg(feature = "fmt")]
 pub use self::display::DisplayStyle;
 
+use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
@@ -171,7 +172,7 @@ impl RegSpec {
         }
     }
 
-    /// construct a `RegSpec` for non-rex byte reg `num`
+    /// construct a `RegSpec` for byte reg `num`
     #[inline]
     pub fn b(num: u8) -> RegSpec {
         if num >= 8 {
@@ -707,35 +708,31 @@ impl Operand {
     }
 
     /// return the width of this operand, in bytes. register widths are determined by the
-    /// register's class.
-    ///
-    /// TODO: /!\ MEMORY WIDTHS ARE ALWAYS REPORTED AS 8 /!\
-    pub fn width(&self) -> u8 {
+    /// register's class. the widths of memory operands are recorded on the instruction this
+    /// `Operand` came from; `None` here means the authoritative width is `instr.mem_size()`.
+    pub fn width(&self) -> Option<u8> {
         match self {
-            Operand::Nothing => {
-                panic!("non-operand does not have a size");
-            }
             Operand::Register(reg) => {
-                reg.width()
+                Some(reg.width())
             }
             Operand::RegisterMaskMerge(reg, _, _) => {
-                reg.width()
+                Some(reg.width())
             }
             Operand::ImmediateI8(_) |
             Operand::ImmediateU8(_) => {
-                1
+                Some(1)
             }
             Operand::ImmediateI16(_) |
             Operand::ImmediateU16(_) => {
-                2
+                Some(2)
             }
             Operand::ImmediateI32(_) |
             Operand::ImmediateU32(_) => {
-                4
+                Some(4)
             }
-            // memory operands
+            // memory operands or `Nothing`
             _ => {
-                4
+                None
             }
         }
     }
@@ -752,7 +749,7 @@ fn operand_size() {
 #[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct RegisterClass {
-    pub(self) kind: RegisterBank,
+    kind: RegisterBank,
 }
 
 const REGISTER_CLASS_NAMES: &[&'static str] = &[
@@ -2446,7 +2443,39 @@ pub enum Opcode {
     VPANDQ,
 }
 
-#[derive(Debug)]
+impl PartialEq for Instruction {
+    fn eq(&self, other: &Self) -> bool {
+        if self.prefixes != other.prefixes {
+            return false;
+        }
+
+        if self.opcode != other.opcode {
+            return false;
+        }
+
+        if self.operand_count != other.operand_count {
+            return false;
+        }
+
+        if self.mem_size != other.mem_size {
+            return false;
+        }
+
+        for i in 0..self.operand_count {
+            if self.operands[i as usize] != other.operands[i as usize] {
+                return false;
+            }
+
+            if self.operand(i) != other.operand(i) {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+#[derive(Debug, Clone, Eq)]
 pub struct Instruction {
     pub prefixes: Prefixes,
     /*
@@ -2491,7 +2520,7 @@ impl yaxpeax_arch::DecodeError for DecodeError {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OperandSpec {
     Nothing,
     // the register in modrm_rrr
@@ -2586,7 +2615,7 @@ pub struct InstDecoder {
     //  2. monitor (intel-only?)
     //  3. vmx (some atom chips still lack it)
     //  4. fma3 (intel haswell/broadwell+, amd piledriver+)
-    //  5. cmpxchg16b (some amd are missingt this one)
+    //  5. cmpxchg16b (some amd are missing this one)
     //  6. sse4.1
     //  7. sse4.2
     //  8. movbe
@@ -3334,7 +3363,6 @@ impl InstDecoder {
             Opcode::MWAIT => {
                 // via Intel section 5.7, SSE3 Instructions
                 if !self.sse3() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3356,7 +3384,6 @@ impl InstDecoder {
             Opcode::PALIGNR => {
                 // via Intel section 5.8, SSSE3 Instructions
                 if !self.ssse3() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3412,7 +3439,6 @@ impl InstDecoder {
             Opcode::PACKUSDW => {
                 // via Intel section 5.10, SSE4.1 Instructions
                 if !self.sse4_1() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3421,7 +3447,6 @@ impl InstDecoder {
             Opcode::MOVNTSS |
             Opcode::MOVNTSD => {
                 if !self.sse4a() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3433,7 +3458,6 @@ impl InstDecoder {
             Opcode::PCMPGTQ => {
                 // via Intel section 5.11, SSE4.2 Instructions
                 if !self.sse4_2() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3445,14 +3469,12 @@ impl InstDecoder {
             Opcode::AESKEYGENASSIST => {
                 // via Intel section 5.12. AESNI AND PCLMULQDQ
                 if !self.aesni() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::PCLMULQDQ => {
                 // via Intel section 5.12. AESNI AND PCLMULQDQ
                 if !self.pclmulqdq() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3461,7 +3483,6 @@ impl InstDecoder {
             Opcode::XEND |
             Opcode::XTEST => {
                 if !self.tsx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3473,7 +3494,6 @@ impl InstDecoder {
             Opcode::SHA256MSG2 |
             Opcode::SHA256RNDS2 => {
                 if !self.sha() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3481,7 +3501,6 @@ impl InstDecoder {
             Opcode::ENCLS |
             Opcode::ENCLU => {
                 if !self.sgx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3830,7 +3849,6 @@ impl InstDecoder {
             Opcode::VSTMXCSR => {
                 // TODO: check a table for these
                 if !self.avx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3842,13 +3860,11 @@ impl InstDecoder {
             Opcode::VAESKEYGENASSIST => {
                 // TODO: check a table for these
                 if !self.avx() || !self.aesni() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::MOVBE => {
                 if !self.movbe() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3871,7 +3887,6 @@ impl InstDecoder {
                      * the less quirky default, so `intel_quirks` is considered the outlier, and
                      * before this default.
                      * */
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3890,17 +3905,14 @@ impl InstDecoder {
                  * so that's considered the less-quirky (default) case here.
                  * */
                 if self.amd_quirks() && !self.abm() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 } else if !self.lzcnt() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::ADCX |
             Opcode::ADOX => {
                 if !self.adx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3911,21 +3923,18 @@ impl InstDecoder {
             Opcode::VMMCALL |
             Opcode::INVLPGA => {
                 if !self.svm() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::STGI |
             Opcode::SKINIT => {
                 if !self.svm() || !self.skinit() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::LAHF |
             Opcode::SAHF => {
                 if !self.lahfsahf() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3947,19 +3956,16 @@ impl InstDecoder {
                  * EVEX.512-coded.
                  */
                 if !self.avx() || !self.f16c() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::RDRAND => {
                 if !self.rdrand() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::RDSEED => {
                 if !self.rdseed() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4001,11 +4007,32 @@ impl Default for InstDecoder {
 impl Decoder<Arch> for InstDecoder {
     fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        read_instr(self, words, &mut instr)
-            .map(|_: ()| instr)
+        read_instr(self, words, &mut instr)?;
+
+        instr.length = words.offset() as u8;
+        if words.offset() > 15 {
+            return Err(DecodeError::TooLong);
+        }
+
+        if self != &InstDecoder::default() {
+            self.revise_instruction(&mut instr)?;
+        }
+
+        Ok(instr)
     }
     fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        read_instr(self, words, instr)
+        read_instr(self, words, instr)?;
+
+        instr.length = words.offset() as u8;
+        if words.offset() > 15 {
+            return Err(DecodeError::TooLong);
+        }
+
+        if self != &InstDecoder::default() {
+            self.revise_instruction(instr)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -4071,6 +4098,23 @@ impl Default for Instruction {
     }
 }
 
+pub struct MemoryAccessSize {
+    size: u8,
+}
+impl MemoryAccessSize {
+    pub fn bytes_size(&self) -> Option<u8> {
+        if self.size == 63 {
+            None
+        } else {
+            Some(self.size)
+        }
+    }
+
+    pub fn size_name(&self) -> &'static str {
+        "name_strings"
+    }
+}
+
 impl Instruction {
     pub fn opcode(&self) -> Opcode {
         self.opcode
@@ -4102,6 +4146,14 @@ impl Instruction {
             false
         } else {
             true
+        }
+    }
+
+    pub fn mem_size(&self) -> Option<MemoryAccessSize> {
+        if self.mem_size != 0 {
+            Some(MemoryAccessSize { size: self.mem_size })
+        } else {
+            None
         }
     }
 
@@ -6863,35 +6915,44 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
 
 fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
     words.mark();
-//    use core::intrinsics::unlikely;
+    let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+    let mut next_rec = OPCODES[nextb as usize];
     let mut prefixes = Prefixes::new(0);
 
+    // default registers to `[eax; 4]`
     instruction.regs = unsafe { core::mem::transmute(0u64) };
     instruction.mem_size = 0;
+    // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
     instruction.operand_count = 2;
 
 
     let record: OpcodeRecord = loop {
-        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        if words.offset() >= 15 {
-            return Err(DecodeError::TooLong);
-        }
-        let record = OPCODES[b as usize];
-        if b == 0x0f {
-            let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            if b == 0x38 {
-                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                break read_0f38_opcode(b, &mut prefixes);
-            } else if b == 0x3a {
-                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                break read_0f3a_opcode(b, &mut prefixes);
-            } else {
-                break read_0f_opcode(b, &mut prefixes);
-            }
-        } else if let Interpretation::Instruction(_) = record.0 {
+        let record = next_rec;
+        if let Interpretation::Instruction(_) = record.0 {
             break record;
         } else {
+            let b = nextb;
+            if words.offset() >= 15 {
+                return Err(DecodeError::TooLong);
+            }
+            if b == 0x0f {
+                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                if b == 0x38 {
+                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                    break read_0f38_opcode(b, &mut prefixes);
+                } else if b == 0x3a {
+                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                    break read_0f3a_opcode(b, &mut prefixes);
+                } else {
+                    break read_0f_opcode(b, &mut prefixes);
+                }
+            }
+
+            nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+            next_rec = unsafe {
+                core::ptr::read_volatile(&OPCODES[nextb as usize])
+            };
             match b {
                 0x26 => {
                     prefixes.set_es();
@@ -7229,40 +7290,24 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                 }
             };
             instruction.operands[0] = mem_oper;
-            instruction.operand_count = 1;
-            match (modrm >> 3) & 7 {
-                0 | 1 => {
-                    instruction.opcode = Opcode::TEST;
-                    instruction.imm = read_imm_signed(words, opwidth)? as u32;
-                    instruction.operands[1] = match opwidth {
-                        1 => OperandSpec::ImmI8,
-                        2 => OperandSpec::ImmI16,
-                        4 => OperandSpec::ImmI32,
-                        _ => unsafe { unreachable_unchecked() }
-                    };
-                    instruction.operand_count = 2;
-                },
-                2 => {
-                    instruction.opcode = Opcode::NOT;
-                },
-                3 => {
-                    instruction.opcode = Opcode::NEG;
-                },
-                4 => {
-                    instruction.opcode = Opcode::MUL;
-                },
-                5 => {
-                    instruction.opcode = Opcode::IMUL;
-                },
-                6 => {
-                    instruction.opcode = Opcode::DIV;
-                },
-                7 => {
-                    instruction.opcode = Opcode::IDIV;
-                },
-                _ => {
-                    unsafe { unreachable_unchecked(); }
-                }
+            const TABLE: [Opcode; 8] = [
+                Opcode::TEST, Opcode::TEST, Opcode::NOT, Opcode::NEG,
+                Opcode::MUL, Opcode::IMUL, Opcode::DIV, Opcode::IDIV,
+            ];
+            let rrr = (modrm >> 3) & 7;
+            instruction.opcode = TABLE[rrr as usize];
+            if rrr < 2 {
+                instruction.opcode = Opcode::TEST;
+                let numwidth = if opwidth == 8 { 4 } else { opwidth };
+                instruction.imm = read_imm_signed(words, numwidth)? as u32;
+                instruction.operands[1] = match opwidth {
+                    1 => OperandSpec::ImmI8,
+                    2 => OperandSpec::ImmI16,
+                    4 => OperandSpec::ImmI32,
+                    _ => unsafe { unreachable_unchecked() }
+                };
+            } else {
+                instruction.operand_count = 1;
             }
         },
         13 => {
@@ -7876,8 +7921,6 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             };
             let addr_width = if instruction.prefixes.address_size() { 2 } else { 4 };
             let imm = read_num(words, addr_width)?;
-            instruction.regs[0] =
-                RegSpec::gp_from_parts(0, instruction.prefixes.rex().b(), opwidth);
             instruction.disp = imm;
             if instruction.prefixes.address_size() {
                 instruction.operands[1] = OperandSpec::DispU16;
