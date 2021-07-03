@@ -762,7 +762,7 @@ impl Operand {
 
     /// return the width of this operand, in bytes. register widths are determined by the
     /// register's class. the widths of memory operands are recorded on the instruction this
-    /// `Operand` came from; `None` here mans the authoritative width is `instr.mem_size()`.
+    /// `Operand` came from; `None` here means the authoritative width is `instr.mem_size()`.
     pub fn width(&self) -> Option<u8> {
         match self {
             Operand::Register(reg) => {
@@ -6998,13 +6998,12 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
-//    use core::intrinsics::unlikely;
     let mut prefixes = Prefixes::new(0);
 
-    // ever so slightly faster than just setting .bank: this allows the two assignments to merge
-    // into one `mov 0, dword [instruction + modrm_mmm_offset]`
+    // default x86_64 registers to `[rax; 4]`
     instruction.regs = unsafe { core::mem::transmute(0u64) };
     instruction.mem_size = 0;
+    // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
     instruction.operand_count = 2;
 
