@@ -6943,6 +6943,9 @@ fn read_0f38_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
 
 fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     if prefixes.rep() {
+        if prefixes.operand_size() || prefixes.repnz() {
+            return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
+        }
         return match opcode {
             0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::HRESET), OperandCode::ModRM_0xf30f3af0),
             _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -7645,7 +7648,8 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operands[0] = mem_oper;
             let r = (modrm >> 3) & 7;
             if r >= 1 {
-                return Err(DecodeError::InvalidOpcode);
+                // TODO: this is where XOP decoding would occur
+                return Err(DecodeError::IncompleteDecoder);
             }
             instruction.opcode = [
                 Opcode::POP,
@@ -9162,13 +9166,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             if r == 0 {
-                if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
-                    return Err(DecodeError::InvalidOperand);
-                }
-
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
+                    if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
+                        return Err(DecodeError::InvalidOperand);
+                    }
+
                     instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
                     match m {
@@ -9298,10 +9302,6 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
                 if mod_bits == 0b11 {
-                    if instruction.prefixes.rep() || instruction.prefixes.repnz() || instruction.prefixes.operand_size() {
-                        return Err(DecodeError::InvalidOperand);
-                    }
-
                     match m {
                         0b000 => {
                             instruction.opcode = Opcode::VMRUN;
