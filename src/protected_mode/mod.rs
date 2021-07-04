@@ -513,6 +513,8 @@ impl OperandSpec {
             OperandSpec::RegDisp => OperandSpec::RegDisp_mask,
             OperandSpec::RegScale => OperandSpec::RegScale_mask,
             OperandSpec::RegScaleDisp => OperandSpec::RegScaleDisp_mask,
+            OperandSpec::RegIndexBase => OperandSpec::RegIndexBase_mask,
+            OperandSpec::RegIndexBaseDisp => OperandSpec::RegIndexBaseDisp_mask,
             OperandSpec::RegIndexBaseScale => OperandSpec::RegIndexBaseScale_mask,
             OperandSpec::RegIndexBaseScaleDisp => OperandSpec::RegIndexBaseScaleDisp_mask,
             o => o,
@@ -536,6 +538,8 @@ impl OperandSpec {
             OperandSpec::RegDisp_mask |
             OperandSpec::RegScale_mask |
             OperandSpec::RegScaleDisp_mask |
+            OperandSpec::RegIndexBase_mask |
+            OperandSpec::RegIndexBaseDisp_mask |
             OperandSpec::RegIndexBaseScale_mask |
             OperandSpec::RegIndexBaseScaleDisp_mask => {
                 true
@@ -753,6 +757,20 @@ impl Operand {
                     Operand::RegScaleDispMasked(inst.regs[2], inst.scale, inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
                 } else {
                     Operand::RegScaleDisp(inst.regs[2], inst.scale, inst.disp as i32)
+                }
+            }
+            OperandSpec::RegIndexBase_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegIndexBaseMasked(inst.regs[1], inst.regs[2], RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegIndexBase(inst.regs[1], inst.regs[2])
+                }
+            }
+            OperandSpec::RegIndexBaseDisp_mask => {
+                if inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                    Operand::RegIndexBaseDispMasked(inst.regs[1], inst.regs[2], inst.disp as i32, RegSpec::mask(inst.prefixes.evex_unchecked().mask_reg()))
+                } else {
+                    Operand::RegIndexBaseDisp(inst.regs[1], inst.regs[2], inst.disp as i32)
                 }
             }
             OperandSpec::RegIndexBaseScale_mask => {
@@ -2707,6 +2725,8 @@ enum OperandSpec {
     RegDisp_mask,
     RegScale_mask,
     RegScaleDisp_mask,
+    RegIndexBase_mask,
+    RegIndexBaseDisp_mask,
     RegIndexBaseScale_mask,
     RegIndexBaseScaleDisp_mask,
 }
