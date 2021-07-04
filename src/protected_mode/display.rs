@@ -3324,8 +3324,14 @@ impl Instruction {
 }
 
 fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
+    if instr.xacquire() {
+        out.write_str("xacquire ")?;
+    }
+    if instr.xrelease() {
+        out.write_str("xrelease ")?;
+    }
     if instr.prefixes.lock() {
-        write!(out, "lock ")?;
+        out.write_str("lock ")?;
     }
 
     if instr.prefixes.rep_any() {
@@ -3436,8 +3442,23 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
 fn contextualize_c<T: fmt::Write, Y: YaxColors>(instr: &Instruction, _colors: &Y, _address: u32, _context: Option<&NoContext>, out: &mut T) -> fmt::Result {
     let mut brace_count = 0;
 
+    let mut prefixed = false;
+
+    if instr.xacquire() {
+        out.write_str("xacquire ")?;
+        prefixed = true;
+    }
+    if instr.xrelease() {
+        out.write_str("xrelease ")?;
+        prefixed = true;
+    }
     if instr.prefixes.lock() {
-        out.write_str("lock { ")?;
+        out.write_str("lock ")?;
+        prefixed = true;
+    }
+
+    if prefixed {
+        out.write_str("{ ")?;
         brace_count += 1;
     }
 

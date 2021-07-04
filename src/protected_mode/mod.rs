@@ -4412,6 +4412,47 @@ impl Instruction {
             instr: self,
         }
     }
+
+    /// does this instruction include the `xacquire` hint for hardware lock elision?
+    pub fn xacquire(&self) -> bool {
+        if self.prefixes.repnz() {
+            // xacquire is permitted on typical `lock` instructions, OR `xchg` with memory operand,
+            // regardless of `lock` prefix.
+            if self.prefixes.lock() {
+                true
+            } else if self.opcode == Opcode::XCHG {
+                self.operands[0] != OperandSpec::RegMMM && self.operands[1] != OperandSpec::RegMMM
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// does this instruction include the `xrelease` hint for hardware lock elision?
+    pub fn xrelease(&self) -> bool {
+        if self.prefixes.rep() {
+            // xrelease is permitted on typical `lock` instructions, OR `xchg` with memory operand,
+            // regardless of `lock` prefix. additionally, xrelease is permitted on some forms of mov.
+            if self.prefixes.lock() {
+                true
+            } else if self.opcode == Opcode::XCHG {
+                self.operands[0] != OperandSpec::RegMMM && self.operands[1] != OperandSpec::RegMMM
+            } else if self.opcode == Opcode::MOV {
+                self.operands[0] != OperandSpec::RegMMM && (
+                    self.operands[1] == OperandSpec::RegRRR ||
+                    self.operands[1] == OperandSpec::ImmI8 ||
+                    self.operands[1] == OperandSpec::ImmI16 ||
+                    self.operands[1] == OperandSpec::ImmI32
+                )
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
