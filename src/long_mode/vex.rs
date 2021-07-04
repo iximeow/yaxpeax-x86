@@ -439,6 +439,12 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             Ok(())
         }
         VEXOperandCode::Nothing => {
+            if instruction.opcode == Opcode::VZEROUPPER || instruction.opcode == Opcode::VZEROALL {
+                if instruction.regs[3].num != 0 {
+                    instruction.opcode = Opcode::Invalid;
+                    return Err(DecodeError::InvalidOperand);
+                }
+            }
             instruction.operand_count = 0;
             Ok(())
         },
@@ -1541,7 +1547,11 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
-                        0x77 => (Opcode::VZEROUPPER, VEXOperandCode::Nothing),
+                        0x77 => if L {
+                            (Opcode::VZEROALL, VEXOperandCode::Nothing)
+                        } else {
+                            (Opcode::VZEROUPPER, VEXOperandCode::Nothing)
+                        },
                         0xAE => (Opcode::Invalid, if L {
                             return Err(DecodeError::InvalidOpcode);
                         } else {

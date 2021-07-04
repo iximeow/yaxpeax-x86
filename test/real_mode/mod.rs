@@ -18189,6 +18189,7 @@ fn test_invalid_sequences() {
     test_invalid(&[0xc4, 0b110_00011, 0b1_1111_101, 0x19, 0b11_001_010, 0x77]);
     test_invalid(&[0xc4, 0b110_00011, 0b1_1111_101, 0x46, 0b11_001_010, 0x77]);
     test_invalid(&[0xc5, 0b1_1111_111, 0x2f, 0b11_001_010]);
+    test_invalid(&[0xc5, 0x8c, 0x77]);
     test_invalid(&[0xd9, 0x08]);
     test_invalid(&[0xd9, 0x09]);
     test_invalid(&[0xd9, 0x0a]);
