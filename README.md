@@ -30,14 +30,14 @@ yaxpeax-x86 decodes long-mode (`amd64`/`x86_64`), protected-mode (`x86`/`x86_32`
 \*\*\*: i ran out of space for feature bits. `InstDecoder` is currently a `u64` and all 64 bits are used for x86 features mapping to `cpuid` bits. supporting these as optional instructions would require growing this to a pair of `u64`. since the typical case is to decode everything, these are decoded regardless of `InstDecoder` settings. growing `InstDecoder` to an `u128` is likely acceptable, but has not yet been profiled.
 
 ### very fast
-when hooked up to [`disas-bench`](https://github.com/iximeow/disas-bench#results), `yaxpeax_x86::long_mode` has shown roughly 250mb/s decode throughput and on most hardware is the fastest software x86 decoder available.
+when hooked up to [`disas-bench`](https://github.com/iximeow/disas-bench#results), `yaxpeax_x86::long_mode` has shown roughly 250mb/s decode throughput and on most hardware is the fastest software x86 decoder available. the likely path through the decoder, through `<yaxpeax_x86::amd64::InstDecoder as yaxpeax_arch::Decoder>::decode_into``, is an average of 58 cycles on a zen2 core.
 
-while there is an in-repo benchmark, i've decided it's so unrealistic as to be unuseful, and prefer `disas-bench` until it can be made more informative..
+while there is an in-repo benchmark, i've decided it's so unrealistic as to be unuseful, and prefer `disas-bench` until it can be made more informative.
 
 ### pretty small?
-`yaxpeax_x86::long_mode` is expected to be around 20kb of code and data. currently a stripped static build of `ffi/` takes a bit more space - around 130kb. instruction rendering is currently non-optional, and is a significant amount of `.text` size. data tables are larger than anticipated, and it's currently an open question if they can be reduced down, or the size target of `yaxpeax_x86::long_mode` should be raised.
+`yaxpeax_x86::long_mode` built on its own is around 143kb of code and data. with data for instruction formatting, this grows to 249kb. while code size can be shrunk some, most of the crate is a few lookup tables - the hot path through `yaxpeax-x86`'s decode logic stays in functions coming out to ~5 kilobytes of code, and lots of supporting logic for less likely instructions.
 
-this, however, does not by any means make this library the smallest `x86_64` decoder; [`zydis`](https://github.com/zyantific/zydis) handily beats `yaxpeax-x86` out, taking only 10kb in an -O3 build for benchmarking.
+`yaxpeax_x86` may be the smallest library for tasks focused entirely on decoding and instruction formatting, but this crate doesn't have extensive testing to that end.
 
 ### mirrors
 
@@ -59,3 +59,5 @@ a changelog across crate versions is maintained in the `CHANGELOG` file located 
 [`iced`](https://github.com/0xd4d/iced) is another very good `x86_64` decoder, also written in rust. it provides additional information about instruction semantics as part of the crate, as well as the ability to re-encode instructions.
 
 [`disas-bench`](https://github.com/athre0z/disas-bench), a handy benchmark of several `x86_64` decoders including `yaxpeax-x86`.
+
+[`mishegos`](https://github.com/trailofbits/mishegos/), a differential fuzzer that has made testing the correctness of `yaxpeax-x86` _much_ easier.
