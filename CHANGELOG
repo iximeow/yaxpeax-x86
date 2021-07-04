@@ -1,3 +1,18 @@
+## 1.0.0
+* `avx512` support
+* `avx2` support
+* `avx` support
+* real-mode (x86_16) support
+* ffi-friendly packaging of decoders for 16-bit, 32-bit, and multi-arch uses
+* added `Instruction::mem_size()` to query the size of an instruction's memory access
+* `xacquire`/`xrelease` support
+* `AMD` `sev_snp` support
+* `pconfig`/Total Memory Encryption support
+* `Intel` `keylocker` support
+* removed `MOVSX_b`, `MOVSX_w`, `MOVZX_b`, and `MOVZX_w` - these differentiations are now described by `mem_size` and the `MOVSX`/`MOVZX` opcodes generally
+* `PartialEq` impl for `Instruction` and all contained structures
+* expose more details of an instruction's prefixes, and which prefixes are actually present on the instruction
+
 ## 0.2.2
 * fix rendering error in `ShowContextual` impl with `&[Option<String>]` overrides
   - would in some circumstances incorrectly print stale data if an `Instruction` was reused for decoding.
