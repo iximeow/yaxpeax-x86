@@ -4,7 +4,7 @@ mod evex;
 mod display;
 pub mod uarch;
 
-pub use MemoryAccessSize;
+pub use crate::MemoryAccessSize;
 
 #[cfg(feature = "fmt")]
 pub use self::display::DisplayStyle;
@@ -964,7 +964,6 @@ const REGISTER_CLASS_NAMES: &[&'static str] = &[
 /// and so on. constants in this module are useful for inspecting the register class of a decoded
 /// instruction. as an example:
 /// ```
-/// extern crate yaxpeax_arch;
 /// use yaxpeax_x86::long_mode::{self as amd64};
 /// use yaxpeax_x86::long_mode::{Opcode, Operand, RegisterClass};
 /// use yaxpeax_arch::{Decoder, U8Reader};

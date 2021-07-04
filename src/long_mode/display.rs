@@ -1,12 +1,9 @@
-extern crate yaxpeax_arch;
-
-use MEM_SIZE_STRINGS;
-
 use core::fmt;
 
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
+use crate::MEM_SIZE_STRINGS;
 use crate::long_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
 
 impl fmt::Display for InstDecoder {

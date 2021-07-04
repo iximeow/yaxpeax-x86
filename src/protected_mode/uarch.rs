@@ -16,7 +16,7 @@ pub mod amd {
     //! as retrieved 2020 may 19,
     //! `sha256: 87ff152ae18c017dcbfb9f7ee6e88a9f971f6250fd15a70a3dd87c3546323bd5`
 
-    use long_mode::InstDecoder;
+    use crate::protected_mode::InstDecoder;
 
     /// `k8` was the first AMD microarchitecture to implement x86_64, launched in 2003. while later
     /// `k8`-based processors supported SSE3, these predefined decoders pick the lower end of
@@ -107,7 +107,7 @@ pub mod amd {
 pub mod intel {
     //! sourced by walking wikipedia pages. seriously! this stuff is kinda hard to figure out!
 
-    use long_mode::InstDecoder;
+    use crate::protected_mode::InstDecoder;
 
     /// `Netburst` was the first Intel microarchitecture to implement x86_64, beginning with the
     /// `Prescott` family launched in 2004. while the wider `Netburst` family launched in 2000

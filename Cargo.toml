@@ -7,6 +7,7 @@ license = "0BSD"
 repository = "http://git.iximeow.net/yaxpeax-x86/"
 description = "x86 decoders for the yaxpeax project"
 readme = "README.md"
+edition = "2018"
 
 [dependencies]
 yaxpeax-arch = { version = "0.1.0", default-features = false, features = [] }
