@@ -13,18 +13,12 @@ use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
+use yaxpeax_arch::{DecodeError as ArchDecodeError};
 
 use core::fmt;
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            DecodeError::ExhaustedInput => { write!(f, "exhausted input") },
-            DecodeError::InvalidOpcode => { write!(f, "invalid opcode") },
-            DecodeError::InvalidOperand => { write!(f, "invalid operand") },
-            DecodeError::InvalidPrefixes => { write!(f, "invalid prefixes") },
-            DecodeError::TooLong => { write!(f, "too long") },
-            DecodeError::IncompleteDecoder => { write!(f, "the decoder is incomplete") },
-        }
+        f.write_str(self.description())
     }
 }
 
@@ -2727,6 +2721,16 @@ impl yaxpeax_arch::DecodeError for DecodeError {
     fn data_exhausted(&self) -> bool { self == &DecodeError::ExhaustedInput }
     fn bad_opcode(&self) -> bool { self == &DecodeError::InvalidOpcode }
     fn bad_operand(&self) -> bool { self == &DecodeError::InvalidOperand }
+    fn description(&self) -> &'static str {
+        match self {
+            DecodeError::ExhaustedInput => { "exhausted input" },
+            DecodeError::InvalidOpcode => { "invalid opcode" },
+            DecodeError::InvalidOperand => { "invalid operand" },
+            DecodeError::InvalidPrefixes => { "invalid prefixes" },
+            DecodeError::TooLong => { "too long" },
+            DecodeError::IncompleteDecoder => { "the decoder is incomplete" },
+        }
+    }
 }
 
 #[allow(non_camel_case_types)]
