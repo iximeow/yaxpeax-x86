@@ -388,34 +388,91 @@ enum SizeCode {
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Operand {
+    /// a sign-extended byte
     ImmediateI8(i8),
+    /// a zero-extended byte
     ImmediateU8(u8),
+    /// a sign-extended word
     ImmediateI16(i16),
+    /// a zero-extended word
     ImmediateU16(u16),
-    ImmediateU32(u32),
+    /// a sign-extended dword
     ImmediateI32(i32),
+    /// a zero-extended dword
+    ImmediateU32(u32),
+    /// a bare register operand, such as `rcx`.
     Register(RegSpec),
+    /// an `avx512` register operand with optional mask register and merge mode, such as
+    /// `zmm3{k4}{z}`.
+    ///
+    /// if the mask register is `k0`, there is no masking applied, and the default x86 operation is
+    /// `MergeMode::Merge`.
     RegisterMaskMerge(RegSpec, RegSpec, MergeMode),
+    /// an `avx512` register operand with optional mask register, merge mode, and suppressed
+    /// exceptions, such as `zmm3{k4}{z}{rd-sae}`.
+    ///
+    /// if the mask register is `k0`, there is no masking applied, and the default x86 operation is
+    /// `MergeMode::Merge`.
     RegisterMaskMergeSae(RegSpec, RegSpec, MergeMode, SaeMode),
+    /// an `avx512` register operand with optional mask register, merge mode, and suppressed
+    /// exceptions, with no overridden rounding mode, such as `zmm3{k4}{z}{sae}`.
+    ///
+    /// if the mask register is `k0`, there is no masking applied, and the default x86 operation is
+    /// `MergeMode::Merge`.
     RegisterMaskMergeSaeNoround(RegSpec, RegSpec, MergeMode),
+    /// a memory access to a literal word address. it's extremely rare that a well-formed x86
+    /// instruction uses this mode. as an example, `[0x1133]`
     DisplacementU16(u16),
+    /// a memory access to a literal qword address. it's relatively rare that a well-formed x86
+    /// instruction uses this mode, but plausibe. for example, `fs:[0x14]`. segment overrides,
+    /// however, are maintained on the instruction itself.
     DisplacementU32(u32),
+    /// a simple dereference of the address held in some register. for example: `[esi]`.
     RegDeref(RegSpec),
+    /// a dereference of the address held in some register with offset. for example: `[esi + 0x14]`.
     RegDisp(RegSpec, i32),
+    /// a dereference of the address held in some register scaled by 1, 2, 4, or 8. this is almost always used with the `lea` instruction. for example: `[edx * 4]`.
     RegScale(RegSpec, u8),
+    /// a dereference of the address from summing two registers. for example: `[ebp + rax]`
     RegIndexBase(RegSpec, RegSpec),
+    /// a dereference of the address from summing two registers with offset. for example: `[edi + ecx + 0x40]`
     RegIndexBaseDisp(RegSpec, RegSpec, i32),
+    /// a dereference of the address held in some register scaled by 1, 2, 4, or 8 with offset. this is almost always used with the `lea` instruction. for example: `[eax * 4 + 0x30]`.
     RegScaleDisp(RegSpec, u8, i32),
+    /// a dereference of the address from summing a register and index register scaled by 1, 2, 4,
+    /// or 8. for
+    /// example: `[esi + ecx * 4]`
     RegIndexBaseScale(RegSpec, RegSpec, u8),
+    /// a dereference of the address from summing a register and index register scaled by 1, 2, 4,
+    /// or 8, with offset. for
+    /// example: `[esi + ecx * 4 + 0x1234]`
     RegIndexBaseScaleDisp(RegSpec, RegSpec, u8, i32),
+    /// an `avx512` dereference of register with optional masking. for example: `[edx]{k3}`
     RegDerefMasked(RegSpec, RegSpec),
+    /// an `avx512` dereference of register plus offset, with optional masking. for example: `[esp + 0x40]{k3}`
     RegDispMasked(RegSpec, i32, RegSpec),
+    /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8, with optional masking. this
+    /// seems extraordinarily unlikely to occur in practice. for example: `[esi * 4]{k2}`
     RegScaleMasked(RegSpec, u8, RegSpec),
+    /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8, with optional masking.
+    /// for example: `[esi + eax * 4]{k6}`
     RegIndexBaseMasked(RegSpec, RegSpec, RegSpec),
+    /// an `avx512` dereference of a register plus offset, with optional masking.  for example:
+    /// `[esi + eax + 0x1313]{k6}`
     RegIndexBaseDispMasked(RegSpec, RegSpec, i32, RegSpec),
+    /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8 plus offset, with optional
+    /// masking. this seems extraordinarily unlikely to occur in practice. for example: `[esi *
+    /// 4 + 0x1357]{k2}`
     RegScaleDispMasked(RegSpec, u8, i32, RegSpec),
+    /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8, with optional
+    /// masking.  for example: `[esi + eax * 4]{k6}`
     RegIndexBaseScaleMasked(RegSpec, RegSpec, u8, RegSpec),
+    /// an `avx512` dereference of a register plus index scaled by 1, 2, 4, or 8 and offset, with
+    /// optional masking.  for example: `[esi + eax * 4 + 0x1313]{k6}`
     RegIndexBaseScaleDispMasked(RegSpec, RegSpec, u8, i32, RegSpec),
+    /// no operand. it is a bug for `yaxpeax-x86` to construct an `Operand` of this kind for public
+    /// use; the instruction's `operand_count` should be reduced so as to make this invisible to
+    /// library clients.
     Nothing,
 }
 

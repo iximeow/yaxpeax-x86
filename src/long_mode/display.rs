@@ -123,10 +123,10 @@ const REG_NAMES: &[&'static str] = &[
     "st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)",
     "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7",
     "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
-    "eip", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
-    "rip", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
-    "eflags", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
-    "rflags", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+    "eip", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "rip", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "eflags", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "rflags", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
 ];
 
 pub(crate) fn regspec_label(spec: &RegSpec) -> &'static str {
