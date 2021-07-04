@@ -5013,6 +5013,56 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
         instruction.mem_size = 8;
       }
     }
+    generated::EVEXOperandCode::Mvector_Mask_G_LL => {
+      check_mask_reg(instruction)?;
+      deny_z(instruction)?;
+
+      // we can't just `deny_vex_reg` because vp is used as bit 5 for the index register
+      if instruction.regs[3].num & 0b1111 != 0 {
+        return Err(DecodeError::InvalidOperand);
+      }
+
+      let modrm = read_modrm(words)?;
+      set_rrr(instruction, modrm);
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      instruction.regs[2].num |= instruction.regs[3].num & 0b10000;
+      instruction.operands[0] = mem_oper;
+      instruction.operands[1] = OperandSpec::RegVex;
+      instruction.regs[3].bank = RegisterBank::K;
+      instruction.regs[3].num = instruction.prefixes.evex_unchecked().mask_reg();
+      instruction.operands[2] = OperandSpec::RegRRR;
+      instruction.operand_count = 2;
+
+      if mem_oper == OperandSpec::RegMMM {
+        return Err(DecodeError::InvalidOperand);
+      }
+
+      if instruction.prefixes.evex_unchecked().lp() {
+        if instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOperand);
+        }
+        instruction.regs[0].bank = RegisterBank::Z;
+        instruction.regs[2].bank = RegisterBank::Z;
+      } else if instruction.prefixes.evex_unchecked().vex().l() {
+        instruction.regs[0].bank = RegisterBank::Y;
+        instruction.regs[2].bank = RegisterBank::Y;
+      } else {
+        instruction.regs[0].bank = RegisterBank::X;
+        instruction.regs[2].bank = RegisterBank::X;
+      }
+
+      if instruction.prefixes.evex_unchecked().vex().w() {
+        if instruction.opcode == Opcode::VPSCATTERDD {
+          instruction.opcode = Opcode::VPSCATTERDQ;
+        } else if instruction.opcode == Opcode::VPSCATTERQD {
+          instruction.opcode = Opcode::VPSCATTERQQ;
+        }
+        instruction.mem_size = 8;
+      } else {
+        instruction.mem_size = 4;
+      }
+      instruction.operand_count = 3;
+    }
     generated::EVEXOperandCode::Nothing => {}
   }
   Ok(())
