@@ -71,6 +71,20 @@ pub(crate) fn read_evex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
       let (opcode, operand_code) = table[entry].1[index_lower];
       instruction.opcode = opcode;
       read_evex_operands(words, instruction, operand_code)?;
+      if instruction.prefixes.evex_unchecked().rp() {
+        instruction.regs[0].num |= 0b10000;
+        if ![RegisterBank::X, RegisterBank::Y, RegisterBank::Z].contains(&instruction.regs[0].bank) {
+          return Err(DecodeError::InvalidOperand);
+        }
+      }
+      if instruction.prefixes.evex_unchecked().vex().x() {
+        if instruction.operands.contains(&OperandSpec::RegMMM) {
+          instruction.regs[1].num |= 0b10000;
+          if ![RegisterBank::X, RegisterBank::Y, RegisterBank::Z].contains(&instruction.regs[1].bank) {
+            return Err(DecodeError::InvalidOperand);
+          }
+        }
+      }
       if instruction.prefixes.evex_unchecked().vex().compressed_disp() {
         let overridden_size = match instruction.opcode {
           Opcode::VPEXPANDB => Some(1),
