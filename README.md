@@ -1,5 +1,8 @@
 ## yaxpeax-x86
 
+[![crate](https://img.shields.io/crates/v/yaxpeax-x86.svg?logo=rust)](https://crates.io/crates/yaxpeax-x86)
+[![documentation](https://docs.rs/yaxpeax-x86/badge.svg)](https://docs.rs/yaxpeax-x86)
+
 x86 decoders implemented as part of the yaxpeax project, implementing traits provided by `yaxpeax-arch`.
 
 Rust users of this library will either want to use the [quick and dirty APIs], or more generic decode interfaces from `yaxpeax-arch` - appropriate when mixing `yaxpeax-x86` usage with other `yaxpeax` decoders, such as `yaxpeax-arm`. examples of both styles are provided [in the documentation](link).
