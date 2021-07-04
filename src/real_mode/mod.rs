@@ -2679,6 +2679,15 @@ impl yaxpeax_arch::DecodeError for DecodeError {
     }
 }
 
+#[cfg(feature = "std")]
+extern crate std;
+#[cfg(feature = "std")]
+impl std::error::Error for DecodeError {
+    fn description(&self) -> &str {
+        <Self as yaxpeax_arch::DecodeError>::description(self)
+    }
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OperandSpec {
