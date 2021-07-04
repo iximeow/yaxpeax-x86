@@ -1218,7 +1218,7 @@ fn test_control_flow() {
     test_display(&[0x66, 0xff, 0xe0], "jmp rax");
     test_display(&[0x67, 0xff, 0xe0], "jmp rax");
     test_invalid(&[0xff, 0xd8]);
-    test_display(&[0xff, 0x18], "callf far [rax]");
+    test_display(&[0xff, 0x18], "callf mword [rax]");
     test_display(&[0xe0, 0x12], "loopnz 0x12");
     test_display(&[0xe1, 0x12], "loopz 0x12");
     test_display(&[0xe2, 0x12], "loop 0x12");
@@ -1489,9 +1489,9 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00011, 0b0_0111_001, 0x09, 0b11_001_010, 0x77]);
     test_invalid(&[0xc4, 0b000_00011, 0b0_0111_101, 0x09, 0b11_001_010, 0x77]);
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x0a, 0b11_001_010, 0x77], "vroundss xmm9, xmm8, xmm10, 0x77");
-    test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x0a, 0b11_001_010, 0x77], "vroundss ymm9, ymm8, ymm10, 0x77");
+    test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x0a, 0b11_001_010, 0x77], "vroundss xmm9, xmm8, xmm10, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x0b, 0b11_001_010, 0x77], "vroundsd xmm9, xmm8, xmm10, 0x77");
-    test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x0b, 0b11_001_010, 0x77], "vroundsd ymm9, ymm8, ymm10, 0x77");
+    test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x0b, 0b11_001_010, 0x77], "vroundsd xmm9, xmm8, xmm10, 0x77");
 
     test_instr(&[0xc4, 0b000_00011, 0b1_0111_001, 0x0f, 0b11_001_010, 0x77], "vpalignr xmm9, xmm8, xmm10, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b1_0111_101, 0x0f, 0b11_001_010, 0x77], "vpalignr ymm9, ymm8, ymm10, 0x77");
@@ -1517,7 +1517,7 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00011, 0b0_0111_101, 0x17, 0b00_001_010, 0x77]);
 
     test_invalid(&[0xc4, 0b000_00011, 0b1_0111_001, 0x18, 0b11_001_010, 0x77]);
-    test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x18, 0b11_001_010, 0x77], "vinsertf128 ymm9, ymm8, ymm10, 0x77");
+    test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x18, 0b11_001_010, 0x77], "vinsertf128 ymm9, ymm8, xmm10, 0x77");
     test_invalid(&[0xc4, 0b000_00011, 0b1_0111_101, 0x18, 0b11_001_010, 0x77]);
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_101, 0x19, 0b11_001_010, 0x77], "vextractf128 xmm10, ymm9, 0x77");
     test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x19, 0b11_001_010, 0x77]);
@@ -1853,7 +1853,7 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00001, 0b0_0111_011, 0x12, 0b00_001_010]);
     test_invalid(&[0xc4, 0b000_00001, 0b0_0111_111, 0x12, 0b00_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_000, 0x12, 0b11_001_010], "vmovhlps xmm9, xmm8, xmm10");
-    test_instr(&[0xc4, 0b000_00001, 0b1_0111_000, 0x12, 0b00_001_010], "vmovlps xmm9, xmm8, dword [r10]");
+    test_instr(&[0xc4, 0b000_00001, 0b1_0111_000, 0x12, 0b00_001_010], "vmovlps xmm9, xmm8, qword [r10]");
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_100, 0x12, 0b11_001_010]);
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_111, 0x12, 0b11_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_010, 0x12, 0b00_001_010], "vmovsldup xmm9, xmmword [r10]");
@@ -2269,8 +2269,8 @@ fn test_vex() {
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_001, 0xd9, 0b11_001_010], "vpsubusw xmm9, xmm8, xmm10");
     test_avx2(&[0xc4, 0b000_00001, 0b1_0111_101, 0xd9, 0b11_001_010], "vpsubusw ymm9, ymm8, ymm10");
 
-    test_instr(&[0xc4, 0b000_00001, 0b0_0111_001, 0xda, 0b11_001_010], "vpminsw xmm9, xmm8, xmm10");
-    test_avx2(&[0xc4, 0b000_00001, 0b0_0111_101, 0xda, 0b11_001_010], "vpminsw ymm9, ymm8, ymm10");
+    test_instr(&[0xc4, 0b000_00001, 0b0_0111_001, 0xda, 0b11_001_010], "vpminub xmm9, xmm8, xmm10");
+    test_avx2(&[0xc4, 0b000_00001, 0b0_0111_101, 0xda, 0b11_001_010], "vpminub ymm9, ymm8, ymm10");
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_001, 0xdb, 0b11_001_010], "vpand xmm9, xmm8, xmm10");
     test_avx2(&[0xc4, 0b000_00001, 0b1_0111_101, 0xdb, 0b11_001_010], "vpand ymm9, ymm8, ymm10");
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_001, 0xdc, 0b11_001_010], "vpaddusb xmm9, xmm8, xmm10");

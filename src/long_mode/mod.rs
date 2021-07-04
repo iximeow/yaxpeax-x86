@@ -7673,7 +7673,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                 if opcode == Opcode::CALL || opcode == Opcode::JMP || opcode == Opcode::PUSH || opcode == Opcode::POP {
                     instruction.mem_size = 8;
                 } else if opcode == Opcode::CALLF || opcode == Opcode::JMPF {
-                    instruction.mem_size = 9;
+                    instruction.mem_size = 10;
                 }
             }
             instruction.opcode = opcode;

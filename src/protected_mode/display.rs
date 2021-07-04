@@ -1328,7 +1328,7 @@ const MNEMONICS: &[&'static str] = &[
     "loopnz",
     "loopz",
     "loop",
-    "jrcxz",
+    "jecxz",
     "pusha",
     "popa",
     "bound",
@@ -1337,8 +1337,8 @@ const MNEMONICS: &[&'static str] = &[
     "aaa",
     "das",
     "daa",
-    "amx",
-    "adx",
+    "aam",
+    "aad",
     "movdir64b",
     "movdiri",
     "aesdec128kl",
@@ -2332,8 +2332,8 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::AAS |
             Opcode::DAS |
             Opcode::DAA |
-            Opcode::ADX |
-            Opcode::AMX |
+            Opcode::AAD |
+            Opcode::AAM |
             Opcode::KADDB |
             Opcode::KANDB |
             Opcode::KANDNB |
@@ -2403,7 +2403,7 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::LOOPNZ |
             Opcode::LOOPZ |
             Opcode::LOOP |
-            Opcode::JRCXZ |
+            Opcode::JECXZ |
             Opcode::CALL |
             Opcode::CALLF |
             Opcode::JMP |

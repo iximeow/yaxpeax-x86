@@ -411,7 +411,7 @@ fn read_vex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.opcode = if modrm & 0xc0 == 0xc0 {
                 Opcode::VMOVHLPS
             } else {
-                instruction.mem_size = 4;
+                instruction.mem_size = 8;
                 Opcode::VMOVLPS
             };
             instruction.regs[0] =
@@ -1925,7 +1925,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
-                        0xDA => (Opcode::VPMINSW, if L {
+                        0xDA => (Opcode::VPMINUB, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
                             VEXOperandCode::G_V_E_xmm
@@ -3201,12 +3201,12 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         VEXOperandCode::G_E_xmm_imm8
                     }),
                     0x0A => (Opcode::VROUNDSS, if L {
-                        VEXOperandCode::G_V_E_ymm_imm8
+                        VEXOperandCode::G_V_E_xmm_imm8
                     } else {
                         VEXOperandCode::G_V_E_xmm_imm8
                     }),
                     0x0B => (Opcode::VROUNDSD, if L {
-                        VEXOperandCode::G_V_E_ymm_imm8
+                        VEXOperandCode::G_V_E_xmm_imm8
                     } else {
                         VEXOperandCode::G_V_E_xmm_imm8
                     }),
@@ -3269,7 +3269,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         return Err(DecodeError::InvalidOpcode);
                     } else {
                         (Opcode::VINSERTF128, if L {
-                            VEXOperandCode::G_V_E_ymm_imm8
+                            VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8
                         } else {
                             instruction.opcode = Opcode::Invalid;
                             return Err(DecodeError::InvalidOpcode);

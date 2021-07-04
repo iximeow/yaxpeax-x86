@@ -888,7 +888,7 @@ const REGISTER_CLASS_NAMES: &[&'static str] = &[
     "eflags",
 ];
 
-/// high-level register classes in an x86 machine, such as "8-byte general purpose", "xmm", "x87",
+/// high-level register classes in an x86 machine, such as "4-byte general purpose", "xmm", "x87",
 /// and so on. constants in this module are useful for inspecting the register class of a decoded
 /// instruction. as an example:
 /// ```
@@ -2078,7 +2078,7 @@ pub enum Opcode {
     LOOPNZ,
     LOOPZ,
     LOOP,
-    JRCXZ,
+    JECXZ,
 
     PUSHA,
     POPA,
@@ -2088,8 +2088,8 @@ pub enum Opcode {
     AAA,
     DAS,
     DAA,
-    AMX,
-    ADX,
+    AAM,
+    AAD,
 
     // started shipping in Tremont, 2020 sept 23
     MOVDIR64B,
@@ -5471,8 +5471,8 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xd1_Ev_1),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xd2_Eb_CL),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xd3_Ev_CL),
-    OpcodeRecord(Interpretation::Instruction(Opcode::AMX), OperandCode::Ib),
-    OpcodeRecord(Interpretation::Instruction(Opcode::ADX), OperandCode::Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::AAM), OperandCode::Ib),
+    OpcodeRecord(Interpretation::Instruction(Opcode::AAD), OperandCode::Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::SALC), OperandCode::Nothing),
     // XLAT
     OpcodeRecord(Interpretation::Instruction(Opcode::XLAT), OperandCode::Nothing),
@@ -5496,7 +5496,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::LOOPNZ), OperandCode::Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::LOOPZ), OperandCode::Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::LOOP), OperandCode::Ibs),
-    OpcodeRecord(Interpretation::Instruction(Opcode::JRCXZ), OperandCode::Ibs),
+    OpcodeRecord(Interpretation::Instruction(Opcode::JECXZ), OperandCode::Ibs),
     OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AL_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::IN), OperandCode::AX_Ib),
     OpcodeRecord(Interpretation::Instruction(Opcode::OUT), OperandCode::Ib_AL),
@@ -5721,19 +5721,35 @@ fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpea
             }
         },
         0b01 => {
-            instr.disp = read_num(words, 1)?;
+            instr.disp = read_num(words, 1)? as i8 as i32 as u32;
             if mmm > 3 {
-                Ok(OperandSpec::RegDisp)
+                if instr.disp != 0 {
+                    Ok(OperandSpec::RegDisp)
+                } else {
+                    Ok(OperandSpec::Deref)
+                }
             } else {
-                Ok(OperandSpec::RegIndexBaseDisp)
+                if instr.disp != 0 {
+                    Ok(OperandSpec::RegIndexBaseDisp)
+                } else {
+                    Ok(OperandSpec::RegIndexBase)
+                }
             }
         },
         0b10 => {
-            instr.disp = read_num(words, 2)?;
+            instr.disp = read_num(words, 2)? as i16 as i32 as u32;
             if mmm > 3 {
-                Ok(OperandSpec::RegDisp)
+                if instr.disp != 0 {
+                    Ok(OperandSpec::RegDisp)
+                } else {
+                    Ok(OperandSpec::Deref)
+                }
             } else {
-                Ok(OperandSpec::RegIndexBaseDisp)
+                if instr.disp != 0 {
+                    Ok(OperandSpec::RegIndexBaseDisp)
+                } else {
+                    Ok(OperandSpec::RegIndexBase)
+                }
             }
         },
         _ => {
@@ -7528,7 +7544,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                 if opcode == Opcode::CALL || opcode == Opcode::JMP || opcode == Opcode::PUSH || opcode == Opcode::POP {
                     instruction.mem_size = 4;
                 } else if opcode == Opcode::CALLF || opcode == Opcode::JMPF {
-                    instruction.mem_size = 5;
+                    instruction.mem_size = 6;
                 }
             }
             instruction.opcode = opcode;
@@ -7782,6 +7798,9 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.regs[0] = RegSpec { bank: RegisterBank::X, num: (modrm >> 3) & 7 };
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            if instruction.opcode == Opcode::CVTTSD2SI || instruction.opcode == Opcode::CVTSD2SI {
+                instruction.regs[0].bank = RegisterBank::D;
+            }
             if instruction.operands[1] != OperandSpec::RegMMM {
                 if [Opcode::PMOVSXBQ, Opcode::PMOVZXBQ].contains(&instruction.opcode) {
                     instruction.mem_size = 2;
@@ -8462,7 +8481,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                     7 => {
                         instruction.opcode = Opcode::RDPID;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
                         if instruction.operands[0] != OperandSpec::RegMMM {
                             return Err(DecodeError::InvalidOperand);
                         }
@@ -9668,7 +9687,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                         }
                         6 => {
                             instruction.opcode = Opcode::UMONITOR;
-                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
+                            if instruction.prefixes.address_size() {
+                                instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::W);
+                            } else {
+                                instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
+                            };
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
