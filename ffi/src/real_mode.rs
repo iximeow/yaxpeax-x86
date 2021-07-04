@@ -1,10 +1,11 @@
-use yaxpeax_arch::{Arch, Decoder, LengthedInstruction, AddressBase};
+use yaxpeax_arch::{Arch, Decoder, LengthedInstruction, U8Reader, AddressBase};
 use yaxpeax_x86::real_mode;
 
 #[no_mangle]
-pub unsafe extern "C" fn yaxpeax_x86_16_decode_optimistic(data: *const u8, length: u64, inst: *mut real_mode::Instruction) -> bool {
+pub unsafe extern "C" fn yaxpeax_x86_16_decode(data: *const u8, length: u64, inst: *mut real_mode::Instruction) -> bool {
     let inst: &mut real_mode::Instruction = core::mem::transmute(inst);
-    <real_mode::Arch as Arch>::Decoder::default().decode_into(inst, core::slice::from_raw_parts(data as *const u8, length as usize).iter().cloned()).is_err()
+    let mut reader = U8Reader::new(core::slice::from_raw_parts(data as *const u8, length as usize));
+    <real_mode::Arch as Arch>::Decoder::default().decode_into(inst, &mut reader).is_err()
 }
 
 #[no_mangle]
@@ -13,14 +14,16 @@ pub unsafe extern "C" fn yaxpeax_x86_16_instr_length(inst: *mut real_mode::Instr
     0.wrapping_offset(inst.len()).to_linear()
 }
 
-#[cfg(fmt)]
+#[cfg(feature = "fmt")]
 mod write_sink;
 
-#[cfg(fmt)]
+#[cfg(feature = "fmt")]
 mod fmt {
-    use write_sink::InstructionSink;
+    use super::write_sink::InstructionSink;
 
     use core::fmt::Write;
+
+    use yaxpeax_x86::real_mode;
 
     #[no_mangle]
     pub unsafe extern "C" fn yaxpeax_x86_16_fmt(inst: *mut real_mode::Instruction, text: *mut u8, len: usize) {
@@ -31,5 +34,5 @@ mod fmt {
     }
 }
 
-#[cfg(fmt)]
+#[cfg(feature = "fmt")]
 pub use fmt::yaxpeax_x86_16_fmt;

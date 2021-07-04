@@ -11,4 +11,9 @@ yaxpeax-arch = { version = "0.1.0", default-features = false }
 [lib]
 name = "yaxpeax_x86_ffi_multiarch"
 path = "src/lib.rs"
-crate-type = ["staticlib"]
+crate-type = ["staticlib", "cdylib"]
+
+[features]
+default = ["fmt"]
+
+fmt = ["yaxpeax-x86/fmt"]

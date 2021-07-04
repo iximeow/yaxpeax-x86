@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 yaxpeax-x86 = { path = "../../", default-features = false }
-yaxpeax-arch = { version = "0.0.4", default-features = false }
+yaxpeax-arch = { version = "0.1.0", default-features = false }
 
 [lib]
 name = "yaxpeax_x86_ffi_protected_mode"
