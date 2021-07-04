@@ -2838,7 +2838,7 @@ pub struct InstDecoder {
     //  2. monitor (intel-only?)
     //  3. vmx (some atom chips still lack it)
     //  4. fma3 (intel haswell/broadwell+, amd piledriver+)
-    //  5. cmpxchg16b (some amd are missingt this one)
+    //  5. cmpxchg16b (some amd are missing this one)
     //  6. sse4.1
     //  7. sse4.2
     //  8. movbe
@@ -3705,14 +3705,12 @@ impl InstDecoder {
             Opcode::AESKEYGENASSIST => {
                 // via Intel section 5.12. AESNI AND PCLMULQDQ
                 if !self.aesni() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::PCLMULQDQ => {
                 // via Intel section 5.12. AESNI AND PCLMULQDQ
                 if !self.pclmulqdq() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3721,7 +3719,6 @@ impl InstDecoder {
             Opcode::XEND |
             Opcode::XTEST => {
                 if !self.tsx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3733,7 +3730,6 @@ impl InstDecoder {
             Opcode::SHA256MSG2 |
             Opcode::SHA256RNDS2 => {
                 if !self.sha() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -3741,7 +3737,6 @@ impl InstDecoder {
             Opcode::ENCLS |
             Opcode::ENCLU => {
                 if !self.sgx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4090,7 +4085,6 @@ impl InstDecoder {
             Opcode::VSTMXCSR => {
                 // TODO: check a table for these
                 if !self.avx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4102,13 +4096,11 @@ impl InstDecoder {
             Opcode::VAESKEYGENASSIST => {
                 // TODO: check a table for these
                 if !self.avx() || !self.aesni() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::MOVBE => {
                 if !self.movbe() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4131,7 +4123,6 @@ impl InstDecoder {
                      * the less quirky default, so `intel_quirks` is considered the outlier, and
                      * before this default.
                      * */
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4150,17 +4141,14 @@ impl InstDecoder {
                  * so that's considered the less-quirky (default) case here.
                  * */
                 if self.amd_quirks() && !self.abm() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 } else if !self.lzcnt() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::ADCX |
             Opcode::ADOX => {
                 if !self.adx() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4171,21 +4159,18 @@ impl InstDecoder {
             Opcode::VMMCALL |
             Opcode::INVLPGA => {
                 if !self.svm() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::STGI |
             Opcode::SKINIT => {
                 if !self.svm() || !self.skinit() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::LAHF |
             Opcode::SAHF => {
                 if !self.lahfsahf() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4207,19 +4192,16 @@ impl InstDecoder {
                  * EVEX.512-coded.
                  */
                 if !self.avx() || !self.f16c() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::RDRAND => {
                 if !self.rdrand() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
             Opcode::RDSEED => {
                 if !self.rdseed() {
-                    inst.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidOpcode);
                 }
             }
@@ -4587,19 +4569,19 @@ impl Prefixes {
     #[inline]
     pub fn rep(&self) -> bool { self.bits & 0x30 == 0x10 }
     #[inline]
-    fn set_rep(&mut self) { self.bits = (self.bits & 0xcf) | 0x10; }
+    fn set_rep(&mut self) { self.bits = (self.bits & 0xcf) | 0x10 }
     #[inline]
     pub fn repnz(&self) -> bool { self.bits & 0x30 == 0x30 }
     #[inline]
-    fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30; }
+    fn set_repnz(&mut self) { self.bits = (self.bits & 0xcf) | 0x30 }
     #[inline]
     pub fn rep_any(&self) -> bool { self.bits & 0x30 != 0x00 }
     #[inline]
     fn operand_size(&self) -> bool { self.bits & 0x1 == 1 }
     #[inline]
-    fn set_operand_size(&mut self) { self.bits = self.bits | 0x1; }
+    fn set_operand_size(&mut self) { self.bits = self.bits | 0x1 }
     #[inline]
-    fn unset_operand_size(&mut self) { self.bits = self.bits & !0x1; }
+    fn unset_operand_size(&mut self) { self.bits = self.bits & !0x1 }
     #[inline]
     fn address_size(&self) -> bool { self.bits & 0x2 == 2 }
     #[inline]
@@ -7271,7 +7253,6 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             } else if b == 0x62 {
                 if prefixes.rex_unchecked().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
                     // rex and then evex is invalid! reject it.
-                    instruction.opcode = Opcode::Invalid;
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;

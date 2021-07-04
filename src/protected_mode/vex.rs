@@ -1326,10 +1326,10 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
 
     // the name of this bit is `L` in the documentation, so use the same name here.
     #[allow(non_snake_case)]
-    let L = instruction.prefixes.vex().l();
+    let L = instruction.prefixes.vex_unchecked().l();
 
 //    println!("reading vex instruction from opcode prefix {:?}, L: {}, opc: {:#x}, map:{:?}", p, L, opc, opcode_map);
-//    println!("w? {}", instruction.prefixes.vex().w());
+//    println!("w? {}", instruction.prefixes.vex_unchecked().w());
 
     // several combinations simply have no instructions. check for those first.
     let (opcode, operand_code) = match opcode_map {
@@ -1696,7 +1696,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
-                        0x6E => if instruction.prefixes.vex().w() {
+                        0x6E => if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VMOVD, if L {
                                 instruction.opcode = Opcode::Invalid;
                                 return Err(DecodeError::InvalidOpcode);
@@ -1761,7 +1761,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         } else {
                             VEXOperandCode::G_V_E_xmm
                         }),
-                        0x7E => if instruction.prefixes.vex().w() {
+                        0x7E => if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VMOVD, if L {
                                 instruction.opcode = Opcode::Invalid;
                                 return Err(DecodeError::InvalidOpcode);
@@ -2050,17 +2050,17 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         } else {
                             VEXOperandCode::G_E_xmm
                         }),
-                        0x2a => (Opcode::VCVTSI2SD, if instruction.prefixes.vex().w() {
+                        0x2a => (Opcode::VCVTSI2SD, if instruction.prefixes.vex_unchecked().w() {
                             VEXOperandCode::G_V_xmm_Ed // 32-bit last operand
                         } else {
                             VEXOperandCode::G_V_xmm_Ed // 32-bit last operand
                         }),
-                        0x2c => (Opcode::VCVTTSD2SI, if instruction.prefixes.vex().w() {
+                        0x2c => (Opcode::VCVTTSD2SI, if instruction.prefixes.vex_unchecked().w() {
                             VEXOperandCode::VCVT_Gd_Eq_xmm
                         } else {
                             VEXOperandCode::VCVT_Gd_Eq_xmm
                         }),
-                        0x2d => (Opcode::VCVTSD2SI, if instruction.prefixes.vex().w() {
+                        0x2d => (Opcode::VCVTSD2SI, if instruction.prefixes.vex_unchecked().w() {
                             VEXOperandCode::VCVT_Gd_Eq_xmm
                         } else {
                             VEXOperandCode::VCVT_Gd_Eq_xmm
@@ -2116,17 +2116,17 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         0x11 => (Opcode::VMOVSS, VEXOperandCode::VMOVSS_11),
                         0x12 => (Opcode::VMOVSLDUP, if L { VEXOperandCode::G_E_ymm } else { VEXOperandCode::G_E_xmm }),
                         0x16 => (Opcode::VMOVSHDUP, if L { VEXOperandCode::G_E_ymm } else { VEXOperandCode::G_E_xmm }),
-                        0x2a => (Opcode::VCVTSI2SS, if instruction.prefixes.vex().w() {
+                        0x2a => (Opcode::VCVTSI2SS, if instruction.prefixes.vex_unchecked().w() {
                             VEXOperandCode::G_V_xmm_Ed
                         } else {
                             VEXOperandCode::G_V_xmm_Ed
                         }),
-                        0x2c => (Opcode::VCVTTSS2SI, if instruction.prefixes.vex().w() {
+                        0x2c => (Opcode::VCVTTSS2SI, if instruction.prefixes.vex_unchecked().w() {
                             VEXOperandCode::VCVT_Gd_Ed_xmm // 32-bit
                         } else {
                             VEXOperandCode::VCVT_Gd_Ed_xmm // 32-bit
                         }),
-                        0x2d => (Opcode::VCVTSS2SI, if instruction.prefixes.vex().w() {
+                        0x2d => (Opcode::VCVTSS2SI, if instruction.prefixes.vex_unchecked().w() {
                             VEXOperandCode::VCVT_Gd_Ed_xmm // 32-bit
                         } else {
                             VEXOperandCode::VCVT_Gd_Ed_xmm // 32-bit
@@ -2251,7 +2251,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         VEXOperandCode::G_E_xmm
                     }),
                     0x16 => (Opcode::VPERMPS, if L {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_ymm
@@ -2264,7 +2264,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                     } else {
                         VEXOperandCode::G_E_xmm
                     }),
-                    0x18 => if instruction.prefixes.vex().w() {
+                    0x18 => if instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {
@@ -2274,7 +2274,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             VEXOperandCode::G_E_xmm
                         })
                     },
-                    0x19 => if instruction.prefixes.vex().w() {
+                    0x19 => if instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {
@@ -2467,7 +2467,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                     } else {
                         VEXOperandCode::G_E_xmm
                     }),
-                    0x45 => if instruction.prefixes.vex().w() {
+                    0x45 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VPSRLVQ, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
@@ -2481,17 +2481,17 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         })
                     },
                     0x46 => (Opcode::VPSRAVD, if L {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_ymm
                     } else {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_xmm
                     }),
-                    0x47 => if instruction.prefixes.vex().w() {
+                    0x47 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VPSLLVQ, if L {
                             VEXOperandCode::G_V_E_ymm
                         } else {
@@ -2515,7 +2515,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         VEXOperandCode::G_E_xmm
                     }),
                     0x5A => (Opcode::VBROADCASTI128, if L {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_ymm_M_xmm
@@ -2534,7 +2534,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         VEXOperandCode::G_E_ymm
                     }),
                     0x8C => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VPMASKMOVQ, if L {
                                 VEXOperandCode::G_V_M_ymm
                             } else {
@@ -2549,7 +2549,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x8E => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VPMASKMOVQ, if L {
                                 VEXOperandCode::M_V_G_ymm
                             } else {
@@ -2564,7 +2564,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x90 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VPGATHERDQ, if L {
                                 VEXOperandCode::G_Ey_V_ymm
                             } else {
@@ -2579,7 +2579,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x91 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VPGATHERQQ, if L {
                                 VEXOperandCode::G_Ey_V_ymm
                             } else {
@@ -2594,7 +2594,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x92 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VGATHERDPD, if L {
                                 VEXOperandCode::G_Ey_V_ymm
                             } else {
@@ -2609,7 +2609,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x93 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VGATHERQPD, if L {
                                 VEXOperandCode::G_Ey_V_ymm
                             } else {
@@ -2624,7 +2624,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x96 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMADDSUB132PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2639,7 +2639,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x97 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMSUBADD132PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2654,7 +2654,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0x98 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMADD132PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2668,13 +2668,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0x99 => if instruction.prefixes.vex().w() {
+                    0x99 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFMADD132SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFMADD132SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0x9A => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMSUB132PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2688,13 +2688,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0x9B => if instruction.prefixes.vex().w() {
+                    0x9B => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFMSUB132SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFMSUB132SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0x9C => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFNMADD132PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2708,13 +2708,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0x9D => if instruction.prefixes.vex().w() {
+                    0x9D => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFNMADD132SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFNMADD132SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0x9E => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFNMSUB132PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2728,13 +2728,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0x9F => if instruction.prefixes.vex().w() {
+                    0x9F => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFNMSUB132SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFNMSUB132SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xA6 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMADDSUB213PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2749,7 +2749,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0xA7 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMSUBADD213PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2764,7 +2764,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0xA8 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMADD213PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2778,13 +2778,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xA9 => if instruction.prefixes.vex().w() {
+                    0xA9 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFMADD231SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFMADD231SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xAA => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMSUB213PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2798,13 +2798,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xAB => if instruction.prefixes.vex().w() {
+                    0xAB => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFMSUB231SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFMSUB231SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xAC => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFNMADD213PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2818,13 +2818,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xAD => if instruction.prefixes.vex().w() {
+                    0xAD => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFNMADD213SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFNMADD213SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xAE => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFNMSUB213PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2838,13 +2838,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xAF => if instruction.prefixes.vex().w() {
+                    0xAF => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFNMSUB213SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFNMSUB213SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xB6 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMADDSUB231PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2859,7 +2859,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0xB7 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMSUBADD231PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2874,7 +2874,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         }
                     },
                     0xB8 => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMADD231PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2888,13 +2888,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xB9 => if instruction.prefixes.vex().w() {
+                    0xB9 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFMADD231SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFMADD231SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xBA => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFMSUB231PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2908,13 +2908,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xBB => if instruction.prefixes.vex().w() {
+                    0xBB => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFMSUB231SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFMSUB231SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xBC => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFNMADD231PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2928,13 +2928,13 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xBD => if instruction.prefixes.vex().w() {
+                    0xBD => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFNMADD231SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFNMADD231SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     },
                     0xBE => {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             (Opcode::VFNMSUB231PD, if L {
                                 VEXOperandCode::G_V_E_ymm
                             } else {
@@ -2948,7 +2948,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             })
                         }
                     },
-                    0xBF => if instruction.prefixes.vex().w() {
+                    0xBF => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VFNMSUB231SD, VEXOperandCode::G_V_E_xmm /* 64bit */)
                     } else {
                         (Opcode::VFNMSUB231SS, VEXOperandCode::G_V_E_xmm /* 64bit */)
@@ -3072,7 +3072,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                 // possibly valid!
                 match opc {
                     0x00 => (Opcode::VPERMQ, if L {
-                        if !instruction.prefixes.vex().w() {
+                        if !instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_E_ymm_imm8
@@ -3081,7 +3081,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         return Err(DecodeError::InvalidOpcode);
                     }),
                     0x01 => (Opcode::VPERMPD, if L {
-                        if !instruction.prefixes.vex().w() {
+                        if !instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_E_ymm_imm8
@@ -3090,12 +3090,12 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         return Err(DecodeError::InvalidOpcode);
                     }),
                     0x02 => (Opcode::VPBLENDD, if L {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_ymm_imm8
                     } else {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_xmm_imm8
@@ -3111,7 +3111,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         VEXOperandCode::G_E_xmm_imm8
                     }),
                     0x06 => (Opcode::VPERM2F128, if L {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_ymm_imm8
@@ -3159,19 +3159,19 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                     } else {
                         VEXOperandCode::G_V_E_xmm_imm8
                     }),
-                    0x14 => (Opcode::VPEXTRB, if L || instruction.prefixes.vex().w() {
+                    0x14 => (Opcode::VPEXTRB, if L || instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {
                         VEXOperandCode::Ev_G_xmm_imm8
                     }),
-                    0x15 => (Opcode::VPEXTRW, if L || instruction.prefixes.vex().w() {
+                    0x15 => (Opcode::VPEXTRW, if L || instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {
                         VEXOperandCode::Ev_G_xmm_imm8
                     }),
-                    0x16 => if instruction.prefixes.vex().w() {
+                    0x16 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VPEXTRQ, if L {
                             instruction.opcode = Opcode::Invalid;
                             return Err(DecodeError::InvalidOpcode);
@@ -3193,7 +3193,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                     } else {
                         VEXOperandCode::Ev_G_xmm_imm8
                     }),
-                    0x18 => if instruction.prefixes.vex().w() {
+                    0x18 => if instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {
@@ -3204,7 +3204,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                             return Err(DecodeError::InvalidOpcode);
                         })
                     },
-                    0x19 => if instruction.prefixes.vex().w() {
+                    0x19 => if instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {
@@ -3232,7 +3232,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                     } else {
                         VEXOperandCode::G_V_E_xmm_imm8
                     }),
-                    0x22 => if instruction.prefixes.vex().w() {
+                    0x22 => if instruction.prefixes.vex_unchecked().w() {
                         (Opcode::VPINSRQ, if L {
                             instruction.opcode = Opcode::Invalid;
                             return Err(DecodeError::InvalidOpcode);
@@ -3282,7 +3282,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                         VEXOperandCode::G_V_E_xmm_imm8
                     }),
                     0x46 => (Opcode::VPERM2I128, if L {
-                        if instruction.prefixes.vex().w() {
+                        if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);
                         }
                         VEXOperandCode::G_V_E_ymm_imm8
@@ -3300,7 +3300,7 @@ fn read_vex_instruction<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch a
                     } else {
                         VEXOperandCode::G_V_E_xmm_xmm4
                     }),
-                    0x4C => if instruction.prefixes.vex().w() {
+                    0x4C => if instruction.prefixes.vex_unchecked().w() {
                         instruction.opcode = Opcode::Invalid;
                         return Err(DecodeError::InvalidOpcode);
                     } else {

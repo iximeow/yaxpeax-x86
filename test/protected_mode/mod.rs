@@ -1327,6 +1327,7 @@ fn test_vex() {
         test_invalid_under(&InstDecoder::minimal(), bytes);
     }
 
+    #[allow(dead_code)]
     fn test_instr_invalid(bytes: &[u8]) {
         test_invalid_under(&InstDecoder::minimal().with_avx(), bytes);
         test_invalid_under(&InstDecoder::default(), bytes);
