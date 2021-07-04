@@ -4,7 +4,7 @@ mod evex;
 mod display;
 pub mod uarch;
 
-use MemoryAccessSize;
+pub use MemoryAccessSize;
 
 #[cfg(feature = "fmt")]
 pub use self::display::DisplayStyle;
