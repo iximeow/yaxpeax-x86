@@ -1,12 +1,12 @@
 [package]
 name = "yaxpeax_x86_ffi_long_mode"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["iximeow <me@iximeow.net>"]
 edition = "2018"
 
 [dependencies]
 yaxpeax-x86 = { path = "../../", default-features = false }
-yaxpeax-arch = { version = "0.0.4", default-features = false }
+yaxpeax-arch = { version = "0.1.0", default-features = false }
 
 [lib]
 name = "yaxpeax_x86_ffi_long_mode"
