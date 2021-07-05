@@ -5,7 +5,7 @@
 
 x86 decoders implemented as part of the yaxpeax project, implementing traits provided by `yaxpeax-arch`.
 
-Rust users of this library will either want to use the [quick and dirty APIs], or more generic decode interfaces from `yaxpeax-arch` - appropriate when mixing `yaxpeax-x86` usage with other `yaxpeax` decoders, such as `yaxpeax-arm`. examples of both styles are provided [in the documentation](link).
+Rust users of this library will either want to use the [quick and dirty APIs], or more generic decode interfaces from `yaxpeax-arch` - appropriate when mixing `yaxpeax-x86` usage with other `yaxpeax` decoders, such as `yaxpeax-arm`. examples of both styles are provided [in the documentation](https://docs.rs/yaxpeax-x86/).
 
 the `ffi/` directory provides a repackaging of `yaxpeax-x86` suitable for use by non-Rust callers, such as C or C++. see the `examples` directory for FFI usage of this library.
 

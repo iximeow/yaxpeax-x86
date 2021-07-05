@@ -1,3 +1,6 @@
+## 1.0.1
+* fix a broken docs link in README
+
 ## 1.0.0
 * `avx512` support
 * `avx2` support
