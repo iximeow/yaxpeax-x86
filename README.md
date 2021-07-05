@@ -48,9 +48,6 @@ the canonical copy of `yaxpeax-x86` is at [https://git.iximeow.net/yaxpeax-x86/]
 
 `yaxpeax-x86` is also mirrored on GitHub at [https://www.github.com/iximeow/yaxpeax-x86](https://www.github.com/iximeow/yaxpeax-x86).
 
-### ! user beware !
-* `yaxpeax-x86` will, but does not yet, have a decoder for real-mode `x86`. it is strongly recommended to use `<yaxpeax_x86::protected_mode::Arch as Arch>::Instruction` and similar type aliases, rather than using struct and operand types directly. user beware!
-
 ### unsafety
 `yaxpeax_x86` makes regular use of `unsafe { unreachable_unchecked(); }` and occasional use of `unsafe { _.get_unchecked() }` for purely performance reasons. `yaxpeax_x86` is fuzzed via `mishegos` and has passed multiple days of fuzzing without issue.
 
