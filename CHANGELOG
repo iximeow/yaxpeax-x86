@@ -1,3 +1,7 @@
+## 1.0.3
+
+* fix a few broken doc links, added example of yaxpeax-x86 usage through yaxpeax-arch traits
+
 ## 1.0.2
 * remove a stale line from README
 

@@ -5,7 +5,7 @@
 
 x86 decoders implemented as part of the yaxpeax project, implementing traits provided by `yaxpeax-arch`.
 
-Rust users of this library will either want to use the [quick and dirty APIs], or more generic decode interfaces from `yaxpeax-arch` - appropriate when mixing `yaxpeax-x86` usage with other `yaxpeax` decoders, such as `yaxpeax-arm`. examples of both styles are provided [in the documentation](https://docs.rs/yaxpeax-x86/).
+Rust users of this library will either want to use the [quick and dirty APIs](https://docs.rs/yaxpeax-x86/latest/yaxpeax_x86/long_mode/struct.InstDecoder.html#method.decode_slice), or more [generic decode interfaces](https://docs.rs/yaxpeax-arch/latest/yaxpeax_arch/trait.Decoder.html#method.decode) from `yaxpeax-arch` - appropriate when mixing `yaxpeax-x86` usage with other `yaxpeax` decoders, such as `yaxpeax-arm`. examples of both styles are provided [in the documentation](https://docs.rs/yaxpeax-x86/).
 
 the `ffi/` directory provides a repackaging of `yaxpeax-x86` suitable for use by non-Rust callers, such as C or C++. see the `examples` directory for FFI usage of this library.
 
@@ -17,7 +17,7 @@ the `ffi/` directory provides a repackaging of `yaxpeax-x86` suitable for use by
 * pretty small?
 
 ### `#[no_std]`
-the decoders provided by `yaxpeax-x86` are designed to be usable in a `no_std` setting, and does so by default. to build `yaxpeax_x86` without `std`, add the parameter `default-features = false` to your `yaxpeax-x86` dependency; the [ffi packaging] of `yaxpeax_x86` does this and builds without the Rust standard library as well. serde can be enabled without `std`, but json serialization/deserialization [need some careful attention](https://serde.rs/no-std.html) in that mode. as well as the `colors` feature to render instructions with default (eg terminal-friendly) syntax highlighting.
+the decoders provided by `yaxpeax-x86` are designed to be usable in a `no_std` setting, and does so by default. to build `yaxpeax_x86` without `std`, add the parameter `default-features = false` to your `yaxpeax-x86` dependency; the [ffi packaging](https://git.iximeow.net/yaxpeax-x86/tree/ffi) of `yaxpeax_x86` does this and builds without the Rust standard library as well. serde can be enabled without `std`, but json serialization/deserialization [need some careful attention](https://serde.rs/no-std.html) in that mode. as well as the `colors` feature to render instructions with default (eg terminal-friendly) syntax highlighting.
 
 ### instruction set extensions
 `yaxpeax-x86` decoders provide the option to specify what [instruction set extensions](http://git.iximeow.net/yaxpeax-x86/tree/src/long_mode/mod.rs#n1297) are eligible when decoding, to support decoding x86 instructions as understood by a particular microarchitecture. the default impls of decoders in `yaxpeax_x86` take an optimistsic approach to decoding and assumes all feature sets are available, as well as accepting both intel-specific and amd-specific quirks around undefined encodings.

@@ -17,9 +17,9 @@
 //!
 //! instructions, operands, registers, and generally all decoding structures, are in their mode's
 //! repsective submodule:
-//! * `x86_64`/`amd64` decoding is under [`yaxpeax_x86::long_mode`]
-//! * `x86_32`/`x86` decoding is under [`yaxpeax_x86::protected_mode`]
-//! * `x86_16`/`8086` decoding is under [`yaxpeax_x86::real_mode`]
+//! * `x86_64`/`amd64` decoding is under [`long_mode`]
+//! * `x86_32`/`x86` decoding is under [`protected_mode`]
+//! * `x86_16`/`8086` decoding is under [`real_mode`]
 //!
 //! all modes have equivalent data available in a decoded instruction. for example, all modes have
 //! library-friendly `Operand` and `RegSpec` types:
@@ -46,6 +46,46 @@
 //!
 //! // `MemoryAccessSize::size_name()` is how its `Display` impl works, as well:
 //! assert_eq!("dword", mem_size.to_string());
+//! ```
+//!
+//! `yaxpeax-x86` can also be used to decode instructions generically through the `yaxpeax-arch`
+//! traits:
+//! ```
+//! mod decoder {
+//!     use yaxpeax_arch::{Arch, AddressDisplay, Decoder, Reader, ReaderBuilder};
+//!
+//!     pub fn decode_stream<
+//!         'data,
+//!         A: yaxpeax_arch::Arch,
+//!         U: ReaderBuilder<A::Address, A::Word>,
+//!     >(data: U) where
+//!         A::Instruction: std::fmt::Display,
+//!     {
+//!         let mut reader = ReaderBuilder::read_from(data);
+//!         let mut address: A::Address = reader.total_offset();
+//!
+//!         let decoder = A::Decoder::default();
+//!         let mut decode_res = decoder.decode(&mut reader);
+//!         loop {
+//!             match decode_res {
+//!                 Ok(ref inst) => {
+//!                     println!("{}: {}", address.show(), inst);
+//!                     decode_res = decoder.decode(&mut reader);
+//!                     address = reader.total_offset();
+//!                 }
+//!                 Err(e) => {
+//!                     println!("{}: decode error: {}", address.show(), e);
+//!                     break;
+//!                 }
+//!             }
+//!         }
+//!     }
+//! }
+//!
+//! use yaxpeax_x86::amd64::{Arch as x86_64};
+//! use yaxpeax_arch::{ReaderBuilder, U8Reader};
+//! let data: &[u8] = &[0x55, 0x33, 0xc0, 0x48, 0x8b, 0x02, 0x5d, 0xc3];
+//! decoder::decode_stream::<x86_64, _>(data);
 //! ```
 //!
 //! ## `#![no_std]`
