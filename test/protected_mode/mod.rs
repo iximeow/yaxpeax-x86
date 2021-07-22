@@ -2363,6 +2363,16 @@ fn prefixed_f30f() {
 
 #[test]
 fn only_32bit() {
+    test_display(&[0x67, 0xac], "lods al, byte ds:[si]");
+    test_display(&[0x67, 0xae], "scas byte es:[di], al");
+    test_display(&[0xac], "lods al, byte ds:[esi]");
+    test_display(&[0xae], "scas byte es:[edi], al");
+    test_display(&[0x67, 0xf3, 0xa4], "rep movs byte es:[di], byte ds:[si]");
+    test_display(&[0xf3, 0xa4], "rep movs byte es:[edi], byte ds:[esi]");
+    test_display(&[0x67, 0xf3, 0xa5], "rep movs dword es:[di], dword ds:[si]");
+    test_display(&[0xf3, 0xa5], "rep movs dword es:[edi], dword ds:[esi]");
+    test_display(&[0x66, 0x67, 0x8b, 0x0e, 0x55, 0xaa], "mov cx, word [0xaa55]");
+    test_display(&[0x66, 0x8b, 0x0e], "mov cx, word [esi]");
     test_display(&[0x40], "inc eax");
     test_display(&[0x41], "inc ecx");
     test_display(&[0x47], "inc edi");

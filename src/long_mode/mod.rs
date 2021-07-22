@@ -382,6 +382,18 @@ impl RegSpec {
         RegSpec { bank: RegisterBank::D, num: 3 }
     }
 
+    // TODO: make pub in the 1.1 version bump
+    #[inline]
+    const fn esi() -> RegSpec {
+        RegSpec { bank: RegisterBank::D, num: 6 }
+    }
+
+    // TODO: make pub in the 1.1 version bump
+    #[inline]
+    const fn edi() -> RegSpec {
+        RegSpec { bank: RegisterBank::D, num: 7 }
+    }
+
     #[inline]
     pub const fn ax() -> RegSpec {
         RegSpec { bank: RegisterBank::W, num: 0 }
@@ -582,6 +594,8 @@ impl OperandSpec {
             OperandSpec::DispU32 |
             OperandSpec::DispU64 |
             OperandSpec::Deref |
+            OperandSpec::Deref_esi |
+            OperandSpec::Deref_edi |
             OperandSpec::Deref_rsi |
             OperandSpec::Deref_rdi |
             OperandSpec::RegDisp |
@@ -759,6 +773,12 @@ impl Operand {
             OperandSpec::DispU64 => Operand::DisplacementU64(inst.disp as u64),
             OperandSpec::Deref => {
                 Operand::RegDeref(inst.regs[1])
+            }
+            OperandSpec::Deref_esi => {
+                Operand::RegDeref(RegSpec::esi())
+            }
+            OperandSpec::Deref_edi => {
+                Operand::RegDeref(RegSpec::edi())
             }
             OperandSpec::Deref_rsi => {
                 Operand::RegDeref(RegSpec::rsi())
@@ -2782,6 +2802,8 @@ enum OperandSpec {
     DispU32,
     DispU64,
     Deref,
+    Deref_esi,
+    Deref_edi,
     Deref_rsi,
     Deref_rdi,
     RegDisp,
@@ -4415,7 +4437,8 @@ impl Instruction {
     /// prefixes.
     pub fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
         match self.opcode {
-            Opcode::STOS => {
+            Opcode::STOS |
+            Opcode::SCAS => {
                 if op == 0 {
                     Some(Segment::ES)
                 } else {
@@ -9122,21 +9145,34 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
             instruction.regs[0] = RegSpec::al();
-            instruction.regs[1] = RegSpec::rsi();
+            if instruction.prefixes.address_size() {
+                instruction.regs[1] = RegSpec::esi();
+            } else {
+                instruction.regs[1] = RegSpec::rsi();
+            }
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
             instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_Xb => {
-            instruction.operands[0] = OperandSpec::Deref_rdi;
-            instruction.operands[1] = OperandSpec::Deref_rsi;
+            if instruction.prefixes.address_size() {
+                instruction.operands[0] = OperandSpec::Deref_edi;
+                instruction.operands[1] = OperandSpec::Deref_esi;
+            } else {
+                instruction.operands[0] = OperandSpec::Deref_rdi;
+                instruction.operands[1] = OperandSpec::Deref_rsi;
+            }
             instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_AL => {
             instruction.regs[0] = RegSpec::al();
-            instruction.regs[1] = RegSpec::rsi();
+            if instruction.prefixes.address_size() {
+                instruction.regs[1] = RegSpec::edi();
+            } else {
+                instruction.regs[1] = RegSpec::rdi();
+            }
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.mem_size = 1;
@@ -9150,7 +9186,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 8 => RegSpec::rax(),
                 _ => { unreachable!(); }
             };
-            instruction.regs[1] = RegSpec::rsi();
+            if instruction.prefixes.address_size() {
+                instruction.regs[1] = RegSpec::esi();
+            } else {
+                instruction.regs[1] = RegSpec::rsi();
+            }
             instruction.operands[1] = OperandSpec::Deref;
             instruction.mem_size = opwidth;
         }
@@ -9162,7 +9202,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 8 => RegSpec::rax(),
                 _ => { unreachable!(); }
             };
-            instruction.regs[1] = RegSpec::rdi();
+            if instruction.prefixes.address_size() {
+                instruction.regs[1] = RegSpec::edi();
+            } else {
+                instruction.regs[1] = RegSpec::rdi();
+            }
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.mem_size = opwidth;
@@ -9170,8 +9214,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         OperandCode::Yv_Xv => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             instruction.mem_size = opwidth;
-            instruction.operands[0] = OperandSpec::Deref_rdi;
-            instruction.operands[1] = OperandSpec::Deref_rsi;
+            if instruction.prefixes.address_size() {
+                instruction.operands[0] = OperandSpec::Deref_edi;
+                instruction.operands[1] = OperandSpec::Deref_esi;
+            } else {
+                instruction.operands[0] = OperandSpec::Deref_rdi;
+                instruction.operands[1] = OperandSpec::Deref_rsi;
+            }
         }
         OperandCode::ModRM_0x0f12 => {
             instruction.regs[0].bank = RegisterBank::X;

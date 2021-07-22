@@ -1,3 +1,21 @@
+## 1.0.4
+
+in 64-, 32-, and 16-bit modes:
+  * fix incorrect decoding of `scas`; memory access is through `*di` not `*si`.
+  * fix incorrect segment register for `scas` memory operand; `es` segment is always used.
+  * fix incorrect decoding of some 67-prefixed string instructions: `movs`, `scas`, `lods`, `stos`, `cmps`.
+    - a 67-prefix selects an alternate addressing mode. in 64-bit mode, this
+      selects 32-bit registers for addressing, 32-bit selects 16-bit registers,
+      and 16-bit selects 32-bit registers. the decoder had ignored the 67 prefix
+      on these instructions.
+
+in 32- and 16-bit modes:
+  * fix incorrect decoding of 16-bit memory accesses with modrm where mod=00 and mmm=110.
+    - the memory access from this modrm is a disp16 memory access, which the
+      decoder reports. the decoder would then not read the subsequent 16-bit
+      displacement. this would typically result in a `Displacement(0)` operand,
+      and incorrect following instructions.
+
 ## 1.0.3
 
 * fix a few broken doc links, added example of yaxpeax-x86 usage through yaxpeax-arch traits

@@ -2676,6 +2676,15 @@ fn prefixed_f30f() {
 }
 
 #[test]
+fn only_64bit() {
+    test_display(&[0xae], "scas byte es:[rdi], al");
+    test_display(&[0xaf], "scas dword es:[rdi], eax");
+    test_display(&[0x67, 0xaf], "scas dword es:[edi], eax");
+    test_display(&[0x67, 0xac], "lods al, byte ds:[esi]");
+    test_display(&[0x67, 0xaa], "stos byte es:[edi], al");
+}
+
+#[test]
 fn test_adx() {
     test_display(&[0x66, 0x0f, 0x38, 0xf6, 0xc1], "adcx eax, ecx");
     test_display(&[0x66, 0x0f, 0x38, 0xf6, 0x01], "adcx eax, dword [rcx]");

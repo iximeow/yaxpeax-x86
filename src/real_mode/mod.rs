@@ -4367,7 +4367,8 @@ impl Instruction {
     /// prefixes.
     pub fn segment_override_for_op(&self, op: u8) -> Option<Segment> {
         match self.opcode {
-            Opcode::STOS => {
+            Opcode::STOS |
+            Opcode::SCAS => {
                 if op == 0 {
                     Some(Segment::ES)
                 } else {
@@ -5758,6 +5759,7 @@ fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpea
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
     if modbits == 0b00 && mmm == 0b110 {
+        instr.disp = read_num(words, 2)? as u16 as u32;
         return Ok(OperandSpec::DispU16);
     }
     match mmm {
@@ -8994,21 +8996,34 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         // sure hope these aren't backwards huh
         OperandCode::AL_Xb => {
             instruction.regs[0] = RegSpec::al();
-            instruction.regs[1] = RegSpec::esi();
+            if instruction.prefixes.address_size() {
+                instruction.regs[1] = RegSpec::esi();
+            } else {
+                instruction.regs[1] = RegSpec::si();
+            }
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::Deref;
             instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_Xb => {
-            instruction.operands[0] = OperandSpec::Deref_edi;
-            instruction.operands[1] = OperandSpec::Deref_esi;
+            if instruction.prefixes.address_size() {
+                instruction.operands[0] = OperandSpec::Deref_edi;
+                instruction.operands[1] = OperandSpec::Deref_esi;
+            } else {
+                instruction.operands[0] = OperandSpec::Deref_di;
+                instruction.operands[1] = OperandSpec::Deref_si;
+            }
             instruction.mem_size = 1;
             instruction.operand_count = 2;
         }
         OperandCode::Yb_AL => {
             instruction.regs[0] = RegSpec::al();
-            instruction.regs[1] = RegSpec::esi();
+            if instruction.prefixes.address_size() {
+                instruction.regs[1] = RegSpec::edi();
+            } else {
+                instruction.regs[1] = RegSpec::di();
+            }
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.mem_size = 1;

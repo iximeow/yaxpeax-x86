@@ -50,6 +50,22 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
 }
 
 #[test]
+fn only_16bit() {
+    test_display(&[0xac], "lods al, byte ds:[si]");
+    test_display(&[0xae], "scas byte es:[di], al");
+    test_display(&[0x67, 0xac], "lods al, byte ds:[esi]");
+    test_display(&[0x67, 0xae], "scas byte es:[edi], al");
+    test_display(&[0xf3, 0xa4], "rep movs byte es:[di], byte ds:[si]");
+    test_display(&[0x67, 0xf3, 0xa4], "rep movs byte es:[edi], byte ds:[esi]");
+    test_display(&[0xf3, 0xa5], "rep movs word es:[di], word ds:[si]");
+    test_display(&[0x67, 0xf3, 0xa5], "rep movs word es:[edi], word ds:[esi]");
+    test_display(&[0x8b, 0x0e, 0x55, 0xaa], "mov cx, word [0xaa55]");
+    test_display(&[0x66, 0x8b, 0x0e, 0x55, 0xaa], "mov ecx, dword [0xaa55]");
+    test_display(&[0x67, 0x8b, 0x0e], "mov cx, word [esi]");
+    test_display(&[0x66, 0x67, 0x8b, 0x0e], "mov ecx, dword [esi]");
+}
+
+#[test]
 fn test_real_mode() {
     test_display(&[0x00, 0xcc], "add ah, cl");
     test_display(&[0x03, 0x0b], "add cx, word [bp + di]");
