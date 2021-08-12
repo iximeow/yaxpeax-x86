@@ -343,6 +343,11 @@ impl RegSpec {
     }
 
     #[inline]
+    pub const fn rbx() -> RegSpec {
+        RegSpec { bank: RegisterBank::Q, num: 3 }
+    }
+
+    #[inline]
     pub const fn rsi() -> RegSpec {
         RegSpec { bank: RegisterBank::Q, num: 6 }
     }
