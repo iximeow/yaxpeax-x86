@@ -13,6 +13,7 @@ use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
+use yaxpeax_arch::{AnnotatingDecoder, DescriptionSink, NullSink};
 use yaxpeax_arch::{DecodeError as ArchDecodeError};
 
 use core::fmt;
@@ -4149,7 +4150,7 @@ impl Default for InstDecoder {
 impl Decoder<Arch> for InstDecoder {
     fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        read_instr(self, words, &mut instr)?;
+        read_with_annotations(self, words, &mut instr, &mut NullSink)?;
 
         instr.length = words.offset() as u8;
         if words.offset() > 15 {
@@ -4163,7 +4164,18 @@ impl Decoder<Arch> for InstDecoder {
         Ok(instr)
     }
     fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        read_instr(self, words, instr)?;
+        self.decode_with_annotation(instr, words, &mut NullSink)
+    }
+}
+
+impl AnnotatingDecoder<Arch> for InstDecoder {
+    type FieldDescription = FieldDescription;
+
+    fn decode_with_annotation<
+        T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+        S: DescriptionSink<Self::FieldDescription>
+    >(&self, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
+        read_with_annotations(self, words, instr, sink)?;
 
         instr.length = words.offset() as u8;
         if words.offset() > 15 {
@@ -4901,7 +4913,7 @@ impl OperandCodeBuilder {
 //   |
 //   ---------------------------> read modr/m?
 #[repr(u16)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum OperandCode {
     Ivs = OperandCodeBuilder::new().special_case(25).bits(),
     I_3 = OperandCodeBuilder::new().special_case(18).bits(),
@@ -5642,24 +5654,66 @@ fn read_modrm_reg(instr: &mut Instruction, modrm: u8, reg_bank: RegisterBank) ->
     Ok(OperandSpec::RegMMM)
 }
 
+#[inline(always)]
+fn read_sib_disp<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(instr: &Instruction, words: &mut T, modbits: u8, sibbyte: u8, sink: &mut S) -> Result<i32, DecodeError> {
+    let sib_start = words.offset() as u32 * 8 - 8;
+    let modbit_addr = words.offset() as u32 * 8 - 10;
+    let disp_start = words.offset() as u32 * 8;
+
+    let disp = if modbits == 0b00 {
+        if (sibbyte & 7) == 0b101 {
+            sink.record(modbit_addr, modbit_addr + 1,
+                InnerDescription::Misc("4-byte displacement").with_id(sib_start + 0));
+            sink.record(sib_start, sib_start + 2,
+                InnerDescription::Misc("4-byte displacement").with_id(sib_start + 0));
+            let disp = read_num(words, 4)? as i32;
+            sink.record(disp_start, disp_start + 31,
+                InnerDescription::Number("displacement", disp as i64).with_id(sib_start + 1));
+            disp
+        } else {
+            0
+        }
+    } else if modbits == 0b01 {
+        sink.record(modbit_addr, modbit_addr + 1,
+            InnerDescription::Misc("1-byte displacement").with_id(sib_start + 0));
+        if instr.prefixes.evex().is_some() {
+            sink.record(modbit_addr, modbit_addr + 1,
+                InnerDescription::Misc("EVEX prefix implies displacement is scaled by vector size")
+                    .with_id(sib_start + 0));
+        }
+        let disp = read_num(words, 1)? as i8 as i32;
+        sink.record(disp_start, disp_start + 7,
+            InnerDescription::Number("displacement", disp as i64).with_id(sib_start + 1));
+        disp
+    } else {
+        sink.record(modbit_addr, modbit_addr + 1,
+            InnerDescription::Misc("4-byte displacement").with_id(sib_start + 0));
+        let disp = read_num(words, 4)? as i32;
+        sink.record(disp_start, disp_start + 31,
+            InnerDescription::Number("displacement", disp as i64).with_id(sib_start + 1));
+        disp
+    };
+
+    Ok(disp)
+}
+
 #[allow(non_snake_case)]
-fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
+fn read_sib<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
+    let modrm_start = words.offset() as u32 * 8 - 8;
+    let sib_start = words.offset() as u32 * 8;
+
     let modbits = modrm >> 6;
     let sibbyte = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     instr.regs[1].num |= sibbyte & 7;
     instr.regs[2].num |= (sibbyte >> 3) & 7;
 
-    let disp = if modbits == 0b00 {
-        if (sibbyte & 7) == 0b101 {
-            read_num(words, 4)? as i32
-        } else {
-            0
-        }
-    } else if modbits == 0b01 {
-        read_num(words, 1)? as i8 as i32
-    } else {
-        read_num(words, 4)? as i32
-    };
+    let disp = read_sib_disp(instr, words, modbits, sibbyte, sink)?;
     instr.disp = disp as u32 as u64;
 
     let scale = 1u8 << (sibbyte >> 6);
@@ -5667,75 +5721,163 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
 
     let op_spec = if disp == 0 {
         if (sibbyte & 7) == 0b101 {
-            if ((sibbyte >> 3) & 7) == 0b100 {
-                if modbits == 0b00 && !instr.prefixes.rex_unchecked().x() {
+            sink.record(
+                sib_start,
+                sib_start + 2,
+                InnerDescription::Misc("bbb selects displacement in address, but displacement is 0")
+                    .with_id(sib_start + 0)
+            );
+            if instr.regs[2].num == 0b0100 {
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::Misc("iii + rex.x selects no index register")
+                        .with_id(sib_start + 0)
+                );
+                if modbits == 0b00 {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("mod bits select no base register, absolute [disp32] only")
+                            .with_id(sib_start + 0)
+                    );
                     OperandSpec::DispU32
                 } else {
-                    if instr.prefixes.rex_unchecked().x() {
-                            if modbits == 0 {
-                                OperandSpec::RegScale
-                            } else {
-                                OperandSpec::RegIndexBaseScale
-                            }
-                    } else {
-                            OperandSpec::Deref
-                    }
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::RegisterNumber("mod", 0b101, instr.regs[1])
+                            .with_id(sib_start + 0)
+                    );
+                    OperandSpec::Deref
                 }
             } else {
-                    if modbits == 0 {
-                        OperandSpec::RegScale
-                    } else {
-                        OperandSpec::RegIndexBaseScale
-                    }
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::RegisterNumber("iii", instr.regs[2].num & 0b111, instr.regs[2])
+                        .with_id(sib_start + 0)
+                );
+                if modbits == 0 {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("mod bits select no base register")
+                            .with_id(sib_start + 0)
+                    );
+                    OperandSpec::RegScale
+                } else {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::RegisterNumber("mod", 0b101, instr.regs[1])
+                            .with_id(sib_start + 0)
+                    );
+                    OperandSpec::RegIndexBaseScale
+                }
             }
         } else {
-            if ((sibbyte >> 3) & 7) == 0b100 {
-                if instr.prefixes.rex_unchecked().x() {
-                        OperandSpec::RegIndexBaseScale
-                } else {
-                        OperandSpec::Deref
-                }
+            if instr.regs[2].num == 0b0100 {
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::Misc("iii + rex.x selects no index register")
+                        .with_id(sib_start + 0)
+                );
+                OperandSpec::Deref
             } else {
-                    OperandSpec::RegIndexBaseScale
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::RegisterNumber("iii", instr.regs[2].num & 0b111, instr.regs[2])
+                        .with_id(sib_start + 0)
+                );
+                OperandSpec::RegIndexBaseScale
             }
         }
 
     } else {
         if (sibbyte & 7) == 0b101 {
-            if ((sibbyte >> 3) & 7) == 0b100 {
-                if modbits == 0b00 && !instr.prefixes.rex_unchecked().x() {
+            sink.record(
+                sib_start,
+                sib_start + 2,
+                InnerDescription::Misc("bbb selects displacement in address")
+                    .with_id(sib_start + 0)
+            );
+            if instr.regs[2].num == 0b0100 {
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::Misc("iii + rex.x selects no index register")
+                        .with_id(sib_start + 0)
+                );
+                if modbits == 0b00 {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("mod bits select no base register, absolute [disp32] only")
+                            .with_id(sib_start + 0)
+                    );
                     OperandSpec::DispU32
                 } else {
-                    if instr.prefixes.rex_unchecked().x() {
-                        if modbits == 0 {
-                            OperandSpec::RegScaleDisp
-                        } else {
-                            OperandSpec::RegIndexBaseScaleDisp
-                        }
-                    } else {
-                            OperandSpec::RegDisp
-                    }
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::RegisterNumber("mod", 0b101, instr.regs[1])
+                            .with_id(sib_start + 0)
+                    );
+                    OperandSpec::RegDisp
                 }
             } else {
-                    if modbits == 0 {
-                        OperandSpec::RegScaleDisp
-                    } else {
-                        OperandSpec::RegIndexBaseScaleDisp
-                    }
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::RegisterNumber("iii", instr.regs[2].num & 0b111, instr.regs[2])
+                        .with_id(sib_start + 0)
+                );
+                if modbits == 0 {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("mod bits select no base register, [scale+disp] only")
+                            .with_id(sib_start + 0)
+                    );
+                    OperandSpec::RegScaleDisp
+                } else {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::RegisterNumber("mod", 0b101, instr.regs[1])
+                            .with_id(sib_start + 0)
+                    );
+                    OperandSpec::RegIndexBaseScaleDisp
+                }
             }
         } else {
-            if ((sibbyte >> 3) & 7) == 0b100 {
-                if instr.prefixes.rex_unchecked().x() {
-                        OperandSpec::RegIndexBaseScaleDisp
-                } else {
-                        OperandSpec::RegDisp
-                }
+            sink.record(
+                sib_start + 3,
+                sib_start + 5,
+                InnerDescription::RegisterNumber("bbb", instr.regs[1].num & 0b111, instr.regs[2])
+                    .with_id(sib_start + 0)
+            );
+            if instr.regs[2].num == 0b0100 {
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::Misc("iii + rex.x selects no index register")
+                        .with_id(sib_start + 0)
+                );
+                OperandSpec::RegDisp
             } else {
-                    OperandSpec::RegIndexBaseScaleDisp
+                sink.record(
+                    sib_start + 3,
+                    sib_start + 5,
+                    InnerDescription::RegisterNumber("iii", instr.regs[2].num & 0b111, instr.regs[2])
+                        .with_id(sib_start + 0)
+                );
+                OperandSpec::RegIndexBaseScaleDisp
             }
         }
-
-
     };
 
     // b = 101?
@@ -5743,6 +5885,139 @@ fn read_sib<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
     // rex.x?
     // mod = 0?
     // disp = 0?
+    Ok(op_spec)
+}
+
+#[allow(non_snake_case)]
+#[inline(always)]
+fn read_M2<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
+    let modrm_start = words.offset() as u32 * 8 - 8;
+
+    let modbits = modrm >> 6;
+    let mmm = modrm & 7;
+    let op_spec = if mmm == 4 {
+        if instr.prefixes.rex_unchecked().b() {
+            instr.regs[1].num = 0b1000;
+        } else {
+            instr.regs[1].num = 0;
+        }
+        if instr.prefixes.rex_unchecked().x() {
+            instr.regs[2].num = 0b1000;
+        } else {
+            instr.regs[2].num = 0;
+        }
+        sink.record(
+            modrm_start,
+            modrm_start + 2,
+            InnerDescription::Misc("`mmm` field selects sib access")
+                .with_id(modrm_start + 2)
+        );
+        return read_sib(words, instr, modrm, sink);
+    } else if mmm == 5 && modbits == 0b00 {
+        sink.record(
+            modrm_start + 6,
+            modrm_start + 7,
+            InnerDescription::Misc("rip-relative reference")
+                .with_id(modrm_start + 0)
+        );
+        sink.record(
+            modrm_start + 0,
+            modrm_start + 2,
+            InnerDescription::Misc("rip-relative reference")
+                .with_id(modrm_start + 0)
+        );
+        if instr.prefixes.address_size() {
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("address-size override selects `eip` instead")
+                    .with_id(modrm_start + 1)
+            );
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("address-size override selects `eip` instead")
+                    .with_id(modrm_start + 1)
+            );
+        }
+
+        let disp = read_num(words, 4)? as i32;
+
+        sink.record(
+            modrm_start + 8,
+            modrm_start + 8 + 32,
+            InnerDescription::Number("displacement", disp as i64)
+                .with_id(modrm_start + 3)
+        );
+
+        instr.regs[1] =
+            if !instr.prefixes.address_size() { RegSpec::rip() } else { RegSpec::eip() };
+        if disp == 0 {
+            OperandSpec::Deref
+        } else {
+            instr.disp = disp as i64 as u64;
+            OperandSpec::RegDisp
+        }
+    } else {
+        if instr.prefixes.rex_unchecked().b() {
+            instr.regs[1].num = 0b1000;
+        } else {
+            instr.regs[1].num = 0;
+        }
+        instr.regs[1].num |= mmm;
+        sink.record(
+            modrm_start,
+            modrm_start + 2,
+            InnerDescription::RegisterNumber("mmm", (modrm & 7), instr.regs[1])
+                .with_id(modrm_start + 2)
+        );
+
+        if modbits == 0b00 {
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("mmm field is a simple register dereference (mod bits: 00)")
+                    .with_id(modrm_start + 0)
+            );
+            OperandSpec::Deref
+        } else {
+            let disp_start = words.offset();
+            let disp = if modbits == 0b01 {
+                sink.record(
+                    modrm_start + 6,
+                    modrm_start + 7,
+                    InnerDescription::Misc("memory operand is [reg+disp8] indexed by register selected by `mmm` (mod bits: 01)")
+                        .with_id(modrm_start + 0)
+                );
+                read_num(words, 1)? as i8 as i32
+            } else {
+                sink.record(
+                    modrm_start + 6,
+                    modrm_start + 7,
+                    InnerDescription::Misc("memory operand is [reg+disp32] indexed by register selected by `mmm` (mod bits: 10)")
+                        .with_id(modrm_start + 0)
+                );
+                read_num(words, 4)? as i32
+            };
+            let disp_end = words.offset();
+
+            sink.record(
+                disp_start as u32 * 8,
+                disp_end as u32 * 8 - 1,
+                InnerDescription::Number("displacement", disp as i64)
+                    .with_id(words.offset() as u32 * 8 + 3)
+            );
+            if disp == 0 {
+                OperandSpec::Deref
+            } else {
+                instr.disp = disp as i64 as u64;
+                OperandSpec::RegDisp
+            }
+        }
+    };
     Ok(op_spec)
 }
 
@@ -5762,7 +6037,7 @@ fn read_M<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch
         } else {
             instr.regs[2].num = 0;
         }
-        return read_sib(words, instr, modrm);
+        return read_sib(words, instr, modrm, &mut NullSink);
     } else if mmm == 5 && modbits == 0b00 {
         let disp = read_num(words, 4)? as i32;
         instr.regs[1] =
@@ -7124,7 +7399,81 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     };
 }
 
-fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum InnerDescription {
+    RexPrefix(u8),
+    SegmentPrefix(Segment),
+    Opcode(Opcode),
+    OperandCode(OperandCode),
+    RegisterNumber(&'static str, u8, RegSpec),
+    Misc(&'static str),
+    Number(&'static str, i64),
+}
+
+impl InnerDescription {
+    fn with_id(self, id: u32) -> FieldDescription {
+        FieldDescription {
+            desc: self,
+            id,
+        }
+    }
+}
+
+impl fmt::Display for InnerDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            InnerDescription::RexPrefix(bits) => {
+                write!(f, "rex prefix: {}{}{}{}",
+                    if bits & 0x8 != 0 { "w" } else { "-" },
+                    if bits & 0x4 != 0 { "r" } else { "-" },
+                    if bits & 0x2 != 0 { "x" } else { "-" },
+                    if bits & 0x1 != 0 { "b" } else { "-" },
+                )
+            }
+            InnerDescription::SegmentPrefix(segment) => {
+                write!(f, "segment override: {}", segment)
+            }
+            InnerDescription::Misc(text) => {
+                f.write_str(text)
+            }
+            InnerDescription::Number(text, num) => {
+                write!(f, "{}: {:#x}", text, num)
+            }
+            InnerDescription::Opcode(opc) => {
+                write!(f, "opcode `{}`", opc)
+            }
+            InnerDescription::OperandCode(code) => {
+                write!(f, "operand code `{:?}`", code)
+            }
+            InnerDescription::RegisterNumber(name, num, reg) => {
+                write!(f, "`{}` (`{}` selects register number {})", reg, name, num)
+            }
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct FieldDescription {
+    desc: InnerDescription,
+    id: u32,
+}
+
+impl yaxpeax_arch::FieldDescription for FieldDescription {
+    fn id(&self) -> u32 {
+        self.id
+    }
+}
+
+impl fmt::Display for FieldDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.desc, f)
+    }
+}
+
+fn read_with_annotations<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
@@ -7137,11 +7486,14 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
     instruction.operand_count = 2;
 
-
     let record: OpcodeRecord = loop {
         let record = next_rec;
         if nextb >= 0x40 && nextb < 0x50 {
             let b = nextb;
+            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                desc: InnerDescription::RexPrefix(b),
+                id: words.offset() as u32 * 8 - 8,
+            });
             if words.offset() >= 15 {
                 return Err(DecodeError::TooLong);
             }
@@ -7150,7 +7502,15 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 core::ptr::read_volatile(&OPCODES[nextb as usize])
             };
             prefixes.rex_from(b);
-        } else if let Interpretation::Instruction(_) = record.0 {
+        } else if let Interpretation::Instruction(opc) = record.0 {
+            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                desc: InnerDescription::Opcode(opc),
+                id: words.offset() as u32 * 8 - 8,
+            });
+            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                desc: InnerDescription::OperandCode(record.1),
+                id: words.offset() as u32 * 8 - 8 + 1,
+            });
             break record;
         } else {
             let b = nextb;
@@ -7217,6 +7577,12 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             if words.offset() >= 15 {
                 return Err(DecodeError::TooLong);
             }
+            if prefixes.rex.bits != 0 {
+                sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                    desc: InnerDescription::Misc("invalidates prior rex prefix"),
+                    id: (words.offset() as u32 * 8 - 16) + 1,
+                });
+            }
             prefixes.rex_from(0);
             match b {
                 0x26 |
@@ -7224,9 +7590,17 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
                 0x36 |
                 0x3e =>{ /* no-op in amd64 */ },
                 0x64 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::FS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_fs();
                 },
                 0x65 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::GS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_gs();
                 },
                 0x66 => {
@@ -7256,7 +7630,7 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         unsafe { unreachable_unchecked(); }
     }
     instruction.prefixes = prefixes;
-    read_operands(decoder, words, instruction, record.1)?;
+    read_operands(decoder, words, instruction, record.1, sink)?;
 
     if instruction.prefixes.lock() {
         if !LOCKABLE_INSTRUCTIONS.contains(&instruction.opcode) || !instruction.operands[0].is_memory() {
@@ -7301,7 +7675,10 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
 
  */
 #[inline(always)]
-fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
+fn read_operands<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
 
     if operand_code.is_only_modrm_operands() {
@@ -7328,11 +7705,32 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                 bank = RegisterBank::B;
             }
         };
+        let modrm_start = words.offset() as u32 * 8;
         modrm = read_modrm(words)?;
         instruction.regs[0].bank = bank;
         instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+        sink.record(
+            modrm_start + 3,
+            modrm_start + 5,
+            InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                .with_id(modrm_start + 1)
+        );
+        if instruction.prefixes.rex_unchecked().r() {
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Misc("rex.r bit adds 0b1000 to register number")
+                    .with_id(modrm_start + 1)
+            );
+        }
 
         mem_oper = if modrm >= 0b11000000 {
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("mmm field is a register number (mod bits: 11)")
+                    .with_id(modrm_start + 0)
+            );
             // special-case here to handle `lea`. there *is* an `M_Gv` but it's only for a
             // reversed-operands `movbe` and fairly unlikely. that case is handled in
             // `unlikely_operands`. TODO: maybe this could just be a bit in `operand_code` for
@@ -7340,9 +7738,16 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             if operand_code.bits() == (OperandCode::Gv_M as u16) {
                 return Err(DecodeError::InvalidOperand);
             }
-            read_modrm_reg(instruction, modrm, bank)?
+            let res = read_modrm_reg(instruction, modrm, bank)?;
+            sink.record(
+                modrm_start,
+                modrm_start + 2,
+                InnerDescription::RegisterNumber("mmm", (modrm & 7), instruction.regs[1])
+                    .with_id(modrm_start + 2)
+            );
+            res
         } else {
-            read_M(words, instruction, modrm)?
+            read_M2(words, instruction, modrm, sink)?
         };
 
         instruction.operands[1] = mem_oper;
@@ -7384,7 +7789,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
         mem_oper = if modrm >= 0b11000000 {
             read_modrm_reg(instruction, modrm, bank)?
         } else {
-            read_M(words, instruction, modrm)?
+            read_M2(words, instruction, modrm, sink)?
         };
         instruction.operands[1] = mem_oper;
     }
@@ -7394,8 +7799,20 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             read_imm_signed(words, 1 << (immsz * 2))? as u64;
         if only_imm {
             if immsz == 0 {
+                sink.record(
+                    words.offset() as u32 * 8 - 8,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8),
+                );
                 instruction.operands[0] = OperandSpec::ImmI8;
             } else {
+                sink.record(
+                    words.offset() as u32 * 8 - 32,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("4-byte immediate", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8),
+                );
                 if instruction.opcode == Opcode::CALL {
                     instruction.mem_size = 8;
                 }
@@ -7830,14 +8247,17 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
         },
         _ => {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
-            unlikely_operands(decoder, words, instruction, operand_code, mem_oper)?;
+            unlikely_operands(decoder, words, instruction, operand_code, mem_oper, sink)?;
         }
     };
 
     Ok(())
 }
 #[inline(never)]
-fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec) -> Result<(), DecodeError> {
+fn unlikely_operands<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, sink: &mut S) -> Result<(), DecodeError> {
     match operand_code {
         OperandCode::G_E_mm_Ib => {
             let modrm = read_modrm(words)?;
@@ -7926,7 +8346,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = read_M(words, instruction, modrm)?;
+            instruction.operands[1] = read_M2(words, instruction, modrm, sink)?;
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if instruction.prefixes.rex_unchecked().w() {
                     instruction.mem_size = 10;
@@ -8797,7 +9217,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                     instruction.mem_size = 48;
                     instruction.opcode = Opcode::AESENCWIDE128KL;
-                    instruction.operands[0] = read_M(words, instruction, modrm)?;
+                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 0b001 => {
@@ -8806,7 +9226,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                     instruction.mem_size = 48;
                     instruction.opcode = Opcode::AESDECWIDE128KL;
-                    instruction.operands[0] = read_M(words, instruction, modrm)?;
+                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 0b010 => {
@@ -8815,7 +9235,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                     instruction.mem_size = 64;
                     instruction.opcode = Opcode::AESENCWIDE256KL;
-                    instruction.operands[0] = read_M(words, instruction, modrm)?;
+                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 0b011 => {
@@ -8824,7 +9244,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     }
                     instruction.mem_size = 64;
                     instruction.opcode = Opcode::AESDECWIDE256KL;
-                    instruction.operands[0] = read_M(words, instruction, modrm)?;
+                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 _ => {
@@ -8833,7 +9253,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38dc => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 instruction.opcode = Opcode::LOADIWKEY;
             } else {
@@ -8842,7 +9262,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38dd => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8851,7 +9271,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38de => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8860,7 +9280,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38df => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8870,13 +9290,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         OperandCode::ModRM_0xf30f38fa => {
             instruction.opcode = Opcode::ENCODEKEY128;
-            read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_U_xmm, sink)?;
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::D;
         }
         OperandCode::ModRM_0xf30f38fb => {
             instruction.opcode = Opcode::ENCODEKEY256;
-            read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_U_xmm, sink)?;
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::D;
         }
@@ -9272,7 +9692,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[1] = OperandSpec::RegMMM;
             } else {
-                instruction.operands[1] = read_M(words, instruction, modrm)?;
+                instruction.operands[1] = read_M2(words, instruction, modrm, sink)?;
                 instruction.mem_size = 2;
             }
         },
@@ -9977,7 +10397,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 ][r as usize];
                 instruction.opcode = opcode;
                 instruction.mem_size = mem_size;
-                instruction.operands[0] = read_M(words, instruction, modrm)?;
+                instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
             }
         }
         OperandCode::ModRM_0x0fba => {
