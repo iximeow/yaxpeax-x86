@@ -3351,6 +3351,34 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
         out.write_str(" ")?;
 
         let x = Operand::from_spec(instr, instr.operands[0]);
+
+        const RELATIVE_BRANCHES: [Opcode; 21] = [
+            Opcode::JMP, Opcode::JECXZ,
+            Opcode::LOOP, Opcode::LOOPZ, Opcode::LOOPNZ,
+            Opcode::JO, Opcode::JNO,
+            Opcode::JB, Opcode::JNB,
+            Opcode::JZ, Opcode::JNZ,
+            Opcode::JNA, Opcode::JA,
+            Opcode::JS, Opcode::JNS,
+            Opcode::JP, Opcode::JNP,
+            Opcode::JL, Opcode::JGE,
+            Opcode::JLE, Opcode::JG,
+        ];
+
+        if instr.operands[0] == OperandSpec::ImmI8 || instr.operands[0] == OperandSpec::ImmI32 {
+            if RELATIVE_BRANCHES.contains(&instr.opcode) {
+                return match x {
+                    Operand::ImmediateI8(rel) => {
+                        write!(out, "$+{}", colors.number(signed_i32_hex(rel as i32)))
+                    }
+                    Operand::ImmediateI32(rel) => {
+                        write!(out, "$+{}", colors.number(signed_i32_hex(rel)))
+                    }
+                    _ => { unreachable!() }
+                };
+            }
+        }
+
         if x.is_memory() {
             out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
             out.write_str(" ")?;
