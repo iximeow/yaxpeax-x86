@@ -76,6 +76,23 @@ pub enum ConditionCode {
     LE,
 }
 
+macro_rules! register {
+    ($bank:ident, $name:ident => $num:expr, $($tail:tt)+) => {
+        #[inline]
+        pub const fn $name() -> RegSpec {
+            RegSpec { bank: RegisterBank::$bank, num: $num }
+        }
+
+        register!($bank, $($tail)*);
+    };
+    ($bank:ident, $name:ident => $num:expr) => {
+        #[inline]
+        pub const fn $name() -> RegSpec {
+            RegSpec { bank: RegisterBank::$bank, num: $num }
+        }
+    };
+}
+
 #[allow(non_snake_case)]
 impl RegSpec {
     /// the register `eip`. this register is in the class `eip`, which contains only it.
@@ -218,156 +235,26 @@ impl RegSpec {
         }
     }
 
-    #[inline]
-    pub const fn eip() -> RegSpec {
-        RegSpec {
-            num: 0,
-            bank: RegisterBank::EIP
-        }
-    }
+    register!(EIP, eip => 0);
 
-    #[inline]
-    pub const fn eflags() -> RegSpec {
-        RegSpec {
-            num: 0,
-            bank: RegisterBank::EFlags
-        }
-    }
+    register!(EFlags, eflags => 0);
 
-    #[inline]
-    pub const fn esp() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 4 }
-    }
+    register!(S, es => 0, cs => 1, ss => 2, ds => 3, fs => 4, gs => 5);
 
-    #[inline]
-    pub const fn ebp() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 5 }
-    }
+    register!(D,
+        eax => 0, ecx => 1, edx => 2, ebx => 3,
+        esp => 4, ebp => 5, esi => 6, edi => 7
+    );
 
-    #[inline]
-    pub const fn cs() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 1 }
-    }
+    register!(W,
+        ax => 0, cx => 1, dx => 2, bx => 3,
+        sp => 4, bp => 5, si => 6, di => 7
+    );
 
-    #[inline]
-    pub const fn ds() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 3 }
-    }
-
-    #[inline]
-    pub const fn es() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 0 }
-    }
-
-    #[inline]
-    pub const fn ss() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 2 }
-    }
-
-    #[inline]
-    pub const fn fs() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 4 }
-    }
-
-    #[inline]
-    pub const fn gs() -> RegSpec {
-        RegSpec { bank: RegisterBank::S, num: 5 }
-    }
-
-    #[inline]
-    pub const fn eax() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 0 }
-    }
-
-    #[inline]
-    pub const fn ecx() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 1 }
-    }
-
-    #[inline]
-    pub const fn edx() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 2 }
-    }
-
-    #[inline]
-    pub const fn ebx() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 3 }
-    }
-
-    #[inline]
-    pub const fn esi() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 6 }
-    }
-
-    #[inline]
-    pub const fn edi() -> RegSpec {
-        RegSpec { bank: RegisterBank::D, num: 7 }
-    }
-
-    #[inline]
-    pub const fn ax() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 0 }
-    }
-
-    #[inline]
-    pub const fn cx() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 1 }
-    }
-
-    #[inline]
-    pub const fn dx() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 2 }
-    }
-
-    #[inline]
-    pub const fn bx() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 3 }
-    }
-
-    #[inline]
-    pub const fn sp() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 4 }
-    }
-
-    #[inline]
-    pub const fn bp() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 5 }
-    }
-
-    #[inline]
-    pub const fn si() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 6 }
-    }
-
-    #[inline]
-    pub const fn di() -> RegSpec {
-        RegSpec { bank: RegisterBank::W, num: 7 }
-    }
-
-    #[inline]
-    pub const fn al() -> RegSpec {
-        RegSpec { bank: RegisterBank::B, num: 0 }
-    }
-
-    #[inline]
-    pub const fn cl() -> RegSpec {
-        RegSpec { bank: RegisterBank::B, num: 1 }
-    }
-
-    #[inline]
-    pub const fn dl() -> RegSpec {
-        RegSpec { bank: RegisterBank::B, num: 2 }
-    }
-
-    #[inline]
-    pub const fn ah() -> RegSpec {
-        RegSpec { bank: RegisterBank::B, num: 4 }
-    }
-
-    #[inline]
-    pub const fn ch() -> RegSpec {
-        RegSpec { bank: RegisterBank::B, num: 5 }
-    }
+    register!(B,
+        al => 0, cl => 1, dl => 2, bl => 3,
+        ah => 4, ch => 5, dh => 6, bh => 7
+    );
 
     #[inline]
     pub const fn zmm0() -> RegSpec {
