@@ -5701,6 +5701,7 @@ fn read_sib_disp<
 }
 
 #[allow(non_snake_case)]
+#[inline(always)]
 fn read_sib<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
