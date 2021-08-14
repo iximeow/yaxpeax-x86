@@ -1,3 +1,14 @@
+## 1.1.0
+
+* `pub const fn` builders for all general-purpose registers, segment registers, and ip/flags registers.
+  - this corrects a spotty and inconsistent set of builders filled in on-demand.
+* `DisplayStyle::Intel` now shows relative offsets as `$+0xXX`, rather than `0xXX`.
+  - this corrects an ambiguity with instructions like `jz 0x1234`, where `jz`
+    on x86 is _only_ relative branches, but the displayed syntax is ambiguous
+    about being a relative or absolute address.
+  - `DisplayStyle::Intel` is how `impl Display for Instruction` works, so
+    typical `Display` use is also fixed.
+
 ## 1.0.4
 
 in 64-, 32-, and 16-bit modes:
