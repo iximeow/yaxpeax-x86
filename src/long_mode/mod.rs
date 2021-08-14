@@ -7462,6 +7462,9 @@ impl yaxpeax_arch::FieldDescription for FieldDescription {
     fn id(&self) -> u32 {
         self.id
     }
+    fn is_separator(&self) -> bool {
+        false
+    }
 }
 
 impl fmt::Display for FieldDescription {
@@ -7547,7 +7550,7 @@ fn read_with_annotations<
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    vex::two_byte_vex(words, instruction)?;
+                    vex::two_byte_vex(words, instruction, sink)?;
                     return Ok(());
                 }
             } else if b == 0xc4 {
@@ -7556,7 +7559,7 @@ fn read_with_annotations<
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    vex::three_byte_vex(words, instruction)?;
+                    vex::three_byte_vex(words, instruction, sink)?;
                     return Ok(());
                 }
             } else if b == 0x62 {
@@ -7565,7 +7568,7 @@ fn read_with_annotations<
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
-                    evex::read_evex(words, instruction, None)?;
+                    evex::read_evex(words, instruction, None, sink)?;
                     return Ok(());
                 }
             }

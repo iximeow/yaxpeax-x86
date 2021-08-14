@@ -1,8 +1,10 @@
 use yaxpeax_arch::Reader;
+use yaxpeax_arch::DescriptionSink;
 
 use crate::long_mode::Arch;
 use crate::long_mode::OperandSpec;
 use crate::long_mode::DecodeError;
+use crate::long_mode::FieldDescription;
 use crate::long_mode::RegSpec;
 use crate::long_mode::RegisterBank;
 use crate::long_mode::Instruction;
@@ -100,7 +102,10 @@ enum VEXOperandCode {
 }
 
 #[inline(never)]
-pub(crate) fn three_byte_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
+pub(crate) fn three_byte_vex<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     let vex_byte_one = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let vex_byte_two = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let p = vex_byte_two & 0x03;
@@ -130,7 +135,10 @@ pub(crate) fn three_byte_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <A
     read_vex_instruction(m, words, instruction, p)
 }
 
-pub(crate) fn two_byte_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
+pub(crate) fn two_byte_vex<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     let vex_byte = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let p = vex_byte & 0x03;
     let p = match p {

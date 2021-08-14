@@ -1,11 +1,17 @@
 use super::OperandSpec;
+use super::FieldDescription;
+
+use yaxpeax_arch::DescriptionSink;
 
 // `evex_byte_one` is an option because the caller *may* have already read it,
 // but may have not. `long_mode` can decide immediately that `0x62` should be read
 // as an `EVEX` instruction, but for other modes we can only make this
 // determination when reading a `bound`'s `modrm` byte.
 #[inline(never)]
-pub(crate) fn read_evex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, evex_byte_one: Option<u8>) -> Result<(), DecodeError> {
+pub(crate) fn read_evex<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instruction: &mut Instruction, evex_byte_one: Option<u8>, sink: &mut S) -> Result<(), DecodeError> {
     let evex_byte_one = if let Some(b) = evex_byte_one {
       b
     } else {

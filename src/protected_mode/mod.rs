@@ -13,6 +13,7 @@ use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
+use yaxpeax_arch::{AnnotatingDecoder, DescriptionSink, NullSink};
 use yaxpeax_arch::{DecodeError as ArchDecodeError};
 
 use core::fmt;
@@ -4090,7 +4091,7 @@ impl Default for InstDecoder {
 impl Decoder<Arch> for InstDecoder {
     fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        read_instr(self, words, &mut instr)?;
+        read_with_annotations(self, words, &mut instr, &mut NullSink)?;
 
         instr.length = words.offset() as u8;
         if words.offset() > 15 {
@@ -4104,7 +4105,7 @@ impl Decoder<Arch> for InstDecoder {
         Ok(instr)
     }
     fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        read_instr(self, words, instr)?;
+        read_with_annotations(self, words, instr, &mut NullSink)?;
 
         instr.length = words.offset() as u8;
         if words.offset() > 15 {
@@ -4822,7 +4823,7 @@ impl OperandCodeBuilder {
 //   |
 //   ---------------------------> read modr/m?
 #[repr(u16)]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum OperandCode {
     Ivs = OperandCodeBuilder::new().special_case(25).bits(),
     I_3 = OperandCodeBuilder::new().special_case(27).bits(),
@@ -7086,7 +7087,84 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     };
 }
 
-fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction) -> Result<(), DecodeError> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum InnerDescription {
+    RexPrefix(u8),
+    SegmentPrefix(Segment),
+    Opcode(Opcode),
+    OperandCode(OperandCode),
+    RegisterNumber(&'static str, u8, RegSpec),
+    Misc(&'static str),
+    Number(&'static str, i64),
+}
+
+impl InnerDescription {
+    fn with_id(self, id: u32) -> FieldDescription {
+        FieldDescription {
+            desc: self,
+            id,
+        }
+    }
+}
+
+impl fmt::Display for InnerDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            InnerDescription::RexPrefix(bits) => {
+                write!(f, "rex prefix: {}{}{}{}",
+                    if bits & 0x8 != 0 { "w" } else { "-" },
+                    if bits & 0x4 != 0 { "r" } else { "-" },
+                    if bits & 0x2 != 0 { "x" } else { "-" },
+                    if bits & 0x1 != 0 { "b" } else { "-" },
+                )
+            }
+            InnerDescription::SegmentPrefix(segment) => {
+                write!(f, "segment override: {}", segment)
+            }
+            InnerDescription::Misc(text) => {
+                f.write_str(text)
+            }
+            InnerDescription::Number(text, num) => {
+                write!(f, "{}: {:#x}", text, num)
+            }
+            InnerDescription::Opcode(opc) => {
+                write!(f, "opcode `{}`", opc)
+            }
+            InnerDescription::OperandCode(code) => {
+                write!(f, "operand code `{:?}`", code)
+            }
+            InnerDescription::RegisterNumber(name, num, reg) => {
+                write!(f, "`{}` (`{}` selects register number {})", reg, name, num)
+            }
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct FieldDescription {
+    desc: InnerDescription,
+    id: u32,
+}
+
+impl yaxpeax_arch::FieldDescription for FieldDescription {
+    fn id(&self) -> u32 {
+        self.id
+    }
+    fn is_separator(&self) -> bool {
+        false
+    }
+}
+
+impl fmt::Display for FieldDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(&self.desc, f)
+    }
+}
+
+fn read_with_annotations<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
@@ -7173,7 +7251,7 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         unsafe { unreachable_unchecked(); }
     }
     instruction.prefixes = prefixes;
-    read_operands(decoder, words, instruction, record.1)?;
+    read_operands(decoder, words, instruction, record.1, sink)?;
     instruction.length = words.offset() as u8;
     if instruction.length > 15 {
         return Err(DecodeError::TooLong);
@@ -7225,7 +7303,10 @@ fn read_instr<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCode::ModRM_0x8f_Ev => 30
 
  */
-fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
+fn read_operands<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
     instruction.operands[0] = OperandSpec::RegRRR;
     instruction.operand_count = 2;
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
@@ -7725,14 +7806,17 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
         },
         _ => {
         let operand_code: OperandCode = unsafe { core::mem::transmute(operand_code.bits()) };
-            unlikely_operands(decoder, words, instruction, operand_code, mem_oper)?;
+            unlikely_operands(decoder, words, instruction, operand_code, mem_oper, sink)?;
         }
     };
     }
 
     Ok(())
 }
-fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec) -> Result<(), DecodeError> {
+fn unlikely_operands<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, sink: &mut S) -> Result<(), DecodeError> {
     match operand_code {
         OperandCode::G_E_mm_Ib => {
             let modrm = read_modrm(words)?;
@@ -7840,7 +7924,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     // prefixes and then vex is invalid! reject it.
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
-                    vex::three_byte_vex(words, modrm, instruction)?;
+                    vex::three_byte_vex(words, modrm, instruction, sink)?;
 
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
@@ -7867,7 +7951,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                     // prefixes and then vex is invalid! reject it.
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
-                    vex::two_byte_vex(words, modrm, instruction)?;
+                    vex::two_byte_vex(words, modrm, instruction, sink)?;
 
                     if decoder != &InstDecoder::default() {
                         decoder.revise_instruction(instruction)?;
@@ -8725,7 +8809,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38dc => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 instruction.opcode = Opcode::LOADIWKEY;
             } else {
@@ -8734,7 +8818,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38dd => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8743,7 +8827,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38de => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8752,7 +8836,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             }
         }
         OperandCode::ModRM_0xf30f38df => {
-            read_operands(decoder, words, instruction, OperandCode::G_E_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_E_xmm, sink)?;
             if let OperandSpec::RegMMM = instruction.operands[1] {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8762,13 +8846,13 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
         }
         OperandCode::ModRM_0xf30f38fa => {
             instruction.opcode = Opcode::ENCODEKEY128;
-            read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_U_xmm, sink)?;
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::D;
         }
         OperandCode::ModRM_0xf30f38fb => {
             instruction.opcode = Opcode::ENCODEKEY256;
-            read_operands(decoder, words, instruction, OperandCode::G_U_xmm)?;
+            read_operands(decoder, words, instruction, OperandCode::G_U_xmm, sink)?;
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::D;
         }
@@ -10072,7 +10156,7 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
                 if prefixes.lock() || prefixes.operand_size() || prefixes.rep_any() {
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
-                    evex::read_evex(words, instruction, Some(modrm))?;
+                    evex::read_evex(words, instruction, Some(modrm), sink)?;
                 }
             }
         }
