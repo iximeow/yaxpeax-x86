@@ -5593,54 +5593,72 @@ const OPCODES: [OpcodeRecord; 256] = [
 ];
 
 #[allow(non_snake_case)]
-pub(self) fn read_E<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8, width: u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, width: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     let bank = width_to_gp_reg_bank(width, instr.prefixes.rex_unchecked().present());
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
     } else {
-        read_M(words, instr, modrm)
+        read_M(words, instr, modrm, sink)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_mm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_mm<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         instr.regs[1] = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
         Ok(OperandSpec::RegMMM)
     } else {
-        read_M(words, instr, modrm)
+        read_M(words, instr, modrm, sink)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_st<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_st<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         instr.regs[1] = RegSpec { bank: RegisterBank::ST, num: modrm & 7 };
         Ok(OperandSpec::RegMMM)
     } else {
-        read_M(words, instr, modrm)
+        read_M(words, instr, modrm, sink)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_xmm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_xmm<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, RegisterBank::X)
     } else {
-        read_M(words, instr, modrm)
+        read_M(words, instr, modrm, sink)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_ymm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_ymm<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, RegisterBank::Y)
     } else {
-        read_M(words, instr, modrm)
+        read_M(words, instr, modrm, sink)
     }
 }
 #[allow(non_snake_case)]
-pub(self) fn read_E_vex<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8, bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
+pub(self) fn read_E_vex<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instr: &mut Instruction, modrm: u8, bank: RegisterBank, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
         read_modrm_reg(instr, modrm, bank)
     } else {
-        let res = read_M(words, instr, modrm)?;
+        let res = read_M(words, instr, modrm, sink)?;
         if (modrm & 0b01_000_000) == 0b01_000_000 {
             instr.prefixes.apply_compressed_disp(true);
         }
@@ -5840,7 +5858,7 @@ fn read_sib<
                     sink.record(
                         modrm_start + 6,
                         modrm_start + 7,
-                        InnerDescription::Misc("mod bits select no base register, [scale+disp] only")
+                        InnerDescription::Misc("mod bits select no base register, [index+disp] only")
                             .with_id(sib_start + 0)
                     );
                     OperandSpec::RegScaleDisp
@@ -5856,8 +5874,8 @@ fn read_sib<
             }
         } else {
             sink.record(
-                sib_start + 3,
-                sib_start + 5,
+                sib_start + 0,
+                sib_start + 2,
                 InnerDescription::RegisterNumber("bbb", instr.regs[1].num & 0b111, instr.regs[2])
                     .with_id(sib_start + 0)
             );
@@ -5891,7 +5909,7 @@ fn read_sib<
 
 #[allow(non_snake_case)]
 #[inline(always)]
-fn read_M2<
+fn read_M<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
 >(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
@@ -5972,7 +5990,7 @@ fn read_M2<
         sink.record(
             modrm_start,
             modrm_start + 2,
-            InnerDescription::RegisterNumber("mmm", (modrm & 7), instr.regs[1])
+            InnerDescription::RegisterNumber("mmm", modrm & 7, instr.regs[1])
                 .with_id(modrm_start + 2)
         );
 
@@ -6011,60 +6029,6 @@ fn read_M2<
                 InnerDescription::Number("displacement", disp as i64)
                     .with_id(words.offset() as u32 * 8 + 3)
             );
-            if disp == 0 {
-                OperandSpec::Deref
-            } else {
-                instr.disp = disp as i64 as u64;
-                OperandSpec::RegDisp
-            }
-        }
-    };
-    Ok(op_spec)
-}
-
-#[allow(non_snake_case)]
-#[inline(always)]
-fn read_M<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
-    let modbits = modrm >> 6;
-    let mmm = modrm & 7;
-    let op_spec = if mmm == 4 {
-        if instr.prefixes.rex_unchecked().b() {
-            instr.regs[1].num = 0b1000;
-        } else {
-            instr.regs[1].num = 0;
-        }
-        if instr.prefixes.rex_unchecked().x() {
-            instr.regs[2].num = 0b1000;
-        } else {
-            instr.regs[2].num = 0;
-        }
-        return read_sib(words, instr, modrm, &mut NullSink);
-    } else if mmm == 5 && modbits == 0b00 {
-        let disp = read_num(words, 4)? as i32;
-        instr.regs[1] =
-            if !instr.prefixes.address_size() { RegSpec::rip() } else { RegSpec::eip() };
-        if disp == 0 {
-            OperandSpec::Deref
-        } else {
-            instr.disp = disp as i64 as u64;
-            OperandSpec::RegDisp
-        }
-    } else {
-        if instr.prefixes.rex_unchecked().b() {
-            instr.regs[1].num = 0b1000;
-        } else {
-            instr.regs[1].num = 0;
-        }
-        instr.regs[1].num |= mmm;
-
-        if modbits == 0b00 {
-            OperandSpec::Deref
-        } else {
-            let disp = if modbits == 0b01 {
-                read_num(words, 1)? as i8 as i32
-            } else {
-                read_num(words, 4)? as i32
-            };
             if disp == 0 {
                 OperandSpec::Deref
             } else {
@@ -7409,6 +7373,7 @@ enum InnerDescription {
     RegisterNumber(&'static str, u8, RegSpec),
     Misc(&'static str),
     Number(&'static str, i64),
+    Boundary(&'static str),
 }
 
 impl InnerDescription {
@@ -7449,6 +7414,9 @@ impl fmt::Display for InnerDescription {
             InnerDescription::RegisterNumber(name, num, reg) => {
                 write!(f, "`{}` (`{}` selects register number {})", reg, name, num)
             }
+            InnerDescription::Boundary(desc) => {
+                write!(f, "{}", desc)
+            }
         }
     }
 }
@@ -7464,7 +7432,11 @@ impl yaxpeax_arch::FieldDescription for FieldDescription {
         self.id
     }
     fn is_separator(&self) -> bool {
-        false
+        if let InnerDescription::Boundary(_) = &self.desc {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -7507,6 +7479,13 @@ fn read_with_annotations<
             };
             prefixes.rex_from(b);
         } else if let Interpretation::Instruction(opc) = record.0 {
+            if words.offset() > 1 {
+                sink.record(
+                    words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                    InnerDescription::Boundary("prefixes end")
+                        .with_id(words.offset() as u32 * 8 - 9)
+                );
+            }
             sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                 desc: InnerDescription::Opcode(opc),
                 id: words.offset() as u32 * 8 - 8,
@@ -7519,6 +7498,13 @@ fn read_with_annotations<
         } else {
             let b = nextb;
             if b == 0x0f {
+                if words.offset() > 1 {
+                    sink.record(
+                        words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                        InnerDescription::Boundary("prefixes end")
+                            .with_id(words.offset() as u32 * 8 - 9)
+                    );
+                }
                 let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                 if b == 0x38 {
                     let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
@@ -7551,6 +7537,12 @@ fn read_with_annotations<
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
+                    sink.record(
+                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Misc("two-byte vex prefix (0xc5)")
+                            .with_id(words.offset() as u32 * 8 - 8)
+                    );
                     vex::two_byte_vex(words, instruction, sink)?;
                     return Ok(());
                 }
@@ -7560,6 +7552,12 @@ fn read_with_annotations<
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
+                    sink.record(
+                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Misc("three-byte vex prefix (0xc4)")
+                            .with_id(words.offset() as u32 * 8 - 8)
+                    );
                     vex::three_byte_vex(words, instruction, sink)?;
                     return Ok(());
                 }
@@ -7569,6 +7567,12 @@ fn read_with_annotations<
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
                     instruction.prefixes = prefixes;
+                    sink.record(
+                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Misc("evex prefix (0x62)")
+                            .with_id(words.offset() as u32 * 8 - 8)
+                    );
                     evex::read_evex(words, instruction, None, sink)?;
                     return Ok(());
                 }
@@ -7683,7 +7687,14 @@ fn read_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
 >(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+    sink.record(
+        words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
+        InnerDescription::Boundary("opcode ends/operands begin (typically)")
+            .with_id(words.offset() as u32 * 8 - 1)
+    );
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
+    let modrm_start = words.offset() as u32 * 8;
+    let opcode_start = modrm_start - 8;
 
     if operand_code.is_only_modrm_operands() {
         let modrm;
@@ -7709,7 +7720,6 @@ fn read_operands<
                 bank = RegisterBank::B;
             }
         };
-        let modrm_start = words.offset() as u32 * 8;
         modrm = read_modrm(words)?;
         instruction.regs[0].bank = bank;
         instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
@@ -7746,12 +7756,12 @@ fn read_operands<
             sink.record(
                 modrm_start,
                 modrm_start + 2,
-                InnerDescription::RegisterNumber("mmm", (modrm & 7), instruction.regs[1])
+                InnerDescription::RegisterNumber("mmm", modrm & 7, instruction.regs[1])
                     .with_id(modrm_start + 2)
             );
             res
         } else {
-            read_M2(words, instruction, modrm, sink)?
+            read_M(words, instruction, modrm, sink)?
         };
 
         instruction.operands[1] = mem_oper;
@@ -7789,11 +7799,23 @@ fn read_operands<
         modrm = read_modrm(words)?;
         instruction.regs[0].bank = bank;
         instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+        sink.record(
+            modrm_start + 3,
+            modrm_start + 5,
+            InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                .with_id(modrm_start + 3)
+        );
 
         mem_oper = if modrm >= 0b11000000 {
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("mmm field is a register number (mod bits: 11)")
+                    .with_id(modrm_start + 0)
+            );
             read_modrm_reg(instruction, modrm, bank)?
         } else {
-            read_M2(words, instruction, modrm, sink)?
+            read_M(words, instruction, modrm, sink)?
         };
         instruction.operands[1] = mem_oper;
     }
@@ -7801,14 +7823,23 @@ fn read_operands<
     if let Some((only_imm, immsz)) = operand_code.has_imm() {
         instruction.imm =
             read_imm_signed(words, 1 << (immsz * 2))? as u64;
+        if immsz == 0 {
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
+        } else {
+            sink.record(
+                words.offset() as u32 * 8 - 32,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("4-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
+        }
         if only_imm {
             if immsz == 0 {
-                sink.record(
-                    words.offset() as u32 * 8 - 8,
-                    words.offset() as u32 * 8 - 1,
-                    InnerDescription::Number("1-byte immediate", instruction.imm as i64)
-                        .with_id(words.offset() as u32 * 8),
-                );
                 instruction.operands[0] = OperandSpec::ImmI8;
             } else {
                 sink.record(
@@ -7845,6 +7876,20 @@ fn read_operands<
                         instruction.regs[0] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
                         instruction.mem_size = 8;
+                        sink.record(
+                            opcode_start + 0,
+                            opcode_start + 2,
+                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                                .with_id(opcode_start + 2)
+                        );
+                        if instruction.prefixes.rex_unchecked().b() {
+                            sink.record(
+                                opcode_start + 0,
+                                opcode_start + 2,
+                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                                    .with_id(opcode_start + 2)
+                            );
+                        }
                         instruction.operand_count = 1;
                     }
                     1 => {
@@ -7870,13 +7915,67 @@ fn read_operands<
                         instruction.operands[1] = OperandSpec::RegMMM;
                         instruction.regs[1] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                        sink.record(
+                            opcode_start,
+                            opcode_start + 2,
+                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                                .with_id(opcode_start + 1)
+                        );
+                        if instruction.prefixes.rex_unchecked().b() {
+                            sink.record(
+                                opcode_start,
+                                opcode_start + 2,
+                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                                    .with_id(opcode_start + 1)
+                            );
+                        }
+                        sink.record(
+                            opcode_start + 3,
+                            opcode_start + 7,
+                            InnerDescription::Misc("opcode selects `eax` operand")
+                                .with_id(opcode_start + 2)
+                        );
+                        if opwidth == 2 {
+                            sink.record(
+                                opcode_start + 3,
+                                opcode_start + 7,
+                                InnerDescription::Misc("operand-size prefix override selects `ax`")
+                                    .with_id(opcode_start + 2)
+                            );
+                        } else if opwidth == 8 {
+                            sink.record(
+                                opcode_start + 3,
+                                opcode_start + 7,
+                                InnerDescription::Misc("rex.w prefix selects `rax`")
+                                    .with_id(opcode_start + 2)
+                            );
+                        }
                     }
                     2 => {
                         // these are Zb_Ib_R
                         instruction.regs[0] =
                             RegSpec::gp_from_parts(reg, instruction.prefixes.rex_unchecked().b(), 1, instruction.prefixes.rex_unchecked().present());
+                        sink.record(
+                            opcode_start,
+                            opcode_start + 2,
+                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                                .with_id(opcode_start + 1)
+                        );
+                        if instruction.prefixes.rex_unchecked().b() {
+                            sink.record(
+                                opcode_start,
+                                opcode_start + 2,
+                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                                    .with_id(opcode_start + 1)
+                            );
+                        }
                         instruction.imm =
                             read_imm_unsigned(words, 1)?;
+                        sink.record(
+                            words.offset() as u32 * 8 - 8,
+                            words.offset() as u32 * 8 - 1,
+                            InnerDescription::Number("imm", instruction.imm as i64)
+                                .with_id(words.offset() as u32 * 8 - 8));
                         instruction.operands[1] = OperandSpec::ImmU8;
                     }
                     3 => {
@@ -7891,6 +7990,20 @@ fn read_operands<
                         };
                         instruction.regs[0] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                        sink.record(
+                            opcode_start,
+                            opcode_start + 2,
+                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                                .with_id(opcode_start + 2)
+                        );
+                        if instruction.prefixes.rex_unchecked().b() {
+                            sink.record(
+                                opcode_start,
+                                opcode_start + 2,
+                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                                    .with_id(opcode_start + 2)
+                            );
+                        }
                         instruction.imm =
                             read_imm_ivq(words, opwidth)?;
                         instruction.operands[1] = match opwidth {
@@ -7899,6 +8012,12 @@ fn read_operands<
                             8 => OperandSpec::ImmI64,
                             _ => unsafe { unreachable_unchecked() }
                         };
+                        sink.record(
+                            words.offset() as u32 * 8 - (8 * opwidth as u32),
+                            words.offset() as u32 * 8 - 1,
+                            InnerDescription::Number("imm", instruction.imm as i64)
+                                .with_id(words.offset() as u32 * 8 - (8 * opwidth as u32) + 1)
+                        );
                     }
                     _ => {
                         unreachable!("bad category");
@@ -7923,15 +8042,46 @@ fn read_operands<
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::ImmI8;
+
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("imm", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8 - 8)
+            );
         }
         2 => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
             if opwidth == 8 {
                 instruction.imm = read_imm_signed(words, 4)? as u64;
+                sink.record(
+                    words.offset() as u32 * 8 - 32,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - 32)
+                );
                 instruction.operands[1] = OperandSpec::ImmI64;
             } else {
                 instruction.imm = read_imm_signed(words, opwidth)? as u64;
+                sink.record(
+                    words.offset() as u32 * 8 - (opwidth as u32 * 8),
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - (opwidth as u32 * 8))
+                );
                 if opwidth == 4 {
                     instruction.operands[1] = OperandSpec::ImmI32;
                 } else {
@@ -7945,15 +8095,35 @@ fn read_operands<
                 if op == 3 {
                     instruction.opcode = Opcode::XABORT;
                     instruction.imm = read_imm_signed(words, 1)? as u64;
+                    sink.record(
+                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(words.offset() as u32 * 8 - 8)
+                    );
                     instruction.operands[0] = OperandSpec::ImmI8;
                     instruction.operand_count = 1;
                     return Ok(());
                 } else {
                     instruction.opcode = Opcode::XBEGIN;
                     instruction.imm = if opwidth == 2 {
-                        read_imm_signed(words, 2)? as i16 as i64 as u64
+                        let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
+                        sink.record(
+                            words.offset() as u32 * 8 - 16,
+                            words.offset() as u32 * 8 - 1,
+                            InnerDescription::Number("imm", instruction.imm as i64)
+                                .with_id(words.offset() as u32 * 8 - 16)
+                        );
+                        imm
                     } else {
-                        read_imm_signed(words, 4)? as i32 as i64 as u64
+                        let imm = read_imm_signed(words, 4)? as i32 as i64 as u64;
+                        sink.record(
+                            words.offset() as u32 * 8 - 32,
+                            words.offset() as u32 * 8 - 1,
+                            InnerDescription::Number("imm", instruction.imm as i64)
+                                .with_id(words.offset() as u32 * 8 - 32)
+                        );
+                        imm
                     };
                     instruction.operands[0] = OperandSpec::ImmI32;
                     instruction.operand_count = 1;
@@ -7961,6 +8131,12 @@ fn read_operands<
                 }
             }
             if (modrm & 0b00111000) != 0 {
+                sink.record(
+                    modrm_start + 3,
+                    modrm_start + 5,
+                    InnerDescription::Misc("invalid rrr field: must be zero")
+                        .with_id(modrm_start - 8)
+                );
                 return Err(DecodeError::InvalidOperand); // Err("Invalid modr/m for opcode 0xc7".to_string());
             }
 
@@ -7975,14 +8151,32 @@ fn read_operands<
                 8 => OperandSpec::ImmI64,
                 _ => unsafe { unreachable_unchecked() }
             };
+            sink.record(
+                modrm_start + 8,
+                modrm_start + numwidth as u32 * 8 - 1,
+                InnerDescription::Number("imm", instruction.imm as i64)
+                    .with_id(modrm_start + 8)
+            );
         },
         op @ 5 |
         op @ 7 |
         op @ 9 => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
             if op == 9 {
                 instruction.regs[0] = RegSpec::cl();
+                sink.record(
+                    modrm_start - 8,
+                    modrm_start - 1,
+                    InnerDescription::RegisterNumber("reg", 1, instruction.regs[0])
+                        .with_id(modrm_start - 7)
+                );
                 instruction.operands[1] = OperandSpec::RegRRR;
             } else {
                 let num = if op == 5 {
@@ -7990,6 +8184,21 @@ fn read_operands<
                 } else {
                     1
                 };
+                if op == 5 {
+                    sink.record(
+                        modrm_start - 8,
+                        modrm_start - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(modrm_start - 8)
+                    );
+                } else {
+                    sink.record(
+                        modrm_start - 8,
+                        modrm_start - 1,
+                        InnerDescription::Misc("opcode specifies integer immediate 1")
+                            .with_id(modrm_start - 8)
+                    );
+                }
                 instruction.imm = num;
                 instruction.operands[1] = OperandSpec::ImmI8;
             }
@@ -8002,6 +8211,12 @@ fn read_operands<
             ];
             let rrr = (modrm >> 3) & 7;
             instruction.opcode = TABLE[rrr as usize];
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
             if rrr < 2 {
                 instruction.opcode = Opcode::TEST;
                 let numwidth = if opwidth == 8 { 4 } else { opwidth };
@@ -8013,6 +8228,12 @@ fn read_operands<
                     8 => OperandSpec::ImmI64,
                     _ => unsafe { unreachable_unchecked() }
                 };
+                sink.record(
+                    modrm_start + 8,
+                    modrm_start + 8 + numwidth as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(modrm_start + 8)
+                );
             } else {
                 instruction.operand_count = 1;
             }
@@ -8021,12 +8242,24 @@ fn read_operands<
             instruction.operands[0] = mem_oper;
             let r = (modrm >> 3) & 7;
             if r >= 2 {
+                sink.record(
+                    modrm_start + 3,
+                    modrm_start + 5,
+                    InnerDescription::Misc("invalid rrr: opcode requires rrr < 0b010")
+                        .with_id(modrm_start - 8)
+                );
                 return Err(DecodeError::InvalidOpcode);
             }
             instruction.opcode = [
                 Opcode::INC,
                 Opcode::DEC,
             ][r as usize];
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
             instruction.operand_count = 1;
         }
         14 => {
@@ -8045,6 +8278,12 @@ fn read_operands<
                 Opcode::PUSH,
             ];
             let opcode = TABLE[r as usize];
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(opcode)
+                    .with_id(modrm_start - 8)
+            );
             if instruction.operands[0] == OperandSpec::RegMMM {
                 if opcode == Opcode::CALL || opcode == Opcode::JMP {
                     instruction.regs[1].bank = RegisterBank::Q;
@@ -8086,9 +8325,15 @@ fn read_operands<
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, w)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, w, sink)?;
             instruction.regs[0] =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth, instruction.prefixes.rex_unchecked().present());
+            sink.record(
+                modrm_start as u32 + 3,
+                modrm_start as u32 + 5,
+                InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                    .with_id(modrm_start as u32 + 3)
+            );
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = w;
             }
@@ -8098,16 +8343,28 @@ fn read_operands<
             let opwidth = 8;
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, 4 /* opwidth */)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4 /* opwidth */, sink)?;
             instruction.mem_size = 4;
             instruction.regs[0] =
                 RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth, instruction.prefixes.rex_unchecked().present());
+            sink.record(
+                modrm_start as u32 + 3,
+                modrm_start as u32 + 5,
+                InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                    .with_id(modrm_start as u32 + 3)
+            );
         },
         19 => {
             instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             if instruction.operands[0] == OperandSpec::RegMMM {
+                sink.record(
+                    modrm_start + 6,
+                    modrm_start + 7,
+                    InnerDescription::Misc("mod bits 0b11 select register operand, width fixed to xmm")
+                        .with_id(modrm_start as u32 + 1)
+                );
                 // fix the register to XMM
                 instruction.regs[1].bank = RegisterBank::X;
             } else {
@@ -8119,8 +8376,20 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::X;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 if op == 20 {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("mod bits 0b11 are illegal for this opcode")
+                            .with_id(modrm_start as u32 - 8)
+                    );
                     return Err(DecodeError::InvalidOperand);
                 } else {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("mod bits 0b11 select register operand, width fixed to xmm")
+                            .with_id(modrm_start as u32 + 1)
+                    );
                     // fix the register to XMM
                     instruction.regs[1].bank = RegisterBank::X;
                 }
@@ -8135,11 +8404,23 @@ fn read_operands<
         22 => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm, sink)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::X);
+            sink.record(
+                modrm_start as u32 + 3,
+                modrm_start as u32 + 5,
+                InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                    .with_id(modrm_start as u32 + 3)
+            );
             instruction.imm =
                 read_num(words, 1)? as u8 as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("imm", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8 - 8 + 1)
+            );
             if instruction.operands[1] != OperandSpec::RegMMM {
                 if instruction.opcode == Opcode::CMPSS {
                     instruction.mem_size = 4;
@@ -8155,6 +8436,12 @@ fn read_operands<
         23 => {
             instruction.regs[0] =
                 RegSpec::al();
+            sink.record(
+                modrm_start as u32 - 8,
+                modrm_start as u32 - 1,
+                InnerDescription::RegisterNumber("reg", 0, instruction.regs[0])
+                    .with_id(modrm_start as u32 - 1)
+            );
             instruction.operands[1] = OperandSpec::ImmI8;
         }
         24 => {
@@ -8162,6 +8449,12 @@ fn read_operands<
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             instruction.regs[0] =
                 RegSpec::gp_from_parts(0, false, opwidth, false);
+            sink.record(
+                modrm_start as u32 - 8,
+                modrm_start as u32 - 1,
+                InnerDescription::RegisterNumber("reg", 0, instruction.regs[0])
+                    .with_id(modrm_start as u32 - 1)
+            );
             instruction.imm =
                 read_imm_signed(words, numwidth)? as u64;
             instruction.operands[1] = match opwidth {
@@ -8170,6 +8463,12 @@ fn read_operands<
                 8 => OperandSpec::ImmI64,
                 _ => unsafe { unreachable_unchecked() }
             };
+            sink.record(
+                words.offset() as u32 * 8 - numwidth as u32 * 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("imm", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8 - numwidth as u32 * 8 + 1)
+            );
         }
         25 => {
             let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
@@ -8181,14 +8480,32 @@ fn read_operands<
                 8 => OperandSpec::ImmI64,
                 _ => unsafe { unreachable_unchecked() }
             };
+            sink.record(
+                words.offset() as u32 * 8 - opwidth as u32 * 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("imm", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8 - opwidth as u32 * 8 + 1)
+            );
             instruction.operand_count = 1;
         },
         26 => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
             instruction.operands[1] = OperandSpec::ImmI8;
         },
         18 => {
+            sink.record(
+                modrm_start - 8,
+                modrm_start - 1,
+                InnerDescription::Number("int", 3 as i64)
+                    .with_id(modrm_start - 1)
+            );
             instruction.imm = 3;
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
@@ -8214,6 +8531,12 @@ fn read_operands<
             instruction.operand_count = 2;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 // fix the register to XMM
+                sink.record(
+                    modrm_start + 6,
+                    modrm_start + 7,
+                    InnerDescription::Misc("mod bits 0b11 select register operand, width fixed to xmm")
+                        .with_id(modrm_start as u32 + 1)
+                );
                 instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.mem_size = 4;
@@ -8223,12 +8546,24 @@ fn read_operands<
             instruction.operands[0] = mem_oper;
             let r = (modrm >> 3) & 7;
             if r >= 1 {
+                sink.record(
+                    modrm_start + 3,
+                    modrm_start + 5,
+                    InnerDescription::Misc("rrr field > 0b000 for this opcode is illegal, except with XOP extensions")
+                        .with_id(modrm_start - 8)
+                );
                 // TODO: this is where XOP decoding would occur
                 return Err(DecodeError::IncompleteDecoder);
             }
             instruction.opcode = [
                 Opcode::POP,
             ][r as usize];
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
             if mem_oper != OperandSpec::RegMMM {
                 // the right size is set by default except for the default case; by default
                 // operands are dword, but 0x8f `pop` defaults to qword (with no way to encode a
@@ -8266,7 +8601,7 @@ fn unlikely_operands<
         OperandCode::G_E_mm_Ib => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_mm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_mm(words, instruction, modrm, sink)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, false, RegisterBank::MM);
             instruction.imm =
@@ -8280,7 +8615,7 @@ fn unlikely_operands<
         OperandCode::G_Ev_xmm_Ib => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm, sink)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::X);
             instruction.imm =
@@ -8307,7 +8642,7 @@ fn unlikely_operands<
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::X);
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.operands[0] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[0] = read_E_xmm(words, instruction, modrm, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 if [].contains(&instruction.opcode) {
                     instruction.mem_size = 2;
@@ -8326,7 +8661,7 @@ fn unlikely_operands<
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::X);
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm, sink)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 if [Opcode::PMOVSXBQ, Opcode::PMOVZXBQ].contains(&instruction.opcode) {
                     instruction.mem_size = 2;
@@ -8350,7 +8685,7 @@ fn unlikely_operands<
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
             instruction.operands[0] = OperandSpec::RegRRR;
-            instruction.operands[1] = read_M2(words, instruction, modrm, sink)?;
+            instruction.operands[1] = read_M(words, instruction, modrm, sink)?;
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if instruction.prefixes.rex_unchecked().w() {
                     instruction.mem_size = 10;
@@ -8366,7 +8701,7 @@ fn unlikely_operands<
         OperandCode::G_U_xmm_Ub => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm, sink)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -8428,7 +8763,7 @@ fn unlikely_operands<
         OperandCode::G_E_xmm_Ub => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm, sink)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::X);
             instruction.imm =
@@ -8515,7 +8850,7 @@ fn unlikely_operands<
         OperandCode::G_mm_Ew_Ib => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, false, RegisterBank::MM);
             if instruction.operands[1] == OperandSpec::RegMMM {
@@ -8554,7 +8889,7 @@ fn unlikely_operands<
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 2, sink)?;
             // lsl is weird. the full register width is written, but only the low 16 bits are used.
             if instruction.operands[1] == OperandSpec::RegMMM {
                 instruction.regs[1].bank = RegisterBank::D;
@@ -8568,7 +8903,7 @@ fn unlikely_operands<
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, opwidth)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, opwidth, sink)?;
             // `opwidth` can be 2, 4, or 8 here. if opwidth is 2, the first operand is a dword.
             // if opwidth is 4, both registers are dwords. and if opwidth is 8, both registers are
             // qword.
@@ -8665,7 +9000,7 @@ fn unlikely_operands<
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = instruction.operands[0];
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             } else {
@@ -8693,7 +9028,7 @@ fn unlikely_operands<
 
             let modrm = read_modrm(words)?;
 
-            instruction.operands[0] = read_E(words, instruction, modrm, 8)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 8, sink)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
@@ -8712,7 +9047,7 @@ fn unlikely_operands<
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
-            instruction.operands[1] = read_E(words, instruction, modrm, 8)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 8, sink)?;
             instruction.operand_count = 2;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
@@ -8742,7 +9077,7 @@ fn unlikely_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::X);
-            instruction.operands[1] = read_E_xmm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_xmm(words, instruction, modrm, sink)?;
             if instruction.prefixes.rex_unchecked().w() {
                 let op = instruction.operands[0];
                 instruction.operands[0] = instruction.operands[1];
@@ -8774,7 +9109,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::NOP;
                 }
             }
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 64;
             }
@@ -8785,7 +9120,7 @@ fn unlikely_operands<
             // instruction.
 
             let modrm = read_modrm(words)?;
-            instruction.operands[1] = read_E_mm(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_mm(words, instruction, modrm, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec { bank: RegisterBank::MM, num: (modrm >> 3) & 7 };
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -8891,7 +9226,7 @@ fn unlikely_operands<
                             }
                             instruction.operand_count = 1;
                             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         }
                         return Ok(());
                     }
@@ -8920,13 +9255,13 @@ fn unlikely_operands<
                             }
                             instruction.operand_count = 1;
                             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         }
                         return Ok(());
                     }
                     6 => {
                         instruction.opcode = Opcode::VMCLEAR;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
@@ -8940,7 +9275,7 @@ fn unlikely_operands<
                         return Ok(());
                     }
                     7 => {
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
@@ -8979,12 +9314,12 @@ fn unlikely_operands<
                             }
                             instruction.operand_count = 1;
                             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         }
                     }
                     6 => {
                         instruction.opcode = Opcode::VMXON;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // invalid as `vmxon`, reg-form is `senduipi`
                             instruction.opcode = Opcode::SENDUIPI;
@@ -8997,7 +9332,7 @@ fn unlikely_operands<
                     }
                     7 => {
                         instruction.opcode = Opcode::RDPID;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                         if instruction.operands[0] != OperandSpec::RegMMM {
                             return Err(DecodeError::InvalidOperand);
                         }
@@ -9089,7 +9424,7 @@ fn unlikely_operands<
             instruction.opcode = opcode;
             instruction.operand_count = 1;
             let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
         },
         OperandCode::ModRM_0x0f71 => {
             if instruction.prefixes.rep() || instruction.prefixes.repnz() {
@@ -9221,7 +9556,7 @@ fn unlikely_operands<
                     }
                     instruction.mem_size = 48;
                     instruction.opcode = Opcode::AESENCWIDE128KL;
-                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 0b001 => {
@@ -9230,7 +9565,7 @@ fn unlikely_operands<
                     }
                     instruction.mem_size = 48;
                     instruction.opcode = Opcode::AESDECWIDE128KL;
-                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 0b010 => {
@@ -9239,7 +9574,7 @@ fn unlikely_operands<
                     }
                     instruction.mem_size = 64;
                     instruction.opcode = Opcode::AESENCWIDE256KL;
-                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 0b011 => {
@@ -9248,7 +9583,7 @@ fn unlikely_operands<
                     }
                     instruction.mem_size = 64;
                     instruction.opcode = Opcode::AESDECWIDE256KL;
-                    instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
+                    instruction.operands[0] = read_M(words, instruction, modrm, sink)?;
                     return Ok(());
                 }
                 _ => {
@@ -9662,7 +9997,7 @@ fn unlikely_operands<
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[0] = OperandSpec::RegMMM;
             } else {
-                instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                 instruction.mem_size = 2;
             }
         },
@@ -9696,7 +10031,7 @@ fn unlikely_operands<
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[1] = OperandSpec::RegMMM;
             } else {
-                instruction.operands[1] = read_M2(words, instruction, modrm, sink)?;
+                instruction.operands[1] = read_M(words, instruction, modrm, sink)?;
                 instruction.mem_size = 2;
             }
         },
@@ -9765,7 +10100,7 @@ fn unlikely_operands<
             } else {
                 unreachable!("r <= 8");
             }
-            instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
@@ -9811,7 +10146,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::SGDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                 }
             } else if r == 1 {
                 let mod_bits = modrm >> 6;
@@ -9866,7 +10201,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::SIDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                 }
             } else if r == 2 {
                 let mod_bits = modrm >> 6;
@@ -9905,7 +10240,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::LGDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                 }
             } else if r == 3 {
                 let mod_bits = modrm >> 6;
@@ -9969,7 +10304,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::LIDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                 }
             } else if r == 4 {
                 // TODO: this permits storing only to word-size registers
@@ -9977,7 +10312,7 @@ fn unlikely_operands<
                 instruction.opcode = Opcode::SMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
             } else if r == 5 {
                 let mod_bits = modrm >> 6;
                 if mod_bits != 0b11 {
@@ -9985,7 +10320,7 @@ fn unlikely_operands<
                         return Err(DecodeError::InvalidOpcode);
                     }
                     instruction.opcode = Opcode::RSTORSSP;
-                    instruction.operands[0] = read_E(words, instruction, modrm, 8)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, 8, sink)?;
                     instruction.mem_size = 8;
                     instruction.operand_count = 1;
                     return Ok(());
@@ -10085,7 +10420,7 @@ fn unlikely_operands<
                 instruction.opcode = Opcode::LMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
             } else if r == 7 {
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
@@ -10170,7 +10505,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::INVLPG;
                     instruction.operand_count = 1;
                     instruction.mem_size = 1;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                 }
             } else {
                 unreachable!("r <= 8");
@@ -10195,7 +10530,7 @@ fn unlikely_operands<
                             return Err(DecodeError::InvalidOpcode);
                         }
                     };
-                    instruction.operands[0] = read_E(words, instruction, modrm, 1 /* opwidth */)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, 1 /* opwidth */, sink)?;
                     instruction.mem_size = 64;
                     instruction.operand_count = 1;
                 } else {
@@ -10208,7 +10543,7 @@ fn unlikely_operands<
                         }
                     };
                     let opwidth = if instruction.prefixes.rex_unchecked().w() { 8 } else { 4 };
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                     instruction.operand_count = 1;
                 }
 
@@ -10248,7 +10583,7 @@ fn unlikely_operands<
                     } else {
                         4
                     };
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
                     if instruction.operands[0] != OperandSpec::RegMMM {
                         instruction.mem_size = opwidth;
                     }
@@ -10328,7 +10663,7 @@ fn unlikely_operands<
                     match r {
                         6 => {
                             instruction.opcode = Opcode::CLRSSBSY;
-                            instruction.operands[0] = read_E(words, instruction, modrm, 8)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, 8, sink)?;
                             instruction.operand_count = 1;
                             instruction.mem_size = 8;
                             return Ok(());
@@ -10401,7 +10736,7 @@ fn unlikely_operands<
                 ][r as usize];
                 instruction.opcode = opcode;
                 instruction.mem_size = mem_size;
-                instruction.operands[0] = read_M2(words, instruction, modrm, sink)?;
+                instruction.operands[0] = read_M(words, instruction, modrm, sink)?;
             }
         }
         OperandCode::ModRM_0x0fba => {
@@ -10429,7 +10764,7 @@ fn unlikely_operands<
                 }
             }
 
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = opwidth;
             }
@@ -10621,7 +10956,7 @@ fn unlikely_operands<
         OperandCode::x87_dd |
         OperandCode::x87_de |
         OperandCode::x87_df => {
-            return decode_x87(words, instruction, operand_code);
+            return decode_x87(words, instruction, operand_code, sink);
         }
         OperandCode::MOVDIR64B => {
             // at this point we've done a read as if it was Gv_M (`lea` operands). because the
@@ -10664,7 +10999,17 @@ fn unlikely_operands<
     Ok(())
 }
 
-fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, operand_code: OperandCode) -> Result<(), DecodeError> {
+fn decode_x87<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+    sink.record(
+        words.offset() as u32 * 8 - 8,
+        words.offset() as u32 * 8 - 1,
+        InnerDescription::Misc("x87 opcode")
+            .with_id(words.offset() as u32 * 8 - 1)
+    );
+
     #[allow(non_camel_case_types)]
     enum OperandCodeX87 {
         Est,
@@ -11011,19 +11356,19 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
 
     match x87_operands {
         OperandCodeX87::Est => {
-            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm, sink)?;
             instruction.operand_count = 1;
         }
         OperandCodeX87::St_Est => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_st(words, instruction, modrm, sink)?;
             instruction.operand_count = 2;
         }
         OperandCodeX87::St_Edst => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_st(words, instruction, modrm, sink)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
             }
@@ -11032,7 +11377,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::St_Eqst => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[1] = read_E_st(words, instruction, modrm, sink)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
             }
@@ -11041,7 +11386,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::St_Ew => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 2)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 2, sink)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
@@ -11050,7 +11395,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::St_Mm => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11060,7 +11405,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::St_Mq => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11070,7 +11415,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::St_Md => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11080,7 +11425,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
         OperandCodeX87::St_Mw => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11088,20 +11433,20 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ew => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 2)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
             instruction.operand_count = 1;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
         }
         OperandCodeX87::Est_St => {
-            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm, sink)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
         }
         OperandCodeX87::Edst_St => {
-            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm, sink)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
@@ -11110,7 +11455,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
         }
         OperandCodeX87::Eqst_St => {
-            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm, sink)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
             instruction.operand_count = 2;
@@ -11119,7 +11464,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             }
         }
         OperandCodeX87::Ed_St => {
-            instruction.operands[0] = read_E_st(words, instruction, modrm)?;
+            instruction.operands[0] = read_E_st(words, instruction, modrm, sink)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
             if instruction.operands[0] != OperandSpec::RegMMM {
@@ -11128,7 +11473,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mm_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11138,7 +11483,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mq_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11148,7 +11493,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             instruction.operand_count = 2;
         }
         OperandCodeX87::Md_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11158,7 +11503,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mw_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -11168,7 +11513,7 @@ fn decode_x87<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ex87S => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
             instruction.operand_count = 1;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
