@@ -1,5 +1,6 @@
 use super::OperandSpec;
 use super::FieldDescription;
+use super::InnerDescription;
 
 use yaxpeax_arch::DescriptionSink;
 
@@ -17,18 +18,53 @@ pub(crate) fn read_evex<
     } else {
       words.next().ok().ok_or(DecodeError::ExhaustedInput)?
     };
+    let evex_start = words.offset() as u32 * 8 - 8;
     let evex_byte_two = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let evex_byte_three = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let p = evex_byte_two & 0x03;
+    sink.record(
+        evex_start + 8,
+        evex_start + 9,
+        InnerDescription::Misc(match p {
+            0b00 => "evex.p indicates no opcode prefix",
+            0b01 => "evex.p indicates opcode prefix 66",
+            0b10 => "evex.p indicates opcode prefix f3",
+            _ => "evex.p indicates opcode prefix f2",
+        })
+            .with_id(evex_start + 1)
+    );
     if evex_byte_one & 0x0c != 0 {
         // the two bits above `m` are reserved and must be 0
         return Err(DecodeError::InvalidOpcode);
     }
+    sink.record(
+        evex_start + 2,
+        evex_start + 3,
+        InnerDescription::Misc("reserved bit pattern in evex prefix")
+            .with_id(evex_start + 0)
+    );
     if evex_byte_two & 0x04 == 0 {
         // the one bit above `p` is reserved and must be 1
         return Err(DecodeError::InvalidOpcode);
     }
+    sink.record(
+        evex_start + 10,
+        evex_start + 10,
+        InnerDescription::Misc("reserved bit pattern in evex prefix")
+            .with_id(evex_start + 0)
+    );
     let m = evex_byte_one & 0x03;
+    sink.record(
+        evex_start + 0,
+        evex_start + 1,
+        InnerDescription::Misc(match m {
+            0b00 => "evex.m indicates no opcode escape (invalid)",
+            0b01 => "evex.m indicates opcode escape `0f`",
+            0b10 => "evex.m indicates opcode escape `0f38`",
+            _ => "evex.m indicates opcode escape `0f3a`",
+        })
+            .with_id(evex_start + 0)
+    );
     if m == 0 {
         return Err(DecodeError::InvalidOpcode);
     }
@@ -60,6 +96,80 @@ pub(crate) fn read_evex<
 
     instruction.prefixes.evex_from(evex_byte_one, evex_byte_two, evex_byte_three);
 
+    let evex_rex = ((evex_byte_two & 0x80) >> 4) | (((evex_byte_one >> 5) & 0b111) ^ 0b111);
+    sink.record(
+        evex_start + 5,
+        evex_start + 7,
+        InnerDescription::RexPrefix(evex_rex)
+            .with_id(evex_start + 5)
+    );
+    sink.record(
+        evex_start + 15,
+        evex_start + 15,
+        InnerDescription::RexPrefix(evex_rex)
+            .with_id(evex_start + 5)
+    );
+
+    sink.record(
+        evex_start + 4,
+        evex_start + 4,
+        InnerDescription::Misc(if ((evex_byte_one >> 4) & 1) ^ 1 != 0 {
+          "evex.r' is set (stored inverted)"
+        } else {
+          "evex.r' is not set (stored inverted)"
+        })
+            .with_id(evex_start + 4)
+    );
+
+    sink.record(
+        evex_start + 20,
+        evex_start + 20,
+        InnerDescription::Misc(if ((evex_byte_three >> 4) & 1) != 0 {
+          "evex.b (broadcast) is set"
+        } else {
+          "evex.b (broadcast) is not set"
+        })
+            .with_id(evex_start + 4)
+    );
+
+    sink.record(
+        evex_start + 23,
+        evex_start + 23,
+        InnerDescription::Misc(if ((evex_byte_three >> 7) & 1) != 0 {
+          "evex.z is set (masking behavior: zero)"
+        } else {
+          "evex.z is unset (masking behavior: merge)"
+        })
+            .with_id(evex_start + 4)
+    );
+
+    let lpl = (evex_byte_three >> 5) & 0b11;
+    sink.record(
+        evex_start + 21,
+        evex_start + 22,
+        InnerDescription::Misc(match lpl {
+            0b00 => "evex.l'l is `0b00` (vector size 128 or rne-sae)",
+            0b01 => "evex.l'l is `0b01` (vector size 256 or rd-sae)",
+            0b10 => "evex.l'l is `0b10` (vector size 512 or ru-sae)",
+            _ => "evex.l'l is `0b11` (vector size 512 + rz-sae)",
+        })
+            .with_id(evex_start + 22)
+    );
+
+    sink.record(
+        evex_start + 16,
+        evex_start + 18,
+        InnerDescription::RegisterNumber("evex.aaa", evex_byte_three & 0b111, RegSpec::mask(evex_byte_three & 0b111))
+            .with_id(evex_start + 16)
+    );
+
+    sink.record(
+        evex_start + 23,
+        evex_start + 23,
+        InnerDescription::Boundary("evex prefix ends/opcode begins")
+            .with_id(evex_start + 23)
+    );
+
     let opc = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let table_idx = ((m << 2) | p) as usize;
     let table = generated::TABLES[table_idx];
@@ -76,7 +186,13 @@ pub(crate) fn read_evex<
     if let Ok(entry) = table.binary_search_by_key(&opc, |x| x.0) {
       let (opcode, operand_code) = table[entry].1[index_lower];
       instruction.opcode = opcode;
-      read_evex_operands(words, instruction, operand_code)?;
+      sink.record(
+          evex_start + 24,
+          evex_start + 31,
+          InnerDescription::Opcode(instruction.opcode)
+              .with_id(evex_start + 24)
+      );
+      read_evex_operands(words, instruction, operand_code, sink)?;
       if instruction.prefixes.evex_unchecked().rp() {
         instruction.regs[0].num |= 0b10000;
         if ![RegisterBank::X, RegisterBank::Y, RegisterBank::Z].contains(&instruction.regs[0].bank) {
@@ -91,6 +207,20 @@ pub(crate) fn read_evex<
           }
         }
       }
+      // have to wait til after `read_evex_operands` to report evex register
+      // because its size may be updated as part of reading operands.
+      sink.record(
+          evex_start + 11,
+          evex_start + 14,
+          InnerDescription::RegisterNumber("evex.vvvvv", instruction.regs[3].num, instruction.regs[3])
+              .with_id(evex_start + 11)
+      );
+      sink.record(
+          evex_start + 19,
+          evex_start + 19,
+          InnerDescription::RegisterNumber("evex.vvvvv", instruction.regs[3].num, instruction.regs[3])
+              .with_id(evex_start + 11)
+      );
       if instruction.prefixes.evex_unchecked().vex().compressed_disp() {
         let overridden_size = match instruction.opcode {
           Opcode::VPEXPANDB => Some(1),
@@ -227,14 +357,17 @@ fn set_reg_sizes_from_ll(inst: &mut Instruction) -> Result<(), DecodeError> {
   Ok(())
 }
 
-pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instruction: &mut Instruction, operand_code: generated::EVEXOperandCode) -> Result<(), DecodeError> {
+pub(crate) fn read_evex_operands<
+  T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, instruction: &mut Instruction, operand_code: generated::EVEXOperandCode, sink: &mut S) -> Result<(), DecodeError> {
   match operand_code {
     generated::EVEXOperandCode::Gm_V_E_LL_imm8_sae_bcast => {
       check_mask_reg(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -282,7 +415,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -312,7 +445,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -337,7 +470,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -368,7 +501,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -426,7 +559,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -504,7 +637,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
 
@@ -540,7 +673,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
 
@@ -572,7 +705,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
 
@@ -606,7 +739,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -624,7 +757,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
       instruction.regs[3].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -651,7 +784,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
       instruction.regs[3].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.regs[1].bank = bank;
         instruction.mem_size = 0;
@@ -687,7 +820,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
       instruction.regs[3].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.regs[1].bank = bank;
         instruction.mem_size = 0;
@@ -708,7 +841,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
       instruction.regs[3].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.regs[1].bank = RegisterBank::D;
         instruction.mem_size = 0;
@@ -730,7 +863,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -752,7 +885,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -768,7 +901,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -787,7 +920,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -806,7 +939,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.operand_count = 2;
@@ -823,7 +956,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
 
       // in specific support of vcomisd/vucomisd
@@ -845,7 +978,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
 
       // in specific support of vcomisd/vucomisd
@@ -870,7 +1003,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -897,7 +1030,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -934,7 +1067,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -968,7 +1101,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -995,7 +1128,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -1032,7 +1165,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1061,7 +1194,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1090,7 +1223,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1116,7 +1249,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1138,7 +1271,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.operand_count = 3;
@@ -1165,7 +1298,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.operand_count = 3;
@@ -1196,7 +1329,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
       instruction.operand_count = 3;
@@ -1235,7 +1368,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1299,7 +1432,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -1318,7 +1451,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -1338,7 +1471,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -1364,7 +1497,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
       instruction.operands[2] = OperandSpec::ImmU8;
@@ -1396,7 +1529,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
 
@@ -1425,7 +1558,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
@@ -1458,7 +1591,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -1488,7 +1621,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         if instruction.opcode == Opcode::VMINSS || instruction.opcode == Opcode::VMAXSS {
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
@@ -1520,7 +1653,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           // sae sets this to `vcvtps2ph ymm, zmm, imm8`
@@ -1553,7 +1686,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           // sae sets this to `vcvtps2ph ymm, zmm, imm8`
@@ -1587,7 +1720,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge_sae_noround;
@@ -1621,7 +1754,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
       instruction.regs[3].bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1648,7 +1781,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Y;
       instruction.regs[3].bank = RegisterBank::Y;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -1677,7 +1810,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
       instruction.regs[3].bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.mem_size = 32;
       instruction.operands[0] = OperandSpec::RegRRR.masked();
       instruction.operands[1] = OperandSpec::RegVex;
@@ -1702,7 +1835,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.mem_size = 32;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -1717,7 +1850,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1735,7 +1868,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1753,7 +1886,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1771,7 +1904,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1789,7 +1922,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1807,7 +1940,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1825,7 +1958,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1843,7 +1976,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1862,7 +1995,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1880,7 +2013,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1898,7 +2031,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1916,7 +2049,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -1935,7 +2068,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       instruction.mem_size = 32;
       instruction.operands[0] = mem_oper.masked();
@@ -1950,7 +2083,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
@@ -1965,7 +2098,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
@@ -1980,7 +2113,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       instruction.mem_size = 8;
       instruction.operands[0] = mem_oper.masked();
@@ -1995,7 +2128,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       instruction.mem_size = 8;
       instruction.operands[0] = mem_oper.masked();
@@ -2010,7 +2143,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       instruction.mem_size = 4;
       instruction.operands[0] = mem_oper.masked();
@@ -2025,7 +2158,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       instruction.mem_size = 4;
       instruction.operands[0] = mem_oper.masked();
@@ -2040,7 +2173,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       instruction.mem_size = 2;
       instruction.operands[0] = mem_oper.masked();
@@ -2055,7 +2188,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       instruction.mem_size = 8;
       instruction.operands[0] = mem_oper.masked();
@@ -2070,7 +2203,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2089,7 +2222,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2115,7 +2248,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
@@ -2141,7 +2274,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
@@ -2167,7 +2300,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
@@ -2189,7 +2322,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2211,7 +2344,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2230,7 +2363,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::Z;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2263,7 +2396,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       } else {
         instruction.regs[0].bank = RegisterBank::Y;
       }
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -2284,7 +2417,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2301,7 +2434,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2316,7 +2449,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2338,7 +2471,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       set_reg_sizes_from_ll(instruction)?;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -2353,7 +2486,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::D;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if mem_oper == OperandSpec::RegMMM {
         instruction.regs[1].bank = RegisterBank::X;
@@ -2375,7 +2508,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if mem_oper == OperandSpec::RegMMM {
         instruction.regs[1].bank = RegisterBank::D;
@@ -2399,7 +2532,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2420,7 +2553,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
@@ -2441,7 +2574,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if mem_oper != OperandSpec::RegMMM {
         instruction.mem_size = 8;
@@ -2459,7 +2592,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if isa_has_qwords() {
@@ -2490,7 +2623,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       if instruction.prefixes.evex_unchecked().vex().w() {
         if isa_has_qwords() {
@@ -2533,7 +2666,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2559,7 +2692,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2585,7 +2718,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2628,7 +2761,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2657,7 +2790,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2689,7 +2822,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2714,7 +2847,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2739,7 +2872,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2763,7 +2896,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2784,7 +2917,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2805,7 +2938,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -2821,7 +2954,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2863,7 +2996,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
@@ -2891,7 +3024,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
@@ -2915,7 +3048,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
@@ -2946,7 +3079,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -2974,7 +3107,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3004,7 +3137,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3029,7 +3162,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3054,7 +3187,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3079,7 +3212,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -3104,7 +3237,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3133,7 +3266,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3159,7 +3292,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
         instruction.regs[0].bank = RegisterBank::D;
       }
 
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
 
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -3209,7 +3342,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3268,7 +3401,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3294,7 +3427,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         deny_broadcast(instruction)?;
         instruction.mem_size = 0;
@@ -3318,7 +3451,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         deny_broadcast(instruction)?;
         instruction.mem_size = 0;
@@ -3352,7 +3485,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3374,7 +3507,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3408,7 +3541,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3431,7 +3564,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -3463,7 +3596,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -3505,7 +3638,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       }
@@ -3539,7 +3672,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
       } else {
@@ -3589,7 +3722,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         deny_broadcast(instruction)?;
         instruction.mem_size = 0;
@@ -3629,7 +3762,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3681,7 +3814,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         deny_broadcast(instruction)?;
         instruction.mem_size = 0;
@@ -3736,7 +3869,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       apply_broadcast(instruction, item_size, sz);
 
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegVex_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -3772,7 +3905,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3809,7 +3942,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         deny_broadcast(instruction)?;
       }
@@ -3830,7 +3963,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         deny_broadcast(instruction)?;
       } else {
@@ -3859,7 +3992,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3876,7 +4009,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3893,7 +4026,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3913,7 +4046,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -3930,7 +4063,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       instruction.operands[1] = mem_oper;
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -3953,7 +4086,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       instruction.operands[1] = mem_oper;
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -3978,7 +4111,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[0].bank = RegisterBank::X;
       instruction.operands[1] = mem_oper;
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -4014,7 +4147,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4094,7 +4227,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4154,7 +4287,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4218,7 +4351,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4289,7 +4422,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4354,7 +4487,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z, sink)?;
       instruction.regs[0].bank = RegisterBank::Y;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
@@ -4373,7 +4506,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -4408,7 +4541,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
@@ -4444,7 +4577,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Z, sink)?;
 
       instruction.operands[1] = mem_oper;
       instruction.operand_count = 2;
@@ -4483,7 +4616,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -4501,7 +4634,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -4524,7 +4657,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -4559,7 +4692,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
       instruction.regs[3].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4599,7 +4732,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -4619,7 +4752,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -4639,7 +4772,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -4657,7 +4790,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
 
       let item_size = if instruction.prefixes.evex_unchecked().vex().w() {
         if instruction.opcode == Opcode::VRNDSCALESS {
@@ -4707,7 +4840,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if let OperandSpec::RegMMM = mem_oper {
         /* no mem size */
       } else{
@@ -4733,7 +4866,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
       instruction.regs[3].bank = RegisterBank::Z;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if let OperandSpec::RegMMM = mem_oper {
         return Err(DecodeError::InvalidOperand);
       } else{
@@ -4751,7 +4884,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
         return Err(DecodeError::InvalidOperand);
       }
@@ -4768,7 +4901,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4790,7 +4923,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper.masked();
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4812,7 +4945,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4834,7 +4967,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper.masked();
       if mem_oper == OperandSpec::RegMMM {
         instruction.operands[1] = OperandSpec::RegVex;
@@ -4856,7 +4989,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() && mem_oper == OperandSpec::RegMMM {
         if (!instruction.prefixes.evex_unchecked().vex().w() || !isa_has_qwords()) && instruction.opcode == Opcode::VCVTSI2SD {
           instruction.operands[0] = OperandSpec::RegRRR;
@@ -4901,7 +5034,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
@@ -4928,7 +5061,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
@@ -4956,7 +5089,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4981,7 +5114,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -5006,7 +5139,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
       instruction.operand_count = 2;
@@ -5030,7 +5163,7 @@ pub(crate) fn read_evex_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X)?;
+      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.regs[2].num |= instruction.regs[3].num & 0b10000;
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegVex;
