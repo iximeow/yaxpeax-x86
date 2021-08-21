@@ -3344,7 +3344,11 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
     out.write_str(instr.opcode.name())?;
 
     if instr.opcode == Opcode::XBEGIN {
-        return write!(out, " $+{}", colors.number(signed_i32_hex(instr.imm as i32)));
+        if (instr.imm as i32) >= 0 {
+            return write!(out, " $+{}", colors.number(signed_i32_hex(instr.imm as i32)));
+        } else {
+            return write!(out, " ${}", colors.number(signed_i32_hex(instr.imm as i32)));
+        }
     }
 
     if instr.operand_count > 0 {
@@ -3369,10 +3373,18 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
             if RELATIVE_BRANCHES.contains(&instr.opcode) {
                 return match x {
                     Operand::ImmediateI8(rel) => {
-                        write!(out, "$+{}", colors.number(signed_i32_hex(rel as i32)))
+                        if rel >= 0 {
+                            write!(out, "$+{}", colors.number(signed_i32_hex(rel as i32)))
+                        } else {
+                            write!(out, "${}", colors.number(signed_i32_hex(rel as i32)))
+                        }
                     }
                     Operand::ImmediateI32(rel) => {
-                        write!(out, "$+{}", colors.number(signed_i32_hex(rel)))
+                        if rel >= 0 {
+                            write!(out, "$+{}", colors.number(signed_i32_hex(rel)))
+                        } else {
+                            write!(out, "${}", colors.number(signed_i32_hex(rel)))
+                        }
                     }
                     _ => { unreachable!() }
                 };
