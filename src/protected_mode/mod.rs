@@ -7235,6 +7235,7 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                         };
                         instruction.regs[0] =
                             RegSpec::from_parts(reg, bank);
+                        instruction.mem_size = 4;
                         instruction.operand_count = 1;
                     }
                     1 => {
@@ -7328,6 +7329,9 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             if immsz == 0 {
                 instruction.operands[0] = OperandSpec::ImmI8;
             } else {
+                if instruction.opcode == Opcode::CALL {
+                    instruction.mem_size = 4;
+                }
                 instruction.operands[0] = OperandSpec::ImmI32;
             }
             instruction.operand_count = 1;
@@ -7505,12 +7509,21 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             if instruction.operands[0] == OperandSpec::RegMMM {
                 if opcode == Opcode::CALL || opcode == Opcode::JMP {
                     instruction.regs[1].bank = RegisterBank::D;
+                    if opcode == Opcode::CALL {
+                        instruction.mem_size = 4;
+                    }
                 } else if opcode == Opcode::CALLF || opcode == Opcode::JMPF {
                     return Err(DecodeError::InvalidOperand);
                 }
             } else {
-                if opcode == Opcode::CALL || opcode == Opcode::JMP || opcode == Opcode::PUSH || opcode == Opcode::POP {
+                if opcode == Opcode::CALL || opcode == Opcode::JMP {
                     instruction.mem_size = 4;
+                } else if opcode == Opcode::PUSH || opcode == Opcode::POP {
+                    if instruction.prefixes.operand_size() {
+                        instruction.mem_size = 2;
+                    } else {
+                        instruction.mem_size = 4;
+                    }
                 } else if opcode == Opcode::CALLF || opcode == Opcode::JMPF {
                     instruction.mem_size = 6;
                 }
@@ -7653,6 +7666,14 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
             instruction.operand_count = 1;
         }
         28 => {
+            if instruction.opcode == Opcode::Invalid {
+                return Err(DecodeError::InvalidOpcode);
+            }
+            if instruction.opcode == Opcode::RETURN {
+                instruction.mem_size = 4;
+            } else {
+                instruction.mem_size = 6;
+            }
             instruction.operands[0] = OperandSpec::Nothing;
             instruction.operand_count = 0;
             return Ok(());
@@ -9132,6 +9153,11 @@ fn unlikely_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as y
             instruction.imm =
                 read_imm_unsigned(words, 2)?;
             instruction.operands[0] = OperandSpec::ImmU16;
+            if instruction.opcode == Opcode::RETURN {
+                instruction.mem_size = 4;
+            } else {
+                instruction.mem_size = 6;
+            }
             instruction.operand_count = 1;
         }
         OperandCode::ModRM_0x0f00 => {

@@ -1,3 +1,5 @@
+mod operand;
+
 use std::fmt::Write;
 
 use yaxpeax_arch::{AddressBase, Decoder, U8Reader, LengthedInstruction};
@@ -17892,6 +17894,7 @@ fn test_real_mode() {
     test_display(&[0xff, 0x08], "dec word [bx + si]");
     test_display(&[0xff, 0x15], "call word [di]");
     test_display(&[0x67, 0xff, 0x15, 0x12, 0x12, 0x12, 0x12], "call word [0x12121212]");
+    // note that this call only writes two bytes, and only moves sp by two.
     test_display(&[0x66, 0xff, 0x15], "call dword [di]");
     test_display(&[0xff, 0x18], "callf dword [bx + si]");
     test_display(&[0xff, 0x24], "jmp word [si]");

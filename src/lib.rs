@@ -185,3 +185,10 @@ impl core::fmt::Display for MemoryAccessSize {
         f.write_str(self.size_name())
     }
 }
+
+#[cfg(feature = "fmt")]
+impl core::fmt::Debug for MemoryAccessSize {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        core::fmt::Display::fmt(self, f)
+    }
+}
