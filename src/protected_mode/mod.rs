@@ -4229,9 +4229,8 @@ impl Instruction {
     /// the reported size is correct for displayed operand sizes (`word [ptr]` will have a
     /// `MemoryAccessSize` indicating two bytes) but is _not_ sufficient to describe all accesses
     /// of all instructions. the most notable exception is for operand-size-prefixed `call`, where
-    /// `66ff10` is the instruction `call word [eax]`, but will push a four-byte `eip`. this same
-    /// imprecision exists for `jmp word [mem]` as well. tools must account for these inconsistent
-    /// sizes internally.
+    /// `66ff10` is the instruction `call word [eax]`, but will push a four-byte `eip`.  tools must
+    /// account for these inconsistent sizes internally.
     pub fn mem_size(&self) -> Option<MemoryAccessSize> {
         if self.mem_size != 0 {
             Some(MemoryAccessSize { size: self.mem_size })

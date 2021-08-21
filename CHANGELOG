@@ -8,6 +8,12 @@
     about being a relative or absolute address.
   - `DisplayStyle::Intel` is how `impl Display for Instruction` works, so
     typical `Display` use is also fixed.
+* `push`, `pop`, `call`, and `ret` now report `mem_size` in all cases.
+  - earlier, these instructions only reported a `mem_size` if their operand was a memory access.
+  - for `call`, in 32- and 16-bit modes the reported memory size may describe
+    the *read*, not the corresponding write of pushing `{e}ip` to the stack.
+    documentation has been added to `mem_size` more specifically describing
+    this circumstance.
 
 ## 1.0.4
 
