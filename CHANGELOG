@@ -14,6 +14,8 @@
     the *read*, not the corresponding write of pushing `{e}ip` to the stack.
     documentation has been added to `mem_size` more specifically describing
     this circumstance.
+* correct `rex.b` incorrectly applying to the `*ax` register - `4f91` is `xchg rax, r9`, not `xchg r8, r9`.
+* correct `nop` incorrectly ignoring `rex.b` - `4190` is `xchg rax, r8`, not `nop`.
 
 ## 1.0.4
 

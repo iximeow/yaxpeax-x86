@@ -1176,8 +1176,10 @@ fn test_mov() {
 fn test_xchg() {
     test_display(&[0x90], "nop");
     test_display(&[0x91], "xchg eax, ecx");
-    test_display(&[0x4f, 0x91], "xchg r8, r9");
+    test_display(&[0x4f, 0x91], "xchg rax, r9");
     test_display(&[0x66, 0x91], "xchg ax, cx");
+    test_display(&[0x4f, 0x90], "xchg rax, r8");
+    test_display(&[0x41, 0x90], "xchg eax, r8d");
 }
 
 #[test]

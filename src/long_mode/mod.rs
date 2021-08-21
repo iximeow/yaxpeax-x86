@@ -5118,7 +5118,7 @@ enum OperandCode {
     Zv_R5 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 5).bits(),
     Zv_R6 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 6).bits(),
     Zv_R7 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 7).bits(),
-    // Zv_AX_R0 = 0x48,
+    Zv_AX_R0 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 0).bits(),
     Zv_AX_R1 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 1).bits(),
     Zv_AX_R2 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 2).bits(),
     Zv_AX_R3 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 3).bits(),
@@ -5447,7 +5447,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::LEA), OperandCode::Gv_M),
     OpcodeRecord(Interpretation::Instruction(Opcode::MOV), OperandCode::Sw_Ew),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x8f_Ev),
-    OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R0),
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R1),
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R2),
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R3),
@@ -7428,6 +7428,13 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                     }
                     1 => {
                         // Zv_AX
+                        // in 64-bit mode, rex.b is able to make "nop" into an `xchg`, as in `4190`
+                        // aka `xchg eax, r8d.
+                        if reg == 0 && !instruction.prefixes.rex_unchecked().b() {
+                            instruction.opcode = Opcode::NOP;
+                            instruction.operand_count = 0;
+                            return Ok(());
+                        }
                         let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
                         let bank = if opwidth == 4 {
                             RegisterBank::D
@@ -7436,8 +7443,9 @@ fn read_operands<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpe
                         } else {
                             RegisterBank::Q
                         };
+                        // always *ax, but size is determined by prefixes (or lack thereof)
                         instruction.regs[0] =
-                            RegSpec::from_parts(0, instruction.prefixes.rex_unchecked().b(), bank);
+                            RegSpec::from_parts(0, false, bank);
                         instruction.operands[1] = OperandSpec::RegMMM;
                         instruction.regs[1] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
