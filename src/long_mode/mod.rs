@@ -6005,7 +6005,7 @@ fn read_M<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm field is a simple register dereference (mod bits: 00)")
+                InnerDescription::Misc("memory operand is [reg] with no displacement, register selected by `mmm` (mod bits: 00)")
                     .with_id(modrm_start + 0)
             );
             OperandSpec::Deref
@@ -7643,7 +7643,13 @@ fn read_with_annotations<
                 0x26 |
                 0x2e |
                 0x36 |
-                0x3e =>{ /* no-op in amd64 */ },
+                0x3e => {
+                    /* no-op in amd64 */
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("ignored prefix in 64-bit mode"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
+                },
                 0x64 => {
                     sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::SegmentPrefix(Segment::FS),

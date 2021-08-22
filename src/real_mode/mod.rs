@@ -5902,7 +5902,7 @@ fn read_M_16bit<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm selects a dereference with no displacement (mod bits: 00)")
+                InnerDescription::Misc("memory operand is [reg(s)] with no displacement, register(s) selected by `mmm` (mod bits: 00)")
                     .with_id(modrm_start + 0)
             );
             if mmm > 3 {
@@ -5918,7 +5918,7 @@ fn read_M_16bit<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm selects registers for deref address with 8-bit displacement (mod bits: 01)")
+                InnerDescription::Misc("memory operand is [reg(s)+disp8] indexed by register(s) selected by `mmm` (mod bits: 01)")
                     .with_id(modrm_start + 0)
             );
             sink.record(
@@ -5948,7 +5948,7 @@ fn read_M_16bit<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm selects registers for deref address with 16-bit displacement (mod bits: 10)")
+                InnerDescription::Misc("memory operand is [reg(s)+disp16] indexed by register(s) selected by `mmm` (mod bits: 01)")
                     .with_id(modrm_start + 0)
             );
             sink.record(
@@ -6029,7 +6029,7 @@ fn read_M<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm field is a simple register dereference (mod bits: 00)")
+                InnerDescription::Misc("memory operand is [reg] with no displacement, register selected by `mmm` (mod bits: 00)")
                     .with_id(modrm_start + 0)
             );
             OperandSpec::Deref
@@ -6039,7 +6039,7 @@ fn read_M<
                 sink.record(
                     modrm_start + 6,
                     modrm_start + 7,
-                    InnerDescription::Misc("memory operand is [reg+disp8] indexed by register(s) selected by `mmm` (mod bits: 01)")
+                    InnerDescription::Misc("memory operand is [reg+disp8] indexed by register selected by `mmm` (mod bits: 01)")
                         .with_id(modrm_start + 0)
                 );
                 read_num(words, 1)? as i8 as i32
@@ -6047,7 +6047,7 @@ fn read_M<
                 sink.record(
                     modrm_start + 6,
                     modrm_start + 7,
-                    InnerDescription::Misc("memory operand is [reg+disp16] indexed by register(s) selected by `mmm` (mod bits: 10)")
+                    InnerDescription::Misc("memory operand is [reg+disp32] indexed by register(s) selected by `mmm` (mod bits: 10)")
                         .with_id(modrm_start + 0)
                 );
                 read_num(words, 4)? as i32
@@ -7723,6 +7723,11 @@ fn read_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
 >(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+    sink.record(
+        words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
+        InnerDescription::Boundary("opcode ends/operands begin (typically)")
+            .with_id(words.offset() as u32 * 8 - 1)
+    );
     let modrm_start = words.offset() as u32 * 8;
     let opcode_start = modrm_start + 8;
     instruction.operands[0] = OperandSpec::RegRRR;
