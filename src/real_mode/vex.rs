@@ -1,5 +1,5 @@
 use yaxpeax_arch::Reader;
-use yaxpeax_arch::DescriptionSink;
+use yaxpeax_arch::annotation::DescriptionSink;
 
 use crate::real_mode::Arch;
 use crate::real_mode::OperandSpec;

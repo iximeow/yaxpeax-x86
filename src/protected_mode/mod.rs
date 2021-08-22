@@ -13,7 +13,7 @@ use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
-use yaxpeax_arch::{AnnotatingDecoder, DescriptionSink, NullSink};
+use yaxpeax_arch::annotation::{AnnotatingDecoder, DescriptionSink, NullSink};
 use yaxpeax_arch::{DecodeError as ArchDecodeError};
 
 use core::fmt;
@@ -7488,7 +7488,7 @@ impl FieldDescription {
     }
 }
 
-impl yaxpeax_arch::FieldDescription for FieldDescription {
+impl yaxpeax_arch::annotation::FieldDescription for FieldDescription {
     fn id(&self) -> u32 {
         self.id
     }

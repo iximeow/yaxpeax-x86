@@ -2,7 +2,7 @@ use super::OperandSpec;
 use super::FieldDescription;
 use super::InnerDescription;
 
-use yaxpeax_arch::DescriptionSink;
+use yaxpeax_arch::annotation::DescriptionSink;
 
 // `evex_byte_one` is an option because the caller *may* have already read it,
 // but may have not. `long_mode` can decide immediately that `0x62` should be read
