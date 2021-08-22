@@ -4163,6 +4163,7 @@ impl Decoder<Arch> for InstDecoder {
 
         Ok(instr)
     }
+    #[inline(always)]
     fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
         self.decode_with_annotation(instr, words, &mut NullSink)
     }
@@ -4171,6 +4172,7 @@ impl Decoder<Arch> for InstDecoder {
 impl AnnotatingDecoder<Arch> for InstDecoder {
     type FieldDescription = FieldDescription;
 
+    #[inline(always)]
     fn decode_with_annotation<
         T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
         S: DescriptionSink<Self::FieldDescription>
@@ -7446,6 +7448,7 @@ impl fmt::Display for FieldDescription {
     }
 }
 
+#[inline(always)]
 fn read_with_annotations<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
