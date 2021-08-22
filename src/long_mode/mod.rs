@@ -7486,10 +7486,12 @@ fn read_with_annotations<
                         .with_id(words.offset() as u32 * 8 - 9)
                 );
             }
-            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                desc: InnerDescription::Opcode(opc),
-                id: words.offset() as u32 * 8 - 8,
-            });
+            if opc != Opcode::Invalid {
+                sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                    desc: InnerDescription::Opcode(opc),
+                    id: words.offset() as u32 * 8 - 8,
+                });
+            }
             sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                 desc: InnerDescription::OperandCode(record.1),
                 id: words.offset() as u32 * 8 - 8 + 1,

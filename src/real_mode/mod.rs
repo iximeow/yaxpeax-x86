@@ -5802,7 +5802,11 @@ fn read_sib<
 }
 
 #[allow(non_snake_case)]
-fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(words: &mut T, instr: &mut Instruction, modrm: u8) -> Result<OperandSpec, DecodeError> {
+fn read_M_16bit<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
+    let modrm_start = words.offset() as u32 * 8 - 8;
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
     if modbits == 0b00 && mmm == 0b110 {
@@ -5811,37 +5815,91 @@ fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpea
     }
     match mmm {
         0b000 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bx + si`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bx();
             instr.regs[2] = RegSpec::si();
         },
         0b001 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bx + di`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bx();
             instr.regs[2] = RegSpec::di();
         },
         0b010 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bp + si`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bp();
             instr.regs[2] = RegSpec::si();
         },
         0b011 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bp + di`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bp();
             instr.regs[2] = RegSpec::di();
         },
         0b100 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `si`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::si();
         },
         0b101 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `di`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::di();
         },
         0b110 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bp`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bp();
         },
         0b111 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bx`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bx();
         },
         _ => { unreachable!("impossible bit pattern"); }
     }
     match modbits {
         0b00 => {
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("mod bits of 00 selects a dereference with no displacement")
+                    .with_id(modrm_start + 0)
+            );
             if mmm > 3 {
                 Ok(OperandSpec::Deref)
             } else {
@@ -5849,7 +5907,21 @@ fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpea
             }
         },
         0b01 => {
+            let disp_start = words.offset() as u32 * 8;
             instr.disp = read_num(words, 1)? as i8 as i32 as u32;
+            let disp_end = words.offset() as u32 * 8;
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("mod bits of 01 selects a dereference with 8-bit displacement")
+                    .with_id(modrm_start + 0)
+            );
+            sink.record(
+                disp_start,
+                disp_end - 1,
+                InnerDescription::Number("displacement", instr.disp as i64)
+                    .with_id(disp_start + 3)
+            );
             if mmm > 3 {
                 if instr.disp != 0 {
                     Ok(OperandSpec::RegDisp)
@@ -5865,7 +5937,21 @@ fn read_M_16bit<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpea
             }
         },
         0b10 => {
+            let disp_start = words.offset() as u32 * 8;
             instr.disp = read_num(words, 2)? as i16 as i32 as u32;
+            let disp_end = words.offset() as u32 * 8;
+            sink.record(
+                modrm_start + 6,
+                modrm_start + 7,
+                InnerDescription::Misc("mod bits of 10 selects a dereference with 16-bit displacement")
+                    .with_id(modrm_start + 0)
+            );
+            sink.record(
+                disp_start,
+                disp_end - 1,
+                InnerDescription::Number("displacement", instr.disp as i64)
+                    .with_id(disp_start + 3)
+            );
             if mmm > 3 {
                 if instr.disp != 0 {
                     Ok(OperandSpec::RegDisp)
@@ -5895,7 +5981,7 @@ fn read_M<
 
     // by default read M as a 16-bit size address
     if !instr.prefixes.address_size() {
-        return read_M_16bit(words, instr, modrm);
+        return read_M_16bit(words, instr, modrm, sink);
     }
     instr.regs[1].bank = RegisterBank::D;
     let modbits = modrm >> 6;
@@ -5948,7 +6034,7 @@ fn read_M<
                 sink.record(
                     modrm_start + 6,
                     modrm_start + 7,
-                    InnerDescription::Misc("memory operand is [reg+disp8] indexed by register selected by `mmm` (mod bits: 01)")
+                    InnerDescription::Misc("memory operand is [reg+disp8] indexed by register(s) selected by `mmm` (mod bits: 01)")
                         .with_id(modrm_start + 0)
                 );
                 read_num(words, 1)? as i8 as i32
@@ -5956,7 +6042,7 @@ fn read_M<
                 sink.record(
                     modrm_start + 6,
                     modrm_start + 7,
-                    InnerDescription::Misc("memory operand is [reg+disp32] indexed by register selected by `mmm` (mod bits: 10)")
+                    InnerDescription::Misc("memory operand is [reg+disp16] indexed by register(s) selected by `mmm` (mod bits: 10)")
                         .with_id(modrm_start + 0)
                 );
                 read_num(words, 4)? as i32
@@ -7398,7 +7484,7 @@ fn read_with_annotations<
 
     let record: OpcodeRecord = loop {
         let record = next_rec;
-        if let Interpretation::Instruction(_) = record.0 {
+        if let Interpretation::Instruction(opc) = record.0 {
             if words.offset() > 1 {
                 sink.record(
                     words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
@@ -7406,6 +7492,16 @@ fn read_with_annotations<
                         .with_id(words.offset() as u32 * 8 - 9)
                 );
             }
+            if opc != Opcode::Invalid {
+                sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                    desc: InnerDescription::Opcode(opc),
+                    id: words.offset() as u32 * 8 - 8,
+                });
+            }
+            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                desc: InnerDescription::OperandCode(record.1),
+                id: words.offset() as u32 * 8 - 8 + 1,
+            });
             break record;
         } else {
             let b = nextb;
@@ -7438,21 +7534,45 @@ fn read_with_annotations<
             };
             match b {
                 0x26 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::ES),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_es();
                 },
                 0x2e => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::CS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_cs();
                 },
                 0x36 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::SS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_ss();
                 },
                 0x3e => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::DS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_ds();
                 },
                 0x64 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::FS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_fs();
                 },
                 0x65 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::SegmentPrefix(Segment::GS),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_gs();
                 },
                 0x66 => {
