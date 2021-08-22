@@ -5815,31 +5815,79 @@ fn read_M_16bit<
     }
     match mmm {
         0b000 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bx + si`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bx();
             instr.regs[2] = RegSpec::si();
         },
         0b001 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bx + di`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bx();
             instr.regs[2] = RegSpec::di();
         },
         0b010 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bp + si`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bp();
             instr.regs[2] = RegSpec::si();
         },
         0b011 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bp + di`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bp();
             instr.regs[2] = RegSpec::di();
         },
         0b100 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `si`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::si();
         },
         0b101 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `di`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::di();
         },
         0b110 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bp`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bp();
         },
         0b111 => {
+            sink.record(
+                modrm_start + 0,
+                modrm_start + 2,
+                InnerDescription::Misc("memory address includes `bx`")
+                    .with_id(modrm_start + 2)
+            );
             instr.regs[1] = RegSpec::bx();
         },
         _ => { unreachable!("impossible bit pattern"); }
@@ -5865,7 +5913,7 @@ fn read_M_16bit<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm selects a dereference with 8-bit displacement (mod bits: 01)")
+                InnerDescription::Misc("mmm selects registers for deref address with 8-bit displacement (mod bits: 01)")
                     .with_id(modrm_start + 0)
             );
             sink.record(
@@ -5895,7 +5943,7 @@ fn read_M_16bit<
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
-                InnerDescription::Misc("mmm selects a dereference with 16-bit displacement (mod bits: 10)")
+                InnerDescription::Misc("mmm selects registers for deref address with 16-bit displacement (mod bits: 10)")
                     .with_id(modrm_start + 0)
             );
             sink.record(
@@ -7526,18 +7574,38 @@ fn read_with_annotations<
                     prefixes.set_gs();
                 },
                 0x66 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("operand size override (to 16 bits)"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_operand_size();
                 },
                 0x67 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("address size override (to 16 bits)"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_address_size();
                 },
                 0xf0 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("lock prefix"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_lock();
                 },
                 0xf2 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("repnz prefix"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_repnz();
                 },
                 0xf3 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("rep prefix"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_rep();
                 },
                 _ => { unsafe { unreachable_unchecked(); } }

@@ -7614,20 +7614,40 @@ fn read_with_annotations<
                     prefixes.set_gs();
                 },
                 0x66 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("operand size override (to 16 bits)"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_operand_size();
                 },
                 0x67 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("address size override (to 32 bits)"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_address_size();
                     instruction.regs[1].bank = RegisterBank::D;
                     instruction.regs[2].bank = RegisterBank::D;
                 },
                 0xf0 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("lock prefix"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_lock();
                 },
                 0xf2 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("repnz prefix"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_repnz();
                 },
                 0xf3 => {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("rep prefix"),
+                        id: words.offset() as u32 * 8 - 16,
+                    });
                     prefixes.set_rep();
                 },
                 _ => { unsafe { unreachable_unchecked(); } }
