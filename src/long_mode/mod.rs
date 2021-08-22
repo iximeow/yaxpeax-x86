@@ -4898,6 +4898,11 @@ impl OperandCodeBuilder {
     }
 }
 
+/// a wrapper to hide internal library implementation details. this is only useful for the inner
+/// content's `Display` impl, which itself is unstable and suitable only for human consumption.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct OperandCodeWrapper { code: OperandCode }
+
 #[allow(non_camel_case_types)]
 // might be able to pack these into a u8, but with `Operand` being u16 as well now there's little
 // point. table entries will have a padding byte per record already.
@@ -7366,15 +7371,45 @@ fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
     };
 }
 
+/// the actual description for a selection of bits involved in decoding an [`long_mode::Instruction`].
+///
+/// some prefixes are only identified as an `InnerDescription::Misc` string, while some are full
+/// `InnerDescription::SegmentPrefix(Segment)`. generally, strings should be considered unstable
+/// and only useful for displaying for human consumption.
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum InnerDescription {
+pub enum InnerDescription {
+    /// the literal byte read for a `rex` prefix, `0x4_`.
     RexPrefix(u8),
+    /// the segment selected by a segment override prefix. this is not necessarily the actual
+    /// segement used in the instruction's memory accesses, if any are made.
     SegmentPrefix(Segment),
+    /// the opcode read for this instruction. this may be reported multiple times in an instruction
+    /// if multiple spans of bits are necessary to determine the opcode. it is a bug if two
+    /// different `Opcode` are indicated by different `InnerDescription::Opcode` reported from
+    /// decoding the same instruction. this invariant is not well-tested, and may occur in
+    /// practice.
     Opcode(Opcode),
-    OperandCode(OperandCode),
+    /// the operand code indicating how to read operands for this instruction. this is an internal
+    /// detail of `yaxpeax-x86` but is typically named in a manner that can aid understanding the
+    /// decoding process. `OperandCode` names are unstable, and this variant is only useful for
+    /// displaying for human consumption.
+    OperandCode(OperandCodeWrapper),
+    /// a decoded register: a name for the bits used to decode it, the register number those bits
+    /// specify, and the fully-constructed [`long_mode::RegSpec`] that was decoded.
     RegisterNumber(&'static str, u8, RegSpec),
+    /// a miscellaneous string describing some bits of the instruction. this may describe a prefix,
+    /// internal details of a prefix, error or constraints on an opcode, operand encoding details,
+    /// or other items involved in an instruction.
     Misc(&'static str),
+    /// a number involved in the instruction: typically either a disaplacement or immediate. the
+    /// string describes which. the `i64` member is typically a sign-extended value from the
+    /// appropriate original size, meaning there may be incorrect cases of a `65535u16` sign
+    /// extending to `-1`. bug reports are highly encouraged for unexpected values.
     Number(&'static str, i64),
+    /// a boundary between two logically distinct sections of an instruction. these typically
+    /// separate the leading prefix string (if any), opcode, and operands (if any). the included
+    /// string describes which boundary this is. boundary names should not be considered stable,
+    /// and are useful at most for displaying for human consumption.
     Boundary(&'static str),
 }
 
@@ -7410,7 +7445,7 @@ impl fmt::Display for InnerDescription {
             InnerDescription::Opcode(opc) => {
                 write!(f, "opcode `{}`", opc)
             }
-            InnerDescription::OperandCode(code) => {
+            InnerDescription::OperandCode(OperandCodeWrapper { code }) => {
                 write!(f, "operand code `{:?}`", code)
             }
             InnerDescription::RegisterNumber(name, num, reg) => {
@@ -7427,6 +7462,13 @@ impl fmt::Display for InnerDescription {
 pub struct FieldDescription {
     desc: InnerDescription,
     id: u32,
+}
+
+impl FieldDescription {
+    /// the actual description associated with this bitfield.
+    pub fn desc(&self) -> &InnerDescription {
+        &self.desc
+    }
 }
 
 impl yaxpeax_arch::FieldDescription for FieldDescription {
@@ -7496,7 +7538,7 @@ fn read_with_annotations<
                 });
             }
             sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                desc: InnerDescription::OperandCode(record.1),
+                desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
                 id: words.offset() as u32 * 8 - 8 + 1,
             });
             break record;

@@ -1,5 +1,24 @@
 ## 1.1.0
 
+* implement `AnnotatingDecoder` from `yaxpeax-arch=0.2.6` and later.
+  this is a relatively involved addition. for rustc reasons, there are several
+  additional `inline(always)` attributes applied to keep non-annotating decoder
+  calls yielding the same generated code (and performance) as before.
+
+  annotations are produced for much but not all of 16-, 32-, and 64-bit x86,
+  describing prefixes, opcodes, operand encoding, and for more common
+  instructions, operand encoding as well. descriptions provided are described
+  by the `FieldDescription` struct in all architectures. `id` generally matches
+  some kind of parse order for the instruction, typically the order that
+  `yaxpeax-x86` considers bit fields in decoding an instruction. prefixes will
+  have lower id than opcodes, opcodes will have lower id than operands,
+  immediates will have the highest id due to being last values read in an
+  instruction.
+
+  between prefixes, opcodes, and operands, "Boundary" field descriptions are
+  reported as a hint to library clients that a logical grouping of descriptions
+  has ended.
+
 * `pub const fn` builders for all general-purpose registers, segment registers, and ip/flags registers.
   - this corrects a spotty and inconsistent set of builders filled in on-demand.
 * `DisplayStyle::Intel` now shows relative offsets as `$+0xXX`, rather than `0xXX`.
