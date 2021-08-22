@@ -16,6 +16,7 @@
     this circumstance.
 * correct `rex.b` incorrectly applying to the `*ax` register - `4f91` is `xchg rax, r9`, not `xchg r8, r9`.
 * correct `nop` incorrectly ignoring `rex.b` - `4190` is `xchg rax, r8`, not `nop`.
+* `DisplayStyle::C` now has rules to nicely display `jCC`, `jmp`, `call`, `loop*`, and `j*cxz` instructions.
 
 ## 1.0.4
 
