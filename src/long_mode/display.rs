@@ -1405,6 +1405,8 @@ const MNEMONICS: &[&'static str] = &[
     "setssbsy",
     "clrssbsy",
     "rstorssp",
+    "endbr64",
+    "endbr32",
 
     // TDX
     "tdcall",
@@ -3220,6 +3222,8 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
             Opcode::SETSSBSY |
             Opcode::CLRSSBSY |
             Opcode::RSTORSSP |
+            Opcode::ENDBR64 |
+            Opcode::ENDBR32 |
             Opcode::AESDEC |
             Opcode::AESDECLAST |
             Opcode::AESENC |

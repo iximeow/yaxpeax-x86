@@ -2361,6 +2361,9 @@ fn prefixed_f20f() {
 #[test]
 fn prefixed_f30f() {
     test_display(&[0xf3, 0x0f, 0x16, 0xcf], "movshdup xmm1, xmm7");
+    test_display(&[0xf3, 0x0f, 0x1e, 0xfa], "endbr64");
+    test_display(&[0xf3, 0x0f, 0x1e, 0xfb], "endbr32");
+    test_display(&[0xf3, 0x0f, 0x1e, 0xfc], "nop esp, edi");
 }
 
 #[test]

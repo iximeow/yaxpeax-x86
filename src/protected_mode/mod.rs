@@ -2077,6 +2077,8 @@ pub enum Opcode {
     SETSSBSY,
     CLRSSBSY,
     RSTORSSP,
+    ENDBR64,
+    ENDBR32,
 
     // TDX
     TDCALL,
@@ -4905,9 +4907,7 @@ enum OperandCode {
     ModRM_0x0f73 = OperandCodeBuilder::new().read_modrm().special_case(57).bits(),
     ModRM_0xf20f78 = OperandCodeBuilder::new().read_modrm().special_case(58).bits(),
     ModRM_0x660f78 = OperandCodeBuilder::new().read_modrm().special_case(59).bits(),
-//    ModRM_0x660f12 = OperandCodeBuilder::new().read_modrm().special_case(58).bits(),
-//    ModRM_0x660f16 = OperandCodeBuilder::new().read_modrm().special_case(59).bits(),
-//    ModRM_0x660f71 = OperandCodeBuilder::new().read_modrm().special_case(60).bits(),
+    ModRM_0xf30f1e = OperandCodeBuilder::new().special_case(60).bits(),
 //    ModRM_0x660f72 = OperandCodeBuilder::new().read_modrm().special_case(61).bits(),
 //    ModRM_0x660f73 = OperandCodeBuilder::new().read_modrm().special_case(62).bits(),
 //    ModRM_0x660fc7 = OperandCodeBuilder::new().read_modrm().special_case(63).bits(),
@@ -6393,7 +6393,7 @@ fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
             0x1b => OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
             0x1c => OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
             0x1d => OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
-            0x1e => OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
+            0x1e => OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::ModRM_0xf30f1e),
             0x1f => OpcodeRecord(Interpretation::Instruction(Opcode::NOP), OperandCode::Ev),
 
             0x20 => OpcodeRecord(Interpretation::Instruction(Opcode::MOV), OperandCode::Rq_Cq_0),
@@ -8780,6 +8780,31 @@ fn unlikely_operands<
             instruction.operands[2] = OperandSpec::ImmInDispField;
             instruction.operand_count = 3;
 
+        }
+        OperandCode::ModRM_0xf30f1e => {
+            let modrm = read_modrm(words)?;
+            match modrm {
+                0xfa => {
+                    instruction.opcode = Opcode::ENDBR64;
+                    instruction.operand_count = 0;
+                },
+                0xfb => {
+                    instruction.opcode = Opcode::ENDBR32;
+                    instruction.operand_count = 0;
+                },
+                _ => {
+                    let (sz, bank) = if !instruction.prefixes.operand_size() {
+                        (4, RegisterBank::D)
+                    } else {
+                        (2, RegisterBank::W)
+                    };
+                    instruction.operands[1] = OperandSpec::RegRRR;
+                    instruction.operands[0] = read_E(words, instruction, modrm, sz, sink)?;
+                    instruction.regs[0] =
+                        RegSpec::from_parts((modrm >> 3) & 7, bank);
+                    instruction.operand_count = 2;
+                }
+            };
         }
         OperandCode::G_E_xmm_Ub => {
             let modrm = read_modrm(words)?;
