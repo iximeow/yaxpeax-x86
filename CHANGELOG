@@ -2,6 +2,11 @@
 * support `endbr64` and `endbr32`
   - these are interpretations of `nop` (`0f1e` wide nop), so the only issue
   with for users <1.1.1 will be `yaxpeax-86` decoding `nop` instead.
+* export `InstructionDisplayer`
+  this fixes an issue where crate docs would have dead links for the return
+  value of public APIs. it also allows callers to write name of what
+  `display_with` returns in their code, which hopefully isn't too useful but
+  shouldn't be impossible.
 
 ## 1.1.0
 
