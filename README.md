@@ -33,7 +33,7 @@ yaxpeax-x86 decodes long-mode (`amd64`/`x86_64`), protected-mode (`x86`/`x86_32`
 \*\*\*: i ran out of space for feature bits. `InstDecoder` is currently a `u64` and all 64 bits are used for x86 features mapping to `cpuid` bits. supporting these as optional instructions would require growing this to a pair of `u64`. since the typical case is to decode everything, these are decoded regardless of `InstDecoder` settings. growing `InstDecoder` to an `u128` is likely acceptable, but has not yet been profiled.
 
 ### very fast
-when hooked up to [`disas-bench`](https://github.com/iximeow/disas-bench#results), `yaxpeax_x86::long_mode` has shown roughly 250mb/s decode throughput and on most hardware is the fastest software x86 decoder available. the likely path through the decoder, through `<yaxpeax_x86::amd64::InstDecoder as yaxpeax_arch::Decoder>::decode_into``, is an average of 58 cycles on a zen2 core.
+when hooked up to [`disas-bench`](https://github.com/iximeow/disas-bench#results), `yaxpeax_x86::long_mode` has shown roughly 250mb/s decode throughput and on some hardware is the fastest software x86 decoder available. the likely path through the decoder, through `<yaxpeax_x86::amd64::InstDecoder as yaxpeax_arch::Decoder>::decode_into``, is an average of 58 cycles on a zen2 core.
 
 while there is an in-repo benchmark, i've decided it's so unrealistic as to be unuseful, and prefer `disas-bench` until it can be made more informative.
 
