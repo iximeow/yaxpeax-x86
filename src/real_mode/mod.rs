@@ -7,7 +7,7 @@ pub mod uarch;
 pub use crate::MemoryAccessSize;
 
 #[cfg(feature = "fmt")]
-pub use self::display::DisplayStyle;
+pub use self::display::{DisplayStyle, InstructionDisplayer};
 
 use core::cmp::PartialEq;
 use core::hint::unreachable_unchecked;
