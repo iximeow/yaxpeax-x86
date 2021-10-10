@@ -3285,7 +3285,7 @@ pub enum DisplayStyle {
     // ATT,
 }
 
-/// Implementation of [`Display`](fmt::Display) that renders instructions using a specified display
+/// implementation of [`Display`](fmt::Display) that renders instructions using a specified display
 /// style.
 pub struct InstructionDisplayer<'instr> {
     pub(crate) instr: &'instr Instruction,
