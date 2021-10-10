@@ -54,6 +54,9 @@ the canonical copy of `yaxpeax-x86` is at [https://git.iximeow.net/yaxpeax-x86/]
 ### changelog
 a changelog across crate versions is maintained in the `CHANGELOG` file located in the repo, as well as [online](https://git.iximeow.net/yaxpeax-x86/tree/CHANGELOG).
 
+### contributing
+unfortunately, pushing commits to the canonical repo at `git.iximeow.net` is impossible. if you'd like to contribute - thank you! - please send patches to emails iximeow has committed under or by opening PRs against the [GitHub mirror](https://www.github.com/iximeow/yaxpeax-x86). both remotes are kept in sync.
+
 ### see also
 
 [`iced`](https://github.com/0xd4d/iced) is another very good `x86_64` decoder, also written in rust. it provides additional information about instruction semantics as part of the crate, as well as the ability to re-encode instructions.
