@@ -18362,3 +18362,9 @@ fn test_invalid_sequences() {
     test_invalid(&[0xf3, 0xf2, 0x0f, 0xae, 0x8f, 0x54, 0x3c, 0x58, 0xb7]);
     test_invalid(&[0xff, 0xd8]);
 }
+
+#[test]
+fn from_reports() {
+    // negative compressed evex displacements should not overflow and panic
+    test_display(&[0x62, 0xf2, 0x6d, 0xac, 0x00, 0x59, 0xa7], "vpshufb ymm3{k4}{z}, ymm2, ymmword [bx + di - 0xb20]");
+}

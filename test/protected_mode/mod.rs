@@ -3077,3 +3077,9 @@ fn test_sevsnp() {
 fn from_llvm() {
     test_display(&[0xf3, 0x0f, 0x3a, 0xf0, 0xc0, 0x01], "hreset 0x1");
 }
+
+#[test]
+fn from_reports() {
+    // negative compressed evex displacements should not overflow and panic
+    test_display(&[0x62, 0xf2, 0x6d, 0xac, 0x00, 0x59, 0xa7], "vpshufb ymm3{k4}{z}, ymm2, ymmword [ecx - 0xb20]");
+}
