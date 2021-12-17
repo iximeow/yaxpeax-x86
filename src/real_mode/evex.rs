@@ -10,9 +10,5 @@ fn isa_has_qwords() -> bool {
     false
 }
 
-fn apply_disp_scale(inst: &mut Instruction) {
-    inst.disp = ((inst.disp as i32) * (inst.mem_size as i32)) as u32;
-}
-
 include!("../shared/generated_evex.in");
 include!("../shared/evex.in");
