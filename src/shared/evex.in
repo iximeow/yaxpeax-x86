@@ -238,7 +238,7 @@ pub(crate) fn read_evex<
           _ => None
         };
         if let Some(size) = overridden_size {
-          instruction.disp *= size;
+          instruction.disp = instruction.disp.wrapping_mul(size);
         } else {
           apply_disp_scale(instruction);
         }
