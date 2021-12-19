@@ -179,7 +179,7 @@ impl RegSpec {
     /// construct a `RegSpec` for mask reg `num`
     #[inline]
     pub fn mask(num: u8) -> RegSpec {
-        if num >= 32 {
+        if num >= 8 {
             panic!("invalid x86 mask reg {}", num);
         }
 

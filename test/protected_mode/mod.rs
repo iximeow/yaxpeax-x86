@@ -3084,3 +3084,55 @@ fn from_reports() {
     test_display(&[0x62, 0xf2, 0x6d, 0xac, 0x00, 0x59, 0xa7], "vpshufb ymm3{k4}{z}, ymm2, ymmword [ecx - 0xb20]");
     test_display(&[0x62, 0xf2, 0xfd, 0x0f, 0x8a, 0x62, 0xf2], "vcompresspd xmmword [edx - 0x70]{k7}, xmm4");
 }
+
+mod reg_masks {
+    use yaxpeax_x86::protected_mode::RegSpec;
+
+    #[test]
+    #[should_panic]
+    fn invalid_mask_reg_panics() {
+        RegSpec::mask(8);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_dword_reg_panics() {
+        RegSpec::d(8);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_word_reg_panics() {
+        RegSpec::w(8);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_byte_reg_panics() {
+        RegSpec::b(8);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_x87_reg_panics() {
+        RegSpec::st(8);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_xmm_reg_panics() {
+        RegSpec::xmm(32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_ymm_reg_panics() {
+        RegSpec::ymm(32);
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_zmm_reg_panics() {
+        RegSpec::zmm(32);
+    }
+}

@@ -232,7 +232,7 @@ impl RegSpec {
     /// construct a `RegSpec` for non-rex byte reg `num`
     #[inline]
     pub fn rb(num: u8) -> RegSpec {
-        if num >= 18 {
+        if num >= 16 {
             panic!("invalid x86 rex-byte reg {}", num);
         }
 
