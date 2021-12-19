@@ -1,0 +1,28 @@
+
+[package]
+name = "yaxpeax-x86-fuzz"
+version = "0.0.1"
+authors = ["Automatically generated"]
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies.yaxpeax-x86]
+path = ".."
+[dependencies.libfuzzer-sys]
+git = "https://github.com/rust-fuzz/libfuzzer-sys.git"
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "decode_does_not_panic"
+path = "fuzz_targets/decode_does_not_panic.rs"
+
+[[bin]]
+name = "display_does_not_panic"
+path = "fuzz_targets/display_does_not_panic.rs"
+test = false
+doc = false

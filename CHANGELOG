@@ -4,6 +4,11 @@
   - when displaying an invalid `RegSpec`, for some out-of-range mask registers, the displayed register name could be chosen as arbitrary const data interpreted as a pointer/length pair
 * fix incorrect (non-present!) memory size for f30f1e-style `nop`.
   - this would decode without error, but produce an instruction with memory operand and memory size of `0`. if formatted, yaxpeax-x86 panics.
+* add in-tree `cargo fuzz` targets for decoding and displaying instructions.
+  neither of these operations should ever panic.
+
+and thank you to @5225225 for the bug reports handled in 1.1.2 and 1.1.3, as
+well as the nudge to start using `cargo fuzz`.
 
 ## 1.1.2
 * fix panic when evex instructions with compressed displacements are decoded in
