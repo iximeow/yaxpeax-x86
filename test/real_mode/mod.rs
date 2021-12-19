@@ -18368,6 +18368,7 @@ fn from_reports() {
     // negative compressed evex displacements should not overflow and panic
     test_display(&[0x62, 0xf2, 0x6d, 0xac, 0x00, 0x59, 0xa7], "vpshufb ymm3{k4}{z}, ymm2, ymmword [bx + di - 0xb20]");
     test_display(&[0x62, 0xf2, 0xfd, 0x0f, 0x8a, 0x62, 0xf2], "vcompresspd xmmword [bp + si - 0x70]{k7}, xmm4");
+    test_display(&[0xf3, 0x0f, 0x1e, 0x0f], "nop word [bx], cx");
 }
 
 mod reg_masks {

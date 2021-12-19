@@ -8800,6 +8800,7 @@ fn unlikely_operands<
                     };
                     instruction.operands[1] = OperandSpec::RegRRR;
                     instruction.operands[0] = read_E(words, instruction, modrm, sz, sink)?;
+                    instruction.mem_size = sz;
                     instruction.regs[0] =
                         RegSpec::from_parts((modrm >> 3) & 7, bank);
                     instruction.operand_count = 2;

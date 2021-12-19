@@ -2,6 +2,8 @@
 * fix reachable unsoundness via `RegSpec` helper functions
   - helpers should only permit creating valid `RegSpec` structs, but three helpers would permit out-of-range register numbers
   - when displaying an invalid `RegSpec`, for some out-of-range mask registers, the displayed register name could be chosen as arbitrary const data interpreted as a pointer/length pair
+* fix incorrect (non-present!) memory size for f30f1e-style `nop`.
+  - this would decode without error, but produce an instruction with memory operand and memory size of `0`. if formatted, yaxpeax-x86 panics.
 
 ## 1.1.2
 * fix panic when evex instructions with compressed displacements are decoded in
