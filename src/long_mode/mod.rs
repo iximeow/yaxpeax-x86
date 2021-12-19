@@ -10,7 +10,7 @@ pub use crate::MemoryAccessSize;
 pub use self::display::{DisplayStyle, InstructionDisplayer};
 
 use core::cmp::PartialEq;
-use core::hint::unreachable_unchecked;
+use crate::safer_unchecked::unreachable_kinda_unchecked as unreachable_unchecked;
 
 use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
 use yaxpeax_arch::annotation::{AnnotatingDecoder, DescriptionSink, NullSink};
