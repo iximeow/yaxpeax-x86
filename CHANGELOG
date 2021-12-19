@@ -12,8 +12,8 @@
 * add in-tree `cargo fuzz` targets for decoding and displaying instructions.
   neither of these operations should ever panic.
 
-and thank you to @5225225 for the bug reports handled in 1.1.2 and 1.1.3, as
-well as the nudge to start using `cargo fuzz`.
+and thank you to @5225225 (https://github.com/5225225) for the bug reports
+handled in 1.1.2 and 1.1.3, as well as the nudge to start using `cargo fuzz`.
 
 ## 1.1.2
 * fix panic when evex instructions with compressed displacements are decoded in
