@@ -3,6 +3,7 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
+use crate::safer_unchecked::GetSaferUnchecked as _;
 use crate::MEM_SIZE_STRINGS;
 use crate::long_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, Segment, PrefixRex, OperandSpec};
 
@@ -127,7 +128,7 @@ const REG_NAMES: &[&'static str] = &[
 ];
 
 pub(crate) fn regspec_label(spec: &RegSpec) -> &'static str {
-    unsafe { REG_NAMES.get_unchecked((spec.num as u16 + ((spec.bank as u16) << 3)) as usize) }
+    unsafe { REG_NAMES.get_kinda_unchecked((spec.num as u16 + ((spec.bank as u16) << 3)) as usize) }
 }
 
 impl fmt::Display for RegSpec {
@@ -1810,7 +1811,7 @@ const MNEMONICS: &[&'static str] = &[
 impl Opcode {
     fn name(&self) -> &'static str {
         unsafe {
-            MNEMONICS.get_unchecked(*self as usize)
+            MNEMONICS.get_kinda_unchecked(*self as usize)
         }
     }
 }
