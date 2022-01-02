@@ -807,11 +807,11 @@ const REGISTER_CLASS_NAMES: &[&'static str] = &[
 /// instruction. as an example:
 /// ```
 /// use yaxpeax_x86::real_mode::{self as amd64};
-/// use yaxpeax_x86::real_mode::{Opcode, Operand, RegisterClass};
+/// use yaxpeax_x86::real_mode::{Opcode, Operand, RegisterClass, InstDecoder};
 /// use yaxpeax_arch::{Decoder, U8Reader};
 ///
 /// let movsx_ax_cl = &[0x0f, 0xbe, 0xc1];
-/// let decoder = amd64::InstDecoder::default();
+/// let decoder = InstDecoder::default();
 /// let instruction = decoder
 ///     .decode(&mut U8Reader::new(movsx_ax_cl))
 ///     .expect("can decode");
