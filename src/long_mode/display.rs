@@ -3532,7 +3532,9 @@ fn contextualize_c<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors: &Y,
                     write!(out, "${}", colors.number(signed_i32_hex(rel)))
                 }
             }
-            _ => { unreachable!() }
+            other => {
+                write!(out, "{}", other)
+            }
         }
     }
 

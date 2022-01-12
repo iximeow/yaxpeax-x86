@@ -1,3 +1,7 @@
+## 1.1.4
+* fix reachable unreachable under `DisplayStyle::C` in 64-, 32-, and 16-bit modes
+* add fuzz target to cover `DisplayStyle::C` formatter for 64-, 32-, and 16-bit modes
+
 ## 1.1.3
 * fix reachable unsoundness via `RegSpec` helper functions
   - helpers should only permit creating valid `RegSpec` structs, but three

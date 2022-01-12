@@ -26,3 +26,9 @@ name = "display_does_not_panic"
 path = "fuzz_targets/display_does_not_panic.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "display_c_does_not_panic"
+path = "fuzz_targets/display_c_does_not_panic.rs"
+test = false
+doc = false
