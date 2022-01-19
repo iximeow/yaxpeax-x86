@@ -3,9 +3,8 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 use yaxpeax_arch::display::*;
 
-use crate::safer_unchecked::GetSaferUnchecked as _;
 use crate::MEM_SIZE_STRINGS;
-use crate::real_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, Segment, PrefixVex, OperandSpec};
+use crate::real_mode::{Opcode, Operand, InstDecoder, Instruction, PrefixVex, OperandSpec};
 
 impl fmt::Display for InstDecoder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -85,250 +84,6 @@ impl fmt::Display for PrefixVex {
             )
         } else {
             write!(f, "vex:none")
-        }
-    }
-}
-
-impl fmt::Display for Segment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Segment::CS => write!(f, "cs"),
-            Segment::DS => write!(f, "ds"),
-            Segment::ES => write!(f, "es"),
-            Segment::FS => write!(f, "fs"),
-            Segment::GS => write!(f, "gs"),
-            Segment::SS => write!(f, "ss"),
-        }
-    }
-}
-
-// register names are grouped by indices scaled by 16.
-// xmm, ymm, zmm all get two indices.
-const REG_NAMES: &[&'static str] = &[
-    "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi",
-    "ax", "cx", "dx", "bx", "sp", "bp", "si", "di",
-    "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
-    "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7",
-    "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7",
-    "es", "cs", "ss", "ds", "fs", "gs", "", "",
-    "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
-    "xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22", "xmm23", "xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29", "xmm30", "xmm31",
-    "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
-    "ymm16", "ymm17", "ymm18", "ymm19", "ymm20", "ymm21", "ymm22", "ymm23", "ymm24", "ymm25", "ymm26", "ymm27", "ymm28", "ymm29", "ymm30", "ymm31",
-    "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31",
-    "st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)",
-    "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7",
-    "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7",
-    "eip", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "eflags", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-];
-
-pub(crate) fn regspec_label(spec: &RegSpec) -> &'static str {
-    unsafe { REG_NAMES.get_kinda_unchecked((spec.num as u16 + ((spec.bank as u16) << 3)) as usize) }
-}
-
-impl fmt::Display for RegSpec {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(regspec_label(self))
-    }
-}
-
-impl fmt::Display for Operand {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        self.colorize(&NoColors, fmt)
-    }
-}
-
-impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
-    fn colorize(&self, colors: &Y, f: &mut T) -> fmt::Result {
-        match self {
-            &Operand::ImmediateU8(imm) => {
-                write!(f, "{}", colors.number(u8_hex(imm)))
-            }
-            &Operand::ImmediateI8(imm) => {
-                write!(f, "{}",
-                    colors.number(signed_i8_hex(imm)))
-            },
-            &Operand::ImmediateU16(imm) => {
-                write!(f, "{}", colors.number(u16_hex(imm)))
-            }
-            &Operand::ImmediateI16(imm) => {
-                write!(f, "{}",
-                    colors.number(signed_i16_hex(imm)))
-            },
-            &Operand::ImmediateU32(imm) => {
-                write!(f, "{}", colors.number(u32_hex(imm)))
-            }
-            &Operand::ImmediateI32(imm) => {
-                write!(f, "{}",
-                    colors.number(signed_i32_hex(imm)))
-            },
-            &Operand::Register(ref spec) => {
-                f.write_str(regspec_label(spec))
-            }
-            &Operand::RegisterMaskMerge(ref spec, ref mask, merge_mode) => {
-                f.write_str(regspec_label(spec))?;
-                if mask.num != 0 {
-                    f.write_str("{")?;
-                    f.write_str(regspec_label(mask))?;
-                    f.write_str("}")?;
-                }
-                if let MergeMode::Zero = merge_mode {
-                    f.write_str("{z}")?;
-                }
-                Ok(())
-            }
-            &Operand::RegisterMaskMergeSae(ref spec, ref mask, merge_mode, sae_mode) => {
-                f.write_str(regspec_label(spec))?;
-                if mask.num != 0 {
-                    f.write_str("{")?;
-                    f.write_str(regspec_label(mask))?;
-                    f.write_str("}")?;
-                }
-                if let MergeMode::Zero = merge_mode {
-                    f.write_str("{z}")?;
-                }
-                f.write_str(sae_mode.label())?;
-                Ok(())
-            }
-            &Operand::RegisterMaskMergeSaeNoround(ref spec, ref mask, merge_mode) => {
-                f.write_str(regspec_label(spec))?;
-                if mask.num != 0 {
-                    f.write_str("{")?;
-                    f.write_str(regspec_label(mask))?;
-                    f.write_str("}")?;
-                }
-                if let MergeMode::Zero = merge_mode {
-                    f.write_str("{z}")?;
-                }
-                f.write_str("{sae}")?;
-                Ok(())
-            }
-            &Operand::DisplacementU16(imm) => {
-                write!(f, "[{}]", colors.address(u16_hex(imm)))
-            }
-            &Operand::DisplacementU32(imm) => {
-                write!(f, "[{}]", colors.address(u32_hex(imm)))
-            }
-            &Operand::RegDisp(ref spec, disp) => {
-                write!(f, "[{} ", regspec_label(spec))?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            },
-            &Operand::RegDeref(ref spec) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(spec))?;
-                f.write_str("]")
-            },
-            &Operand::RegScale(ref spec, scale) => {
-                write!(f, "[{} * {}]",
-                    regspec_label(spec),
-                    colors.number(scale)
-                )
-            },
-            &Operand::RegScaleDisp(ref spec, scale, disp) => {
-                write!(f, "[{} * {} ",
-                    regspec_label(spec),
-                    colors.number(scale),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            },
-            &Operand::RegIndexBase(ref base, ref index) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(base))?;
-                f.write_str(" + ")?;
-                f.write_str(regspec_label(index))?;
-                f.write_str("]")
-            }
-            &Operand::RegIndexBaseDisp(ref base, ref index, disp) => {
-                write!(f, "[{} + {} ",
-                    regspec_label(base),
-                    regspec_label(index),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            },
-            &Operand::RegIndexBaseScale(ref base, ref index, scale) => {
-                write!(f, "[{} + {} * {}]",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale)
-                )
-            }
-            &Operand::RegIndexBaseScaleDisp(ref base, ref index, scale, disp) => {
-                write!(f, "[{} + {} * {} ",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")
-            },
-            &Operand::RegDispMasked(ref spec, disp, ref mask_reg) => {
-                write!(f, "[{} ", regspec_label(spec))?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            },
-            &Operand::RegDerefMasked(ref spec, ref mask_reg) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(spec))?;
-                f.write_str("]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            },
-            &Operand::RegScaleMasked(ref spec, scale, ref mask_reg) => {
-                write!(f, "[{} * {}]",
-                    regspec_label(spec),
-                    colors.number(scale)
-                )?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            },
-            &Operand::RegScaleDispMasked(ref spec, scale, disp, ref mask_reg) => {
-                write!(f, "[{} * {} ",
-                    regspec_label(spec),
-                    colors.number(scale),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            },
-            &Operand::RegIndexBaseMasked(ref base, ref index, ref mask_reg) => {
-                f.write_str("[")?;
-                f.write_str(regspec_label(base))?;
-                f.write_str(" + ")?;
-                f.write_str(regspec_label(index))?;
-                f.write_str("]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegIndexBaseDispMasked(ref base, ref index, disp, ref mask_reg) => {
-                write!(f, "[{} + {} ",
-                    regspec_label(base),
-                    regspec_label(index),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            },
-            &Operand::RegIndexBaseScaleMasked(ref base, ref index, scale, ref mask_reg) => {
-                write!(f, "[{} + {} * {}]",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale)
-                )?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            }
-            &Operand::RegIndexBaseScaleDispMasked(ref base, ref index, scale, disp, ref mask_reg) => {
-                write!(f, "[{} + {} * {} ",
-                    regspec_label(base),
-                    regspec_label(index),
-                    colors.number(scale),
-                )?;
-                format_number_i32(colors, f, disp, NumberStyleHint::HexSignedWithSignSplit)?;
-                write!(f, "]")?;
-                write!(f, "{{{}}}", regspec_label(mask_reg))
-            },
-            &Operand::Nothing => { Ok(()) },
         }
     }
 }
@@ -435,7 +190,7 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
     if instr.operand_count > 0 {
         out.write_str(" ")?;
 
-        let x = Operand::from_spec(instr, instr.operands[0]);
+        let x = instr.operand(0);
 
         const RELATIVE_BRANCHES: [Opcode; 21] = [
             Opcode::JMP, Opcode::JCXZ,
@@ -491,7 +246,7 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                         },
                         _ => {
                             out.write_str(", ")?;
-                            let x = Operand::from_spec(instr, instr.operands[i as usize]);
+                            let x = instr.operand(i);
                             if x.is_memory() {
                                 out.write_str(MEM_SIZE_STRINGS[instr.mem_size as usize - 1])?;
                                 out.write_str(" ")?;
@@ -539,7 +294,7 @@ fn contextualize_intel<T: fmt::Write, Y: YaxColors>(instr: &Instruction, colors:
                                     } else {
                                         // this should never be `None` - that would imply two
                                         // memory operands for a broadcasted operation.
-                                        if let Some(width) = Operand::from_spec(instr, instr.operands[i as usize - 1]).width() {
+                                        if let Some(width) = instr.operand(i - 1).width() {
                                             width / instr.mem_size
                                         } else {
                                             0
@@ -941,7 +696,7 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
                         }
                     }
                 }
-                let x = Operand::from_spec(self, self.operands[0]);
+                let x = self.operand(0);
                 x.colorize(colors, out)?;
             }
         };
@@ -959,7 +714,7 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
                             if let Some(prefix) = self.segment_override_for_op(1) {
                                 write!(out, "{}:", prefix)?;
                             }
-                            let x = Operand::from_spec(self, self.operands[i]);
+                            let x = self.operand(i as u8);
                             x.colorize(colors, out)?
                         }
                     }
