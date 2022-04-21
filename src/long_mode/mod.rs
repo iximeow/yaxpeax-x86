@@ -5604,8 +5604,8 @@ pub(self) fn read_E<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
 >(words: &mut T, instr: &mut Instruction, modrm: u8, width: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
-    let bank = width_to_gp_reg_bank(width, instr.prefixes.rex_unchecked().present());
     if modrm >= 0b11000000 {
+        let bank = width_to_gp_reg_bank(width, instr.prefixes.rex_unchecked().present());
         read_modrm_reg(instr, modrm, bank)
     } else {
         read_M(words, instr, modrm, sink)
