@@ -6399,53 +6399,29 @@ fn read_with_annotations<
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
-    let mut prefixes = Prefixes::new(0);
+    instruction.prefixes = Prefixes::new(0);
 
     // default x86_64 registers to `[rax; 4]`
     instruction.regs = unsafe { core::mem::transmute(0u64) };
-    instruction.mem_size = 0;
     // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
-    instruction.operand_count = 2;
 
-    let record: OpcodeRecord = loop {
-        let record = next_rec;
-        if nextb >= 0x40 && nextb < 0x50 {
-            let b = nextb;
-            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                desc: InnerDescription::RexPrefix(b),
-                id: words.offset() as u32 * 8 - 8,
-            });
-            if words.offset() >= 15 {
-                return Err(DecodeError::TooLong);
-            }
-            nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            next_rec = unsafe {
-                core::ptr::read_volatile(&OPCODES[nextb as usize])
-            };
-            prefixes.rex_from(b);
-        } else if let Interpretation::Instruction(opc) = record.0 {
-            if words.offset() > 1 {
-                sink.record(
-                    words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
-                    InnerDescription::Boundary("prefixes end")
-                        .with_id(words.offset() as u32 * 8 - 9)
-                );
-            }
-            if opc != Opcode::Invalid {
+    let record: OperandCode = {
+        let prefixes = &mut instruction.prefixes;
+        let record = loop {
+            let record = next_rec;
+            if nextb >= 0x40 && nextb < 0x50 {
+                let b = nextb;
                 sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                    desc: InnerDescription::Opcode(opc),
+                    desc: InnerDescription::RexPrefix(b),
                     id: words.offset() as u32 * 8 - 8,
                 });
-            }
-            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
-                id: words.offset() as u32 * 8 - 8 + 1,
-            });
-            break record;
-        } else {
-            let b = nextb;
-            if b == 0x0f {
+                nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                next_rec = unsafe {
+                    core::ptr::read_volatile(&OPCODES[nextb as usize])
+                };
+                prefixes.rex_from(b);
+            } else if let Interpretation::Instruction(opc) = record.0 {
                 if words.offset() > 1 {
                     sink.record(
                         words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
@@ -6453,126 +6429,49 @@ fn read_with_annotations<
                             .with_id(words.offset() as u32 * 8 - 9)
                     );
                 }
-                let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                if b == 0x38 {
-                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                    break read_0f38_opcode(b, &mut prefixes);
-                } else if b == 0x3a {
-                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                    break read_0f3a_opcode(b, &mut prefixes);
-                } else {
-                    break read_0f_opcode(b, &mut prefixes);
+                if opc != Opcode::Invalid {
+                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Opcode(opc),
+                        id: words.offset() as u32 * 8 - 8,
+                    });
                 }
-            }
-            // some prefix seen after we saw rex, but before the 0f escape or an actual
-            // opcode. so we must forget the rex prefix!
-            // this is to handle sequences like 41660f21cf
-            // where if 660f21 were a valid opcode, 41 would apply a rex.b
-            // prefix, but since 660f21 is not valid, the opcode is interpreted
-            // as 0f21, where 66 is a prefix, which makes 41 not the last
-            // prefix before the opcode, and it's discarded.
-
-            // 2.3.2
-            // Any VEX-encoded instruction with a LOCK prefix preceding VEX will #UD.
-            // 2.3.3
-            // Any VEX-encoded instruction with a 66H, F2H, or F3H prefix preceding VEX
-            // will #UD.
-            // 2.3.4
-            // Any VEX-encoded instruction with a REX prefix proceeding VEX will #UD. 
-            if b == 0xc5 {
-                if prefixes.rex_unchecked().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
-                    // rex and then vex is invalid! reject it.
-                    return Err(DecodeError::InvalidPrefixes);
-                } else {
-                    instruction.prefixes = prefixes;
-                    sink.record(
-                        words.offset() as u32 * 8 - 8,
-                        words.offset() as u32 * 8 - 1,
-                        InnerDescription::Misc("two-byte vex prefix (0xc5)")
-                            .with_id(words.offset() as u32 * 8 - 8)
-                    );
-                    vex::two_byte_vex(words, instruction, sink)?;
-                    return Ok(());
-                }
-            } else if b == 0xc4 {
-                if prefixes.rex_unchecked().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
-                    // rex and then vex is invalid! reject it.
-                    return Err(DecodeError::InvalidPrefixes);
-                } else {
-                    instruction.prefixes = prefixes;
-                    sink.record(
-                        words.offset() as u32 * 8 - 8,
-                        words.offset() as u32 * 8 - 1,
-                        InnerDescription::Misc("three-byte vex prefix (0xc4)")
-                            .with_id(words.offset() as u32 * 8 - 8)
-                    );
-                    vex::three_byte_vex(words, instruction, sink)?;
-                    return Ok(());
-                }
-            } else if b == 0x62 {
-                if prefixes.rex_unchecked().present() || prefixes.lock() || prefixes.operand_size() || prefixes.rep() || prefixes.repnz() {
-                    // rex and then evex is invalid! reject it.
-                    return Err(DecodeError::InvalidPrefixes);
-                } else {
-                    instruction.prefixes = prefixes;
-                    sink.record(
-                        words.offset() as u32 * 8 - 8,
-                        words.offset() as u32 * 8 - 1,
-                        InnerDescription::Misc("evex prefix (0x62)")
-                            .with_id(words.offset() as u32 * 8 - 8)
-                    );
-                    evex::read_evex(words, instruction, None, sink)?;
-                    return Ok(());
-                }
-            }
-
-            nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            next_rec = unsafe {
-                core::ptr::read_volatile(&OPCODES[nextb as usize])
-            };
-            if words.offset() >= 15 {
-                return Err(DecodeError::TooLong);
-            }
-            if prefixes.rex.bits != 0 {
-                sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
-                    desc: InnerDescription::Misc("invalidates prior rex prefix"),
-                    id: (words.offset() as u32 * 8 - 16) + 1,
+                sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                    desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
+                    id: words.offset() as u32 * 8 - 8 + 1,
                 });
-            }
-            prefixes.rex_from(0);
-            match b {
-                0x26 |
-                0x2e |
-                0x36 |
-                0x3e => {
-                    /* no-op in amd64 */
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
-                        desc: InnerDescription::Misc("ignored prefix in 64-bit mode"),
-                        id: words.offset() as u32 * 8 - 16,
-                    });
-                },
-                0x64 => {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
-                        desc: InnerDescription::SegmentPrefix(Segment::FS),
-                        id: words.offset() as u32 * 8 - 16,
-                    });
-                    prefixes.set_fs();
-                },
-                0x65 => {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
-                        desc: InnerDescription::SegmentPrefix(Segment::GS),
-                        id: words.offset() as u32 * 8 - 16,
-                    });
-                    prefixes.set_gs();
-                },
-                0x66 => {
+                instruction.mem_size = 0;
+                instruction.operand_count = 2;
+                break record;
+            } else {
+                let b = nextb;
+                if b == 0x0f {
+                    if words.offset() > 1 {
+                        sink.record(
+                            words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                            InnerDescription::Boundary("prefixes end")
+                                .with_id(words.offset() as u32 * 8 - 9)
+                        );
+                    }
+                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                    instruction.mem_size = 0;
+                    instruction.operand_count = 2;
+                    if b == 0x38 {
+                        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                        break read_0f38_opcode(b, prefixes);
+                    } else if b == 0x3a {
+                        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                        break read_0f3a_opcode(b, prefixes);
+                    } else {
+                        break read_0f_opcode(b, prefixes);
+                    }
+                }
+                if b == 0x66 {
                     sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("operand size override (to 16 bits)"),
                         id: words.offset() as u32 * 8 - 16,
                     });
                     prefixes.set_operand_size();
-                },
-                0x67 => {
+                } else if b == 0x67 {
                     sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("address size override (to 32 bits)"),
                         id: words.offset() as u32 * 8 - 16,
@@ -6580,39 +6479,80 @@ fn read_with_annotations<
                     prefixes.set_address_size();
                     instruction.regs[1].bank = RegisterBank::D;
                     instruction.regs[2].bank = RegisterBank::D;
-                },
-                0xf0 => {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
-                        desc: InnerDescription::Misc("lock prefix"),
-                        id: words.offset() as u32 * 8 - 16,
-                    });
-                    prefixes.set_lock();
-                },
-                0xf2 => {
+                } else if b == 0xf2 {
                     sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("repnz prefix"),
                         id: words.offset() as u32 * 8 - 16,
                     });
                     prefixes.set_repnz();
-                },
-                0xf3 => {
+                } else if b == 0xf3 {
                     sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("rep prefix"),
                         id: words.offset() as u32 * 8 - 16,
                     });
                     prefixes.set_rep();
-                },
-                _ => { unsafe { unreachable_unchecked(); } }
+                } else {
+                    match b {
+                        0x26 |
+                        0x2e |
+                        0x36 |
+                        0x3e => {
+                            /* no-op in amd64 */
+                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                                desc: InnerDescription::Misc("ignored prefix in 64-bit mode"),
+                                id: words.offset() as u32 * 8 - 16,
+                            });
+                        },
+                        0x64 => {
+                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                                desc: InnerDescription::SegmentPrefix(Segment::FS),
+                                id: words.offset() as u32 * 8 - 16,
+                            });
+                            prefixes.set_fs();
+                        },
+                        0x65 => {
+                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                                desc: InnerDescription::SegmentPrefix(Segment::GS),
+                                id: words.offset() as u32 * 8 - 16,
+                            });
+                            prefixes.set_gs();
+                        },
+                        0xf0 => {
+                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                                desc: InnerDescription::Misc("lock prefix"),
+                                id: words.offset() as u32 * 8 - 16,
+                            });
+                            prefixes.set_lock();
+                        },
+                        _ => { return read_avx_prefixed(b, words, instruction, sink); }
+                    }
+                }
+                nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                next_rec = unsafe {
+                    core::ptr::read_volatile(&OPCODES[nextb as usize])
+                };
+                if prefixes.rex.bits != 0 {
+                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::Misc("invalidates prior rex prefix"),
+                        id: (words.offset() as u32 * 8 - 16) + 1,
+                    });
+                }
+                prefixes.rex_from(0);
             }
+            if words.offset() >= 15 {
+                return Err(DecodeError::TooLong);
+            }
+        };
+
+        if let Interpretation::Instruction(opcode) = record.0 {
+            instruction.opcode = opcode;
+        } else {
+            unsafe { unreachable_unchecked(); }
         }
+
+        record.1
     };
-    if let Interpretation::Instruction(opcode) = record.0 {
-        instruction.opcode = opcode;
-    } else {
-        unsafe { unreachable_unchecked(); }
-    }
-    instruction.prefixes = prefixes;
-    read_operands(decoder, words, instruction, record.1, sink)?;
+    read_operands(decoder, words, instruction, record, sink)?;
 
     if instruction.prefixes.lock() {
         if !LOCKABLE_INSTRUCTIONS.contains(&instruction.opcode) || !instruction.operands[0].is_memory() {
@@ -6622,6 +6562,61 @@ fn read_with_annotations<
 
     Ok(())
 }
+#[inline(never)]
+fn read_avx_prefixed<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(b: u8, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
+    if instruction.prefixes.rex_unchecked().present() || instruction.prefixes.lock() || instruction.prefixes.operand_size() || instruction.prefixes.rep() || instruction.prefixes.repnz() {
+        // rex and then vex is invalid! reject it.
+        return Err(DecodeError::InvalidPrefixes);
+    }
+    instruction.mem_size = 0;
+    instruction.operand_count = 2;
+
+    // some prefix seen after we saw rex, but before the 0f escape or an actual
+    // opcode. so we must forget the rex prefix!
+    // this is to handle sequences like 41660f21cf
+    // where if 660f21 were a valid opcode, 41 would apply a rex.b
+    // prefix, but since 660f21 is not valid, the opcode is interpreted
+    // as 0f21, where 66 is a prefix, which makes 41 not the last
+    // prefix before the opcode, and it's discarded.
+
+    // 2.3.2
+    // Any VEX-encoded instruction with a LOCK prefix preceding VEX will #UD.
+    // 2.3.3
+    // Any VEX-encoded instruction with a 66H, F2H, or F3H prefix preceding VEX
+    // will #UD.
+    // 2.3.4
+    // Any VEX-encoded instruction with a REX prefix proceeding VEX will #UD.
+    if b == 0xc5 {
+        sink.record(
+            words.offset() as u32 * 8 - 8,
+            words.offset() as u32 * 8 - 1,
+            InnerDescription::Misc("two-byte vex prefix (0xc5)")
+                .with_id(words.offset() as u32 * 8 - 8)
+        );
+        vex::two_byte_vex(words, instruction, sink)?;
+    } else if b == 0xc4 {
+        sink.record(
+            words.offset() as u32 * 8 - 8,
+            words.offset() as u32 * 8 - 1,
+            InnerDescription::Misc("three-byte vex prefix (0xc4)")
+                .with_id(words.offset() as u32 * 8 - 8)
+        );
+        vex::three_byte_vex(words, instruction, sink)?;
+    } else if b == 0x62 {
+        sink.record(
+            words.offset() as u32 * 8 - 8,
+            words.offset() as u32 * 8 - 1,
+            InnerDescription::Misc("evex prefix (0x62)")
+                .with_id(words.offset() as u32 * 8 - 8)
+        );
+        evex::read_evex(words, instruction, None, sink)?;
+    }
+    return Ok(());
+}
+
 /* likely cases
         OperandCode::Eb_R0 => 0
         _op @ OperandCode::ModRM_0x80_Eb_Ib => 1
