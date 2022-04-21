@@ -6049,13 +6049,18 @@ fn read_M<
 
 #[inline]
 fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
-    match width {
-        1 => return if rex { RegisterBank::rB } else { RegisterBank::B },
-        2 => return RegisterBank::W,
-        4 => return RegisterBank::D,
-        8 => return RegisterBank::Q,
-        _ => unsafe { unreachable_unchecked(); }
-    }
+    // transform (width, rex) into an index into an index into a LUT, instead of branching as
+    // `match` would.
+    let index = (width.trailing_zeros() << 1) | (rex as u32);
+
+    const BANK_LUT: [RegisterBank; 8] = [
+        RegisterBank::B, RegisterBank::rB,
+        RegisterBank::W, RegisterBank::W,
+        RegisterBank::D, RegisterBank::D,
+        RegisterBank::Q, RegisterBank::Q,
+    ];
+
+    *BANK_LUT.get(index as usize).unwrap_or_else(|| unsafe { unreachable_unchecked() })
 }
 
 fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
