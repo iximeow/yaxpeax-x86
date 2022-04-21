@@ -6391,6 +6391,51 @@ impl fmt::Display for FieldDescription {
     }
 }
 
+fn read_opc_hotpath<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(mut b: u8, mut record: OpcodeRecord, nextb: &mut u8, next_rec: &mut OpcodeRecord, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<Option<OperandCode>, DecodeError> {
+    if b >= 0x40 && b < 0x50 {
+        sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+            desc: InnerDescription::RexPrefix(b),
+            id: words.offset() as u32 * 8 - 8,
+        });
+        b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+        record = unsafe {
+            core::ptr::read_volatile(&OPCODES[b as usize])
+        };
+        instruction.prefixes.rex_from(b);
+    }
+
+    if let Interpretation::Instruction(opc) = record.0 {
+        if words.offset() > 1 {
+            sink.record(
+                words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                InnerDescription::Boundary("prefixes end")
+                    .with_id(words.offset() as u32 * 8 - 9)
+            );
+        }
+        if opc != Opcode::Invalid {
+            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                desc: InnerDescription::Opcode(opc),
+                id: words.offset() as u32 * 8 - 8,
+            });
+        }
+        sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+            desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
+            id: words.offset() as u32 * 8 - 8 + 1,
+        });
+        instruction.mem_size = 0;
+        instruction.operand_count = 2;
+        instruction.opcode = opc;
+        return Ok(Some(record.1));
+    } else {
+        *nextb = b;
+        *next_rec = record;
+        return Ok(None);
+    }
+}
+
 #[inline(always)]
 fn read_with_annotations<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
@@ -6406,7 +6451,9 @@ fn read_with_annotations<
     // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
 
-    let record: OperandCode = {
+    let record: OperandCode = if let Some(rec) = read_opc_hotpath(nextb, next_rec, &mut nextb, &mut next_rec, words, instruction, sink)? {
+        rec
+    } else {
         let prefixes = &mut instruction.prefixes;
         let record = loop {
             let record = next_rec;
