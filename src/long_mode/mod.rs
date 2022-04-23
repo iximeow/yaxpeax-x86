@@ -6428,6 +6428,16 @@ fn read_opc_hotpath<
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
         instruction.prefixes.rex_from(b);
+    } else if b == 0x66 {
+        sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+            desc: InnerDescription::Misc("operand size override (to 16 bits)"),
+            id: words.offset() as u32 * 8 - 16,
+        });
+        b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+        record = unsafe {
+            core::ptr::read_volatile(&OPCODES[b as usize])
+        };
+        instruction.prefixes.set_operand_size();
     }
 
     if let Interpretation::Instruction(opc) = record.0 {
@@ -6451,6 +6461,32 @@ fn read_opc_hotpath<
         instruction.mem_size = 0;
         instruction.operand_count = 2;
         instruction.opcode = opc;
+        return Ok(Some(record.1));
+    } else if b == 0x0f {
+        if words.offset() > 1 {
+            sink.record(
+                words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                InnerDescription::Boundary("prefixes end")
+                    .with_id(words.offset() as u32 * 8 - 9)
+            );
+        }
+        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+        instruction.mem_size = 0;
+        instruction.operand_count = 2;
+        let record = if b == 0x38 {
+            let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+            read_0f38_opcode(b, &mut instruction.prefixes)
+        } else if b == 0x3a {
+            let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+            read_0f3a_opcode(b, &mut instruction.prefixes)
+        } else {
+            read_0f_opcode(b, &mut instruction.prefixes)
+        };
+        if let Interpretation::Instruction(opc) = record.0 {
+            instruction.opcode = opc;
+        } else {
+            unsafe { unreachable_unchecked(); }
+        }
         return Ok(Some(record.1));
     } else {
         *nextb = b;
