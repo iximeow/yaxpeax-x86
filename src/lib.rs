@@ -12,6 +12,7 @@
 //!
 //! let inst = decoder.decode_slice(&[0x33, 0xc0]).unwrap();
 //!
+//! #[cfg(features="fmt")]
 //! assert_eq!("xor eax, eax", inst.to_string());
 //! ```
 //!
@@ -31,13 +32,16 @@
 //!
 //! let inst = decoder.decode_slice(&[0x33, 0x01]).unwrap();
 //!
+//! #[cfg(features="fmt")]
 //! assert_eq!("xor eax, dword [rcx]", inst.to_string());
 //!
 //! assert_eq!(Operand::Register(RegSpec::eax()), inst.operand(0));
+//! #[cfg(features="fmt")]
 //! assert_eq!("eax", inst.operand(0).to_string());
 //! assert_eq!(Operand::RegDeref(RegSpec::rcx()), inst.operand(1));
 //!
 //! // an operand in isolation does not know the size of memory it references, if any
+//! #[cfg(features="fmt")]
 //! assert_eq!("[rcx]", inst.operand(1).to_string());
 //!
 //! // and for memory operands, the size must be read from the instruction itself:
@@ -45,6 +49,7 @@
 //! assert_eq!("dword", mem_size.size_name());
 //!
 //! // `MemoryAccessSize::size_name()` is how its `Display` impl works, as well:
+//! #[cfg(features="fmt")]
 //! assert_eq!("dword", mem_size.to_string());
 //! ```
 //!
@@ -54,12 +59,23 @@
 //! mod decoder {
 //!     use yaxpeax_arch::{Arch, AddressDisplay, Decoder, Reader, ReaderBuilder};
 //!
+//!     // have to play some games so this example works right even without `fmt` enabled!
+//!     #[cfg(feature="fmt")]
+//!     trait InstBound: std::fmt::Display {}
+//!     #[cfg(not(feature="fmt"))]
+//!     trait InstBound {}
+//!
+//!     #[cfg(feature="fmt")]
+//!     impl <T: std::fmt::Display> InstBound for T {}
+//!     #[cfg(not(feature="fmt"))]
+//!     impl <T> InstBound for T {}
+//!
 //!     pub fn decode_stream<
 //!         'data,
 //!         A: yaxpeax_arch::Arch,
 //!         U: ReaderBuilder<A::Address, A::Word>,
 //!     >(data: U) where
-//!         A::Instruction: std::fmt::Display,
+//!         A::Instruction: InstBound,
 //!     {
 //!         let mut reader = ReaderBuilder::read_from(data);
 //!         let mut address: A::Address = reader.total_offset();
@@ -69,6 +85,7 @@
 //!         loop {
 //!             match decode_res {
 //!                 Ok(ref inst) => {
+//!                     #[cfg(feature="fmt")]
 //!                     println!("{}: {}", address.show(), inst);
 //!                     decode_res = decoder.decode(&mut reader);
 //!                     address = reader.total_offset();
