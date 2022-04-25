@@ -2,6 +2,7 @@ extern crate rand;
 
 mod regspec;
 mod operand;
+#[cfg(feature="fmt")]
 mod display;
 mod evex_generated;
 mod reuse_test;
@@ -18,7 +19,17 @@ fn test_invalid(data: &[u8]) {
 fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     let mut reader = yaxpeax_arch::U8Reader::new(data);
     if let Ok(inst) = decoder.decode(&mut reader)  {
-        panic!("decoded {:?} from {:02x?} under decoder {}", inst.opcode(), data, decoder);
+        // realistically, the chances an error only shows up under non-fmt builds seems unlikely,
+        // but try to report *something* in such cases.
+        cfg_if::cfg_if! {
+            if #[cfg(feature="fmt")] {
+                panic!("decoded {:?} from {:02x?} under decoder {}", inst.opcode(), data, decoder);
+            } else {
+                // don't warn about the unused inst here
+                let _ = inst;
+                panic!("decoded instruction <non-fmt build> from {:02x?} under decoder <non-fmt build>", data);
+            }
+        }
     } else {
         // this is fine
     }
@@ -36,22 +47,36 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
     let mut reader = yaxpeax_arch::U8Reader::new(data);
     match decoder.decode(&mut reader) {
         Ok(instr) => {
-            let text = format!("{}", instr);
-            assert!(
-                text == expected,
-                "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                hex,
-                instr,
-                decoder,
-                text,
-                expected
-            );
+            cfg_if::cfg_if! {
+                if #[cfg(feature="fmt")] {
+                    let text = format!("{}", instr);
+                    assert!(
+                        text == expected,
+                        "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                        hex,
+                        instr,
+                        decoder,
+                        text,
+                        expected
+                    );
+                } else {
+                    eprintln!("non-fmt build cannot compare text equality")
+                }
+            }
             // while we're at it, test that the instruction is as long, and no longer, than its
             // input
             assert_eq!((0u64.wrapping_offset(instr.len()).to_linear()) as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
         },
         Err(e) => {
-            assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);
+            cfg_if::cfg_if! {
+                if #[cfg(feature="fmt")] {
+                    assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);
+                } else {
+                    // avoid the unused `e` warning
+                    let _ = e;
+                    assert!(false, "decode error (<non-fmt build>) for {} under decoder <non-fmt build>:\n  expected: {}\n", hex, expected);
+                }
+            }
         }
     }
 }
