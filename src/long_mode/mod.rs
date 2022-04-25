@@ -888,11 +888,13 @@ const REGISTER_CLASS_NAMES: &[&'static str] = &[
 /// }
 ///
 /// if let Operand::Register(regspec) = instruction.operand(0) {
+///     #[cfg(feature="fmt")]
 ///     println!("first operand is {}", regspec);
 ///     show_register_class_info(regspec.class());
 /// }
 ///
 /// if let Operand::Register(regspec) = instruction.operand(1) {
+///     #[cfg(feature="fmt")]
 ///     println!("first operand is {}", regspec);
 ///     show_register_class_info(regspec.class());
 /// }
@@ -7422,43 +7424,54 @@ impl InnerDescription {
     }
 }
 
-impl fmt::Display for InnerDescription {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            InnerDescription::RexPrefix(bits) => {
-                write!(f, "rex prefix: {}{}{}{}",
-                    if bits & 0x8 != 0 { "w" } else { "-" },
-                    if bits & 0x4 != 0 { "r" } else { "-" },
-                    if bits & 0x2 != 0 { "x" } else { "-" },
-                    if bits & 0x1 != 0 { "b" } else { "-" },
-                )
+cfg_if::cfg_if! {
+    if #[cfg(feature="fmt")] {
+        impl fmt::Display for InnerDescription {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self {
+                    InnerDescription::RexPrefix(bits) => {
+                        write!(f, "rex prefix: {}{}{}{}",
+                            if bits & 0x8 != 0 { "w" } else { "-" },
+                            if bits & 0x4 != 0 { "r" } else { "-" },
+                            if bits & 0x2 != 0 { "x" } else { "-" },
+                            if bits & 0x1 != 0 { "b" } else { "-" },
+                        )
+                    }
+                    InnerDescription::SegmentPrefix(segment) => {
+                        write!(f, "segment override: {}", segment)
+                    }
+                    InnerDescription::Misc(text) => {
+                        f.write_str(text)
+                    }
+                    InnerDescription::Number(text, num) => {
+                        write!(f, "{}: {:#x}", text, num)
+                    }
+                    InnerDescription::Opcode(opc) => {
+                        write!(f, "opcode `{}`", opc)
+                    }
+                    InnerDescription::OperandCode(OperandCodeWrapper { code }) => {
+                        write!(f, "operand code `{:?}`", code)
+                    }
+                    InnerDescription::RegisterNumber(name, num, reg) => {
+                        write!(f, "`{}` (`{}` selects register number {})", reg, name, num)
+                    }
+                    InnerDescription::Boundary(desc) => {
+                        write!(f, "{}", desc)
+                    }
+                }
             }
-            InnerDescription::SegmentPrefix(segment) => {
-                write!(f, "segment override: {}", segment)
-            }
-            InnerDescription::Misc(text) => {
-                f.write_str(text)
-            }
-            InnerDescription::Number(text, num) => {
-                write!(f, "{}: {:#x}", text, num)
-            }
-            InnerDescription::Opcode(opc) => {
-                write!(f, "opcode `{}`", opc)
-            }
-            InnerDescription::OperandCode(OperandCodeWrapper { code }) => {
-                write!(f, "operand code `{:?}`", code)
-            }
-            InnerDescription::RegisterNumber(name, num, reg) => {
-                write!(f, "`{}` (`{}` selects register number {})", reg, name, num)
-            }
-            InnerDescription::Boundary(desc) => {
-                write!(f, "{}", desc)
+        }
+    } else {
+        impl fmt::Display for InnerDescription {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("non-fmt build")
             }
         }
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature="fmt", derive(Debug))]
+#[derive(Clone, PartialEq, Eq)]
 pub struct FieldDescription {
     desc: InnerDescription,
     id: u32,

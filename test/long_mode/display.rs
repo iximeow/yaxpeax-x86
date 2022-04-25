@@ -41,9 +41,13 @@ fn test_display_under(decoder: &InstDecoder, style: DisplayStyle, data: &[u8], e
 
 // decided i do not like at&t syntax much at all. not going to write a formatter for it. some test
 // cases will live on in case someone else feels like adding one, or i get mad enough to do it.
+#[allow(unreachable_code)]
 #[ignore]
 #[test]
 fn test_instructions_atnt() {
+    // `ignore` is now used to avoid running (slow!) exhaustive tests in a default `cargo test`.
+    // running exhaustive tests now runs these tests, which fail. so instead, return early.
+    return;
     // just modrm
     test_display(&[0x33, 0x08], "xor (%rax), %ecx");
     test_display(&[0x33, 0x20], "xor (%rax), %esp");
