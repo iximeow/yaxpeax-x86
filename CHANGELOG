@@ -1,3 +1,18 @@
+## 1.1.5
+* `Makefile` at the crate root now exercises `yaxpeax-x86` builds and tests under:
+  - default features (fmt, std)
+  - no-std + fmt
+  - no-std and no-fmt
+* fix several issues prohibiting builds of the crate with no-std +fmt
+  configurations; the required Display impl for field annotation would simply not
+  compile in no-fmt builds. it is now a minimal implementation to comply with the
+  goals of `no-fmt`: "avoid as much extra code and data for formatting
+  instructions as possible". two dozen bytes for a likely-DCE'd codepath should
+  be ok.
+* adjust test structure so that exhaustive tests can be `#[ignored]` and
+  explicitly run anyway for completeness. this means the ignored at&t tests now
+  are both ignored and appear to succeed when run.
+
 ## 1.1.4
 * fix reachable unreachable under `DisplayStyle::C` in 64-, 32-, and 16-bit modes
 * add fuzz target to cover `DisplayStyle::C` formatter for 64-, 32-, and 16-bit modes
