@@ -18408,13 +18408,13 @@ mod reg_masks {
     #[test]
     #[should_panic]
     fn invalid_dword_reg_panics() {
-        RegSpec::d(8);
+        RegSpec::d(16);
     }
 
     #[test]
     #[should_panic]
     fn invalid_word_reg_panics() {
-        RegSpec::w(8);
+        RegSpec::w(16);
     }
 
     #[test]
