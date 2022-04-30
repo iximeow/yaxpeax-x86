@@ -78,6 +78,8 @@ fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str
 
 #[test]
 fn only_16bit() {
+    test_display(&[0x66, 0x9a, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66], "callf 0x6655:0x44332211");
+    test_display(&[0x9a, 0x11, 0x22, 0x33, 0x44], "callf 0x4433:0x2211");
     test_display(&[0xac], "lods al, byte ds:[si]");
     test_display(&[0xae], "scas byte es:[di], al");
     test_display(&[0x67, 0xac], "lods al, byte ds:[esi]");

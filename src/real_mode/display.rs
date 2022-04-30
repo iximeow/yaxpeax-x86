@@ -163,6 +163,12 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
                 write!(f, "{}",
                     colors.number(signed_i32_hex(imm)))
             },
+            &Operand::AbsoluteFarAddress { segment, address } => {
+                write!(f, "{}:{}",
+                    colors.number(u16_hex(segment as u16)),
+                    colors.number(u32_hex(address as u32)),
+                )
+            },
             &Operand::Register(ref spec) => {
                 f.write_str(regspec_label(spec))
             }

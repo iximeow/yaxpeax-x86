@@ -389,6 +389,9 @@ pub enum Operand {
     /// use; the instruction's `operand_count` should be reduced so as to make this invisible to
     /// library clients.
     Nothing,
+    /// absolute far call. this is only used for `9a` far calls with absolute `u16:u{16,32}`
+    /// operand, and so only exists in 32- and 16-bit modes.
+    AbsoluteFarAddress { segment: u16, address: u32 },
 }
 
 impl OperandSpec {
@@ -450,6 +453,7 @@ impl OperandSpec {
             OperandSpec::RegVex_maskmerge |
             OperandSpec::Reg4 |
             OperandSpec::ImmInDispField |
+            OperandSpec::AbsoluteFarAddress |
             OperandSpec::Nothing => {
                 false
             }
@@ -683,6 +687,12 @@ impl Operand {
                     Operand::RegIndexBaseScaleDisp(inst.regs[1], inst.regs[2], inst.scale, inst.disp as i32)
                 }
             }
+            OperandSpec::AbsoluteFarAddress => {
+                Operand::AbsoluteFarAddress {
+                    segment: inst.disp as u16,
+                    address: inst.imm as u32,
+                }
+            }
         }
     }
     /// returns `true` if this operand implies a memory access, `false` otherwise.
@@ -721,6 +731,7 @@ impl Operand {
             Operand::RegisterMaskMerge(_, _, _) |
             Operand::RegisterMaskMergeSae(_, _, _, _) |
             Operand::RegisterMaskMergeSaeNoround(_, _, _) |
+            Operand::AbsoluteFarAddress { .. } |
             Operand::Nothing => {
                 false
             }
@@ -2639,6 +2650,8 @@ enum OperandSpec {
     RegIndexBaseDisp_mask,
     RegIndexBaseScale_mask,
     RegIndexBaseScaleDisp_mask,
+    // u16:u{16,32} immediate address for a far call
+    AbsoluteFarAddress,
 }
 
 // the Hash, Eq, and PartialEq impls here are possibly misleading.
@@ -5180,6 +5193,7 @@ enum OperandCode {
     PMOVX_E_G_xmm = OperandCodeBuilder::new().operand_case(110).bits(),
     G_Ev_xmm_Ib = OperandCodeBuilder::new().operand_case(111).bits(),
     G_E_mm_Ib = OperandCodeBuilder::new().operand_case(112).bits(),
+    AbsFar = OperandCodeBuilder::new().operand_case(113).bits(),
 }
 
 const LOCKABLE_INSTRUCTIONS: &[Opcode] = &[
@@ -5404,7 +5418,7 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::XCHG), OperandCode::Zv_AX_R7),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::CVT_AA),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::CVT_DA),
-    OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    OpcodeRecord(Interpretation::Instruction(Opcode::CALLF), OperandCode::AbsFar),
     OpcodeRecord(Interpretation::Instruction(Opcode::WAIT), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::PUSHF), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::POPF), OperandCode::Nothing),
@@ -8570,6 +8584,19 @@ fn unlikely_operands<
     S: DescriptionSink<FieldDescription>
 >(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, mem_oper: OperandSpec, sink: &mut S) -> Result<(), DecodeError> {
     match operand_code {
+        OperandCode::AbsFar => {
+            instruction.operands[0] = OperandSpec::AbsoluteFarAddress;
+            instruction.operand_count = 1;
+            instruction.mem_size = 0;
+            // read segment
+            let addr_size = if instruction.prefixes.operand_size() {
+                4
+            } else {
+                2
+            };
+            instruction.imm = read_num(words, addr_size)?;
+            instruction.disp = read_num(words, 2)? as u16 as u32;
+        }
         OperandCode::G_E_mm_Ib => {
             let modrm = read_modrm(words)?;
 

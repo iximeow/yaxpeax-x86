@@ -12,6 +12,8 @@
 * adjust test structure so that exhaustive tests can be `#[ignored]` and
   explicitly run anyway for completeness. this means the ignored at&t tests now
   are both ignored and appear to succeed when run.
+* support `9a` encoding of `callf` with absolute segment/address operand
+  - this encoding is only present in 32-bit and 16-bit modes
 
 ## 1.1.4
 * fix reachable unreachable under `DisplayStyle::C` in 64-, 32-, and 16-bit modes
