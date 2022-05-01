@@ -4,6 +4,8 @@ mod regspec;
 mod operand;
 #[cfg(feature="fmt")]
 mod display;
+#[cfg(feature="std")]
+mod descriptions;
 mod evex_generated;
 mod reuse_test;
 

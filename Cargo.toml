@@ -40,7 +40,7 @@ lto = true
 default = ["std", "colors", "use-serde", "fmt"]
 
 # opt-in for some apis that are really much nicer with String
-std = []
+std = ["yaxpeax-arch/std"]
 
 # feature for formatting instructions and their components
 fmt = []
