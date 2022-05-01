@@ -6423,15 +6423,15 @@ fn read_opc_hotpath<
             desc: InnerDescription::RexPrefix(b),
             id: words.offset() as u32 * 8 - 8,
         });
+        instruction.prefixes.rex_from(b);
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
         record = unsafe {
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
-        instruction.prefixes.rex_from(b);
     } else if b == 0x66 {
-        sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+        sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
             desc: InnerDescription::Misc("operand size override (to 16 bits)"),
-            id: words.offset() as u32 * 8 - 16,
+            id: words.offset() as u32 * 8 - 8,
         });
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
         record = unsafe {
@@ -6572,29 +6572,29 @@ fn read_with_annotations<
                     }
                 }
                 if b == 0x66 {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("operand size override (to 16 bits)"),
-                        id: words.offset() as u32 * 8 - 16,
+                        id: words.offset() as u32 * 8 - 8,
                     });
                     prefixes.set_operand_size();
                 } else if b == 0x67 {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("address size override (to 32 bits)"),
-                        id: words.offset() as u32 * 8 - 16,
+                        id: words.offset() as u32 * 8 - 8,
                     });
                     prefixes.set_address_size();
                     instruction.regs[1].bank = RegisterBank::D;
                     instruction.regs[2].bank = RegisterBank::D;
                 } else if b == 0xf2 {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("repnz prefix"),
-                        id: words.offset() as u32 * 8 - 16,
+                        id: words.offset() as u32 * 8 - 8,
                     });
                     prefixes.set_repnz();
                 } else if b == 0xf3 {
-                    sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("rep prefix"),
-                        id: words.offset() as u32 * 8 - 16,
+                        id: words.offset() as u32 * 8 - 8,
                     });
                     prefixes.set_rep();
                 } else {
@@ -6604,29 +6604,29 @@ fn read_with_annotations<
                         0x36 |
                         0x3e => {
                             /* no-op in amd64 */
-                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                                 desc: InnerDescription::Misc("ignored prefix in 64-bit mode"),
-                                id: words.offset() as u32 * 8 - 16,
+                                id: words.offset() as u32 * 8 - 8,
                             });
                         },
                         0x64 => {
-                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                                 desc: InnerDescription::SegmentPrefix(Segment::FS),
-                                id: words.offset() as u32 * 8 - 16,
+                                id: words.offset() as u32 * 8 - 8,
                             });
                             prefixes.set_fs();
                         },
                         0x65 => {
-                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                                 desc: InnerDescription::SegmentPrefix(Segment::GS),
-                                id: words.offset() as u32 * 8 - 16,
+                                id: words.offset() as u32 * 8 - 8,
                             });
                             prefixes.set_gs();
                         },
                         0xf0 => {
-                            sink.record((words.offset() - 2) as u32 * 8, (words.offset() - 2) as u32 * 8 + 7, FieldDescription {
+                            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                                 desc: InnerDescription::Misc("lock prefix"),
-                                id: words.offset() as u32 * 8 - 16,
+                                id: words.offset() as u32 * 8 - 8,
                             });
                             prefixes.set_lock();
                         },
