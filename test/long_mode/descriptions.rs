@@ -288,8 +288,8 @@ fn test_modrm_decode() {
             desc.to_string().contains("register number") &&
             desc.to_string().contains("mod bits: 11")
         }),
-//        AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("mmm", 0, RegSpec::eax())),
-//        AnnotationCheck::no_extra(),
+        AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("mmm", 0, RegSpec::eax())),
+        AnnotationCheck::no_extra(),
     ]);
     test_annotations(&[0xc1, 0xe0, 0x03], "shl eax, 0x3", &[
         AnnotationCheck::exact(11, 13, InnerDescription::Opcode(Opcode::SHL)),
@@ -303,7 +303,6 @@ fn test_modrm_decode() {
         AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("mmm", 0, RegSpec::eax())),
         AnnotationCheck::no_extra(),
     ]);
-    // just modrm
     test_annotations(&[0x33, 0x08], "xor ecx, dword [rax]", &[
         AnnotationCheck::exact(0, 7, InnerDescription::Opcode(Opcode::XOR)),
         AnnotationCheck::approximate(0, 7, |desc| { desc.to_string() == "operand code `Gv_Ev`" }),
@@ -314,6 +313,16 @@ fn test_modrm_decode() {
         }),
         AnnotationCheck::exact(11, 13, InnerDescription::RegisterNumber("rrr", 1, RegSpec::ecx())),
         AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("mmm", 0, RegSpec::rax())),
+        AnnotationCheck::no_extra(),
+    ]);
+    test_annotations(&[0x66, 0x0f, 0x38, 0x00, 0xc1], "pshufb xmm0, xmm1", &[
+        AnnotationCheck::exact(0, 7, InnerDescription::Misc("operand size override (to 16 bits)")),
+        AnnotationCheck::approximate(38, 39, |desc| {
+            desc.to_string().contains("mmm") &&
+            desc.to_string().contains("register number") &&
+            desc.to_string().contains("mod bits: 11")
+        }),
+        AnnotationCheck::exact(32, 34, InnerDescription::RegisterNumber("mmm", 1, RegSpec::ecx())),
         AnnotationCheck::no_extra(),
     ]);
 

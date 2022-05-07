@@ -5608,7 +5608,7 @@ pub(self) fn read_E<
 >(words: &mut T, instr: &mut Instruction, modrm: u8, width: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     let bank = width_to_gp_reg_bank(width, instr.prefixes.rex_unchecked().present());
     if modrm >= 0b11000000 {
-        read_modrm_reg(instr, modrm, bank)
+        read_modrm_reg(instr, words, modrm, bank, sink)
     } else {
         read_M(words, instr, modrm, sink)
     }
@@ -5643,7 +5643,7 @@ pub(self) fn read_E_xmm<
     S: DescriptionSink<FieldDescription>,
 >(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
-        read_modrm_reg(instr, modrm, RegisterBank::X)
+        read_modrm_reg(instr, words, modrm, RegisterBank::X, sink)
     } else {
         read_M(words, instr, modrm, sink)
     }
@@ -5654,7 +5654,7 @@ pub(self) fn read_E_ymm<
     S: DescriptionSink<FieldDescription>,
 >(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
-        read_modrm_reg(instr, modrm, RegisterBank::Y)
+        read_modrm_reg(instr, words, modrm, RegisterBank::Y, sink)
     } else {
         read_M(words, instr, modrm, sink)
     }
@@ -5665,7 +5665,7 @@ pub(self) fn read_E_vex<
     S: DescriptionSink<FieldDescription>,
 >(words: &mut T, instr: &mut Instruction, modrm: u8, bank: RegisterBank, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
-        read_modrm_reg(instr, modrm, bank)
+        read_modrm_reg(instr, words, modrm, bank, sink)
     } else {
         let res = read_M(words, instr, modrm, sink)?;
         if (modrm & 0b01_000_000) == 0b01_000_000 {
@@ -5676,8 +5676,18 @@ pub(self) fn read_E_vex<
 }
 
 #[allow(non_snake_case)]
-fn read_modrm_reg(instr: &mut Instruction, modrm: u8, reg_bank: RegisterBank) -> Result<OperandSpec, DecodeError> {
+#[inline(always)]
+fn read_modrm_reg<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(instr: &mut Instruction, words: &mut T, modrm: u8, reg_bank: RegisterBank, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     instr.regs[1] = RegSpec::from_parts(modrm & 7, instr.prefixes.rex_unchecked().b(), reg_bank);
+    sink.record(
+        words.offset() as u32 * 8 - 8,
+        words.offset() as u32 * 8 - 6,
+        InnerDescription::RegisterNumber("mmm", modrm & 7, instr.regs[1])
+            .with_id(words.offset() as u32 * 8 - 8 + 2)
+    );
     Ok(OperandSpec::RegMMM)
 }
 
@@ -7838,14 +7848,7 @@ fn read_operands<
             if operand_code.bits() == (OperandCode::Gv_M as u16) {
                 return Err(DecodeError::InvalidOperand);
             }
-            let res = read_modrm_reg(instruction, modrm, bank)?;
-            sink.record(
-                modrm_start,
-                modrm_start + 2,
-                InnerDescription::RegisterNumber("mmm", modrm & 7, instruction.regs[1])
-                    .with_id(modrm_start + 2)
-            );
-            res
+            read_modrm_reg(instruction, words, modrm, bank, sink)?
         } else {
             read_M(words, instruction, modrm, sink)?
         };
@@ -7885,12 +7888,16 @@ fn read_operands<
         modrm = read_modrm(words)?;
         instruction.regs[0].bank = bank;
         instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
-        sink.record(
-            modrm_start + 3,
-            modrm_start + 5,
-            InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
-                .with_id(modrm_start + 3)
-        );
+
+        // for some encodings, the rrr field selects an opcode, not an operand
+        if operand_code.bits() != OperandCode::ModRM_0xc1_Ev_Ib as u16 && operand_code.bits() != OperandCode::ModRM_0xff_Ev as u16 {
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                    .with_id(modrm_start + 3)
+            );
+        }
 
         mem_oper = if modrm >= 0b11000000 {
             sink.record(
@@ -7899,7 +7906,7 @@ fn read_operands<
                 InnerDescription::Misc("mmm field is a register number (mod bits: 11)")
                     .with_id(modrm_start + 0)
             );
-            read_modrm_reg(instruction, modrm, bank)?
+            read_modrm_reg(instruction, words, modrm, bank, sink)?
         } else {
             read_M(words, instruction, modrm, sink)?
         };
@@ -8272,9 +8279,9 @@ fn read_operands<
                 };
                 if op == 5 {
                     sink.record(
-                        modrm_start - 8,
-                        modrm_start - 1,
-                        InnerDescription::Number("imm", instruction.imm as i64)
+                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", num as i64)
                             .with_id(modrm_start - 8)
                     );
                 } else {
