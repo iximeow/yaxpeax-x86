@@ -323,6 +323,7 @@ fn test_modrm_decode() {
             desc.to_string().contains("mod bits: 11")
         }),
         AnnotationCheck::exact(32, 34, InnerDescription::RegisterNumber("mmm", 1, RegSpec::ecx())),
+        AnnotationCheck::exact(35, 37, InnerDescription::RegisterNumber("rrr", 0, RegSpec::eax())),
         AnnotationCheck::no_extra(),
     ]);
 
