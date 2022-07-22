@@ -138,6 +138,7 @@ pub use protected_mode::Arch as x86_32;
 pub mod real_mode;
 pub use real_mode::Arch as x86_16;
 
+mod generated;
 mod safer_unchecked;
 
 const MEM_SIZE_STRINGS: [&'static str; 64] = [

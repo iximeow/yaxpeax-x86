@@ -1,0 +1,3426 @@
+{
+  "sets": [
+    {
+      "name": "8086_bcd",
+      "new": [
+        "aaa",
+        "aad",
+        "aam",
+        "aas",
+        "daa",
+        "das"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "8086",
+      "new": [
+        "invalid",
+        "cmc",
+        "clc",
+        "stc",
+        "cli",
+        "sti",
+        "cld",
+        "std",
+        "add",
+        "or",
+        "adc",
+        "sbb",
+        "and",
+        "xor",
+        "sub",
+        "cmp",
+        "sar",
+        "sal",
+        "shr",
+        "shl",
+        "rcr",
+        "rcl",
+        "ror",
+        "rol",
+        "inc",
+        "dec",
+        "hlt",
+        "call",
+        "callf",
+        "jmp",
+        "jmpf",
+        "push",
+        "pop",
+        "lea",
+        "nop",
+        "xchg",
+        "popf",
+        "int",
+        "into",
+        "iret",
+        "iretd",
+        "iretq",
+        "retf",
+        "enter",
+        "leave",
+        "mov",
+        "return",
+        "pushf",
+        "wait",
+        "cbw",
+        "cwd",
+        "cqo",
+        "lods",
+        "stos",
+        "cmps",
+        "scas",
+        "movs",
+        "test",
+        "in",
+        "out",
+        "imul",
+        "jo",
+        "jno",
+        "jb",
+        "jnb",
+        "jz",
+        "jnz",
+        "ja",
+        "jna",
+        "js",
+        "jns",
+        "jp",
+        "jnp",
+        "jl",
+        "jge",
+        "jle",
+        "jg",
+        "ud0",
+        "ud1",
+        "ud2",
+        "div",
+        "idiv",
+        "mul",
+        "neg",
+        "not",
+        "xlat",
+
+        "loopnz",
+        "loopz",
+        "loop",
+
+        "salc"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "80186_pusha",
+      "new": [
+        "pusha",
+        "popa"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "80186_bound",
+      "remark": "not included in the base 80186 because that set is reused to extend into 64bit, where bound is not",
+      "new": [
+        "bound"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "80286_arpl",
+      "remark": "not included in the base 80286 because that set is reused to extend into 64bit, where arpl is not",
+      "new": [
+        "arpl"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "80186",
+      "new": [
+        "enter",
+        "leave",
+        "ins",
+        "outs"
+      ],
+      "extended": [
+        "push",
+        "imul",
+        "shl",
+        "shr",
+        "sal",
+        "sar",
+        "rol",
+        "ror",
+        "rcl",
+        "rcr"
+      ]
+    },
+    {
+      "name": "80286",
+      "new": [
+        "clts",
+        "lar",
+        "lgdt",
+        "lidt",
+        "lldt",
+        "lmsw",
+        "lsl",
+        "sgdt",
+        "sidt",
+        "sldt",
+        "smsw",
+        "str",
+        "ltr",
+        "verr",
+        "verw"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "80386",
+      "new": [
+        "bsf",
+        "bsr",
+        "bt",
+        "bts",
+        "btc",
+        "btr",
+        "cdq",
+        "cwde",
+        "lds",
+        "les",
+        "lfs",
+        "lgs",
+        "lss",
+        "movzx",
+        "movsx",
+        "seto",
+        "setno",
+        "setb",
+        "setae",
+        "setz",
+        "setnz",
+        "setbe",
+        "seta",
+        "sets",
+        "setns",
+        "setp",
+        "setnp",
+        "setl",
+        "setge",
+        "setle",
+        "setg",
+        "shld",
+        "shrd"
+      ]
+    },
+    {
+      "name": "jcxz",
+      "remark": "for 16-bit modes, jcxz is treated as jcxz (e.g. 16-bit ecx test)",
+      "new": [
+        "jcxz"
+      ]
+    },
+    {
+      "name": "jecxz",
+      "remark": "for 32-bit modes, jcxz is treated as jecxz (e.g. 32-bit ecx test)",
+      "new": [
+        "jecxz"
+      ]
+    },
+    {
+      "name": "80486",
+      "new": [
+        "bswap",
+        "cmpxchg",
+        "invd",
+        "wbinvd",
+        "invlpg",
+        "xadd"
+      ]
+    },
+    {
+      "name": "pentium",
+      "new": [
+        "cpuid",
+        "wrmsr",
+        "rdtsc",
+        "rdmsr",
+        "rsm",
+        "cmpxchg8b"
+      ]
+    },
+    {
+      "name": "pentium_pro",
+      "new": [
+        "+pentium",
+        "+cmov",
+        "ud2"
+      ]
+    },
+    {
+      "name": "64bit",
+      "new": [
+        "+8086",
+        "+80186",
+        "+80286",
+        "+80386",
+        "+80486",
+        "+3dnow",
+        "+3dnowprefetch",
+        "+x87",
+        "+mmx",
+        "+sse",
+        "+sse2",
+        "+pentium_pro",
+        "+cmpxchg16b",
+
+        "jrcxz",
+        "cdqe",
+        "movzx",
+        "swapgs",
+        "movsxd",
+        "+syscall",
+        "+fsgsbase"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "extra_instructions",
+      "remark": "real_mode and long_mode had these instructions in their Opcode enums, but these variants could never be constructed. they were included by accident, and so are ''redundant'' with the extension that added them, but are explicitly noted as an error here.",
+      "new": [
+        "swapgs",
+        "slhd",
+        "cdqe",
+        "movsxd",
+        "cmpxchg16b"
+      ]
+    },
+    {
+      "name": "typo_instructions",
+      "remark": "these instructions never existed, are just transcription errors.",
+      "new": [
+        "+avx512_f_typo",
+        "slhd"
+      ]
+    },
+    {
+      "name": "x86_64_baseline",
+      "new": [
+        "+80386",
+        "+cmov",
+        "+x87",
+        "+mmx",
+        "+sse",
+        "+sse2",
+        "+sse3",
+        "+fxsr",
+        "+64bit",
+        "+typo_instructions"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "mmx",
+      "new": [
+        "rdpmc",
+        "punpcklbw",
+        "punpcklwd",
+        "punpckldq",
+        "packsswb",
+        "pcmpgtb",
+        "pcmpgtd",
+        "pcmpgtw",
+        "packuswb",
+        "punpckhbw",
+        "punpckhwd",
+        "punpckhdq",
+        "packssdw",
+        "movd",
+        "movq",
+        "pcmpeqb",
+        "pcmpeqd",
+        "pcmpeqw",
+        "psrlw",
+        "psrld",
+        "psrlq",
+        "pmullw",
+        "psubusb",
+        "psubusw",
+        "pand",
+        "paddusb",
+        "paddusw",
+        "pandn",
+        "psraw",
+        "psrad",
+        "pmulhw",
+        "psubsb",
+        "psubsw",
+        "por",
+        "paddsb",
+        "paddsw",
+        "pxor",
+        "psllw",
+        "pslld",
+        "psllq",
+        "pmaddwd",
+        "psubb",
+        "psubw",
+        "psubd",
+        "paddb",
+        "paddw",
+        "paddd",
+        "emms"
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "sse",
+      "new": [
+        "movss",
+        "addss",
+        "subss",
+        "mulss",
+        "divss",
+        "minss",
+        "maxss",
+        "sqrtss",
+        "movups",
+        "movhlps",
+        "movlps",
+        "movhps",
+        "movlhps",
+        "unpcklps",
+        "unpckhps",
+        "prefetchnta",
+        "prefetch0",
+        "prefetch1",
+        "prefetch2",
+        "movaps",
+        "cvtpi2ps",
+        "cvtsi2ss",
+        "movntps",
+        "cvttss2si",
+        "cvttps2pi",
+        "cvtss2si",
+        "cvtps2pi",
+        "ucomiss",
+        "comiss",
+        "sqrtps",
+        "movmskps",
+        "rsqrtss",
+        "rsqrtps",
+        "rcpps",
+        "rcpss",
+        "andps",
+        "andnps",
+        "xorps",
+        "orps",
+        "addps",
+        "mulps",
+        "subps",
+        "minps",
+        "divps",
+        "maxps",
+        "pshufw",
+        "ldmxcsr",
+        "stmxcsr",
+        "sfence",
+        "cmpps",
+        "cmpss",
+        "pinsrw",
+        "pextrw",
+        "shufps",
+        "pmovmskb",
+        "pminub",
+        "pmaxub",
+        "pavgb",
+        "pavgw",
+        "pmulhuw",
+        "movntq",
+        "pminsw",
+        "pmaxsw",
+        "psadbw",
+        "maskmovq",
+        "ldmxcsr",
+        "stmxcsr"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "sse2",
+      "new": [
+        "movupd",
+        "psrldq",
+        "pslldq",
+        "movsd",
+        "movlpd",
+        "unpcklpd",
+        "unpckhpd",
+        "movhpd",
+        "movapd",
+        "movmskpd",
+        "cvtpi2pd",
+        "cvtsi2sd",
+        "movntpd",
+        "movnti",
+        "movntdq",
+        "cvttpd2pi",
+        "cvttsd2si",
+        "cvtpd2pi",
+        "cvtsd2si",
+        "ucomisd",
+        "comisd",
+        "sqrtpd",
+        "sqrtsd",
+        "andpd",
+        "andnpd",
+        "orpd",
+        "xorpd",
+        "addpd",
+        "addsd",
+        "mulsd",
+        "mulpd",
+        "cvtps2pd",
+        "cvtpd2ps",
+        "cvtss2sd",
+        "cvtsd2ss",
+        "cvtps2dq",
+        "cvtdq2ps",
+        "cvttps2dq",
+        "subsd",
+        "subpd",
+        "minpd",
+        "minsd",
+        "divpd",
+        "divsd",
+        "maxpd",
+        "maxsd",
+        "punpcklqdq",
+        "punpckhqdq",
+        "movdqa",
+        "movdqu",
+        "pshufhw",
+        "pshuflw",
+        "pshufd",
+        "lfence",
+        "mfence",
+        "clflush",
+        "cmppd",
+        "cmpps",
+        "cmpsd",
+        "shufpd",
+        "paddq",
+        "movq2dq",
+        "movdq2q",
+        "cvtpd2dq",
+        "cvttpd2dq",
+        "cvtdq2pd",
+        "pmuludq",
+        "maskmovdqu",
+        "psubq"
+      ],
+      "extended": [
+        "punpcklbw",
+        "punpcklwd",
+        "punpckldq",
+        "packsswb",
+        "pcmpgtb",
+        "pcmpgtd",
+        "pcmpgtw",
+        "packuswb",
+        "punpckhbw",
+        "punpckhwd",
+        "punpckhdq",
+        "packssdw",
+        "movd",
+        "movq",
+        "pcmpeqb",
+        "pcmpeqd",
+        "pcmpeqw",
+        "psrlw",
+        "psrld",
+        "psrlq",
+        "pmullw",
+        "psubusb",
+        "psubusw",
+        "pand",
+        "paddusb",
+        "paddusw",
+        "pandn",
+        "psraw",
+        "psrad",
+        "pmulhw",
+        "psubsb",
+        "psubsw",
+        "por",
+        "paddsb",
+        "paddsw",
+        "pxor",
+        "psllw",
+        "pslld",
+        "psllq",
+        "pmaddwd",
+        "psubb",
+        "psubw",
+        "psubd",
+        "paddb",
+        "paddw",
+        "paddd"
+      ]
+    },
+    {
+      "name": "sse3",
+      "new": [
+        "addsubpd",
+        "addsubps",
+        "hsubpd",
+        "haddpd",
+        "movsldup",
+        "movshdup",
+        "movddup",
+        "haddps",
+        "hsubps",
+        "lddqu",
+        "+monitor"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "ssse3",
+      "new": [
+        "palignr",
+        "psignw",
+        "psignd",
+        "psignb",
+        "pshufb",
+        "pmulhrsw",
+        "pmaddubsw",
+        "pabsd",
+        "pabsw",
+        "pabsb",
+        "phsubsw",
+        "phsubw",
+        "phsubd",
+        "phaddd",
+        "phaddsw",
+        "phaddw"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "monitor",
+      "new": [
+        "monitor",
+        "mwait"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "vmx",
+      "new": [
+        "vmptrld",
+        "vmptrst",
+        "vmclear",
+        "vmread",
+        "vmwrite",
+        "vmcall",
+        "vmlaunch",
+        "vmresume",
+        "vmxoff",
+        "vmxon",
+        "invept",
+        "invvpid",
+        "vmfunc"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "fma3",
+      "new": [
+        "vfmadd132pd",
+        "vfmadd132ps",
+        "vfmadd132sd",
+        "vfmadd132ss",
+        "vfmadd213pd",
+        "vfmadd213ps",
+        "vfmadd213sd",
+        "vfmadd213ss",
+        "vfmadd231pd",
+        "vfmadd231ps",
+        "vfmadd231sd",
+        "vfmadd231ss",
+        "vfmaddsub132pd",
+        "vfmaddsub132ps",
+        "vfmaddsub213pd",
+        "vfmaddsub213ps",
+        "vfmaddsub231pd",
+        "vfmaddsub231ps",
+        "vfmsub132pd",
+        "vfmsub132ps",
+        "vfmsub132sd",
+        "vfmsub132ss",
+        "vfmsub213pd",
+        "vfmsub213ps",
+        "vfmsub213sd",
+        "vfmsub213ss",
+        "vfmsub231pd",
+        "vfmsub231ps",
+        "vfmsub231sd",
+        "vfmsub231ss",
+        "vfmsubadd132pd",
+        "vfmsubadd132ps",
+        "vfmsubadd213pd",
+        "vfmsubadd213ps",
+        "vfmsubadd231pd",
+        "vfmsubadd231ps",
+        "vfnmadd132pd",
+        "vfnmadd132ps",
+        "vfnmadd132sd",
+        "vfnmadd132ss",
+        "vfnmadd213pd",
+        "vfnmadd213ps",
+        "vfnmadd213sd",
+        "vfnmadd213ss",
+        "vfnmadd231pd",
+        "vfnmadd231ps",
+        "vfnmadd231sd",
+        "vfnmadd231ss",
+        "vfnmsub132pd",
+        "vfnmsub132ps",
+        "vfnmsub132sd",
+        "vfnmsub132ss",
+        "vfnmsub213pd",
+        "vfnmsub213ps",
+        "vfnmsub213sd",
+        "vfnmsub213ss",
+        "vfnmsub231pd",
+        "vfnmsub231ps",
+        "vfnmsub231sd",
+        "vfnmsub231ss"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "cmpxchg16b",
+      "remark": "appears to be present in all x86-64 machines, though it's hard to find data to confirm",
+      "new": [
+        "cmpxchg16b"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "sse4_1",
+      "new": [
+        "phminposuw",
+        "pmuldq",
+        "pmulld",
+        "dpps",
+        "dppd",
+        "packusdw",
+        "pcmpeqq",
+        "ptest",
+        "movntdqa",
+        "roundss",
+        "roundsd",
+        "roundps",
+        "roundpd",
+        "pmaxsb",
+        "pmaxsd",
+        "pmaxuw",
+        "pmaxud",
+        "pminsd",
+        "pminsb",
+        "pminud",
+        "pminuw",
+        "blendw",
+        "pblendw",
+        "blendvps",
+        "blendvpd",
+        "pblendvb",
+        "blendps",
+        "blendpd",
+        "mpsadbw",
+        "pmovzxdq",
+        "pmovsxdq",
+        "pmovzxbd",
+        "pmovsxbd",
+        "pmovzxwq",
+        "pmovsxwq",
+        "pmovzxbq",
+        "pmovsxbq",
+        "pmovsxwd",
+        "pmovzxwd",
+        "pextrq",
+        "pextrd",
+        "pextrb",
+        "pmovsxbw",
+        "pmovzxbw",
+        "pinsrq",
+        "pinsrd",
+        "pinsrb",
+        "extractps",
+        "insertps"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "sse4_2",
+      "new": [
+        "crc32",
+        "pcmpestri",
+        "pcmpestrm",
+        "pcmpistri",
+        "pcmpistrm",
+        "pcmpgtq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "movbe",
+      "new": [
+        "movbe"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "popcnt",
+      "new": [
+        "popcnt"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "aesni",
+      "new": [
+        "aeskeygenassist",
+        "aesimc",
+        "aesenc",
+        "aesenclast",
+        "aesdec",
+        "aesdeclast"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "sgx",
+      "new": [
+        "encls",
+        "enclu",
+        "enclv"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "bmi1",
+      "new": [
+        "andn",
+        "bextr",
+        "blsi",
+        "blsmsk",
+        "blsr",
+        "tzcnt"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "bmi2",
+      "new": [
+        "bzhi",
+        "mulx",
+        "pdep",
+        "pext",
+        "rorx",
+        "sarx",
+        "shrx",
+        "shlx"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx",
+      "new": [
+        "vlddqu",
+        "vpaddb",
+        "vpaddd",
+        "vpaddq",
+        "vpaddw",
+        "vpabsb",
+        "vpabsw",
+        "vpabsd",
+        "vmaxsd",
+        "vmaxss",
+        "vminsd",
+        "vminss",
+        "vmulsd",
+        "vmulss",
+        "vrcpss",
+        "vpsubusb",
+        "vpsubusw",
+        "vxorpd",
+        "vxorps",
+        "vpavgb",
+        "vpavgw",
+        "vandnpd",
+        "vandnps",
+        "vphaddd",
+        "vphaddsw",
+        "vphaddw",
+        "vandpd",
+        "vandps",
+        "vpaddsb",
+        "vpaddsw",
+        "vpaddusb",
+        "vpaddusw",
+        "vphsubd",
+        "vphsubsw",
+        "vphsubw",
+        "vhaddpd",
+        "vhaddps",
+        "vhsubpd",
+        "vhsubps",
+        "vorpd",
+        "vorps",
+        "vpblendvb",
+        "vpblendw",
+        "vaddsubpd",
+        "vaddsubps",
+        "vrsqrtps",
+        "vrsqrtss",
+        "vpalignr",
+        "vpsubsb",
+        "vpsubsw",
+        "vpmulhuw",
+        "vpmulhw",
+        "vpmullw",
+        "vpshufb",
+        "vpshufhw",
+        "vpshuflw",
+        "vphminposuw",
+        "vrcpps",
+        "vmpsadbw",
+        "vpmaddubsw",
+        "vpmaddwd",
+        "vmaskmovdqu",
+        "vpmovmskb",
+        "vpsadbw",
+
+        "vpslldq",
+        "vpsrldq",
+
+        "vdppd",
+        "vdpps",
+
+        "vldmxcsr",
+        "vstmxcsr",
+
+        "vmovmskpd",
+        "vmovmskps",
+
+        "vptest",
+        "vtestpd",
+        "vtestps",
+        "vpextrb",
+        "vpextrw",
+        "vpextrd",
+        "vpextrq",
+        "vpackssdw",
+        "vpackusdw",
+        "vpacksswb",
+        "vpackuswb",
+        "vblendpd",
+        "vblendps",
+        "vblendvpd",
+        "vblendvps",
+        "vpmulhrsw",
+
+        "vpand",
+        "vpandn",
+        "vpor",
+
+        "vpcmpeqb",
+        "vpcmpeqd",
+        "vpcmpeqq",
+        "vpcmpeqw",
+        "vpcmpgtb",
+        "vpcmpgtd",
+        "vpcmpgtq",
+        "vpcmpgtw",
+
+        "vpmaxsb",
+        "vpmaxsd",
+        "vpmaxsw",
+        "vpmaxub",
+        "vpmaxuw",
+        "vpminsb",
+        "vpminsw",
+        "vpminub",
+        "vpminuw",
+        "vpmaxud",
+        "vpminsd",
+        "vpsignb",
+        "vpsignw",
+        "vpsignd",
+        "vpinsrb",
+        "vpinsrw",
+        "vpinsrd",
+        "vpinsrq",
+
+        "vpmovsxbd",
+        "vpmovsxbq",
+        "vpmovsxbw",
+        "vpmovsxdq",
+        "vpmovsxwd",
+        "vpmovsxwq",
+        "vpmovzxbd",
+        "vpmovzxbq",
+        "vpmovzxbw",
+        "vpmovzxdq",
+        "vpmovzxwd",
+        "vpmovzxwq",
+
+        "vpmuldq",
+        "vpmullq",
+        "vpmulld",
+        "vpmuludq",
+        "vpshufd",
+        "vshufpd",
+        "vshufps",
+        "vsqrtpd",
+        "vsqrtps",
+        "vsqrtss",
+        "vsqrtsd",
+        "vsubpd",
+        "vsubps",
+        "vsubsd",
+        "vsubss",
+        "vucomisd",
+        "vucomiss",
+        "vroundpd",
+        "vroundps",
+        "vroundsd",
+        "vroundss",
+
+        "vpslld",
+        "vpsllq",
+        "vpsllw",
+        "vpsrad",
+        "vpsraw",
+        "vpsrld",
+        "vpsrlq",
+        "vpsrlw",
+        "vpsubb",
+        "vpsubw",
+        "vpsubd",
+        "vpsubq",
+        "vpxor",
+
+        "vpunpckhbw",
+        "vpunpckhwd",
+        "vpunpckhdq",
+        "vpunpckhqdq",
+        "vpunpcklbw",
+        "vpunpcklwd",
+        "vpunpckldq",
+        "vpunpcklqdq",
+        "vunpckhpd",
+        "vunpckhps",
+        "vunpcklpd",
+        "vunpcklps",
+        "vpcmpestri",
+        "vpcmpestrm",
+        "vpcmpistri",
+        "vpcmpistrm",
+
+        "vbroadcastss",
+        "vbroadcastsd",
+        "vbroadcastf128",
+        "vbroadcastsd",
+        "vbroadcastss",
+        "vinsertf128",
+        "vextractf128",
+        "vmaskmovpd",
+        "vmaskmovps",
+        "vpermilpd",
+        "vpermilps",
+        "vperm2f128",
+        "vzeroupper",
+        "vzeroall"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx2",
+      "new": [
+        "vbroadcasti128",
+        "vpbroadcastb",
+        "vpbroadcastw",
+        "vpbroadcastd",
+        "vpbroadcastq",
+        "vinserti128",
+        "vextracti128",
+        "vpmaskmovd",
+        "vpmaskmovq",
+        "vpermps",
+        "vpermd",
+        "vpermpd",
+        "vpermq",
+        "vperm2i128",
+        "vpblendd",
+        "vpsllvd",
+        "vpsllvq",
+        "vpsrlvd",
+        "vpsrlvq",
+        "vpsravd"
+      ],
+      "extended": [
+        "vpaddb",
+        "vpaddd",
+        "vpaddq",
+        "vpaddw",
+        "vpabsb",
+        "vpabsw",
+        "vpabsd",
+        "vpand",
+        "vpandn",
+        "vpor",
+        "vpavgb",
+        "vpavgw",
+        "vphaddd",
+        "vphaddsw",
+        "vphaddw",
+        "vpmulhrsw",
+        "vpaddsb",
+        "vpaddsw",
+        "vpaddusb",
+        "vpaddusw",
+        "vphsubd",
+        "vphsubsw",
+        "vphsubw",
+        "vpblendvb",
+        "vpblendw",
+        "vpalignr",
+        "vpsubsb",
+        "vpsubsw",
+        "vpmulhuw",
+        "vpmulhw",
+        "vpmullw",
+        "vpshufb",
+        "vpshufhw",
+        "vpshuflw",
+        "vmpsadbw",
+        "vpmaddubsw",
+        "vpmaddwd",
+        "vpmovmskb",
+        "vpsadbw",
+
+        "vpslldq",
+        "vpsrldq",
+
+        "vpcmpeqb",
+        "vpcmpeqd",
+        "vpcmpeqq",
+        "vpcmpeqw",
+        "vpcmpgtb",
+        "vpcmpgtd",
+        "vpcmpgtq",
+        "vpcmpgtw",
+        "vpmaxsb",
+        "vpmaxsd",
+        "vpmaxsw",
+        "vpmaxud",
+        "vpminsd",
+        "vpminud",
+
+        "vpmovsxbd",
+        "vpmovsxbq",
+        "vpmovsxbw",
+        "vpmovsxdq",
+        "vpmovsxwd",
+        "vpmovsxwq",
+        "vpmovzxbd",
+        "vpmovzxbq",
+        "vpmovzxbw",
+        "vpmovzxdq",
+        "vpmovzxwd",
+        "vpmovzxwq",
+        "vpackssdw",
+        "vpackusdw",
+        "vpacksswb",
+        "vpackuswb",
+
+        "vpmuldq",
+        "vpmullq",
+        "vpmulld",
+        "vpmuludq",
+        "vpshufd",
+        "vshufpd",
+        "vshufps",
+        "vsqrtpd",
+        "vsqrtps",
+        "vsubps",
+        "vsubpd",
+
+        "vpslld",
+        "vpsllq",
+        "vpsllw",
+        "vpsrad",
+        "vpsraw",
+        "vpsrld",
+        "vpsrlq",
+        "vpsrlw",
+        "vpsubb",
+        "vpsubw",
+        "vpsubd",
+        "vpsubq",
+        "vpxor",
+        "vpsignb",
+        "vpsignd",
+        "vpsignw",
+
+        "vpunpckhbw",
+        "vpunpckhwd",
+        "vpunpckhdq",
+        "vpunpckhqdq",
+        "vpunpcklbw",
+        "vpunpcklwd",
+        "vpunpckldq",
+        "vpunpcklqdq",
+        "vunpckhpd",
+        "vunpckhps",
+        "vunpcklpd",
+        "vunpcklps",
+
+        "vbroadcastss",
+        "vbroadcastsd",
+        "vbroadcastsd",
+        "vbroadcastss"
+      ]
+    },
+    {
+       "name": "invpcid",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "invlpgb",
+      "new": [
+        "invlpgb",
+        "tlbsync"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "mpx",
+      "new": [
+        "bndmk",
+        "bndcl",
+        "bndcu",
+        "bndcn",
+        "bndmov",
+        "bndldx",
+        "bndstx"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_f_typo",
+      "remark": "these instructions never existed, are just transcription errors.",
+      "new": [
+        "vprorrd",
+        "vprorrq"
+      ]
+    },
+    {
+      "name": "vpclmulqdq",
+      "new": [
+        "vpclmulqdq"
+      ]
+    },
+    {
+      "name": "avx_unimplemented",
+      "remark": "these avx instructions were missed when implementing the various avx* extensions",
+      "new": [
+        "vpmaxub",
+        "vpmaxub"
+      ]
+    },
+    {
+      "name": "avx512_f__vl_unimplemented",
+      "remark": "these avx512f instructions were missed when implementing avx512",
+      "new": [
+        "vscatterdps",
+        "vscatterdpd",
+        "vscatterqps",
+        "vscatterqpd"
+      ]
+    },
+    {
+      "name": "avx512bw_unimplemented",
+      "remark": "these avx512bw instructions were missed when implementing avx512",
+      "new": [
+        "vpmovq2m"
+      ]
+    },
+    {
+      "name": "invpcid_unimplemented",
+      "new": [
+        "invvpid"
+      ]
+    },
+
+    {
+      "name": "avx512_f_typo",
+      "new": [
+        "vprorrd",
+        "vprorrq"
+      ]
+    },
+
+    {
+      "name": "avx512_f",
+      "new": [
+        "+avx512_f__vl_unimplemented",
+        "vcvtqq2pd",
+        "vcvtqq2ps",
+        "vcvtusi2usd",
+        "vcvtusi2uss",
+        "vextractf32x4",
+        "vextractf64x4",
+        "vextracti32x4",
+        "vextracti64x4",
+        "vfixupimmsd",
+        "vfixupimmss",
+        "vinserti64x4",
+        "vmovdqa32",
+        "vmovdqa64",
+        "vmovdqu32",
+        "vmovdqu64",
+        "vpcompressq",
+        "vpcompressd",
+        "vscaledpd",
+        "vscaledps",
+        "vscaledsd",
+        "vscaledss",
+        "vscatterdd",
+        "vscatterdq",
+        "vscatterqd",
+        "vscatterqq",
+
+        "vaddpd",
+        "vaddps",
+        "vcmppd",
+        "vcmpps",
+        "vcvtdq2pd",
+        "vcvtdq2ps",
+        "vcvtpd2dq",
+        "vcvtpd2ps",
+        "vcvtps2dq",
+        "vcvtps2pd",
+        "vcvttpd2dq",
+        "vcvttps2dq",
+        "vdivpd",
+        "vdivps",
+        "vmaxpd",
+        "vmaxps",
+        "vminpd",
+        "vminps",
+        "vmovapd",
+        "vmovaps",
+        "vmovddup",
+        "vmovdqa",
+        "vmovdqu",
+        "vmovntdqa",
+        "vmovntdq",
+        "vmovntpd",
+        "vmovntps",
+        "vmovshdup",
+        "vmovsldup",
+        "vmovupd",
+        "vmovups",
+        "vmulpd",
+        "vmulps",
+        "vpandd",
+        "vpandq",
+        "vpandnd",
+        "vpandnq",
+        "vpcmpeqd",
+        "vpcmpeqq",
+        "vpcmpgtd",
+        "vpcmpgtq",
+        "vpmaxsd",
+        "vpmaxsq",
+        "vpmaxud",
+        "vpmaxuq",
+        "vpminsd",
+        "vpminsq",
+        "vpminud",
+        "vpminuq",
+        "vpcmpd",
+        "vpcmpq",
+        "vpcmpud",
+        "vpcmpuq",
+
+        "vpord",
+        "vporq",
+        "vpxord",
+        "vpxorq",
+
+        "vpslld",
+        "vpsllq",
+        "vpsllw",
+        "vpsrad",
+        "vpsraq",
+        "valignd",
+        "valignq",
+        "vblendmpd",
+        "vblendmps",
+        "vprold",
+        "vprolq",
+        "vprolvd",
+        "vprolvq",
+        "vprord",
+        "vprorq",
+        "vprorvd",
+        "vprorvq",
+
+        "vpunpckhdq",
+        "vpunpckhqdq",
+        "vpunpckldq",
+        "vpunpcklqdq",
+        "vunpckhpd",
+        "vunpckhps",
+        "vunpcklpd",
+        "vunpcklps",
+
+        "vbroadcastf32x4",
+        "vbroadcastf64x4",
+        "vbroadcasti64x4",
+        "vbroadcasti32x4",
+        "vinsertf32x4",
+        "vinserti32x4",
+        "vshuff32x4",
+        "vshuff64x2",
+        "vshufi32x4",
+        "vshufi64x2",
+        "vcompressd",
+        "vcompressq",
+        "vcompresspd",
+        "vcompressps",
+        "vexpandpd",
+        "vexpandps",
+        "vcvtpd2udq",
+        "vcvtps2udq",
+        "vcvtudq2pd",
+        "vcvtudq2ps",
+        "vcvttpd2udq",
+        "vcvttps2udq",
+        "vfixupimmpd",
+        "vfixupimmps",
+        "vcvtph2ps",
+        "vcvtps2ph",
+
+        "vfmadd132pd",
+        "vfmadd132ps",
+        "vfmadd213pd",
+        "vfmadd213ps",
+        "vfmadd231pd",
+        "vfmadd231ps",
+        "vfmaddsub132pd",
+        "vfmaddsub132ps",
+        "vfmaddsub213pd",
+        "vfmaddsub213ps",
+        "vfmaddsub231pd",
+        "vfmaddsub231ps",
+        "vfmsub132pd",
+        "vfmsub132ps",
+        "vfmsub213pd",
+        "vfmsub213ps",
+        "vfmsub231pd",
+        "vfmsub231ps",
+        "vfmsubadd132pd",
+        "vfmsubadd132ps",
+        "vfmsubadd213pd",
+        "vfmsubadd213ps",
+        "vfmsubadd231pd",
+        "vfmsubadd231ps",
+        "vfnmadd132pd",
+        "vfnmadd132ps",
+        "vfnmadd213pd",
+        "vfnmadd213ps",
+        "vfnmadd231pd",
+        "vfnmadd231ps",
+        "vfnmsub132pd",
+        "vfnmsub132ps",
+        "vfnmsub213pd",
+        "vfnmsub213ps",
+        "vfnmsub231pd",
+        "vfnmsub231ps",
+
+        "vscatterdps",
+        "vscatterdpd",
+        "vscatterqps",
+        "vscatterqpd",
+        "vgatherdpd",
+        "vgatherdps",
+        "vgatherqpd",
+        "vgatherqps",
+        "vgetexppd",
+        "vgetexpps",
+        "vgetmantpd",
+        "vgetmantps",
+        "vpblendmd",
+        "vpblendmq",
+
+        "vpermd",
+        "vpermq",
+        "vpermi2d",
+        "vpermi2q",
+        "vpermi2pd",
+        "vpermi2ps",
+        "vpermt2d",
+        "vpermt2q",
+        "vpermt2pd",
+        "vpermt2ps",
+        "vpexpandd",
+        "vpexpandq",
+        "vpgatherdd",
+        "vpgatherdq",
+        "vpgatherqd",
+        "vpgatherqq",
+        "vpscatterdd",
+        "vpscatterdq",
+        "vpscatterqd",
+        "vpscatterqq",
+        "vpmovdb",
+        "vpmovsdb",
+        "vpmovusdb",
+        "vpmovdw",
+        "vpmovsdw",
+        "vpmovusdw",
+        "vpmovqb",
+        "vpmovsqb",
+        "vpmovusqb",
+        "vpmovqd",
+        "vpmovsqd",
+        "vpmovusqd",
+        "vpmovqw",
+        "vpmovsqw",
+        "vpmovusqw",
+
+        "vpsravq",
+        "vpternlogd",
+        "vpternlogq",
+        "vptestmd",
+        "vptestmq",
+        "vptestnmd",
+        "vptestnmq",
+        "vrcp14pd",
+        "vrcp14ps",
+        "vrndscalepd",
+        "vrndscaleps",
+        "vrsqrt14pd",
+        "vrsqrt14ps",
+        "vscalefps",
+        "vscalefpd",
+        "vpabsq",
+
+        "vaddsd",
+        "vaddss",
+        "vcmpsd",
+        "vcmpss",
+        "vcomisd",
+        "vcomiss",
+        "vcvtsd2si",
+        "vcvtsd2ss",
+        "vcvtsi2ss",
+        "vcvtsi2sd",
+        "vcvtss2sd",
+        "vcvtss2si",
+        "vcvttss2si",
+        "vcvttsd2si",
+        "vdivsd",
+        "vdivss",
+        "vextractps",
+        "vinsertps",
+        "vgetmantsd",
+        "vgetmantss",
+
+        "vmovd",
+        "vmovq",
+        "vmovhlps",
+        "vmovhpd",
+        "vmovhps",
+        "vmovlhps",
+        "vmovlpd",
+        "vmovlps",
+        "vmovss",
+        "vmovsd",
+        "vsqrtss",
+        "vsqrtsd",
+        "vsubsd",
+        "vsubss",
+        "vucomisd",
+        "vucomiss",
+        "vrcp14sd",
+        "vrcp14ss",
+        "vrndscalesd",
+        "vrndscaless",
+        "vrsqrt14sd",
+        "vrsqrt14ss",
+        "vscalefss",
+        "vscalefsd",
+
+        "vinsertf64x4",
+
+        "vcvtusi2sd",
+        "vcvtusi2ss",
+        "vcvtsd2usi",
+        "vcvtss2usi",
+        "vcvttsd2usi",
+        "vcvttss2usi",
+
+        "kandw",
+        "kandnw",
+        "kmovw",
+        "knotw",
+        "korw",
+        "kortestw",
+        "kshiftlw",
+        "kshiftrw",
+        "kunpckbw",
+        "kxnorw",
+        "kxorw"
+      ],
+      "extended": [
+        "vpabsd",
+        "vpaddd",
+        "vmaxsd",
+        "vmaxss",
+        "vminsd",
+        "vminss",
+        "vmulsd",
+        "vmulss",
+
+        "vfmadd213sd",
+        "vfmadd213ss",
+        "vfmadd132sd",
+        "vfmadd132ss",
+        "vfmadd231sd",
+        "vfmadd231ss",
+        "vfmsub132sd",
+        "vfmsub132ss",
+        "vfmsub213sd",
+        "vfmsub213ss",
+        "vfmsub231sd",
+        "vfmsub231ss",
+        "vfnmsub132sd",
+        "vfnmsub132ss",
+        "vfnmsub213sd",
+        "vfnmsub213ss",
+        "vfnmsub231sd",
+        "vfnmsub231ss",
+        "vfnmadd132sd",
+        "vfnmadd132ss",
+        "vfnmadd213sd",
+        "vfnmadd213ss",
+        "vfnmadd231sd",
+        "vfnmadd231ss",
+
+        "vpmovsxbd",
+        "vpmovsxbq",
+        "vpmovsxdq",
+        "vpmovsxwd",
+        "vpmovsxwq",
+        "vpmovzxbd",
+        "vpmovzxbq",
+        "vpmovzxdq",
+        "vpmovzxwd",
+        "vpmovzxwq",
+
+        "vpmuldq",
+        "vpmulld",
+        "vpmuludq",
+        "vpshufd",
+        "vshufpd",
+        "vshufps",
+        "vsqrtpd",
+        "vsqrtps",
+
+        "vpslld",
+        "vpsllq",
+        "vpsrad",
+        "vpsrld",
+        "vpsrlq",
+        "vpsubd",
+        "vpsubq",
+        "vsubpd",
+        "vsubps",
+
+        "vpbroadcastd",
+        "vpbroadcastq",
+        "vpermilpd",
+        "vpermilps",
+        "vpermpd",
+        "vpermps",
+        "vpsllvd",
+        "vpsllvq",
+        "vpsravd",
+        "vpsrlvd",
+        "vpsrlvq"
+      ]
+    },
+    {
+      "name": "avx512_dq",
+      "new": [
+        "kandb",
+        "kandnb",
+        "kaddb",
+        "ktestb",
+        "kaddw",
+        "ktestw",
+        "kmovb",
+        "knotb",
+        "korb",
+        "kortestb",
+        "kshiftlb",
+        "kshiftrb",
+        "kxnorb",
+        "kxorb",
+        "vbroadcastf32x2",
+        "vbroadcastf64x2",
+        "vbroadcastf32x8",
+        "vbroadcasti32x8",
+        "vbroadcasti64x2",
+        "vbroadcasti32x2",
+        "vextractf32x8",
+        "vextracti32x8",
+        "vgetexpsd",
+        "vgetexpss",
+        "vxorpd",
+        "vxorps",
+        "vpextrd",
+        "vpextrq",
+        "vpinsrd",
+        "vpinsrq",
+        "vandnpd",
+        "vandnps",
+        "vandpd",
+        "vandps",
+        "vorpd",
+        "vorps",
+        "vcvttpd2qq",
+        "vcvtpd2qq",
+        "vcvttpd2uqq",
+        "vcvtpd2uqq",
+        "vcvttps2qq",
+        "vcvtps2qq",
+        "vcvttps2uqq",
+        "vcvtps2uqq",
+        "vcvtuqq2pd",
+        "vcvtuqq2ps",
+        "vextractf64x2",
+        "vextracti64x2",
+        "vfpclasspd",
+        "vfpclassps",
+        "vfpclasssd",
+        "vfpclassss",
+        "vinsertf64x2",
+        "vinsertf32x8",
+        "vinserti32x8",
+        "vinserti64x2",
+        "vpmovm2d",
+        "vpmovm2q",
+        "vpmovb2d",
+        "vpmovq2m",
+        "vrangepd",
+        "vrangeps",
+        "vrangesd",
+        "vrangess",
+        "vreducepd",
+        "vreduceps",
+        "vreducesd",
+        "vreducess"
+      ],
+      "extended": [
+        "vpaddq",
+        "vpmullq"
+      ]
+    },
+    {
+       "name": "rdseed",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "adx",
+      "new": [
+        "adcx",
+        "adox"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_ifma",
+      "new": [
+        "vpmadd52huq",
+        "vpmadd52luq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+       "name": "pcommit",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "avx512_pf",
+      "new": [
+        "vgatherpf0dpd",
+        "vgatherpf0dps",
+        "vgatherpf0qpd",
+        "vgatherpf0qps",
+        "vgatherpf1dpd",
+        "vgatherpf1dps",
+        "vgatherpf1qpd",
+        "vgatherpf1qps",
+        "vscatterpf0dpd",
+        "vscatterpf0dps",
+        "vscatterpf0qpd",
+        "vscatterpf0qps",
+        "vscatterpf1dpd",
+        "vscatterpf1dps",
+        "vscatterpf1qpd",
+        "vscatterpf1qps"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_er",
+      "new": [
+        "vexp2pd",
+        "vexp2ps",
+        "vexp2sd",
+        "vexp2ss",
+        "vrcp28pd",
+        "vrcp28ps",
+        "vrcp28sd",
+        "vrcp28ss",
+        "vrsqrt28pd",
+        "vrsqrt28ps",
+        "vrsqrt28sd",
+        "vrsqrt28ss"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_cd",
+      "new": [
+        "vpbroadcastmw2d",
+        "vpbroadcastmb2q",
+        "vpbroadcastm",
+        "vpconflictd",
+        "vpconflictq",
+        "vplzcntd",
+        "vplzcntq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "sha",
+      "new": [
+        "sha1rnds4",
+        "sha1nexte",
+        "sha1msg1",
+        "sha1msg2",
+        "sha256rnds2",
+        "sha256msg1",
+        "sha256msg2"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_bw",
+      "new": [
+        "+avx512bw_unimplemented",
+        "kandq",
+        "kandd",
+        "kandnq",
+        "kandnd",
+        "kmovd",
+        "kmovq",
+        "knotd",
+        "knotq",
+        "kord",
+        "korq",
+        "kaddd",
+        "ktestd",
+        "kaddq",
+        "ktestq",
+        "kortestd",
+        "kortestq",
+        "kshiftld",
+        "kshiftrd",
+        "kshiftlq",
+        "kshiftrq",
+        "kunpckwd",
+        "kunpckdq",
+        "kxnord",
+        "kxnorq",
+        "kxord",
+        "kxorq",
+        "vpcmpeqb",
+        "vpcmpeqw",
+        "vpcmpgtb",
+        "vpcmpgtw",
+        "vpsubusb",
+        "vpsubusw",
+        "vpermw",
+        "vpermi2w",
+        "vpermt2w",
+        "vpsllvw",
+        "vpsravw",
+        "vpsrlvw",
+        "vpextrb",
+        "vpextrw",
+        "vpinsrb",
+        "vpinsrw",
+        "vpmulhuw",
+        "vpmulhrsw",
+        "vpaddsb",
+        "vpaddsw",
+        "vpaddusb",
+        "vpaddusw",
+        "vpalignr",
+        "vpmovd2m",
+        "vpmovq2m",
+        "vpmovwb",
+        "vdbpsadbw",
+        "vmovdqu8",
+        "vmovdqu16",
+        "vpblendmb",
+        "vpblendmw",
+        "vpcmpb",
+        "vpcmpub",
+        "vpcmpw",
+        "vpcmpuw",
+        "vpermw",
+        "vpermi2b",
+        "vpermi2w",
+        "vpmovm2b",
+        "vpmovm2w",
+        "vpmovb2m",
+        "vpmovw2m",
+        "vpmovswb",
+        "vpmovuswb",
+        "vpsllvw",
+        "vpsravw",
+        "vpsrlvw",
+        "vptestnmb",
+        "vptestnmw",
+        "vptestmb",
+        "vptestmw"
+      ],
+      "extended": [
+        "vpabsb",
+        "vpabsw",
+
+        "vpaddb",
+        "vpaddw",
+        "vpsubsb",
+        "vpsubsw",
+        "vpmaxsb",
+        "vpmaxsw",
+        "vpminsb",
+        "vpminsw",
+        "vpminub",
+        "vpminuw",
+        "vpmaddubsw",
+        "vpmaddwd",
+        "vpsadbw",
+
+        "vpslldq",
+        "vpsrldq",
+
+        "vpmovsxbw",
+        "vpmovzxbw",
+        "vpsllw",
+        "vpsraw",
+        "vpsrlw",
+        "vpsubb",
+        "vpsubw",
+
+        "vpunpckhbw",
+        "vpunpckhwd",
+        "vpunpcklbw",
+        "vpunpcklwd",
+        "vpbroadcastb",
+        "vpbroadcastw",
+        "vpermt2w",
+        "vpackssdw",
+        "vpackusdw",
+        "vpacksswb",
+        "vpackuswb",
+        "vpavgb",
+        "vpavgw",
+        "vpmulhw",
+        "vpmullw",
+        "vpshufb",
+        "vpshufhw",
+        "vpshuflw"
+      ]
+    },
+    {
+      "name": "avx512_vl",
+      "remark": "not used for opcode generation, since this only adds new modes to existing instructions",
+      "new": [
+      ],
+      "extended": [
+        "vaddpd",
+        "vaddps",
+        "vcmppd",
+        "vcmpps",
+        "vcvtdq2pd",
+        "vcvtdq2ps",
+        "vcvtpd2dq",
+        "vcvtpd2ps",
+        "vcvtps2dq",
+        "vcvtps2pd",
+        "vcvttpd2dq",
+        "vcvttps2dq",
+        "vdivpd",
+        "vdivps",
+        "vmaxpd",
+        "vmaxps",
+        "vminpd",
+        "vminps",
+        "vmovapd",
+        "vmovaps",
+        "vmovddup",
+        "vmovdqa",
+        "vmovdqu",
+        "vmovntdqa",
+        "vmovntdq",
+        "vmovntpd",
+        "vmovntps",
+        "vmovshdup",
+        "vmovsldup",
+        "vmovupd",
+        "vmovups",
+        "vmulpd",
+        "vmulps",
+        "vpandd",
+        "vpandq",
+        "vpandnd",
+        "vpandnq",
+        "vpcmpeqd",
+        "vpcmpeqq",
+        "vpcmpgtd",
+        "vpcmpgtq",
+        "vpmaxsd",
+        "vpmaxsq",
+        "vpmaxud",
+        "vpmaxud",
+        "vpminsd",
+        "vpminsq",
+        "vpminud",
+        "vpminuq",
+        "vpcmpd",
+        "vpcmpq",
+        "vpcmpud",
+        "vpcmpuq",
+
+        "vpord",
+        "vporq",
+        "vpxord",
+        "vpxorq",
+
+        "vpslld",
+        "vpsllq",
+        "vpsllw",
+        "vpsrad",
+        "vpsraq",
+        "valignd",
+        "valignq",
+        "vblendmpd",
+        "vblendmps",
+        "vprold",
+        "vprolq",
+        "vprolvd",
+        "vprolvq",
+        "vprord",
+        "vprorq",
+        "vprorvd",
+        "vprorvq",
+
+        "vpunpckhdq",
+        "vpunpckhqdq",
+        "vpunpckldq",
+        "vpunpcklqdq",
+        "vunpckhpd",
+        "vunpckhps",
+        "vunpcklpd",
+        "vunpcklps",
+
+        "vbroadcastf32x4",
+        "vbroadcastf64x4",
+        "vbroadcasti64x4",
+        "vbroadcasti32x4",
+        "vinsertf32x4",
+        "vinserti32x4",
+        "vshuff32x4",
+        "vshuff64x2",
+        "vshufi32x4",
+        "vshufi64x2",
+        "vcompressd",
+        "vcompressq",
+        "vcompresspd",
+        "vcompressps",
+        "vexpandpd",
+        "vexpandps",
+        "vcvtpd2udq",
+        "vcvtps2udq",
+        "vcvtudq2pd",
+        "vcvtudq2ps",
+        "vcvttpd2udq",
+        "vcvttps2udq",
+        "vfixupimmpd",
+        "vfixupimmps",
+        "vcvtph2ps",
+        "vcvtps2ph",
+
+        "vfmadd132pd",
+        "vfmadd132ps",
+        "vfmadd213pd",
+        "vfmadd213ps",
+        "vfmadd231pd",
+        "vfmadd231ps",
+        "vfmaddsub132pd",
+        "vfmaddsub132ps",
+        "vfmaddsub213pd",
+        "vfmaddsub213ps",
+        "vfmaddsub231pd",
+        "vfmaddsub231ps",
+        "vfmsub132pd",
+        "vfmsub132ps",
+        "vfmsub213pd",
+        "vfmsub213ps",
+        "vfmsub231pd",
+        "vfmsub231ps",
+        "vfmsubadd132pd",
+        "vfmsubadd132ps",
+        "vfmsubadd213pd",
+        "vfmsubadd213ps",
+        "vfmsubadd231pd",
+        "vfmsubadd231ps",
+        "vfnmadd132pd",
+        "vfnmadd132ps",
+        "vfnmadd213pd",
+        "vfnmadd213ps",
+        "vfnmadd231pd",
+        "vfnmadd231ps",
+        "vfnmsub132pd",
+        "vfnmsub132ps",
+        "vfnmsub213pd",
+        "vfnmsub213ps",
+        "vfnmsub231pd",
+        "vfnmsub231ps",
+
+        "vscatterdps",
+        "vscatterdpd",
+        "vscatterqps",
+        "vscatterqpd",
+        "vgatherdpd",
+        "vgatherdps",
+        "vgatherqpd",
+        "vgatherqps",
+        "vgetexppd",
+        "vgetexpps",
+        "vgetmantpd",
+        "vgetmantps",
+        "vpblendmd",
+        "vpblendmq",
+
+        "vpermd",
+        "vpermq",
+        "vpermi2d",
+        "vpermi2q",
+        "vpermi2pd",
+        "vpermi2ps",
+        "vpermt2d",
+        "vpermt2q",
+        "vpermt2pd",
+        "vpermt2ps",
+        "vpexpandd",
+        "vpexpandq",
+        "vpgatherdd",
+        "vpgatherdq",
+        "vpgatherqd",
+        "vpgatherqq",
+        "vpscatterdd",
+        "vpscatterdq",
+        "vpscatterqd",
+        "vpscatterqq",
+        "vpmovdb",
+        "vpmovsdb",
+        "vpmovusdb",
+        "vpmovdw",
+        "vpmovsdw",
+        "vpmovusdw",
+        "vpmovqb",
+        "vpmovsqb",
+        "vpmovusqb",
+        "vpmovqd",
+        "vpmovsqd",
+        "vpmovusqd",
+        "vpmovqw",
+        "vpmovsqw",
+        "vpmovusqw",
+
+        "vpsravq",
+        "vpternlogd",
+        "vpternlogq",
+        "vptestmd",
+        "vptestmq",
+        "vptestnmd",
+        "vptestnmq",
+        "vrcp14pd",
+        "vrcp14ps",
+        "vrndscalepd",
+        "vrndscaleps",
+        "vrsqrt14pd",
+        "vrsqrt14ps",
+        "vscalefps",
+        "vscalefpd",
+        "vpabsq"
+      ]
+    },
+    {
+      "name": "prefetchwt1",
+      "new": [
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_vbmi",
+      "new": [
+        "vpermt2b",
+        "vpermb"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_vbmi2",
+      "new": [
+        "vpcompressb",
+        "vpcompressw",
+        "vpshldvw",
+        "vpshldw",
+        "vpexpandb",
+        "vpexpandw",
+        "vpshrdvw",
+        "vpshrdw",
+        "vpshldvq",
+        "vpshldvd",
+        "vpshldq",
+        "vpshldd",
+        "vpshrdq",
+        "vpshrdd",
+        "vpshrdvq",
+        "vpshrdvd"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "gfni",
+      "new": [
+        "gf2p8affineqb",
+        "gf2p8affineinvqb",
+        "gf2p8mulb"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_gfni",
+      "new": [
+        "vgf2p8affineqb",
+        "vgf2p8affineinvqb",
+        "vgf2p8mulb"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "vaes",
+      "new": [
+        "vaesdec",
+        "vaesdeclast",
+        "vaesenc",
+        "vaesenclast",
+        "vaesimc",
+        "vaeskeygenassist"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "clmul",
+      "remark": "this extension is pclmulqdq in a few forms",
+      "new": [
+        "+pclmulqdq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "pclmulqdq",
+      "new": [
+        "pclmulqdq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_vp2intersect",
+      "new": [
+        "vp2intersectd",
+        "vp2intersectq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_vnni",
+      "new": [
+        "vpdpbusds",
+        "vpdpbusd",
+        "vpdpwssds",
+        "vpdpwssd"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_bitalg",
+      "new": [
+        "vpopcntd",
+        "vpopcntq",
+        "vpopcntb",
+        "vpopcntw",
+        "vpshufbitqmb",
+        "vpmultishiftqb"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_vpopcntdq",
+      "new": [
+        "vpopcntd",
+        "vpopcntq"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_4vnniw",
+      "new": [
+        "vp4dpwssds",
+        "vp4dpwssd"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_4fmaps",
+      "new": [
+        "v4fnmaddss",
+        "v4fnmaddps",
+        "v4fmaddss",
+        "v4fmaddps"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "avx512_bf16",
+      "new": [
+        "vcvtne2ps2bf16",
+        "vcvtneps2bf16",
+        "vdpbf16ps"
+      ],
+      "extended": [
+      ]
+    },
+    {
+       "name": "cx8",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "sysenter",
+      "new": [
+        "sysenter",
+        "sysexit"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "syscall",
+      "new": [
+        "syscall",
+        "sysret"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "rdtscp",
+      "new": [
+        "rdtscp"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "abm",
+      "new": [
+        "popcnt",
+        "lzcnt"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "sse4a",
+      "new": [
+        "extrq",
+        "insertq",
+        "movntsd",
+        "movntss"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "3dnowprefetch",
+      "new": [
+        "prefetchw"
+      ],
+      "extended": [
+      ]
+    },
+    {
+       "name": "xop",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+       "name": "skinit",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "tbm",
+      "new": [
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "svm",
+      "new": [
+        "clgi",
+        "stgi",
+        "skinit",
+        "vmload",
+        "vmmcall",
+        "vmsave",
+        "vmrun",
+        "invlpga"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "lahfsahf",
+      "new": [
+        "lahf",
+        "sahf"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "cmov",
+      "new": [
+        "cmova",
+        "cmovb",
+        "cmovg",
+        "cmovge",
+        "cmovl",
+        "cmovle",
+        "cmovna",
+        "cmovnb",
+        "cmovno",
+        "cmovnp",
+        "cmovns",
+        "cmovnz",
+        "cmovo",
+        "cmovp",
+        "cmovs",
+        "cmovz"
+      ],
+      "extended": [
+      ]
+    },
+    {
+       "name": "f16c",
+       "new": [
+         "vcvtph2ps",
+         "vcvtps2ph"
+       ],
+       "extended": [
+       ]
+    },
+    {
+       "name": "fma4",
+       "new": [
+       ],
+       "extended": [
+       ]
+    },
+    {
+      "name": "prefetchw",
+      "new": [
+        "+3dnowprefetch"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "tsx",
+      "new": [
+        "xabort",
+        "xbegin",
+        "xend",
+        "xtest"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "lzcnt",
+      "new": [
+        "lzcnt"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "keylocker",
+      "new": [
+        "aesdec128kl",
+        "aesdec256kl",
+        "aesdecwide128kl",
+        "aesdecwide256kl",
+        "aesenc128kl",
+        "aesenc256kl",
+        "aesencwide128kl",
+        "aesencwide256kl",
+        "encodekey128",
+        "encodekey256",
+        "loadiwkey"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "cet",
+      "new": [
+        "wruss",
+        "wrss",
+        "incssp",
+        "saveprevssp",
+        "setssbsy",
+        "clrssbsy",
+        "rstorssp",
+        "endbr64",
+        "endbr32"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "tdx",
+      "new": [
+        "tdcall",
+        "seamret",
+        "seamops",
+        "seamcall"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "waitpkg",
+      "new": [
+        "tpause",
+        "umonitor",
+        "umwait"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "uintr",
+      "new": [
+        "uiret",
+        "testui",
+        "clui",
+        "stui",
+        "senduipi"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "tsxldtrk",
+      "new": [
+        "xsusldtrk",
+        "xresldtrk"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "3dnow",
+      "new": [
+        "femms",
+        "pi2fw",
+        "pi2fd",
+        "pf2iw",
+        "pf2id",
+        "pmulhrw",
+        "pfcmpge",
+        "pfmin",
+        "pfrcp",
+        "pfrsqrt",
+        "pfsub",
+        "pfadd",
+        "pfcmpgt",
+        "pfmax",
+        "pfrcpit1",
+        "pfrsqit1",
+        "pfsubr",
+        "pfacc",
+        "pfcmpeq",
+        "pfmul",
+        "pfmulhrw",
+        "pfrcpit2",
+        "pfnacc",
+        "pfpnacc",
+        "pswapd",
+        "pavgusb",
+        "+3dnowprefetch"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "enqcmd",
+      "new": [
+        "enqcmd",
+        "enqcmds"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "invpcid",
+      "new": [
+        "invept",
+        "invvpid",
+        "invpcid"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "ptwrite",
+      "new": [
+        "ptwrite"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "x87",
+      "new": [
+        "f2xm1",
+        "fabs",
+        "fadd",
+        "faddp",
+        "fbld",
+        "fbstp",
+        "fchs",
+        "fcmovb",
+        "fcmovbe",
+        "fcmove",
+        "fcmovnb",
+        "fcmovnbe",
+        "fcmovne",
+        "fcmovnu",
+        "fcmovu",
+        "fcom",
+        "fcomi",
+        "fcomip",
+        "fcomp",
+        "fcompp",
+        "fcos",
+        "fdecstp",
+        "fdisi8087_nop",
+        "fdiv",
+        "fdivp",
+        "fdivr",
+        "fdivrp",
+        "feni8087_nop",
+        "ffree",
+        "ffreep",
+        "fiadd",
+        "ficom",
+        "ficomp",
+        "fidiv",
+        "fidivr",
+        "fild",
+        "fimul",
+        "fincstp",
+        "fist",
+        "fistp",
+        "fisttp",
+        "fisub",
+        "fisubr",
+        "fld",
+        "fld1",
+        "fldcw",
+        "fldenv",
+        "fldl2e",
+        "fldl2t",
+        "fldlg2",
+        "fldln2",
+        "fldpi",
+        "fldz",
+        "fmul",
+        "fmulp",
+        "fnclex",
+        "fninit",
+        "fnop",
+        "fnsave",
+        "fnstcw",
+        "fnstenv",
+        "fnstor",
+        "fnstsw",
+        "fpatan",
+        "fprem",
+        "fprem1",
+        "fptan",
+        "frndint",
+        "frstor",
+        "fscale",
+        "fsetpm287_nop",
+        "fsin",
+        "fsincos",
+        "fsqrt",
+        "fst",
+        "fstp",
+        "fstpnce",
+        "fsub",
+        "fsubp",
+        "fsubr",
+        "fsubrp",
+        "ftst",
+        "fucom",
+        "fucomi",
+        "fucomip",
+        "fucomp",
+        "fucompp",
+        "fxam",
+        "fxch",
+        "fxtract",
+        "fyl2x",
+        "fyl2xp1"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "snp",
+      "new": [
+        "psmash",
+        "pvalidate",
+        "rmpadjust",
+        "rmpupdate"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "fxsr",
+      "new": [
+        "fxsave",
+        "fxrstor"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "xsave",
+      "new": [
+        "+xsaveopt",
+        "xgetbv",
+        "xrstor",
+        "xrstors",
+        "xsave",
+        "xsavec",
+        "xsaves",
+        "xsetbv",
+        "+xsave64"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "xsave64",
+      "new": [
+        "xrstors64",
+        "xsavec64",
+        "xsaves64"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "rdrand",
+      "new": [
+        "rdrand"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "rdseed",
+      "new": [
+        "rdseed"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "xsaveopt",
+      "new": [
+        "xsaveopt"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "smap",
+      "new": [
+        "clac",
+        "stac"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "rdpid",
+      "new": [
+        "rdpid"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "salc",
+      "new": [
+        "salc"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "clwb",
+      "new": [
+        "clwb"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "clzero",
+      "new": [
+        "clzero"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "pconfig",
+      "new": [
+        "pconfig"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "hreset",
+      "new": [
+        "hreset"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "clflushopt",
+      "new": [
+        "clflushopt"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "pmem",
+      "new": [
+        "+clflushopt",
+        "+clwb"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "emx",
+      "new": [
+        "monitorx",
+        "mwaitx",
+        "+monitor"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "mpk",
+      "new": [
+        "rdpkru",
+        "wrpkru"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "rdpru",
+      "new": [
+        "rdpru"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "itanium",
+      "new": [
+        "jmpe"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "smx",
+      "new": [
+        "getsec"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "fsgsbase",
+      "new": [
+        "rdfsbase",
+        "rdgsbase",
+        "wrfsbase",
+        "wrgsbase"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "movdir",
+      "new": [
+        "movdiri",
+        "movdir64b"
+      ],
+      "extended": [
+      ]
+    },
+    {
+      "name": "new",
+      "vendor": "yax",
+      "remark": "misc instruction sets implementing newer features of x86, such as `syscall`, `skinit`, `svm`, `tsx`, `mpx`, and others",
+      "new": [
+        "+invpcid_unimplemented",
+        "+invpcid",
+        "+pconfig",
+        "+abm",
+        "+smap",
+        "+smx",
+        "+rdpid",
+        "+rdpru",
+        "+tsxldtrk",
+        "+waitpkg",
+        "+clwb",
+        "+uintr",
+        "+mpk",
+        "+emx",
+        "+snp",
+        "+invlpgb",
+        "+enqcmd",
+        "+cet",
+        "+tdx",
+        "+clflushopt",
+        "+fxsr",
+        "+sgx",
+        "+keylocker",
+        "+vmx",
+        "+svm",
+        "+rdrand",
+        "+rdseed",
+        "+ptwrite",
+        "+clzero",
+        "+popcnt",
+        "+movbe",
+        "+xsave",
+        "+xsave64",
+        "+mpx",
+        "+tsx",
+        "+movdir",
+        "+sysenter",
+        "+syscall",
+        "+hreset",
+        "+rdtscp"
+      ]
+    },
+    {
+      "name": "simd",
+      "vendor": "yax",
+      "remark": "SIMD extensions for x86-family architectures",
+      "new": [
+        "+3dnow",
+        "+sha",
+        "+mmx",
+        "+sse",
+        "+sse2",
+        "+sse3",
+        "+ssse3",
+        "+sse4a",
+        "+sse4_1",
+        "+sse4_2",
+        "+pclmulqdq",
+        "+avx",
+        "+avx2",
+        "+gfni",
+        "+fma3",
+        "+fma4",
+        "+bmi1",
+        "+bmi2",
+        "+aesni",
+        "+avx_unimplemented",
+        "+avx512_f",
+        "+avx512_f_typo",
+        "+avx512_vnni",
+        "+avx512_dq",
+        "+avx512_er",
+        "+avx512_ifma",
+        "+avx512_pf",
+        "+avx512_cd",
+        "+avx512_bw",
+        "+avx512_vbmi",
+        "+avx512_vbmi2",
+        "+avx512_gfni",
+        "+avx512_bitalg",
+        "+avx512_vpopcntdq",
+        "+avx512_4vnniw",
+        "+avx512_4fmaps",
+        "+avx512_bf16",
+        "+avx512_vp2intersect",
+        "+vpclmulqdq",
+        "+vaes"
+      ]
+    }
+  ],
+  "uarch": [
+    {
+      "name": "k8",
+      "vendor": "amd",
+      "sets": [
+        "64bit"
+      ]
+    },
+    {
+      "name": "k10",
+      "vendor": "amd",
+      "sets": [
+        "+k8",
+        "cmov",
+        "cmpxchg16b",
+        "svm",
+        "abm",
+        "lahfsahf",
+        "sse3",
+        "ssse3",
+        "sse4_1",
+        "sse4_2",
+        "sse4a"
+      ]
+    },
+    {
+      "name": "bulldozer",
+      "vendor": "amd",
+      "sets": [
+        "+k10",
+        "bmi1",
+        "aesni",
+        "pclmulqdq",
+        "f16c",
+        "avx",
+        "fma4",
+        "xop"
+      ]
+    },
+    {
+      "name": "piledriver",
+      "vendor": "amd",
+      "sets": [
+        "+bulldozer",
+        "tbm",
+        "fma3",
+        "fma4"
+      ]
+    },
+    {
+      "name": "steamroller",
+      "vendor": "amd",
+      "sets": [
+        "+bulldozer"
+      ]
+    },
+    {
+      "name": "excavator",
+      "vendor": "amd",
+      "sets": [
+        "+steamroller",
+        "movbe",
+        "bmi2",
+        "rdrand",
+        "avx",
+        "xop",
+        "sha",
+        "avx2"
+      ]
+    },
+    {
+      "name": "zen",
+      "vendor": "amd",
+      "sets": [
+        "+k10",
+        "avx",
+        "avx2",
+        "bmi1",
+        "bmi2",
+        "aesni",
+        "pclmulqdq",
+        "f16c",
+        "movbe",
+        "rdrand",
+        "adx",
+        "sha",
+        "rdseed",
+        "fma3",
+        "xsave",
+        "clflushopt",
+        "clzero"
+      ]
+    },
+    {
+      "name": "netburst",
+      "vendor": "intel",
+      "sets": [
+        "64bit",
+        "cmov",
+        "cmpxchg16b",
+        "sse3"
+      ]
+    },
+    {
+      "name": "core",
+      "vendor": "intel",
+      "sets": [
+        "+netburst",
+        "ssse3"
+      ]
+    },
+    {
+      "name": "penryn",
+      "vendor": "intel",
+      "sets": [
+        "+core",
+        "sse4_1"
+      ]
+    },
+    {
+      "name": "nehalem",
+      "vendor": "intel",
+      "sets": [
+        "+penryn",
+        "sse4_2",
+        "popcnt"
+      ]
+    },
+    {
+      "name": "westmere",
+      "vendor": "intel",
+      "sets": [
+        "+nehalem",
+        "aesni",
+        "pclmulqdq"
+      ]
+    },
+    {
+      "name": "sandybridge",
+      "vendor": "intel",
+      "sets": [
+        "+westmere",
+        "avx"
+      ]
+    },
+    {
+      "name": "ivybridge",
+      "vendor": "intel",
+      "sets": [
+        "+sandybridge",
+        "f16c",
+        "rdrand"
+      ]
+    },
+    {
+      "name": "haswell",
+      "vendor": "intel",
+      "sets": [
+        "+ivybridge",
+        "bmi1",
+        "bmi2",
+        "abm",
+        "fma3",
+        "avx2"
+      ]
+    },
+    {
+      "name": "haswell_ex",
+      "vendor": "intel",
+      "sets": [
+        "+haswell",
+        "tsx"
+      ]
+    },
+    {
+      "name": "broadwell",
+      "vendor": "intel",
+      "sets": [
+        "+haswell_ex",
+        "rdseed",
+        "prefetchw"
+      ]
+    },
+    {
+      "name": "skylake",
+      "vendor": "intel",
+      "sets": [
+        "+broadwell",
+        "mpx",
+        "sgx"
+      ]
+    },
+    {
+      "name": "kabylake",
+      "vendor": "intel",
+      "sets": [
+        "+skylake"
+      ]
+    },
+    {
+      "name": "tigerlake",
+      "vendor": "intel",
+      "sets": [
+        "keylocker"
+      ]
+    },
+    {
+      "name": "goldencove",
+      "vendor": "intel",
+      "sets": [
+        "/cldemote",
+        "ptwrite",
+        "hreset",
+        "avx512_vnni",
+        "avx512_f",
+        "/avx512_fp16"
+      ]
+    },
+    {
+      "name": "long_mode",
+      "vendor": "yax",
+      "remark": "pseudo-architecture describing the sum of all x86_64 instructions on various processors and architectures",
+      "sets": [
+        "+goldencove",
+        "+tigerlake",
+        "+kabylake",
+        "+skylake",
+        "+broadwell",
+        "+haswell_ex",
+        "+haswell",
+        "+ivybridge",
+        "+sandybridge",
+        "+westmere",
+        "+nehalem",
+        "+penryn",
+        "+core",
+        "+netburst",
+        "+zen",
+        "+excavator",
+        "+steamroller",
+        "+piledriver",
+        "+bulldozer",
+        "+k10",
+        "+k8",
+        "x86_64_baseline",
+        "simd",
+        "new",
+        "itanium",
+        "avx_unimplemented",
+        "avx512bw_unimplemented",
+        "invpcid_unimplemented",
+        "avx512_f__vl_unimplemented",
+        "typo_instructions"
+      ]
+    },
+    {
+      "name": "protected_mode",
+      "vendor": "yax",
+      "remark": "pseudo-architecture describing the sum of all x86_32 instructions on various processors and architectures",
+      "sets": [
+        "80186_bound",
+        "jecxz",
+        "fsgsbase",
+        "extra_instructions",
+        "pentium_pro",
+        "8086_bcd",
+        "80186_pusha",
+        "8086",
+        "x87",
+        "80186",
+        "80286",
+        "80286_arpl",
+        "80386",
+        "80486",
+        "itanium",
+        "lahfsahf",
+        "adx",
+        "simd",
+        "new"
+      ]
+    },
+    {
+      "name": "real_mode",
+      "vendor": "yax",
+      "remark": "pseudo-architecture describing the sum of all x86_16 instructions on various processors and architectures",
+      "sets": [
+        "80186_bound",
+        "jcxz",
+        "fsgsbase",
+        "extra_instructions",
+        "pentium_pro",
+        "8086_bcd",
+        "80186_pusha",
+        "8086",
+        "x87",
+        "80186",
+        "80286",
+        "80286_arpl",
+        "80386",
+        "80486",
+        "itanium",
+        "lahfsahf",
+        "adx",
+        "simd",
+        "new"
+      ]
+    },
+    {
+      "name": "x86_generic",
+      "vendor": "yax",
+      "remark": "the union of all instructions in any x86 operation mode. processor can execute all these instructions in a single execution mode, but the generalization can be useful for f.ex generic program disassembly",
+      "sets": [
+        "+real_mode",
+        "+protected_mode",
+        "+long_mode"
+      ]
+    }
+  ]
+}
