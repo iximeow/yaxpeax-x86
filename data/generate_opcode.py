@@ -6,6 +6,7 @@ class IsaData:
     def __init__(self, data):
         isa_extensions = isa_data['sets']
         microarchitectures = isa_data['uarch']
+        self.instructions = isa_data['instructions']
 
         loaded_exts = {}
         for ext in isa_extensions:
@@ -14,6 +15,36 @@ class IsaData:
         loaded_uarches = {}
         for arch in microarchitectures:
             loaded_uarches[arch['name']] = arch
+
+        def validate_err(mnemonic, message):
+            raise Exception("inst={}, {}".format(mnemonic, message))
+
+        for (name, data) in self.instructions.items():
+            if "kind" not in data:
+                validate_err(name, "instruction is missing declared kind")
+            if "fault_causes" not in data:
+                validate_err(name, "instruction is missing declared fault causes")
+            if "deprecated" not in data:
+                validate_err(name, "instruction does not declare if it is deprecated")
+            if data['kind'] == "":
+                validate_err(name, "kind is not acutally... populated..")
+
+        for (name, ext) in loaded_exts.items():
+            if 'new' not in ext:
+                raise Exception("ext {} does not have a new instructions section".format(name))
+
+            def validate_instructions(setname, to_validate, insts):
+                for inst in to_validate:
+                    # it's actually "include this set", not an instruction, so skip it.
+                    # if there's another set with that name, we'll have covered it in iterating all extensions.
+                    if inst.startswith("+"):
+                        continue
+                    if inst not in insts:
+                        validate_err(inst, "instruction is in extension {} but not defined".format(setname))
+
+            validate_instructions(name, ext['new'], self.instructions)
+            if 'extended' in ext:
+                validate_instructions(name, ext['extended'], self.instructions)
 
         self.exts = loaded_exts
         self.uarches = loaded_uarches
@@ -173,6 +204,8 @@ for root in ROOTS:
 
 f = open("../src/generated/opcode.rs", "w")
 f = Output(f)
+f.writeline("use crate::safer_unchecked::GetSaferUnchecked;")
+f.newline()
 for annotation in OPCODE_ANNOTATIONS:
     f.writeline(annotation)
 f.begin_block("pub enum Opcode")
@@ -197,6 +230,17 @@ f.outdent()
 f.writeline("];")
 f.newline()
 
+f.begin_block("impl Opcode")
+f.begin_block("pub(crate) fn name(&self) -> &'static str")
+f.comment("safety: `MNEMONICS` and `Opcode` are generated together, where every entry in `Opcode` guarantees")
+f.comment("  a corresponding entry in `MNEMONICS`.")
+f.begin_block("unsafe")
+f.writeline("MNEMONICS.get_kinda_unchecked(*self as usize)")
+f.end_block()
+f.end_block()
+f.end_block()
+f.newline()
+
 for root in ROOTS:
     if root == "x86_generic":
         continue
@@ -213,6 +257,22 @@ for root in ROOTS:
             f.writeline("Invalid = super::Opcode::Invalid as {},".format(OPCODE_REPR))
         else:
             f.writeline("{} = super::Opcode::{} as {},".format(str(inst).upper(), str(inst).upper(), OPCODE_REPR))
+    f.end_block()
+    f.newline()
+    f.begin_block("impl Opcode")
+
+    f.begin_block("pub fn to_generic(&self) -> super::Opcode")
+    f.comment("safety: each item in `Self` is defined with the same value in `super::Opcode`. `Self` is")
+    f.comment("  a subset of `super::Opcode` so casting to the more generic form is well-defined.")
+    f.writeline("unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }")
+    f.end_block()
+
+    f.newline()
+
+    f.begin_block("fn nane(&self) -> &'static str")
+    f.writeline("self.to_generic().name()")
+    f.end_block()
+
     f.end_block()
     f.end_block()
 
@@ -235,6 +295,57 @@ f = Output(f)
 
 #    f.newline()
 
+f.writeline("use yaxpeax_arch::{Colorize, YaxColors};")
+f.writeline("use core::fmt;")
+f.writeline("use crate::generated::opcode::Opcode;")
+
+f.newline()
+
+f.begin_block("impl fmt::Display for Opcode")
+f.begin_block("fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result")
+f.writeline("f.write_str(self.name())")
+f.end_block()
+f.end_block()
+
+f.newline()
+
+f.begin_block("impl<T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode")
+f.begin_block("fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result")
+f.begin_block("match self")
+
+by_kind = {}
+for (inst, data) in isa_data.instructions.items():
+    if data['kind'] not in by_kind:
+        by_kind[data['kind']] = []
+    by_kind[data['kind']].append(inst)
+
+for (kind, insts) in by_kind.items():
+    insts = list(insts)
+    insts.sort()
+    suffix_needed = False
+    any_entries = False
+    for inst in insts:
+        if suffix_needed:
+            f.writeline("|")
+
+        if inst == "invalid":
+            f.write("Opcode::Invalid ")
+        else:
+            f.write("Opcode::{} ".format(inst.upper()))
+        suffix_needed = True
+        any_entries = True
+
+    f.writeline("=> {")
+    f.indent()
+    f.writeline("write!(out, \"{{}}\", colors.{}(self))".format(kind))
+    f.outdent()
+    f.writeline("}")
+
+f.end_block()
+f.end_block()
+f.end_block()
+
+f.newline()
 
 for root in ROOTS:
     if root == "x86_generic":
@@ -244,12 +355,27 @@ for root in ROOTS:
     f.begin_block("pub(crate) mod {}".format(root))
     f.writeline("use crate::generated::{}::Opcode;".format(root))
     f.writeline("use crate::{}::{{InstDecoder, Instruction, DecodeError}};".format(root))
+    f.newline()
+    f.writeline("use yaxpeax_arch::{Colorize, YaxColors};")
+    f.writeline("use core::fmt;")
 
     f.begin_block("impl InstDecoder")
     for ext in arch['extensions']:
         f.begin_block("fn feature_{}(&self) -> bool".format(ext))
         f.writeline("true")
         f.end_block()
+    f.end_block()
+
+    f.begin_block("impl<T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode")
+    f.begin_block("fn colorize(&self, colors: &Y, out: &mut T) -> fmt::Result")
+    f.writeline("self.to_generic().colorize(colors, out)")
+    f.end_block()
+    f.end_block()
+
+    f.begin_block("impl Opcode")
+    f.begin_block("pub(crate) fn name(&self) -> &'static str")
+    f.writeline("self.to_generic().name()")
+    f.end_block()
     f.end_block()
 
     f.begin_block("pub(crate) fn revise_instruction(decoder: &InstDecoder, inst: &mut Instruction) -> Result<(), DecodeError>")

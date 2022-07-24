@@ -1270,7 +1270,6 @@
       "name": "avx_unimplemented",
       "remark": "these avx instructions were missed when implementing the various avx* extensions",
       "new": [
-        "vpmaxub",
         "vpmaxub"
       ]
     },
@@ -2059,7 +2058,7 @@
         "vpmaxsd",
         "vpmaxsq",
         "vpmaxud",
-        "vpmaxud",
+        "vpmaxuq",
         "vpminsd",
         "vpminsq",
         "vpminud",
@@ -3422,5 +3421,7172 @@
         "+long_mode"
       ]
     }
-  ]
+  ],
+  "instructions": {
+    "aaa": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aad": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aam": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aas": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "adc": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "adcx": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "add": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "addpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "addps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "addsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "addss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "addsubpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "addsubps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "adox": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesdec": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesdec128kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesdec256kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesdeclast": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesdecwide128kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesdecwide256kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesenc": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesenc128kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesenc256kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesenclast": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesencwide128kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesencwide256kl": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aesimc": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "aeskeygenassist": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "and": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "andn": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "andnpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "andnps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "andpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "andps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "arpl": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bextr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blendpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blendps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blendvpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blendvps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blendw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blsi": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blsmsk": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "blsr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndcl": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndcn": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndcu": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndldx": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndmk": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndmov": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bndstx": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bound": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bsf": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bsr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bswap": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bt": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "btc": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "btr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bts": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "bzhi": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "call": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "callf": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cdqe": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clac": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clc": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cld": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clflush": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clflushopt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clgi": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cli": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clrssbsy": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clts": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clui": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clwb": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "clzero": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmc": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmova": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovg": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovge": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovl": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovle": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovna": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovnb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovno": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovnp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovns": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovnz": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovo": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovs": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmovz": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmp": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmppd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmpps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmpsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmpss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmpxchg": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmpxchg16b": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cmpxchg8b": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "comisd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "comiss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cpuid": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cqo": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "crc32": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtdq2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtdq2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtpd2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtpd2pi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtpd2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtpi2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtpi2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtps2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtps2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtps2pi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtsd2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtsd2ss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtsi2sd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtsi2ss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtss2sd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvtss2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvttpd2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvttpd2pi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvttps2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvttps2pi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvttsd2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cvttss2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "cwde": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "daa": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "das": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "dec": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "div": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "divpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "divps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "divsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "divss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "dppd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "dpps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "emms": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "encls": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "enclu": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "enclv": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "encodekey128": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "encodekey256": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "endbr32": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "endbr64": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "enqcmd": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "enqcmds": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "enter": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "extractps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "extrq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "f2xm1": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fabs": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fadd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "faddp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fbld": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fbstp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fchs": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovbe": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmove": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovnb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovnbe": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovne": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovnu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcmovu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcom": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcomi": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcomip": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcomp": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcompp": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fcos": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fdecstp": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fdisi8087_nop": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fdiv": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fdivp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fdivr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fdivrp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "femms": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "feni8087_nop": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ffree": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ffreep": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fiadd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ficom": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ficomp": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fidiv": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fidivr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fild": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fimul": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fincstp": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fist": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fistp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fisttp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fisub": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fisubr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fld": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fld1": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldcw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldenv": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldl2e": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldl2t": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldlg2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldln2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldpi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fldz": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fmul": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fmulp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnclex": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fninit": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnop": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnsave": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnstcw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnstenv": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnstor": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fnstsw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fpatan": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fprem": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fprem1": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fptan": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "frndint": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "frstor": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fscale": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsetpm287_nop": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsin": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsincos": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsqrt": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fst": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fstp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fstpnce": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsub": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsubp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsubr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fsubrp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ftst": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fucom": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fucomi": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fucomip": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fucomp": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fucompp": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fxam": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fxch": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fxrstor": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fxsave": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fxtract": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fyl2x": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "fyl2xp1": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "getsec": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "gf2p8affineinvqb": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "gf2p8affineqb": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "gf2p8mulb": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "haddpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "haddps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "hlt": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "hreset": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "hsubpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "hsubps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "idiv": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "imul": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "in": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "inc": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "incssp": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ins": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "insertps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "insertq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "int": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "into": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invalid": {
+      "kind": "invalid_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invd": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invept": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invlpg": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invlpga": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invlpgb": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invpcid": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "invvpid": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "iret": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "iretd": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "iretq": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ja": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jb": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jcxz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jecxz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jg": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jge": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jl": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jle": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jmp": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jmpe": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jmpf": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jna": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jnb": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jno": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jnp": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jns": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jnz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jo": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jp": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jrcxz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "js": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "jz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kaddb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kaddd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kaddq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kaddw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandnb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandnd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandnq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandnw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kandw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kmovb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kmovd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kmovq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kmovw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "knotb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "knotd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "knotq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "knotw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "korb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kord": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "korq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kortestb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kortestd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kortestq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kortestw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "korw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftlb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftlq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftlw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftrb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftrd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftrq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kshiftrw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ktestb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ktestd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ktestq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ktestw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kunpckbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kunpckdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kunpckwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxnorb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxnord": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxnorq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxnorw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxorb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxord": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxorq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "kxorw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lahf": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lar": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lddqu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ldmxcsr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lds": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lea": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "leave": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "les": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lfence": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lfs": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lgdt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lgs": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lidt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lldt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lmsw": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "loadiwkey": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lods": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "loop": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "loopnz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "loopz": {
+      "kind": "control_flow_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lsl": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lss": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ltr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "lzcnt": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "maskmovdqu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "maskmovq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "maxpd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "maxps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "maxsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "maxss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mfence": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "minpd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "minps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "minsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "minss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "monitor": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "monitorx": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mov": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movapd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movaps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movbe": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movddup": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movdir64b": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movdiri": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movdq2q": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movdqa": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movdqu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movhlps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movhpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movhps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movlhps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movlpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movlps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movmskpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movmskps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntdqa": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movnti": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movntss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movq2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movs": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movshdup": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movsldup": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movsx": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movsxd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movupd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movups": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "movzx": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mpsadbw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mul": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mulpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mulps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mulsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mulss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mulx": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mwait": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "mwaitx": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "neg": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "nop": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "not": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "or": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "orpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "orps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "out": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "outs": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pabsb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pabsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pabsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "packssdw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "packsswb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "packusdw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "packuswb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddsb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddusb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddusw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "paddw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "palignr": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pand": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pandn": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pavgb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pavgusb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pavgw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pblendvb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pblendw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pclmulqdq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpeqb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpeqd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpeqq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpeqw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpestri": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpestrm": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpgtb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpgtd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpgtq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpgtw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpistri": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pcmpistrm": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pconfig": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pdep": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pext": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pextrb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pextrd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pextrq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pextrw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pf2id": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pf2iw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfacc": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfadd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfcmpeq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfcmpge": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfcmpgt": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfmax": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfmin": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfmul": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfmulhrw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfnacc": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfpnacc": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfrcp": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfrcpit1": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfrcpit2": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfrsqit1": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfrsqrt": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfsub": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pfsubr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phaddd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phaddsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phaddw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phminposuw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phsubd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phsubsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "phsubw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pi2fd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pi2fw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pinsrb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pinsrd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pinsrq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pinsrw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaddubsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaddwd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaxsb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaxsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaxsw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaxub": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaxud": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmaxuw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pminsb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pminsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pminsw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pminub": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pminud": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pminuw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovmskb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovsxbd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovsxbq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovsxbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovsxdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovsxwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovsxwq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovzxbd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovzxbq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovzxbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovzxdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovzxwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmovzxwq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmuldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmulhrsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmulhrw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmulhuw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmulhw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmulld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmullw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pmuludq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pop": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "popa": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "popcnt": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "popf": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "por": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "prefetch0": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "prefetch1": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "prefetch2": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "prefetchnta": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "prefetchw": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psadbw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pshufb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pshufd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pshufhw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pshuflw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pshufw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psignb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psignd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psignw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pslld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pslldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psllq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psllw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psmash": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psrad": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psraw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psrld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psrldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psrlq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psrlw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubsb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubusb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubusw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "psubw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pswapd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ptest": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ptwrite": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpckhbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpckhdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpckhqdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpckhwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpcklbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpckldq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpcklqdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "punpcklwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "push": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pusha": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pushf": {
+      "kind": "stack_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pvalidate": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "pxor": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rcl": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rcpps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rcpss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rcr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdfsbase": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdgsbase": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdmsr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdpid": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdpkru": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdpmc": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdpru": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdrand": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdseed": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdtsc": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rdtscp": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "retf": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "return": {
+      "kind": "stop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rmpadjust": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rmpupdate": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rol": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ror": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rorx": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "roundpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "roundps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "roundsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "roundss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rsm": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rsqrtps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rsqrtss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "rstorssp": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sahf": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sal": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "salc": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sar": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sarx": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "saveprevssp": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sbb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "scas": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "seamcall": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "seamops": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "seamret": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "senduipi": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "seta": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setae": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setbe": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setg": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setge": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setl": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setle": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setno": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setnp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setns": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setnz": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "seto": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setp": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sets": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setssbsy": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "setz": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sfence": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sgdt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha1msg1": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha1msg2": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha1nexte": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha1rnds4": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha256msg1": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha256msg2": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sha256rnds2": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shl": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shlx": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shr": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shrd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shrx": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shufpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "shufps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sidt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "skinit": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sldt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "slhd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "smsw": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sqrtpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sqrtps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sqrtsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sqrtss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "stac": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "stc": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "std": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "stgi": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sti": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "stmxcsr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "stos": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "str": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "stui": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sub": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "subpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "subps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "subsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "subss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "swapgs": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "syscall": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sysenter": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sysexit": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "sysret": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "tdcall": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "test": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "testui": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "tlbsync": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "tpause": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "tzcnt": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ucomisd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ucomiss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ud0": {
+      "kind": "invalid_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ud1": {
+      "kind": "invalid_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "ud2": {
+      "kind": "invalid_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "uiret": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "umonitor": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "umwait": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "unpckhpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "unpckhps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "unpcklpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "unpcklps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "v4fmaddps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "v4fmaddss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "v4fnmaddps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "v4fnmaddss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaddpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaddps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaddsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaddss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaddsubpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaddsubps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaesdec": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaesdeclast": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaesenc": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaesenclast": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaesimc": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vaeskeygenassist": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "valignd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "valignq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vandnpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vandnps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vandpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vandps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vblendmpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vblendmps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vblendpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vblendps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vblendvpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vblendvps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastf128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastf32x2": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastf32x4": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastf32x8": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastf64x2": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastf64x4": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcasti128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcasti32x2": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcasti32x4": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcasti32x8": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcasti64x2": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcasti64x4": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vbroadcastss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcmppd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcmpps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcmpsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcmpss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcomisd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcomiss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcompressd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcompresspd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcompressps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcompressq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtdq2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtdq2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtne2ps2bf16": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtneps2bf16": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtpd2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtpd2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtpd2qq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtpd2udq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtpd2uqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtph2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtps2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtps2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtps2ph": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtps2qq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtps2udq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtps2uqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtqq2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtqq2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtsd2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtsd2ss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtsd2usi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtsi2sd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtsi2ss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtss2sd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtss2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtss2usi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttpd2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttpd2qq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttpd2udq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttpd2uqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttps2dq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttps2qq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttps2udq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttps2uqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttsd2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttsd2usi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttss2si": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvttss2usi": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtudq2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtudq2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtuqq2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtuqq2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtusi2sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtusi2ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtusi2usd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vcvtusi2uss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdbpsadbw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdivpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdivps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdivsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdivss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdpbf16ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdppd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vdpps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "verr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "verw": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vexp2pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vexp2ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vexp2sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vexp2ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vexpandpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vexpandps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextractf128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextractf32x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextractf32x8": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextractf64x2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextractf64x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextracti128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextracti32x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextracti32x8": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextracti64x2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextracti64x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vextractps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfixupimmpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfixupimmps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfixupimmsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfixupimmss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd132pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd132ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd132sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd132ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd213pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd213ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd213sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd213ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd231pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd231ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd231sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmadd231ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmaddsub132pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmaddsub132ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmaddsub213pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmaddsub213ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmaddsub231pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmaddsub231ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub132pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub132ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub132sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub132ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub213pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub213ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub213sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub213ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub231pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub231ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub231sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsub231ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsubadd132pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsubadd132ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsubadd213pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsubadd213ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsubadd231pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfmsubadd231ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd132pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd132ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd132sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd132ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd213pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd213ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd213sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd213ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd231pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd231ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd231sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmadd231ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub132pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub132ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub132sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub132ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub213pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub213ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub213sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub213ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub231pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub231ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub231sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfnmsub231ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfpclasspd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfpclassps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfpclasssd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vfpclassss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherdpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherdps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf0dpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf0dps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf0qpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf0qps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf1dpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf1dps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf1qpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherpf1qps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherqpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgatherqps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetexppd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetexpps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetexpsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetexpss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetmantpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetmantps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetmantsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgetmantss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgf2p8affineinvqb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgf2p8affineqb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vgf2p8mulb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vhaddpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vhaddps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vhsubpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vhsubps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinsertf128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinsertf32x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinsertf32x8": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinsertf64x2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinsertf64x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinserti128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinserti32x4": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinserti32x8": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinserti64x2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinserti64x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vinsertps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vlddqu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vldmxcsr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaskmovdqu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaskmovpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaskmovps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaxpd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaxps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaxsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmaxss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmcall": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmclear": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmfunc": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vminpd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vminps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vminsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vminss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmlaunch": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmload": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmmcall": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovapd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovaps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovddup": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqa": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqa32": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqa64": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqu": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqu16": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqu32": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqu64": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovdqu8": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovhlps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovhpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovhps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovlhps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovlpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovlps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovmskpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovmskps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovntdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovntdqa": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovntpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovntps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovsd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovshdup": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovsldup": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovss": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovupd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmovups": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmpsadbw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmptrld": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmptrst": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmread": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmresume": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmrun": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmsave": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmulpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmulps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmulsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmulss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmwrite": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmxoff": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vmxon": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vorpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vorps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vp2intersectd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vp2intersectq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vp4dpwssd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vp4dpwssds": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpabsb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpabsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpabsq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpabsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpackssdw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpacksswb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpackusdw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpackuswb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddsb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddusb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddusw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpaddw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpalignr": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpand": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpandd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpandn": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpandnd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpandnq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpandq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpavgb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpavgw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendmb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendmd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendmq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendmw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendvb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpblendw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastm": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastmb2q": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastmw2d": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpbroadcastw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpclmulqdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpeqb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpeqd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpeqq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpeqw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpestri": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpestrm": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpgtb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpgtd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpgtq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpgtw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpistri": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpistrm": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpub": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpud": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpuq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpuw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcmpw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcompressb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcompressd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcompressq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpcompressw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpconflictd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpconflictq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpdpbusd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpdpbusds": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpdpwssd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpdpwssds": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vperm2f128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vperm2i128": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermi2b": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermi2d": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermi2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermi2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermi2q": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermi2w": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermilpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermilps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermt2b": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermt2d": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermt2pd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermt2ps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermt2q": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermt2w": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpermw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpexpandb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpexpandd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpexpandq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpexpandw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpextrb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpextrd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpextrq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpextrw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpgatherdd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpgatherdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpgatherqd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpgatherqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphaddd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphaddsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphaddw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphminposuw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphsubd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphsubsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vphsubw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpinsrb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpinsrd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpinsrq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpinsrw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vplzcntd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vplzcntq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmadd52huq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmadd52luq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaddubsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaddwd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaskmovd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaskmovq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxsb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxsq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxsw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxub": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxud": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxuq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmaxuw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminsb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminsd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminsq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminsw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminub": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminud": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminuq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpminuw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovb2d": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovb2m": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovd2m": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovdb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovdw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovm2b": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovm2d": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovm2q": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovm2w": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovmskb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovq2m": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovqb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovqd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovqw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsdb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsdw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsqb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsqd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsqw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovswb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsxbd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsxbq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsxbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsxdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsxwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovsxwq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovusdb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovusdw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovusqb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovusqd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovusqw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovuswb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovw2m": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovwb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovzxbd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovzxbq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovzxbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovzxdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovzxwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmovzxwq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmuldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmulhrsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmulhuw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmulhw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmulld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmullq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmullw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmultishiftqb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpmuludq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpopcntb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpopcntd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpopcntq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpopcntw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpor": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpord": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vporq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprold": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprolq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprolvd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprolvq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprord": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprorq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprorrd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprorrq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprorvd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vprorvq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsadbw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpscatterdd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpscatterdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpscatterqd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpscatterqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshldd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshldvd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshldvq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshldvw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshldw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshrdd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshrdq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshrdvd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshrdvq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshrdvw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshrdw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshufb": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshufbitqmb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshufd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshufhw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpshuflw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsignb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsignd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsignw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpslld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpslldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsllq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsllvd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsllvq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsllvw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsllw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrad": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsraq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsravd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsravq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsravw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsraw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrld": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrldq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrlq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrlvd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrlvq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrlvw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsrlw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubsb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubsw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubusb": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubusw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpsubw": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpternlogd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpternlogq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptest": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestmb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestmd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestmq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestmw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestnmb": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestnmd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestnmq": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vptestnmw": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpckhbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpckhdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpckhqdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpckhwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpcklbw": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpckldq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpcklqdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpunpcklwd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpxor": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpxord": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vpxorq": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrangepd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrangeps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrangesd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrangess": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp14pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp14ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp14sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp14ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp28pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp28ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp28sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcp28ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcpps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrcpss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vreducepd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vreduceps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vreducesd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vreducess": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrndscalepd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrndscaleps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrndscalesd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrndscaless": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vroundpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vroundps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vroundsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vroundss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt14pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt14ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt14sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt14ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt28pd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt28ps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt28sd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrt28ss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrtps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vrsqrtss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscaledpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscaledps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscaledsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscaledss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscalefpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscalefps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscalefsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscalefss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterdd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterdpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterdps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterdq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf0dpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf0dps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf0qpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf0qps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf1dpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf1dps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf1qpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterpf1qps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterqd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterqpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterqps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vscatterqq": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vshuff32x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vshuff64x2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vshufi32x4": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vshufi64x2": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vshufpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vshufps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsqrtpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsqrtps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsqrtsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsqrtss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vstmxcsr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsubpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsubps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsubsd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vsubss": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vtestpd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vtestps": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vucomisd": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vucomiss": {
+      "kind": "comparison_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vunpckhpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vunpckhps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vunpcklpd": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vunpcklps": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vxorpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vxorps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vzeroall": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "vzeroupper": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wait": {
+      "kind": "nop_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wbinvd": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wrfsbase": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wrgsbase": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wrmsr": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wrpkru": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wrss": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "wruss": {
+      "kind": "misc_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xabort": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xadd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xbegin": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xchg": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xend": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xgetbv": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xlat": {
+      "kind": "data_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xor": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xorpd": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xorps": {
+      "kind": "arithmetic_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xresldtrk": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xrstor": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xrstors": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xrstors64": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsave": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsavec": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsavec64": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsaveopt": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsaves": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsaves64": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsetbv": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xsusldtrk": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    },
+    "xtest": {
+      "kind": "platform_op",
+      "deprecated": false,
+      "fault_causes": []
+    }
+  }
 }

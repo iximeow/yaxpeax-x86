@@ -1,3 +1,5 @@
+use crate::safer_unchecked::GetSaferUnchecked;
+
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -2874,6 +2876,16 @@ pub(crate) const MNEMONICS: &'static [&'static str] = &[
   "xtest",
 ];
 
+impl Opcode {
+  pub(crate) fn name(&self) -> &'static str {
+    // safety: `MNEMONICS` and `Opcode` are generated together, where every entry in `Opcode` guarantees
+    //   a corresponding entry in `MNEMONICS`.
+    unsafe {
+      MNEMONICS.get_kinda_unchecked(*self as usize)
+    }
+  }
+}
+
 pub(crate) mod real_mode {
   #[allow(non_camel_case_types)]
   #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -4311,6 +4323,18 @@ pub(crate) mod real_mode {
     XSETBV = super::Opcode::XSETBV as u16,
     XSUSLDTRK = super::Opcode::XSUSLDTRK as u16,
     XTEST = super::Opcode::XTEST as u16,
+  }
+
+  impl Opcode {
+    pub fn to_generic(&self) -> super::Opcode {
+      // safety: each item in `Self` is defined with the same value in `super::Opcode`. `Self` is
+      //   a subset of `super::Opcode` so casting to the more generic form is well-defined.
+      unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }
+    }
+
+    fn nane(&self) -> &'static str {
+      self.to_generic().name()
+    }
   }
 }
 
@@ -5752,6 +5776,18 @@ pub(crate) mod protected_mode {
     XSUSLDTRK = super::Opcode::XSUSLDTRK as u16,
     XTEST = super::Opcode::XTEST as u16,
   }
+
+  impl Opcode {
+    pub fn to_generic(&self) -> super::Opcode {
+      // safety: each item in `Self` is defined with the same value in `super::Opcode`. `Self` is
+      //   a subset of `super::Opcode` so casting to the more generic form is well-defined.
+      unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }
+    }
+
+    fn nane(&self) -> &'static str {
+      self.to_generic().name()
+    }
+  }
 }
 
 pub(crate) mod long_mode {
@@ -7181,6 +7217,18 @@ pub(crate) mod long_mode {
     XSETBV = super::Opcode::XSETBV as u16,
     XSUSLDTRK = super::Opcode::XSUSLDTRK as u16,
     XTEST = super::Opcode::XTEST as u16,
+  }
+
+  impl Opcode {
+    pub fn to_generic(&self) -> super::Opcode {
+      // safety: each item in `Self` is defined with the same value in `super::Opcode`. `Self` is
+      //   a subset of `super::Opcode` so casting to the more generic form is well-defined.
+      unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }
+    }
+
+    fn nane(&self) -> &'static str {
+      self.to_generic().name()
+    }
   }
 }
 
