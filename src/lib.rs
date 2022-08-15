@@ -128,6 +128,9 @@ extern crate serde;
 #[cfg(feature="std")]
 extern crate alloc;
 
+pub mod generic;
+pub use generic as x86_generic;
+
 pub mod long_mode;
 pub use long_mode as amd64;
 pub use long_mode::Arch as x86_64;

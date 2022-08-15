@@ -1098,6 +1098,8 @@ impl std::error::Error for DecodeError {
     }
 }
 
+// almost compatible with 32-bi and 16-bit operand specs, but those modes include variants that
+// arenot present here, and vice-versa
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum OperandSpec {
