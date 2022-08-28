@@ -231,7 +231,7 @@ f.writeline("];")
 f.newline()
 
 f.begin_block("impl Opcode")
-f.begin_block("pub(crate) fn name(&self) -> &'static str")
+f.begin_block("pub fn name(&self) -> &'static str")
 f.comment("safety: `MNEMONICS` and `Opcode` are generated together, where every entry in `Opcode` guarantees")
 f.comment("  a corresponding entry in `MNEMONICS`.")
 f.begin_block("unsafe")
@@ -269,7 +269,7 @@ for root in ROOTS:
 
     f.newline()
 
-    f.begin_block("fn nane(&self) -> &'static str")
+    f.begin_block("pub fn nane(&self) -> &'static str")
     f.writeline("self.to_generic().name()")
     f.end_block()
 
@@ -373,7 +373,7 @@ for root in ROOTS:
     f.end_block()
 
     f.begin_block("impl Opcode")
-    f.begin_block("pub(crate) fn name(&self) -> &'static str")
+    f.begin_block("pub fn name(&self) -> &'static str")
     f.writeline("self.to_generic().name()")
     f.end_block()
     f.end_block()

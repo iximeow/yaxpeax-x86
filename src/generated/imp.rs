@@ -1800,7 +1800,7 @@ pub(crate) mod real_mode {
     }
   }
   impl Opcode {
-    pub(crate) fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
       self.to_generic().name()
     }
   }
@@ -4227,7 +4227,7 @@ pub(crate) mod protected_mode {
     }
   }
   impl Opcode {
-    pub(crate) fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
       self.to_generic().name()
     }
   }
@@ -6660,7 +6660,7 @@ pub(crate) mod long_mode {
     }
   }
   impl Opcode {
-    pub(crate) fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
       self.to_generic().name()
     }
   }

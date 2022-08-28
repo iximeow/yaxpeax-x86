@@ -2877,7 +2877,7 @@ pub(crate) const MNEMONICS: &'static [&'static str] = &[
 ];
 
 impl Opcode {
-  pub(crate) fn name(&self) -> &'static str {
+  pub fn name(&self) -> &'static str {
     // safety: `MNEMONICS` and `Opcode` are generated together, where every entry in `Opcode` guarantees
     //   a corresponding entry in `MNEMONICS`.
     unsafe {
@@ -4332,7 +4332,7 @@ pub(crate) mod real_mode {
       unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }
     }
 
-    fn nane(&self) -> &'static str {
+    pub fn nane(&self) -> &'static str {
       self.to_generic().name()
     }
   }
@@ -5784,7 +5784,7 @@ pub(crate) mod protected_mode {
       unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }
     }
 
-    fn nane(&self) -> &'static str {
+    pub fn nane(&self) -> &'static str {
       self.to_generic().name()
     }
   }
@@ -7226,7 +7226,7 @@ pub(crate) mod long_mode {
       unsafe { core::mem::transmute::<Self, super::Opcode>(*self) }
     }
 
-    fn nane(&self) -> &'static str {
+    pub fn nane(&self) -> &'static str {
       self.to_generic().name()
     }
   }

@@ -1073,6 +1073,12 @@ pub enum DecodeError {
     IncompleteDecoder,
 }
 
+impl DecodeError {
+    pub fn to_generic(&self) -> crate::generic::DecodeError {
+        panic!("TODO")
+    }
+}
+
 impl yaxpeax_arch::DecodeError for DecodeError {
     fn data_exhausted(&self) -> bool { self == &DecodeError::ExhaustedInput }
     fn bad_opcode(&self) -> bool { self == &DecodeError::InvalidOpcode }
@@ -2062,6 +2068,10 @@ impl Default for Instruction {
 }
 
 impl Instruction {
+    pub fn to_generic(&self) -> crate::generic::Instruction {
+        panic!("TODO");
+    }
+
     /// get the `Opcode` of this instruction.
     pub fn opcode(&self) -> Opcode {
         self.opcode
