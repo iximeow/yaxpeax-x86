@@ -17,7 +17,7 @@
 //! ```
 //!
 //! instructions, operands, registers, and generally all decoding structures, are in their mode's
-//! repsective submodule:
+//! respective submodule:
 //! * `x86_64`/`amd64` decoding is under [`long_mode`]
 //! * `x86_32`/`x86` decoding is under [`protected_mode`]
 //! * `x86_16`/`8086` decoding is under [`real_mode`]

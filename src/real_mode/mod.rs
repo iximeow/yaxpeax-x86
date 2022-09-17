@@ -339,7 +339,7 @@ pub enum Operand {
     /// instruction uses this mode. as an example, `[0x1133]`
     DisplacementU16(u16),
     /// a memory access to a literal qword address. it's relatively rare that a well-formed x86
-    /// instruction uses this mode, but plausibe. for example, `fs:[0x14]`. segment overrides,
+    /// instruction uses this mode, but plausible. for example, `fs:[0x14]`. segment overrides,
     /// however, are maintained on the instruction itself.
     DisplacementU32(u32),
     /// a simple dereference of the address held in some register. for example: `[esi]`.
@@ -464,7 +464,7 @@ impl OperandSpec {
 ///
 /// the behavior for non-`avx512` instructions is equivalent to `merge`.  `zero` is only useful in
 /// conjunction with a mask register, where bits specified in the mask register correspond to
-/// unmodified items in the instruction's desination.
+/// unmodified items in the instruction's destination.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MergeMode {
     Merge,
@@ -2609,7 +2609,7 @@ enum OperandSpec {
     RegRRR_maskmerge_sae_noround,
     // the register in modrm_mmm (eg modrm mod bits were 11)
     RegMMM,
-    // same as `RegRRR`: the register is modrm's `mmm` bits, and may be masekd.
+    // same as `RegRRR`: the register is modrm's `mmm` bits, and may be masked.
     RegMMM_maskmerge,
     RegMMM_maskmerge_sae_noround,
     // the register selected by vex-vvvv bits
@@ -3213,7 +3213,7 @@ impl InstDecoder {
     }
 
     /// enable all `avx512` features on this `InstDecoder`. no real CPU, at time of writing,
-    /// actually has such a feature comination, but this is a useful overestimate for `avx512`
+    /// actually has such a feature combination, but this is a useful overestimate for `avx512`
     /// generally.
     pub fn with_avx512(mut self) -> Self {
         let avx512_mask =
