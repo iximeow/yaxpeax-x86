@@ -1,4 +1,5 @@
 ## 1.1.5
+* fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)
 * optimizations (mostly code motion) for hot codepaths
   - large `match`-based decode tables have been outlined to 256-entry arrays.
     this makes for slicely nicer inlining in `read_with_annotations`.
