@@ -6089,12 +6089,15 @@ fn read_M<
 
 #[inline]
 fn width_to_gp_reg_bank(width: u8) -> RegisterBank {
-    match width {
-        1 => return RegisterBank::B,
-        2 => return RegisterBank::W,
-        4 => return RegisterBank::D,
-        _ => unsafe { unreachable_unchecked(); }
-    }
+    let index = width.trailing_zeros();
+
+    const BANK_LUT: [RegisterBank; 3] = [
+        RegisterBank::B,
+        RegisterBank::W,
+        RegisterBank::D,
+    ];
+
+    *BANK_LUT.get(index as usize).unwrap_or_else(|| unsafe { unreachable_unchecked() })
 }
 
 fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
