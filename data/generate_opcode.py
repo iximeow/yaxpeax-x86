@@ -354,15 +354,20 @@ for root in ROOTS:
 
     f.begin_block("pub(crate) mod {}".format(root))
     f.writeline("use crate::generated::{}::Opcode;".format(root))
-    f.writeline("use crate::{}::{{InstDecoder, Instruction, DecodeError}};".format(root))
+    f.writeline("use crate::{}::{{Instruction, DecodeError}};".format(root))
     f.newline()
     f.writeline("use yaxpeax_arch::{Colorize, YaxColors};")
     f.writeline("use core::fmt;")
 
-    f.begin_block("impl InstDecoder")
-    for ext in arch['extensions']:
+    f.begin_block("struct ExtensionAwareInstDecoder")
+    f.writeline("flags: u128")
+    f.end_block()
+
+    f.begin_block("impl ExtensionAwareInstDecoder")
+    for (i, ext) in enumerate(arch['extensions']):
         f.begin_block("fn feature_{}(&self) -> bool".format(ext))
-        f.writeline("true")
+        f.writeline("(self.flags >> {}) & 1".format(i))
+#        f.writeline("true")
         f.end_block()
     f.end_block()
 

@@ -1476,322 +1476,322 @@ pub(crate) mod real_mode {
   use core::fmt;
   impl InstDecoder {
     fn feature_sgx(&self) -> bool {
-      true
+      (self.flags >> 0) & 1
     }
     fn feature_smap(&self) -> bool {
-      true
+      (self.flags >> 1) & 1
     }
     fn feature_avx_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 2) & 1
     }
     fn feature_uintr(&self) -> bool {
-      true
+      (self.flags >> 3) & 1
     }
     fn feature_pentium(&self) -> bool {
-      true
+      (self.flags >> 4) & 1
     }
     fn feature_aesni(&self) -> bool {
-      true
+      (self.flags >> 5) & 1
     }
     fn feature_invlpgb(&self) -> bool {
-      true
+      (self.flags >> 6) & 1
     }
     fn feature_fsgsbase(&self) -> bool {
-      true
+      (self.flags >> 7) & 1
     }
     fn feature_vmx(&self) -> bool {
-      true
+      (self.flags >> 8) & 1
     }
     fn feature_simd(&self) -> bool {
-      true
+      (self.flags >> 9) & 1
     }
     fn feature_avx(&self) -> bool {
-      true
+      (self.flags >> 10) & 1
     }
     fn feature_hreset(&self) -> bool {
-      true
+      (self.flags >> 11) & 1
     }
     fn feature_avx512_vp2intersect(&self) -> bool {
-      true
+      (self.flags >> 12) & 1
     }
     fn feature_rdpru(&self) -> bool {
-      true
+      (self.flags >> 13) & 1
     }
     fn feature_sse4_2(&self) -> bool {
-      true
+      (self.flags >> 14) & 1
     }
     fn feature_monitor(&self) -> bool {
-      true
+      (self.flags >> 15) & 1
     }
     fn feature_avx512_f_typo(&self) -> bool {
-      true
+      (self.flags >> 16) & 1
     }
     fn feature_sse4_1(&self) -> bool {
-      true
+      (self.flags >> 17) & 1
     }
     fn feature_avx512_dq(&self) -> bool {
-      true
+      (self.flags >> 18) & 1
     }
     fn feature_adx(&self) -> bool {
-      true
+      (self.flags >> 19) & 1
     }
     fn feature_fxsr(&self) -> bool {
-      true
+      (self.flags >> 20) & 1
     }
     fn feature_tsx(&self) -> bool {
-      true
+      (self.flags >> 21) & 1
     }
     fn feature_waitpkg(&self) -> bool {
-      true
+      (self.flags >> 22) & 1
     }
     fn feature_80286(&self) -> bool {
-      true
+      (self.flags >> 23) & 1
     }
     fn feature_sysenter(&self) -> bool {
-      true
+      (self.flags >> 24) & 1
     }
     fn feature_invpcid_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 25) & 1
     }
     fn feature_avx512_4vnniw(&self) -> bool {
-      true
+      (self.flags >> 26) & 1
     }
     fn feature_avx512_vnni(&self) -> bool {
-      true
+      (self.flags >> 27) & 1
     }
     fn feature_avx512_pf(&self) -> bool {
-      true
+      (self.flags >> 28) & 1
     }
     fn feature_avx512_cd(&self) -> bool {
-      true
+      (self.flags >> 29) & 1
     }
     fn feature_avx512_bf16(&self) -> bool {
-      true
+      (self.flags >> 30) & 1
     }
     fn feature_avx512bw_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 31) & 1
     }
     fn feature_mpk(&self) -> bool {
-      true
+      (self.flags >> 32) & 1
     }
     fn feature_avx512_f__vl_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 33) & 1
     }
     fn feature_sha(&self) -> bool {
-      true
+      (self.flags >> 34) & 1
     }
     fn feature_cet(&self) -> bool {
-      true
+      (self.flags >> 35) & 1
     }
     fn feature_80486(&self) -> bool {
-      true
+      (self.flags >> 36) & 1
     }
     fn feature_sse(&self) -> bool {
-      true
+      (self.flags >> 37) & 1
     }
     fn feature_pentium_pro(&self) -> bool {
-      true
+      (self.flags >> 38) & 1
     }
     fn feature_itanium(&self) -> bool {
-      true
+      (self.flags >> 39) & 1
     }
     fn feature_mpx(&self) -> bool {
-      true
+      (self.flags >> 40) & 1
     }
     fn feature_extra_instructions(&self) -> bool {
-      true
+      (self.flags >> 41) & 1
     }
     fn feature_rdtscp(&self) -> bool {
-      true
+      (self.flags >> 42) & 1
     }
     fn feature_avx2(&self) -> bool {
-      true
+      (self.flags >> 43) & 1
     }
     fn feature_pconfig(&self) -> bool {
-      true
+      (self.flags >> 44) & 1
     }
     fn feature_avx512_ifma(&self) -> bool {
-      true
+      (self.flags >> 45) & 1
     }
     fn feature_gfni(&self) -> bool {
-      true
+      (self.flags >> 46) & 1
     }
     fn feature_vpclmulqdq(&self) -> bool {
-      true
+      (self.flags >> 47) & 1
     }
     fn feature_80386(&self) -> bool {
-      true
+      (self.flags >> 48) & 1
     }
     fn feature_movbe(&self) -> bool {
-      true
+      (self.flags >> 49) & 1
     }
     fn feature_avx512_f(&self) -> bool {
-      true
+      (self.flags >> 50) & 1
     }
     fn feature_emx(&self) -> bool {
-      true
+      (self.flags >> 51) & 1
     }
     fn feature_pclmulqdq(&self) -> bool {
-      true
+      (self.flags >> 52) & 1
     }
     fn feature_fma3(&self) -> bool {
-      true
+      (self.flags >> 53) & 1
     }
     fn feature_fma4(&self) -> bool {
-      true
+      (self.flags >> 54) & 1
     }
     fn feature_xsaveopt(&self) -> bool {
-      true
+      (self.flags >> 55) & 1
     }
     fn feature_syscall(&self) -> bool {
-      true
+      (self.flags >> 56) & 1
     }
     fn feature_sse4a(&self) -> bool {
-      true
+      (self.flags >> 57) & 1
     }
     fn feature_avx512_vpopcntdq(&self) -> bool {
-      true
+      (self.flags >> 58) & 1
     }
     fn feature_invpcid(&self) -> bool {
-      true
+      (self.flags >> 59) & 1
     }
     fn feature_80186_bound(&self) -> bool {
-      true
+      (self.flags >> 60) & 1
     }
     fn feature_tsxldtrk(&self) -> bool {
-      true
+      (self.flags >> 61) & 1
     }
     fn feature_cmov(&self) -> bool {
-      true
+      (self.flags >> 62) & 1
     }
     fn feature_avx512_bw(&self) -> bool {
-      true
+      (self.flags >> 63) & 1
     }
     fn feature_ssse3(&self) -> bool {
-      true
+      (self.flags >> 64) & 1
     }
     fn feature_clflushopt(&self) -> bool {
-      true
+      (self.flags >> 65) & 1
     }
     fn feature_80186_pusha(&self) -> bool {
-      true
+      (self.flags >> 66) & 1
     }
     fn feature_smx(&self) -> bool {
-      true
+      (self.flags >> 67) & 1
     }
     fn feature_8086_bcd(&self) -> bool {
-      true
+      (self.flags >> 68) & 1
     }
     fn feature_abm(&self) -> bool {
-      true
+      (self.flags >> 69) & 1
     }
     fn feature_3dnowprefetch(&self) -> bool {
-      true
+      (self.flags >> 70) & 1
     }
     fn feature_rdpid(&self) -> bool {
-      true
+      (self.flags >> 71) & 1
     }
     fn feature_lahfsahf(&self) -> bool {
-      true
+      (self.flags >> 72) & 1
     }
     fn feature_jcxz(&self) -> bool {
-      true
+      (self.flags >> 73) & 1
     }
     fn feature_enqcmd(&self) -> bool {
-      true
+      (self.flags >> 74) & 1
     }
     fn feature_new(&self) -> bool {
-      true
+      (self.flags >> 75) & 1
     }
     fn feature_ptwrite(&self) -> bool {
-      true
+      (self.flags >> 76) & 1
     }
     fn feature_avx512_vbmi(&self) -> bool {
-      true
+      (self.flags >> 77) & 1
     }
     fn feature_x87(&self) -> bool {
-      true
+      (self.flags >> 78) & 1
     }
     fn feature_mmx(&self) -> bool {
-      true
+      (self.flags >> 79) & 1
     }
     fn feature_avx512_bitalg(&self) -> bool {
-      true
+      (self.flags >> 80) & 1
     }
     fn feature_keylocker(&self) -> bool {
-      true
+      (self.flags >> 81) & 1
     }
     fn feature_80186(&self) -> bool {
-      true
+      (self.flags >> 82) & 1
     }
     fn feature_clwb(&self) -> bool {
-      true
+      (self.flags >> 83) & 1
     }
     fn feature_avx512_4fmaps(&self) -> bool {
-      true
+      (self.flags >> 84) & 1
     }
     fn feature_tdx(&self) -> bool {
-      true
+      (self.flags >> 85) & 1
     }
     fn feature_popcnt(&self) -> bool {
-      true
+      (self.flags >> 86) & 1
     }
     fn feature_snp(&self) -> bool {
-      true
+      (self.flags >> 87) & 1
     }
     fn feature_avx512_gfni(&self) -> bool {
-      true
+      (self.flags >> 88) & 1
     }
     fn feature_3dnow(&self) -> bool {
-      true
+      (self.flags >> 89) & 1
     }
     fn feature_avx512_vbmi2(&self) -> bool {
-      true
+      (self.flags >> 90) & 1
     }
     fn feature_8086(&self) -> bool {
-      true
+      (self.flags >> 91) & 1
     }
     fn feature_svm(&self) -> bool {
-      true
+      (self.flags >> 92) & 1
     }
     fn feature_sse3(&self) -> bool {
-      true
+      (self.flags >> 93) & 1
     }
     fn feature_sse2(&self) -> bool {
-      true
+      (self.flags >> 94) & 1
     }
     fn feature_avx512_er(&self) -> bool {
-      true
+      (self.flags >> 95) & 1
     }
     fn feature_xsave64(&self) -> bool {
-      true
+      (self.flags >> 96) & 1
     }
     fn feature_80286_arpl(&self) -> bool {
-      true
+      (self.flags >> 97) & 1
     }
     fn feature_bmi1(&self) -> bool {
-      true
+      (self.flags >> 98) & 1
     }
     fn feature_bmi2(&self) -> bool {
-      true
+      (self.flags >> 99) & 1
     }
     fn feature_movdir(&self) -> bool {
-      true
+      (self.flags >> 100) & 1
     }
     fn feature_vaes(&self) -> bool {
-      true
+      (self.flags >> 101) & 1
     }
     fn feature_xsave(&self) -> bool {
-      true
+      (self.flags >> 102) & 1
     }
     fn feature_rdrand(&self) -> bool {
-      true
+      (self.flags >> 103) & 1
     }
     fn feature_clzero(&self) -> bool {
-      true
+      (self.flags >> 104) & 1
     }
     fn feature_rdseed(&self) -> bool {
-      true
+      (self.flags >> 105) & 1
     }
   }
   impl<T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
@@ -3903,322 +3903,322 @@ pub(crate) mod protected_mode {
   use core::fmt;
   impl InstDecoder {
     fn feature_sgx(&self) -> bool {
-      true
+      (self.flags >> 0) & 1
     }
     fn feature_smap(&self) -> bool {
-      true
+      (self.flags >> 1) & 1
     }
     fn feature_avx_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 2) & 1
     }
     fn feature_uintr(&self) -> bool {
-      true
+      (self.flags >> 3) & 1
     }
     fn feature_pentium(&self) -> bool {
-      true
+      (self.flags >> 4) & 1
     }
     fn feature_aesni(&self) -> bool {
-      true
+      (self.flags >> 5) & 1
     }
     fn feature_invlpgb(&self) -> bool {
-      true
+      (self.flags >> 6) & 1
     }
     fn feature_fsgsbase(&self) -> bool {
-      true
+      (self.flags >> 7) & 1
     }
     fn feature_vmx(&self) -> bool {
-      true
+      (self.flags >> 8) & 1
     }
     fn feature_simd(&self) -> bool {
-      true
+      (self.flags >> 9) & 1
     }
     fn feature_avx(&self) -> bool {
-      true
+      (self.flags >> 10) & 1
     }
     fn feature_hreset(&self) -> bool {
-      true
+      (self.flags >> 11) & 1
     }
     fn feature_avx512_vp2intersect(&self) -> bool {
-      true
+      (self.flags >> 12) & 1
     }
     fn feature_rdpru(&self) -> bool {
-      true
+      (self.flags >> 13) & 1
     }
     fn feature_sse4_2(&self) -> bool {
-      true
+      (self.flags >> 14) & 1
     }
     fn feature_monitor(&self) -> bool {
-      true
+      (self.flags >> 15) & 1
     }
     fn feature_avx512_f_typo(&self) -> bool {
-      true
+      (self.flags >> 16) & 1
     }
     fn feature_sse4_1(&self) -> bool {
-      true
+      (self.flags >> 17) & 1
     }
     fn feature_avx512_dq(&self) -> bool {
-      true
+      (self.flags >> 18) & 1
     }
     fn feature_adx(&self) -> bool {
-      true
+      (self.flags >> 19) & 1
     }
     fn feature_fxsr(&self) -> bool {
-      true
+      (self.flags >> 20) & 1
     }
     fn feature_tsx(&self) -> bool {
-      true
+      (self.flags >> 21) & 1
     }
     fn feature_waitpkg(&self) -> bool {
-      true
+      (self.flags >> 22) & 1
     }
     fn feature_80286(&self) -> bool {
-      true
+      (self.flags >> 23) & 1
     }
     fn feature_sysenter(&self) -> bool {
-      true
+      (self.flags >> 24) & 1
     }
     fn feature_invpcid_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 25) & 1
     }
     fn feature_avx512_4vnniw(&self) -> bool {
-      true
+      (self.flags >> 26) & 1
     }
     fn feature_avx512_vnni(&self) -> bool {
-      true
+      (self.flags >> 27) & 1
     }
     fn feature_avx512_pf(&self) -> bool {
-      true
+      (self.flags >> 28) & 1
     }
     fn feature_avx512_cd(&self) -> bool {
-      true
+      (self.flags >> 29) & 1
     }
     fn feature_avx512_bf16(&self) -> bool {
-      true
+      (self.flags >> 30) & 1
     }
     fn feature_avx512bw_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 31) & 1
     }
     fn feature_mpk(&self) -> bool {
-      true
+      (self.flags >> 32) & 1
     }
     fn feature_avx512_f__vl_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 33) & 1
     }
     fn feature_sha(&self) -> bool {
-      true
+      (self.flags >> 34) & 1
     }
     fn feature_cet(&self) -> bool {
-      true
+      (self.flags >> 35) & 1
     }
     fn feature_80486(&self) -> bool {
-      true
+      (self.flags >> 36) & 1
     }
     fn feature_sse(&self) -> bool {
-      true
+      (self.flags >> 37) & 1
     }
     fn feature_pentium_pro(&self) -> bool {
-      true
+      (self.flags >> 38) & 1
     }
     fn feature_itanium(&self) -> bool {
-      true
+      (self.flags >> 39) & 1
     }
     fn feature_mpx(&self) -> bool {
-      true
+      (self.flags >> 40) & 1
     }
     fn feature_extra_instructions(&self) -> bool {
-      true
+      (self.flags >> 41) & 1
     }
     fn feature_rdtscp(&self) -> bool {
-      true
+      (self.flags >> 42) & 1
     }
     fn feature_avx2(&self) -> bool {
-      true
+      (self.flags >> 43) & 1
     }
     fn feature_pconfig(&self) -> bool {
-      true
+      (self.flags >> 44) & 1
     }
     fn feature_avx512_ifma(&self) -> bool {
-      true
+      (self.flags >> 45) & 1
     }
     fn feature_gfni(&self) -> bool {
-      true
+      (self.flags >> 46) & 1
     }
     fn feature_vpclmulqdq(&self) -> bool {
-      true
+      (self.flags >> 47) & 1
     }
     fn feature_80386(&self) -> bool {
-      true
+      (self.flags >> 48) & 1
     }
     fn feature_movbe(&self) -> bool {
-      true
+      (self.flags >> 49) & 1
     }
     fn feature_avx512_f(&self) -> bool {
-      true
+      (self.flags >> 50) & 1
     }
     fn feature_emx(&self) -> bool {
-      true
+      (self.flags >> 51) & 1
     }
     fn feature_pclmulqdq(&self) -> bool {
-      true
+      (self.flags >> 52) & 1
     }
     fn feature_fma3(&self) -> bool {
-      true
+      (self.flags >> 53) & 1
     }
     fn feature_fma4(&self) -> bool {
-      true
+      (self.flags >> 54) & 1
     }
     fn feature_xsaveopt(&self) -> bool {
-      true
+      (self.flags >> 55) & 1
     }
     fn feature_syscall(&self) -> bool {
-      true
+      (self.flags >> 56) & 1
     }
     fn feature_sse4a(&self) -> bool {
-      true
+      (self.flags >> 57) & 1
     }
     fn feature_avx512_vpopcntdq(&self) -> bool {
-      true
+      (self.flags >> 58) & 1
     }
     fn feature_invpcid(&self) -> bool {
-      true
+      (self.flags >> 59) & 1
     }
     fn feature_80186_bound(&self) -> bool {
-      true
+      (self.flags >> 60) & 1
     }
     fn feature_tsxldtrk(&self) -> bool {
-      true
+      (self.flags >> 61) & 1
     }
     fn feature_cmov(&self) -> bool {
-      true
+      (self.flags >> 62) & 1
     }
     fn feature_avx512_bw(&self) -> bool {
-      true
+      (self.flags >> 63) & 1
     }
     fn feature_ssse3(&self) -> bool {
-      true
+      (self.flags >> 64) & 1
     }
     fn feature_clflushopt(&self) -> bool {
-      true
+      (self.flags >> 65) & 1
     }
     fn feature_80186_pusha(&self) -> bool {
-      true
+      (self.flags >> 66) & 1
     }
     fn feature_smx(&self) -> bool {
-      true
+      (self.flags >> 67) & 1
     }
     fn feature_8086_bcd(&self) -> bool {
-      true
+      (self.flags >> 68) & 1
     }
     fn feature_abm(&self) -> bool {
-      true
+      (self.flags >> 69) & 1
     }
     fn feature_3dnowprefetch(&self) -> bool {
-      true
+      (self.flags >> 70) & 1
     }
     fn feature_rdpid(&self) -> bool {
-      true
+      (self.flags >> 71) & 1
     }
     fn feature_lahfsahf(&self) -> bool {
-      true
+      (self.flags >> 72) & 1
     }
     fn feature_enqcmd(&self) -> bool {
-      true
+      (self.flags >> 73) & 1
     }
     fn feature_jecxz(&self) -> bool {
-      true
+      (self.flags >> 74) & 1
     }
     fn feature_new(&self) -> bool {
-      true
+      (self.flags >> 75) & 1
     }
     fn feature_ptwrite(&self) -> bool {
-      true
+      (self.flags >> 76) & 1
     }
     fn feature_avx512_vbmi(&self) -> bool {
-      true
+      (self.flags >> 77) & 1
     }
     fn feature_x87(&self) -> bool {
-      true
+      (self.flags >> 78) & 1
     }
     fn feature_mmx(&self) -> bool {
-      true
+      (self.flags >> 79) & 1
     }
     fn feature_avx512_bitalg(&self) -> bool {
-      true
+      (self.flags >> 80) & 1
     }
     fn feature_keylocker(&self) -> bool {
-      true
+      (self.flags >> 81) & 1
     }
     fn feature_80186(&self) -> bool {
-      true
+      (self.flags >> 82) & 1
     }
     fn feature_clwb(&self) -> bool {
-      true
+      (self.flags >> 83) & 1
     }
     fn feature_avx512_4fmaps(&self) -> bool {
-      true
+      (self.flags >> 84) & 1
     }
     fn feature_tdx(&self) -> bool {
-      true
+      (self.flags >> 85) & 1
     }
     fn feature_popcnt(&self) -> bool {
-      true
+      (self.flags >> 86) & 1
     }
     fn feature_snp(&self) -> bool {
-      true
+      (self.flags >> 87) & 1
     }
     fn feature_avx512_gfni(&self) -> bool {
-      true
+      (self.flags >> 88) & 1
     }
     fn feature_3dnow(&self) -> bool {
-      true
+      (self.flags >> 89) & 1
     }
     fn feature_avx512_vbmi2(&self) -> bool {
-      true
+      (self.flags >> 90) & 1
     }
     fn feature_8086(&self) -> bool {
-      true
+      (self.flags >> 91) & 1
     }
     fn feature_svm(&self) -> bool {
-      true
+      (self.flags >> 92) & 1
     }
     fn feature_sse3(&self) -> bool {
-      true
+      (self.flags >> 93) & 1
     }
     fn feature_sse2(&self) -> bool {
-      true
+      (self.flags >> 94) & 1
     }
     fn feature_avx512_er(&self) -> bool {
-      true
+      (self.flags >> 95) & 1
     }
     fn feature_xsave64(&self) -> bool {
-      true
+      (self.flags >> 96) & 1
     }
     fn feature_80286_arpl(&self) -> bool {
-      true
+      (self.flags >> 97) & 1
     }
     fn feature_bmi1(&self) -> bool {
-      true
+      (self.flags >> 98) & 1
     }
     fn feature_bmi2(&self) -> bool {
-      true
+      (self.flags >> 99) & 1
     }
     fn feature_movdir(&self) -> bool {
-      true
+      (self.flags >> 100) & 1
     }
     fn feature_vaes(&self) -> bool {
-      true
+      (self.flags >> 101) & 1
     }
     fn feature_xsave(&self) -> bool {
-      true
+      (self.flags >> 102) & 1
     }
     fn feature_rdrand(&self) -> bool {
-      true
+      (self.flags >> 103) & 1
     }
     fn feature_clzero(&self) -> bool {
-      true
+      (self.flags >> 104) & 1
     }
     fn feature_rdseed(&self) -> bool {
-      true
+      (self.flags >> 105) & 1
     }
   }
   impl<T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
@@ -6330,328 +6330,328 @@ pub(crate) mod long_mode {
   use core::fmt;
   impl InstDecoder {
     fn feature_sgx(&self) -> bool {
-      true
+      (self.flags >> 0) & 1
     }
     fn feature_smap(&self) -> bool {
-      true
+      (self.flags >> 1) & 1
     }
     fn feature_avx_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 2) & 1
     }
     fn feature_uintr(&self) -> bool {
-      true
+      (self.flags >> 3) & 1
     }
     fn feature_pentium(&self) -> bool {
-      true
+      (self.flags >> 4) & 1
     }
     fn feature_aesni(&self) -> bool {
-      true
+      (self.flags >> 5) & 1
     }
     fn feature_invlpgb(&self) -> bool {
-      true
+      (self.flags >> 6) & 1
     }
     fn feature_sse(&self) -> bool {
-      true
+      (self.flags >> 7) & 1
     }
     fn feature_xsaveopt(&self) -> bool {
-      true
+      (self.flags >> 8) & 1
     }
     fn feature_simd(&self) -> bool {
-      true
+      (self.flags >> 9) & 1
     }
     fn feature_avx(&self) -> bool {
-      true
+      (self.flags >> 10) & 1
     }
     fn feature_hreset(&self) -> bool {
-      true
+      (self.flags >> 11) & 1
     }
     fn feature_avx512_vp2intersect(&self) -> bool {
-      true
+      (self.flags >> 12) & 1
     }
     fn feature_itanium(&self) -> bool {
-      true
+      (self.flags >> 13) & 1
     }
     fn feature_rdpru(&self) -> bool {
-      true
+      (self.flags >> 14) & 1
     }
     fn feature_sse4_2(&self) -> bool {
-      true
+      (self.flags >> 15) & 1
     }
     fn feature_monitor(&self) -> bool {
-      true
+      (self.flags >> 16) & 1
     }
     fn feature_avx512_f_typo(&self) -> bool {
-      true
+      (self.flags >> 17) & 1
     }
     fn feature_sse4_1(&self) -> bool {
-      true
+      (self.flags >> 18) & 1
     }
     fn feature_avx512_dq(&self) -> bool {
-      true
+      (self.flags >> 19) & 1
     }
     fn feature_adx(&self) -> bool {
-      true
+      (self.flags >> 20) & 1
     }
     fn feature_fxsr(&self) -> bool {
-      true
+      (self.flags >> 21) & 1
     }
     fn feature_typo_instructions(&self) -> bool {
-      true
+      (self.flags >> 22) & 1
     }
     fn feature_tsx(&self) -> bool {
-      true
+      (self.flags >> 23) & 1
     }
     fn feature_cmpxchg16b(&self) -> bool {
-      true
+      (self.flags >> 24) & 1
     }
     fn feature_waitpkg(&self) -> bool {
-      true
+      (self.flags >> 25) & 1
     }
     fn feature_80286(&self) -> bool {
-      true
+      (self.flags >> 26) & 1
     }
     fn feature_sysenter(&self) -> bool {
-      true
+      (self.flags >> 27) & 1
     }
     fn feature_invpcid_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 28) & 1
     }
     fn feature_avx512_4vnniw(&self) -> bool {
-      true
+      (self.flags >> 29) & 1
     }
     fn feature_avx512_vnni(&self) -> bool {
-      true
+      (self.flags >> 30) & 1
     }
     fn feature_avx512_pf(&self) -> bool {
-      true
+      (self.flags >> 31) & 1
     }
     fn feature_avx512_cd(&self) -> bool {
-      true
+      (self.flags >> 32) & 1
     }
     fn feature_prefetchw(&self) -> bool {
-      true
+      (self.flags >> 33) & 1
     }
     fn feature_avx512_bf16(&self) -> bool {
-      true
+      (self.flags >> 34) & 1
     }
     fn feature_avx512bw_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 35) & 1
     }
     fn feature_pclmulqdq(&self) -> bool {
-      true
+      (self.flags >> 36) & 1
     }
     fn feature_avx512_f__vl_unimplemented(&self) -> bool {
-      true
+      (self.flags >> 37) & 1
     }
     fn feature_cet(&self) -> bool {
-      true
+      (self.flags >> 38) & 1
     }
     fn feature_rdseed(&self) -> bool {
-      true
+      (self.flags >> 39) & 1
     }
     fn feature_tbm(&self) -> bool {
-      true
+      (self.flags >> 40) & 1
     }
     fn feature_80486(&self) -> bool {
-      true
+      (self.flags >> 41) & 1
     }
     fn feature_fsgsbase(&self) -> bool {
-      true
+      (self.flags >> 42) & 1
     }
     fn feature_pentium_pro(&self) -> bool {
-      true
+      (self.flags >> 43) & 1
     }
     fn feature_f16c(&self) -> bool {
-      true
+      (self.flags >> 44) & 1
     }
     fn feature_mpx(&self) -> bool {
-      true
+      (self.flags >> 45) & 1
     }
     fn feature_rdtscp(&self) -> bool {
-      true
+      (self.flags >> 46) & 1
     }
     fn feature_avx2(&self) -> bool {
-      true
+      (self.flags >> 47) & 1
     }
     fn feature_pconfig(&self) -> bool {
-      true
+      (self.flags >> 48) & 1
     }
     fn feature_avx512_ifma(&self) -> bool {
-      true
+      (self.flags >> 49) & 1
     }
     fn feature_avx512_er(&self) -> bool {
-      true
+      (self.flags >> 50) & 1
     }
     fn feature_vpclmulqdq(&self) -> bool {
-      true
+      (self.flags >> 51) & 1
     }
     fn feature_80386(&self) -> bool {
-      true
+      (self.flags >> 52) & 1
     }
     fn feature_movbe(&self) -> bool {
-      true
+      (self.flags >> 53) & 1
     }
     fn feature_avx512_f(&self) -> bool {
-      true
+      (self.flags >> 54) & 1
     }
     fn feature_emx(&self) -> bool {
-      true
+      (self.flags >> 55) & 1
     }
     fn feature_fma3(&self) -> bool {
-      true
+      (self.flags >> 56) & 1
     }
     fn feature_fma4(&self) -> bool {
-      true
+      (self.flags >> 57) & 1
     }
     fn feature_vmx(&self) -> bool {
-      true
+      (self.flags >> 58) & 1
     }
     fn feature_tsxldtrk(&self) -> bool {
-      true
+      (self.flags >> 59) & 1
     }
     fn feature_syscall(&self) -> bool {
-      true
+      (self.flags >> 60) & 1
     }
     fn feature_sse4a(&self) -> bool {
-      true
+      (self.flags >> 61) & 1
     }
     fn feature_avx512_vpopcntdq(&self) -> bool {
-      true
+      (self.flags >> 62) & 1
     }
     fn feature_invpcid(&self) -> bool {
-      true
+      (self.flags >> 63) & 1
     }
     fn feature_xsave(&self) -> bool {
-      true
+      (self.flags >> 64) & 1
     }
     fn feature_cmov(&self) -> bool {
-      true
+      (self.flags >> 65) & 1
     }
     fn feature_avx512_bw(&self) -> bool {
-      true
+      (self.flags >> 66) & 1
     }
     fn feature_ssse3(&self) -> bool {
-      true
+      (self.flags >> 67) & 1
     }
     fn feature_clflushopt(&self) -> bool {
-      true
+      (self.flags >> 68) & 1
     }
     fn feature_xop(&self) -> bool {
-      true
+      (self.flags >> 69) & 1
     }
     fn feature_sha(&self) -> bool {
-      true
+      (self.flags >> 70) & 1
     }
     fn feature_64bit(&self) -> bool {
-      true
+      (self.flags >> 71) & 1
     }
     fn feature_x86_64_baseline(&self) -> bool {
-      true
+      (self.flags >> 72) & 1
     }
     fn feature_abm(&self) -> bool {
-      true
+      (self.flags >> 73) & 1
     }
     fn feature_3dnowprefetch(&self) -> bool {
-      true
+      (self.flags >> 74) & 1
     }
     fn feature_rdpid(&self) -> bool {
-      true
+      (self.flags >> 75) & 1
     }
     fn feature_lahfsahf(&self) -> bool {
-      true
+      (self.flags >> 76) & 1
     }
     fn feature_enqcmd(&self) -> bool {
-      true
+      (self.flags >> 77) & 1
     }
     fn feature_new(&self) -> bool {
-      true
+      (self.flags >> 78) & 1
     }
     fn feature_ptwrite(&self) -> bool {
-      true
+      (self.flags >> 79) & 1
     }
     fn feature_avx512_vbmi(&self) -> bool {
-      true
+      (self.flags >> 80) & 1
     }
     fn feature_x87(&self) -> bool {
-      true
+      (self.flags >> 81) & 1
     }
     fn feature_mmx(&self) -> bool {
-      true
+      (self.flags >> 82) & 1
     }
     fn feature_avx512_bitalg(&self) -> bool {
-      true
+      (self.flags >> 83) & 1
     }
     fn feature_keylocker(&self) -> bool {
-      true
+      (self.flags >> 84) & 1
     }
     fn feature_80186(&self) -> bool {
-      true
+      (self.flags >> 85) & 1
     }
     fn feature_clwb(&self) -> bool {
-      true
+      (self.flags >> 86) & 1
     }
     fn feature_mpk(&self) -> bool {
-      true
+      (self.flags >> 87) & 1
     }
     fn feature_avx512_4fmaps(&self) -> bool {
-      true
+      (self.flags >> 88) & 1
     }
     fn feature_tdx(&self) -> bool {
-      true
+      (self.flags >> 89) & 1
     }
     fn feature_popcnt(&self) -> bool {
-      true
+      (self.flags >> 90) & 1
     }
     fn feature_snp(&self) -> bool {
-      true
+      (self.flags >> 91) & 1
     }
     fn feature_avx512_gfni(&self) -> bool {
-      true
+      (self.flags >> 92) & 1
     }
     fn feature_3dnow(&self) -> bool {
-      true
+      (self.flags >> 93) & 1
     }
     fn feature_avx512_vbmi2(&self) -> bool {
-      true
+      (self.flags >> 94) & 1
     }
     fn feature_8086(&self) -> bool {
-      true
+      (self.flags >> 95) & 1
     }
     fn feature_svm(&self) -> bool {
-      true
+      (self.flags >> 96) & 1
     }
     fn feature_sse3(&self) -> bool {
-      true
+      (self.flags >> 97) & 1
     }
     fn feature_sse2(&self) -> bool {
-      true
+      (self.flags >> 98) & 1
     }
     fn feature_gfni(&self) -> bool {
-      true
+      (self.flags >> 99) & 1
     }
     fn feature_xsave64(&self) -> bool {
-      true
+      (self.flags >> 100) & 1
     }
     fn feature_smx(&self) -> bool {
-      true
+      (self.flags >> 101) & 1
     }
     fn feature_bmi1(&self) -> bool {
-      true
+      (self.flags >> 102) & 1
     }
     fn feature_bmi2(&self) -> bool {
-      true
+      (self.flags >> 103) & 1
     }
     fn feature_movdir(&self) -> bool {
-      true
+      (self.flags >> 104) & 1
     }
     fn feature_vaes(&self) -> bool {
-      true
+      (self.flags >> 105) & 1
     }
     fn feature_rdrand(&self) -> bool {
-      true
+      (self.flags >> 106) & 1
     }
     fn feature_clzero(&self) -> bool {
-      true
+      (self.flags >> 107) & 1
     }
   }
   impl<T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
