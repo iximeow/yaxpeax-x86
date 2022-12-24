@@ -1,3 +1,6 @@
+## unreleased
+* fix incorrect old yaxpeax-arch version selection for ffi crates
+
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)
 * optimizations (mostly code motion) for hot codepaths
