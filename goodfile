@@ -2,7 +2,7 @@ if not Build.environment.has("rustup")
 then
   Build.error("i don't know i want to handle dependencies yet")
 end
-Build.artifact("src/lib.rs")
+
 Build.metric(
   "nightly version",
   "rustc --version"
@@ -22,3 +22,37 @@ Build.metric(
   Build.environment.size(sopath)
 )
 Build.artifact(sopath)
+
+-- now run some perf numbers...
+Build.run({"git", "clone", "https://github.com/athre0z/disas-bench.git", "disas-bench"})
+Build.run({"git", "submodule", "update", "--recursive", "--init"}, {cwd="disas-bench"})
+Build.run({"git", "remote", "add", "dev", "../../.."}, {cwd="disas-bench/libs/yaxpeax"})
+Build.run({"git", "fetch", "-a", "dev"}, {cwd="disas-bench/libs/yaxpeax"})
+Build.run({"git", "checkout", Build.sha}, {cwd="disas-bench/libs/yaxpeax"})
+Build.run({"make", "make-bench-yaxpeax"}, {cwd="disas-bench/bench/yaxpeax"})
+
+Build.metric(
+  "bench-yaxpeax-fmt size (bytes)",
+  Build.environment.size("disas-bench/bench/yaxpeax/bench-yaxpeax-fmt")
+)
+
+Build.metric(
+  "bench-yaxpeax-no-fmt size (bytes)",
+  Build.environment.size("disas-bench/bench/yaxpeax/bench-yaxpeax-no-fmt")
+)
+
+-- fmt
+bench_start = Build.now_ms()
+
+Build.run({"./bench-yaxpeax-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
+
+bench_end = Build.now_ms()
+Build.metric("fmt runtime (ms)", bench_end - bench_start)
+
+-- no-fmt
+bench_start = Build.now_ms()
+
+Build.run({"./bench-yaxpeax-no-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
+
+bench_end = Build.now_ms()
+Build.metric("no-fmt runtime (ms)", bench_end - bench_start)
