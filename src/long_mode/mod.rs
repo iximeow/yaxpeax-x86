@@ -4759,8 +4759,8 @@ impl OperandCodeBuilder {
         OperandCodeBuilder { bits: 0 }
     }
 
-    const fn bits(&self) -> u16 {
-        self.bits
+    const fn bits(&self) -> u32 {
+        self.bits as u32
     }
 
     const fn from_bits(bits: u16) -> Self {
@@ -4923,7 +4923,7 @@ pub struct OperandCodeWrapper { code: OperandCode }
 //   |
 //   |
 //   ---------------------------> read modr/m?
-#[repr(u16)]
+#[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum OperandCode {
     Ivs = OperandCodeBuilder::new().special_case(25).bits(),
@@ -6823,7 +6823,7 @@ fn read_operands<
             // reversed-operands `movbe` and fairly unlikely. that case is handled in
             // `unlikely_operands`. TODO: maybe this could just be a bit in `operand_code` for
             // "memory-only mmm"?
-            if operand_code.bits() == (OperandCode::Gv_M as u16) {
+            if operand_code.bits() == (OperandCode::Gv_M as u32) {
                 return Err(DecodeError::InvalidOperand);
             }
             read_modrm_reg(instruction, words, modrm, bank, sink)?
@@ -6868,7 +6868,7 @@ fn read_operands<
         instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
 
         // for some encodings, the rrr field selects an opcode, not an operand
-        if operand_code.bits() != OperandCode::ModRM_0xc1_Ev_Ib as u16 && operand_code.bits() != OperandCode::ModRM_0xff_Ev as u16 {
+        if operand_code.bits() != OperandCode::ModRM_0xc1_Ev_Ib as u32 && operand_code.bits() != OperandCode::ModRM_0xff_Ev as u32 {
             sink.record(
                 modrm_start + 3,
                 modrm_start + 5,
