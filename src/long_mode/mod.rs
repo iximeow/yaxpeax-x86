@@ -6491,7 +6491,7 @@ impl fmt::Display for FieldDescription {
 fn read_opc_hotpath<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(mut b: u8, mut record: OpcodeRecord, nextb: &mut u8, next_rec: &mut OpcodeRecord, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<Option<OperandCode>, DecodeError> {
+>(mut b: u8, nextb: &mut u8, record: &mut OpcodeRecord, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<bool, DecodeError> {
     if b >= 0x40 && b < 0x50 {
         sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
             desc: InnerDescription::RexPrefix(b),
@@ -6499,7 +6499,7 @@ fn read_opc_hotpath<
         });
         instruction.prefixes.rex_from(b);
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        record = unsafe {
+        *record = unsafe {
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
     } else if b == 0x66 {
@@ -6508,7 +6508,7 @@ fn read_opc_hotpath<
             id: words.offset() as u32 * 8 - 8,
         });
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        record = unsafe {
+        *record = unsafe {
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
         instruction.prefixes.set_operand_size();
@@ -6535,7 +6535,7 @@ fn read_opc_hotpath<
         instruction.mem_size = 0;
         instruction.operand_count = 2;
         instruction.opcode = opc;
-        return Ok(Some(record.1));
+        return Ok(true);
     } else if b == 0x0f {
         if words.offset() > 1 {
             sink.record(
@@ -6547,7 +6547,7 @@ fn read_opc_hotpath<
         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
         instruction.mem_size = 0;
         instruction.operand_count = 2;
-        let record = if b == 0x38 {
+        *record = if b == 0x38 {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
             read_0f38_opcode(b, &mut instruction.prefixes)
         } else if b == 0x3a {
@@ -6561,11 +6561,10 @@ fn read_opc_hotpath<
         } else {
             unsafe { unreachable_unchecked(); }
         }
-        return Ok(Some(record.1));
+        return Ok(true);
     } else {
         *nextb = b;
-        *next_rec = record;
-        return Ok(None);
+        return Ok(false);
     }
 }
 
@@ -6584,8 +6583,8 @@ fn read_with_annotations<
     // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
 
-    let record: OperandCode = if let Some(rec) = read_opc_hotpath(nextb, next_rec, &mut nextb, &mut next_rec, words, instruction, sink)? {
-        rec
+    let record: OperandCode = if read_opc_hotpath(nextb, &mut nextb, &mut next_rec, words, instruction, sink)? {
+        next_rec.1
     } else {
         let prefixes = &mut instruction.prefixes;
         let record = loop {
