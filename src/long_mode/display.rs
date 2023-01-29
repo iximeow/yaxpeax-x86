@@ -352,7 +352,6 @@ impl fmt::Display for Opcode {
 }
 
 const MNEMONICS: &[&'static str] = &[
-    "invalid",
     "add",
     "or",
     "adc",
@@ -361,6 +360,7 @@ const MNEMONICS: &[&'static str] = &[
     "xor",
     "sub",
     "cmp",
+    "invalid",
     "xadd",
     "bt",
     "bts",
