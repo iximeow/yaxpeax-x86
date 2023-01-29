@@ -1073,7 +1073,6 @@ const XSAVE: [Opcode; 10] = [
 #[non_exhaustive]
 #[repr(u32)]
 pub enum Opcode {
-    Invalid,
     ADD,
     OR,
     ADC,
@@ -1082,6 +1081,7 @@ pub enum Opcode {
     XOR,
     SUB,
     CMP,
+    Invalid,
     XADD,
     BT,
     BTS,
