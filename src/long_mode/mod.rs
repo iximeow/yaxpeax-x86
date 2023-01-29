@@ -956,9 +956,9 @@ impl RegisterClass {
     /// return the size of this register class, in bytes
     pub fn width(&self) -> u8 {
         match self.kind {
-            RegisterBank::Q => 8,
-            RegisterBank::D => 4,
-            RegisterBank::W => 2,
+            RegisterBank::Q => self.kind as u8,
+            RegisterBank::D => self.kind as u8,
+            RegisterBank::W => self.kind as u8,
             RegisterBank::B |
             RegisterBank::rB => {
                 1
@@ -1008,7 +1008,7 @@ impl RegisterClass {
 #[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
 #[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 enum RegisterBank {
-    Q = 0, D = 2, W = 4, B = 6, rB = 8, // Quadword, Dword, Word, Byte
+    Q = 8, D = 4, W = 2, B = 1, rB = 6, // Quadword, Dword, Word, Byte
     CR = 10, DR = 12, S = 14, EIP = 30, RIP = 31, EFlags = 32, RFlags = 33,  // Control reg, Debug reg, Selector, ...
     X = 15, Y = 19, Z = 23,    // XMM, YMM, ZMM
     ST = 27, MM = 28,     // ST, MM regs (x87, mmx)
@@ -6135,18 +6135,11 @@ fn read_M<
 
 #[inline]
 fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
-    // transform (width, rex) into an index into an index into a LUT, instead of branching as
-    // `match` would.
-    let index = (width.trailing_zeros() << 1) | (rex as u32);
-
-    const BANK_LUT: [RegisterBank; 8] = [
-        RegisterBank::B, RegisterBank::rB,
-        RegisterBank::W, RegisterBank::W,
-        RegisterBank::D, RegisterBank::D,
-        RegisterBank::Q, RegisterBank::Q,
-    ];
-
-    *BANK_LUT.get(index as usize).unwrap_or_else(|| unsafe { unreachable_unchecked() })
+    if width == 1 && rex {
+        RegisterBank::rB
+    } else {
+        unsafe { std::mem::transmute::<u8, RegisterBank>(width) }
+    }
 }
 
 #[inline(always)]
@@ -6578,8 +6571,9 @@ fn read_with_annotations<
     let mut next_rec = OPCODES[nextb as usize];
     instruction.prefixes = Prefixes::new(0);
 
+    const RAXRAXRAXRAX: [RegSpec; 4] = [RegSpec::rax(); 4];
     // default x86_64 registers to `[rax; 4]`
-    instruction.regs = unsafe { core::mem::transmute(0u64) };
+    instruction.regs = RAXRAXRAXRAX;
     // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
 
