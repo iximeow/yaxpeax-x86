@@ -4463,6 +4463,7 @@ pub struct Prefixes {
     rex: PrefixRex,
     segment: Segment,
     evex_data: EvexData,
+    vqp_size: RegisterBank,
 }
 
 /// the `avx512`-related data from an [`evex`](https://en.wikipedia.org/wiki/EVEX_prefix) prefix.
@@ -4539,6 +4540,7 @@ impl Prefixes {
             rex: PrefixRex { bits: 0 },
             segment: Segment::DS,
             evex_data: EvexData { bits: 0 },
+            vqp_size: RegisterBank::D,
         }
     }
     #[inline]
@@ -4554,9 +4556,19 @@ impl Prefixes {
     #[inline]
     fn operand_size(&self) -> bool { self.bits & 0x1 == 1 }
     #[inline]
-    fn set_operand_size(&mut self) { self.bits = self.bits | 0x1 }
+    fn set_operand_size(&mut self) {
+        self.bits = self.bits | 0x1;
+        self.vqp_size = RegisterBank::W;
+    }
     #[inline]
-    fn unset_operand_size(&mut self) { self.bits = self.bits & !0x1 }
+    fn unset_operand_size(&mut self) {
+        self.bits = self.bits & !0x1;
+        if self.rex.w() {
+            self.vqp_size = RegisterBank::Q;
+        } else {
+            self.vqp_size = RegisterBank::D;
+        }
+    }
     #[inline]
     fn address_size(&self) -> bool { self.bits & 0x2 == 2 }
     #[inline]
@@ -4627,6 +4639,15 @@ impl Prefixes {
     #[inline]
     fn rex_from(&mut self, bits: u8) {
         self.rex.bits = bits;
+    }
+
+    #[inline(always)]
+    fn vqp_size(&self) -> RegisterBank {
+        if self.rex.w() {
+            RegisterBank::Q
+        } else {
+            self.vqp_size
+        }
     }
 
     #[inline]
@@ -6770,7 +6791,7 @@ fn read_operands<
         // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            bank = instruction.prefixes.vqp_size();
             instruction.regs[0].bank = bank;
             instruction.mem_size = bank as u8;
             r = if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
@@ -6835,7 +6856,7 @@ fn read_operands<
         // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            bank = instruction.prefixes.vqp_size();
             instruction.mem_size = bank as u8;
             opwidth = bank as u8;
         } else {
@@ -6949,7 +6970,7 @@ fn read_operands<
                             instruction.operand_count = 0;
                             return Ok(());
                         }
-                        let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                        let bank = instruction.prefixes.vqp_size();
                         // always *ax, but size is determined by prefixes (or lack thereof)
                         instruction.regs[0] =
                             RegSpec::from_parts(0, false, bank);
@@ -7021,7 +7042,7 @@ fn read_operands<
                     }
                     3 => {
                         // category == 3, Zv_Ivq_R
-                        let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                        let bank = instruction.prefixes.vqp_size();
                         instruction.regs[0] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
                         sink.record(
@@ -7362,7 +7383,7 @@ fn read_operands<
                 instruction.mem_size = 2;
                 RegisterBank::W
             };
-            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let bank = instruction.prefixes.vqp_size();
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E(words, instruction, modrm, w, sink)?;
@@ -7484,7 +7505,7 @@ fn read_operands<
             instruction.operands[1] = OperandSpec::ImmI8;
         }
         24 => {
-            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let bank = instruction.prefixes.vqp_size();
             let numwidth = if bank as u8 == 8 { 4 } else { bank as u8 };
             instruction.regs[0] =
                 RegSpec::gp_from_parts_non_byte(0, false, bank);
