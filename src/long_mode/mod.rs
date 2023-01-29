@@ -5850,11 +5850,19 @@ fn read_sib<
 
     let modbits = modrm >> 6;
     let sibbyte = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-    instr.regs[1].num |= sibbyte & 7;
-    instr.regs[2].num |= (sibbyte >> 3) & 7;
-
     let disp = read_sib_disp(instr, words, modbits, sibbyte, sink)?;
     instr.disp = disp as u32 as u64;
+
+    let mut r = 0;
+    if instr.prefixes.rex_unchecked().b() {
+        r |= 0b1000;
+    }
+    instr.regs[1].num = r | (sibbyte & 7);
+    let mut r = 0;
+    if instr.prefixes.rex_unchecked().x() {
+        r = 0b1000;
+    }
+    instr.regs[2].num = r | ((sibbyte >> 3) & 7);
 
     let scale = 1u8 << (sibbyte >> 6);
     instr.scale = scale;
@@ -6039,16 +6047,6 @@ fn read_M<
     let modbits = modrm >> 6;
     let mmm = modrm & 7;
     let op_spec = if mmm == 4 {
-        if instr.prefixes.rex_unchecked().b() {
-            instr.regs[1].num = 0b1000;
-        } else {
-            instr.regs[1].num = 0;
-        }
-        if instr.prefixes.rex_unchecked().x() {
-            instr.regs[2].num = 0b1000;
-        } else {
-            instr.regs[2].num = 0;
-        }
         sink.record(
             modrm_start,
             modrm_start + 2,
@@ -6102,12 +6100,11 @@ fn read_M<
             OperandSpec::RegDisp
         }
     } else {
+        let mut r = 0;
         if instr.prefixes.rex_unchecked().b() {
-            instr.regs[1].num = 0b1000;
-        } else {
-            instr.regs[1].num = 0;
+            r = 0b1000;
         }
-        instr.regs[1].num |= mmm;
+        instr.regs[1].num = r | mmm;
         sink.record(
             modrm_start,
             modrm_start + 2,
@@ -6858,27 +6855,25 @@ fn read_operands<
     let opcode_start = modrm_start - 8;
 
     if operand_code.is_only_modrm_operands() {
-        let modrm = read_modrm(words)?;
-        let mem_oper;
-        let bank;
-        let mut r = 0;
         // cool! we can precompute width and know we need to read_E.
-        if !operand_code.has_byte_operands() {
+        let bank = if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            bank = instruction.prefixes.vqp_size();
+            let bank = instruction.prefixes.vqp_size();
             instruction.regs[0].bank = bank;
             instruction.mem_size = bank as u8;
-            r = if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+            bank
         } else {
-            bank = if instruction.prefixes.rex_unchecked().present() {
-                r = if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+            let bank = if instruction.prefixes.rex_unchecked().present() {
                 RegisterBank::rB
             } else {
                 RegisterBank::B
             };
             instruction.regs[0].bank = bank;
             instruction.mem_size = 1;
+            bank
         };
+        let r = if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+        let modrm = read_modrm(words)?;
         instruction.regs[0].num = ((modrm >> 3) & 7) + r;
         sink.record(
             modrm_start + 3,
@@ -6895,7 +6890,7 @@ fn read_operands<
             );
         }
 
-        mem_oper = if modrm >= 0b11000000 {
+        let mem_oper = if modrm >= 0b11000000 {
             sink.record(
                 modrm_start + 6,
                 modrm_start + 7,
@@ -7218,46 +7213,67 @@ fn read_operands<
                 }
             };
         },
-        op @ 3 |
-        op @ 4 => {
+        3 => {
             if modrm == 0xf8 {
-                if op == 3 {
-                    instruction.opcode = Opcode::XABORT;
-                    instruction.imm = read_imm_signed(words, 1)? as u64;
+                instruction.opcode = Opcode::XABORT;
+                instruction.imm = read_imm_signed(words, 1)? as u64;
+                sink.record(
+                    words.offset() as u32 * 8 - 8,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - 8)
+                );
+                instruction.operands[0] = OperandSpec::ImmI8;
+                instruction.operand_count = 1;
+                return Ok(());
+            }
+            if (modrm & 0b00111000) != 0 {
+                sink.record(
+                    modrm_start + 3,
+                    modrm_start + 5,
+                    InnerDescription::Misc("invalid rrr field: must be zero")
+                        .with_id(modrm_start - 8)
+                );
+                return Err(DecodeError::InvalidOperand); // Err("Invalid modr/m for opcode 0xc7".to_string());
+            }
+
+            instruction.operands[0] = mem_oper;
+            instruction.opcode = Opcode::MOV;
+            instruction.imm = read_imm_signed(words, 1)? as u64;
+            instruction.operands[1] = OperandSpec::ImmI8;
+            sink.record(
+                modrm_start + 8,
+                modrm_start + 1 as u32 * 8 - 1,
+                InnerDescription::Number("imm", instruction.imm as i64)
+                    .with_id(modrm_start + 8)
+            );
+
+        }
+        4 => {
+            if modrm == 0xf8 {
+                instruction.opcode = Opcode::XBEGIN;
+                instruction.imm = if opwidth == 2 {
+                    let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
                     sink.record(
-                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 16,
                         words.offset() as u32 * 8 - 1,
                         InnerDescription::Number("imm", instruction.imm as i64)
-                            .with_id(words.offset() as u32 * 8 - 8)
+                            .with_id(words.offset() as u32 * 8 - 16)
                     );
-                    instruction.operands[0] = OperandSpec::ImmI8;
-                    instruction.operand_count = 1;
-                    return Ok(());
+                    imm
                 } else {
-                    instruction.opcode = Opcode::XBEGIN;
-                    instruction.imm = if opwidth == 2 {
-                        let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
-                        sink.record(
-                            words.offset() as u32 * 8 - 16,
-                            words.offset() as u32 * 8 - 1,
-                            InnerDescription::Number("imm", instruction.imm as i64)
-                                .with_id(words.offset() as u32 * 8 - 16)
-                        );
-                        imm
-                    } else {
-                        let imm = read_imm_signed(words, 4)? as i32 as i64 as u64;
-                        sink.record(
-                            words.offset() as u32 * 8 - 32,
-                            words.offset() as u32 * 8 - 1,
-                            InnerDescription::Number("imm", instruction.imm as i64)
-                                .with_id(words.offset() as u32 * 8 - 32)
-                        );
-                        imm
-                    };
-                    instruction.operands[0] = OperandSpec::ImmI32;
-                    instruction.operand_count = 1;
-                    return Ok(());
-                }
+                    let imm = read_imm_signed(words, 4)? as i32 as i64 as u64;
+                    sink.record(
+                        words.offset() as u32 * 8 - 32,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(words.offset() as u32 * 8 - 32)
+                    );
+                    imm
+                };
+                instruction.operands[0] = OperandSpec::ImmI32;
+                instruction.operand_count = 1;
+                return Ok(());
             }
             if (modrm & 0b00111000) != 0 {
                 sink.record(
@@ -7274,7 +7290,6 @@ fn read_operands<
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             instruction.imm = read_imm_signed(words, numwidth)? as u64;
             instruction.operands[1] = match opwidth {
-                1 => OperandSpec::ImmI8,
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
                 8 => OperandSpec::ImmI64,
@@ -7287,9 +7302,7 @@ fn read_operands<
                     .with_id(modrm_start + 8)
             );
         },
-        op @ 5 |
-        op @ 7 |
-        op @ 9 => {
+        5 => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
             sink.record(
@@ -7298,39 +7311,52 @@ fn read_operands<
                 InnerDescription::Opcode(instruction.opcode)
                     .with_id(modrm_start - 8)
             );
-            if op == 9 {
-                instruction.regs[0] = RegSpec::cl();
-                sink.record(
-                    modrm_start - 8,
-                    modrm_start - 1,
-                    InnerDescription::RegisterNumber("reg", 1, instruction.regs[0])
-                        .with_id(modrm_start - 7)
-                );
-                instruction.operands[1] = OperandSpec::RegRRR;
-            } else {
-                let num = if op == 5 {
-                    read_num(words, 1)?
-                } else {
-                    1
-                };
-                if op == 5 {
-                    sink.record(
-                        words.offset() as u32 * 8 - 8,
-                        words.offset() as u32 * 8 - 1,
-                        InnerDescription::Number("imm", num as i64)
-                            .with_id(modrm_start - 8)
-                    );
-                } else {
-                    sink.record(
-                        modrm_start - 8,
-                        modrm_start - 1,
-                        InnerDescription::Misc("opcode specifies integer immediate 1")
-                            .with_id(modrm_start - 8)
-                    );
-                }
-                instruction.imm = num;
-                instruction.operands[1] = OperandSpec::ImmI8;
-            }
+            let num = read_num(words, 1)?;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("imm", num as i64)
+                    .with_id(modrm_start - 8)
+            );
+            instruction.imm = num;
+            instruction.operands[1] = OperandSpec::ImmI8;
+        }
+        7 => {
+            instruction.operands[0] = mem_oper;
+            instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
+            let num = 1;
+            sink.record(
+                modrm_start - 8,
+                modrm_start - 1,
+                InnerDescription::Misc("opcode specifies integer immediate 1")
+                    .with_id(modrm_start - 8)
+            );
+            instruction.imm = num;
+            instruction.operands[1] = OperandSpec::ImmI8;
+        }
+        9 => {
+            instruction.operands[0] = mem_oper;
+            instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
+            instruction.regs[0] = RegSpec::cl();
+            sink.record(
+                modrm_start - 8,
+                modrm_start - 1,
+                InnerDescription::RegisterNumber("reg", 1, instruction.regs[0])
+                    .with_id(modrm_start - 7)
+            );
+            instruction.operands[1] = OperandSpec::RegRRR;
         },
         11 => {
             instruction.operands[0] = mem_oper;
@@ -7444,19 +7470,33 @@ fn read_operands<
             instruction.opcode = opcode;
             instruction.operand_count = 1;
         }
-        op @ 15 |
-        op @ 16 => {
-            let w = if op == 15 {
-                instruction.mem_size = 1;
-                if instruction.prefixes.rex_unchecked().present() {
-                    RegisterBank::rB
-                } else {
-                    RegisterBank::B
-                }
+        15 => {
+            let w = if instruction.prefixes.rex_unchecked().present() {
+                RegisterBank::rB
             } else {
-                instruction.mem_size = 2;
-                RegisterBank::W
+                RegisterBank::B
             };
+            instruction.mem_size = 1;
+            let bank = instruction.prefixes.vqp_size();
+            let modrm = read_modrm(words)?;
+
+            instruction.operands[1] = read_E(words, instruction, modrm, w, sink)?;
+            instruction.regs[0] =
+                RegSpec::gp_from_parts_non_byte((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), bank);
+            sink.record(
+                modrm_start as u32 + 3,
+                modrm_start as u32 + 5,
+                InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
+                    .with_id(modrm_start as u32 + 3)
+            );
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.mem_size = 0;
+            }
+            instruction.operand_count = 2;
+        }
+        16 => {
+            let w = RegisterBank::W;
+            instruction.mem_size = 2;
             let bank = instruction.prefixes.vqp_size();
             let modrm = read_modrm(words)?;
 
