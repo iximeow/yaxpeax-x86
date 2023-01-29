@@ -264,10 +264,18 @@ impl RegSpec {
     }
 
     #[inline]
-    fn gp_from_parts(num: u8, extended: bool, width: u8, rex: bool) -> RegSpec {
+    fn gp_from_parts_byte(num: u8, extended: bool, rex: bool) -> RegSpec {
         RegSpec {
             num: num + if extended { 0b1000 } else { 0 },
-            bank: width_to_gp_reg_bank(width, rex)
+            bank: if rex { RegisterBank::rB } else { RegisterBank::B }
+        }
+    }
+
+    #[inline]
+    fn gp_from_parts_non_byte(num: u8, extended: bool, bank: RegisterBank) -> RegSpec {
+        RegSpec {
+            num: num + if extended { 0b1000 } else { 0 },
+            bank
         }
     }
 
@@ -5679,9 +5687,8 @@ const OPCODES: [OpcodeRecord; 256] = [
 pub(self) fn read_E<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(words: &mut T, instr: &mut Instruction, modrm: u8, width: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
+>(words: &mut T, instr: &mut Instruction, modrm: u8, bank: RegisterBank, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     if modrm >= 0b11000000 {
-        let bank = width_to_gp_reg_bank(width, instr.prefixes.rex_unchecked().present());
         read_modrm_reg(instr, words, modrm, bank, sink)
     } else {
         read_M(words, instr, modrm, sink)
@@ -6131,15 +6138,6 @@ fn read_M<
         }
     };
     Ok(op_spec)
-}
-
-#[inline]
-fn width_to_gp_reg_bank(width: u8, rex: bool) -> RegisterBank {
-    if width == 1 && rex {
-        RegisterBank::rB
-    } else {
-        unsafe { std::mem::transmute::<u8, RegisterBank>(width) }
-    }
 }
 
 #[inline(always)]
@@ -6839,32 +6837,28 @@ fn read_operands<
     let opcode_start = modrm_start - 8;
 
     if operand_code.is_only_modrm_operands() {
-        let modrm;
-        let opwidth;
+        let modrm = read_modrm(words)?;
         let mem_oper;
-        let mut bank = RegisterBank::Q;
-        // cool! we can precompute opwidth and know we need to read_E.
+        let bank;
+        let mut r = 0;
+        // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.mem_size = opwidth;
-            if opwidth == 4 {
-                bank = RegisterBank::D;
-            } else if opwidth == 2 {
-                bank = RegisterBank::W;
-            }
+            bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.regs[0].bank = bank;
+            instruction.mem_size = bank as u8;
+            r = if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
         } else {
-            opwidth = 1;
-            instruction.mem_size = opwidth;
-            if instruction.prefixes.rex_unchecked().present() {
-                bank = RegisterBank::rB;
+            bank = if instruction.prefixes.rex_unchecked().present() {
+                r = if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+                RegisterBank::rB
             } else {
-                bank = RegisterBank::B;
-            }
+                RegisterBank::B
+            };
+            instruction.regs[0].bank = bank;
+            instruction.mem_size = 1;
         };
-        modrm = read_modrm(words)?;
-        instruction.regs[0].bank = bank;
-        instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+        instruction.regs[0].num = ((modrm >> 3) & 7) + r;
         sink.record(
             modrm_start + 3,
             modrm_start + 5,
@@ -6910,26 +6904,22 @@ fn read_operands<
     let mut modrm = 0;
     let mut opwidth = 0;
     let mut mem_oper = OperandSpec::Nothing;
-    let mut bank = RegisterBank::Q;
     if operand_code.has_read_E() {
-        // cool! we can precompute opwidth and know we need to read_E.
+        let bank;
+        // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.mem_size = opwidth;
-            if opwidth == 4 {
-                bank = RegisterBank::D;
-            } else if opwidth == 2 {
-                bank = RegisterBank::W;
-            }
+            bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.mem_size = bank as u8;
+            opwidth = bank as u8;
         } else {
-            opwidth = 1;
-            instruction.mem_size = opwidth;
-            if instruction.prefixes.rex_unchecked().present() {
-                bank = RegisterBank::rB;
+            bank = if instruction.prefixes.rex_unchecked().present() {
+                RegisterBank::rB
             } else {
-                bank = RegisterBank::B;
-            }
+                RegisterBank::B
+            };
+            instruction.mem_size = 1;
+            opwidth = 1;
         };
         modrm = read_modrm(words)?;
         instruction.regs[0].bank = bank;
@@ -7004,14 +6994,7 @@ fn read_operands<
                 match z_operand_code.category() {
                     0 => {
                         // these are Zv_R
-                        let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
-                        let bank = if opwidth == 4 {
-                            RegisterBank::D
-                        } else if opwidth == 2 {
-                            RegisterBank::W
-                        } else {
-                            RegisterBank::Q
-                        };
+                        let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
                         instruction.regs[0] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
                         instruction.mem_size = 8;
@@ -7040,14 +7023,7 @@ fn read_operands<
                             instruction.operand_count = 0;
                             return Ok(());
                         }
-                        let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                        let bank = if opwidth == 4 {
-                            RegisterBank::D
-                        } else if opwidth == 2 {
-                            RegisterBank::W
-                        } else {
-                            RegisterBank::Q
-                        };
+                        let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
                         // always *ax, but size is determined by prefixes (or lack thereof)
                         instruction.regs[0] =
                             RegSpec::from_parts(0, false, bank);
@@ -7093,7 +7069,7 @@ fn read_operands<
                     2 => {
                         // these are Zb_Ib_R
                         instruction.regs[0] =
-                            RegSpec::gp_from_parts(reg, instruction.prefixes.rex_unchecked().b(), 1, instruction.prefixes.rex_unchecked().present());
+                            RegSpec::gp_from_parts_byte(reg, instruction.prefixes.rex_unchecked().b(), instruction.prefixes.rex_unchecked().present());
                         sink.record(
                             opcode_start,
                             opcode_start + 2,
@@ -7119,14 +7095,7 @@ fn read_operands<
                     }
                     3 => {
                         // category == 3, Zv_Ivq_R
-                        let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                        let bank = if opwidth == 4 {
-                            RegisterBank::D
-                        } else if opwidth == 2 {
-                            RegisterBank::W
-                        } else {
-                            RegisterBank::Q
-                        };
+                        let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
                         instruction.regs[0] =
                             RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
                         sink.record(
@@ -7144,18 +7113,18 @@ fn read_operands<
                             );
                         }
                         instruction.imm =
-                            read_imm_ivq(words, opwidth)?;
-                        instruction.operands[1] = match opwidth {
+                            read_imm_ivq(words, bank as u8)?;
+                        instruction.operands[1] = match bank as u8 {
                             2 => OperandSpec::ImmI16,
                             4 => OperandSpec::ImmI32,
                             8 => OperandSpec::ImmI64,
                             _ => unsafe { unreachable_unchecked() }
                         };
                         sink.record(
-                            words.offset() as u32 * 8 - (8 * opwidth as u32),
+                            words.offset() as u32 * 8 - (8 * bank as u8 as u32),
                             words.offset() as u32 * 8 - 1,
                             InnerDescription::Number("imm", instruction.imm as i64)
-                                .with_id(words.offset() as u32 * 8 - (8 * opwidth as u32) + 1)
+                                .with_id(words.offset() as u32 * 8 - (8 * bank as u8 as u32) + 1)
                         );
                     }
                     _ => {
@@ -7457,35 +7426,40 @@ fn read_operands<
         op @ 15 |
         op @ 16 => {
             let w = if op == 15 {
-                1
+                instruction.mem_size = 1;
+                if instruction.prefixes.rex_unchecked().present() {
+                    RegisterBank::rB
+                } else {
+                    RegisterBank::B
+                }
             } else {
-                2
+                instruction.mem_size = 2;
+                RegisterBank::W
             };
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = read_E(words, instruction, modrm, w, sink)?;
             instruction.regs[0] =
-                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth, instruction.prefixes.rex_unchecked().present());
+                RegSpec::gp_from_parts_non_byte((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), bank);
             sink.record(
                 modrm_start as u32 + 3,
                 modrm_start as u32 + 5,
                 InnerDescription::RegisterNumber("rrr", (modrm >> 3) & 7, instruction.regs[0])
                     .with_id(modrm_start as u32 + 3)
             );
-            if instruction.operands[1] != OperandSpec::RegMMM {
-                instruction.mem_size = w;
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.mem_size = 0;
             }
             instruction.operand_count = 2;
         },
         17 => {
-            let opwidth = 8;
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, 4 /* opwidth */, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.mem_size = 4;
             instruction.regs[0] =
-                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth, instruction.prefixes.rex_unchecked().present());
+                RegSpec::gp_from_parts_non_byte((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
             sink.record(
                 modrm_start as u32 + 3,
                 modrm_start as u32 + 5,
@@ -7584,10 +7558,10 @@ fn read_operands<
             instruction.operands[1] = OperandSpec::ImmI8;
         }
         24 => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            let numwidth = if opwidth == 8 { 4 } else { opwidth };
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let numwidth = if bank as u8 == 8 { 4 } else { bank as u8 };
             instruction.regs[0] =
-                RegSpec::gp_from_parts(0, false, opwidth, false);
+                RegSpec::gp_from_parts_non_byte(0, false, bank);
             sink.record(
                 modrm_start as u32 - 8,
                 modrm_start as u32 - 1,
@@ -7596,7 +7570,7 @@ fn read_operands<
             );
             instruction.imm =
                 read_imm_signed(words, numwidth)? as u64;
-            instruction.operands[1] = match opwidth {
+            instruction.operands[1] = match bank as u8 {
                 2 => OperandSpec::ImmI16,
                 4 => OperandSpec::ImmI32,
                 8 => OperandSpec::ImmI64,
@@ -7911,16 +7885,16 @@ fn unlikely_operands<
                     instruction.operand_count = 0;
                 },
                 _ => {
-                    let (sz, bank) = if instruction.prefixes.rex_unchecked().w() {
-                        (8, RegisterBank::Q)
+                    let bank = if instruction.prefixes.rex_unchecked().w() {
+                        RegisterBank::Q
                     } else if !instruction.prefixes.operand_size() {
-                        (4, RegisterBank::D)
+                        RegisterBank::D
                     } else {
-                        (2, RegisterBank::W)
+                        RegisterBank::W
                     };
                     instruction.operands[1] = OperandSpec::RegRRR;
-                    instruction.operands[0] = read_E(words, instruction, modrm, sz, sink)?;
-                    instruction.mem_size = sz;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
+                    instruction.mem_size = bank as u8;
                     instruction.regs[0] =
                         RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), bank);
                     instruction.operand_count = 2;
@@ -8018,7 +7992,7 @@ fn unlikely_operands<
         OperandCode::G_mm_Ew_Ib => {
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, false, RegisterBank::MM);
             if instruction.operands[1] == OperandSpec::RegMMM {
@@ -8054,10 +8028,10 @@ fn unlikely_operands<
             instruction.regs[1].num &= 0b111;
         },
         OperandCode::Gv_Ew_LSL => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let opwidth = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, 2, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             // lsl is weird. the full register width is written, but only the low 16 bits are used.
             if instruction.operands[1] == OperandSpec::RegMMM {
                 instruction.regs[1].bank = RegisterBank::D;
@@ -8065,44 +8039,47 @@ fn unlikely_operands<
                 instruction.mem_size = 2;
             }
             instruction.regs[0] =
-                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth, instruction.prefixes.rex_unchecked().present());
+                RegSpec::gp_from_parts_non_byte((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth);
         },
         OperandCode::Gdq_Ev => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             let modrm = read_modrm(words)?;
 
-            instruction.operands[1] = read_E(words, instruction, modrm, opwidth, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, bank, sink)?;
             // `opwidth` can be 2, 4, or 8 here. if opwidth is 2, the first operand is a dword.
             // if opwidth is 4, both registers are dwords. and if opwidth is 8, both registers are
             // qword.
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 4;
             }
-            let regwidth = if opwidth == 2 {
-                4
+            let regbank = if bank == RegisterBank::W {
+                RegisterBank::D
             } else {
-                opwidth
+                bank
             };
             instruction.regs[0] =
-                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), regwidth, instruction.prefixes.rex_unchecked().present());
+                RegSpec::gp_from_parts_non_byte((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), regbank);
             instruction.operand_count = 2;
         },
         op @ OperandCode::AL_Ob |
         op @ OperandCode::AX_Ov => {
-            let opwidth = match op {
-                OperandCode::AL_Ob => 1,
+            match op {
+                OperandCode::AL_Ob => {
+                    instruction.mem_size = 1;
+                    instruction.regs[0] = RegSpec::al();
+                }
                 OperandCode::AX_Ov => {
-                    imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes)
+                    let b = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                    instruction.mem_size = b as u8;
+                    instruction.regs[0].num = 0;
+                    instruction.regs[0].bank = b;
                 }
                 _ => {
                     unsafe { unreachable_unchecked() }
                 }
             };
-            instruction.mem_size = opwidth;
             let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             let imm = read_num(words, addr_width)?;
-            instruction.regs[0] =
-                RegSpec::gp_from_parts(0, instruction.prefixes.rex_unchecked().b(), opwidth, instruction.prefixes.rex_unchecked().present());
             instruction.disp = imm;
             if instruction.prefixes.address_size() {
                 instruction.operands[1] = OperandSpec::DispU32;
@@ -8113,16 +8090,21 @@ fn unlikely_operands<
         }
         op @ OperandCode::Ob_AL |
         op @ OperandCode::Ov_AX => {
-            let opwidth = match op {
-                OperandCode::Ob_AL => 1,
+            match op {
+                OperandCode::Ob_AL => {
+                    instruction.mem_size = 1;
+                    instruction.regs[0] = RegSpec::al();
+                }
                 OperandCode::Ov_AX => {
-                    imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes)
+                    let b = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                    instruction.mem_size = b as u8;
+                    instruction.regs[0].num = 0;
+                    instruction.regs[0].bank = b;
                 }
                 _ => {
                     unsafe { unreachable_unchecked() }
                 }
             };
-            instruction.mem_size = opwidth;
             let addr_width = if instruction.prefixes.address_size() { 4 } else { 8 };
             let imm = read_num(words, addr_width)?;
             instruction.disp = imm;
@@ -8131,8 +8113,6 @@ fn unlikely_operands<
             } else {
                 OperandSpec::DispU64
             };
-            instruction.regs[0] =
-                RegSpec::gp_from_parts(0, instruction.prefixes.rex_unchecked().b(), opwidth, instruction.prefixes.rex_unchecked().present());
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
@@ -8164,18 +8144,18 @@ fn unlikely_operands<
             instruction.operand_count = 0;
         }
         OperandCode::Mdq_Gdq => {
-            let opwidth = if instruction.prefixes.rex_unchecked().w() { 8 } else { 4 };
+            let bank = if instruction.prefixes.rex_unchecked().w() { RegisterBank::Q } else { RegisterBank::D };
             let modrm = read_modrm(words)?;
 
             instruction.operands[1] = instruction.operands[0];
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             } else {
-                instruction.mem_size = opwidth;
+                instruction.mem_size = bank as u8
             }
             instruction.regs[0] =
-                RegSpec::gp_from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), opwidth, instruction.prefixes.rex_unchecked().present());
+                RegSpec::gp_from_parts_non_byte((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), bank);
             instruction.operand_count = 2;
 
         }
@@ -8196,7 +8176,7 @@ fn unlikely_operands<
 
             let modrm = read_modrm(words)?;
 
-            instruction.operands[0] = read_E(words, instruction, modrm, 8, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
@@ -8215,7 +8195,7 @@ fn unlikely_operands<
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.rex_unchecked().r(), RegisterBank::Q);
-            instruction.operands[1] = read_E(words, instruction, modrm, 8, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
             instruction.operand_count = 2;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
@@ -8267,7 +8247,7 @@ fn unlikely_operands<
             let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 0b111;
 
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
 
             match r {
                 1 => {
@@ -8277,7 +8257,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::NOP;
                 }
             }
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 64;
             }
@@ -8393,8 +8373,8 @@ fn unlikely_operands<
                                 instruction.mem_size = 8;
                             }
                             instruction.operand_count = 1;
-                            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         }
                         return Ok(());
                     }
@@ -8404,7 +8384,7 @@ fn unlikely_operands<
                 }
             }
             if instruction.prefixes.operand_size() {
-                let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
                 let modrm = read_modrm(words)?;
                 let is_reg = (modrm & 0xc0) == 0xc0;
 
@@ -8422,14 +8402,14 @@ fn unlikely_operands<
                                 instruction.mem_size = 8;
                             }
                             instruction.operand_count = 1;
-                            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         }
                         return Ok(());
                     }
                     6 => {
                         instruction.opcode = Opcode::VMCLEAR;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
@@ -8443,7 +8423,7 @@ fn unlikely_operands<
                         return Ok(());
                     }
                     7 => {
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // this would be invalid as `vmclear`, so fall back to the parse as
                             // 66-prefixed rdrand. this is a register operand, so just demote it to the
@@ -8463,7 +8443,7 @@ fn unlikely_operands<
             }
 
             if instruction.prefixes.rep() {
-                let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
                 let modrm = read_modrm(words)?;
                 let is_reg = (modrm & 0xc0) == 0xc0;
 
@@ -8481,13 +8461,13 @@ fn unlikely_operands<
                                 instruction.mem_size = 8;
                             }
                             instruction.operand_count = 1;
-                            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-                            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+                            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         }
                     }
                     6 => {
                         instruction.opcode = Opcode::VMXON;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
                             // invalid as `vmxon`, reg-form is `senduipi`
                             instruction.opcode = Opcode::SENDUIPI;
@@ -8500,7 +8480,7 @@ fn unlikely_operands<
                     }
                     7 => {
                         instruction.opcode = Opcode::RDPID;
-                        instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                        instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         if instruction.operands[0] != OperandSpec::RegMMM {
                             return Err(DecodeError::InvalidOperand);
                         }
@@ -8591,8 +8571,8 @@ fn unlikely_operands<
 
             instruction.opcode = opcode;
             instruction.operand_count = 1;
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
         },
         OperandCode::ModRM_0x0f71 => {
             if instruction.prefixes.rep() || instruction.prefixes.repnz() {
@@ -9015,29 +8995,21 @@ fn unlikely_operands<
             instruction.operand_count = 2;
         }
         OperandCode::AX_Xv => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.regs[0] = match opwidth {
-                2 => RegSpec::ax(),
-                4 => RegSpec::eax(),
-                8 => RegSpec::rax(),
-                _ => { unreachable!(); }
-            };
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.regs[0].num = 0;
+            instruction.regs[0].bank = bank;
             if instruction.prefixes.address_size() {
                 instruction.regs[1] = RegSpec::esi();
             } else {
                 instruction.regs[1] = RegSpec::rsi();
             }
             instruction.operands[1] = OperandSpec::Deref;
-            instruction.mem_size = opwidth;
+            instruction.mem_size = bank as u8;
         }
         OperandCode::Yv_AX => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.regs[0] = match opwidth {
-                2 => RegSpec::ax(),
-                4 => RegSpec::eax(),
-                8 => RegSpec::rax(),
-                _ => { unreachable!(); }
-            };
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.regs[0].num = 0;
+            instruction.regs[0].bank = bank;
             if instruction.prefixes.address_size() {
                 instruction.regs[1] = RegSpec::edi();
             } else {
@@ -9045,11 +9017,11 @@ fn unlikely_operands<
             }
             instruction.operands[0] = OperandSpec::Deref;
             instruction.operands[1] = OperandSpec::RegRRR;
-            instruction.mem_size = opwidth;
+            instruction.mem_size = bank as u8;
         }
         OperandCode::Yv_Xv => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
-            instruction.mem_size = opwidth;
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            instruction.mem_size = bank as u8;
             if instruction.prefixes.address_size() {
                 instruction.operands[0] = OperandSpec::Deref_edi;
                 instruction.operands[1] = OperandSpec::Deref_esi;
@@ -9145,7 +9117,6 @@ fn unlikely_operands<
             instruction.regs[0].bank = RegisterBank::X;
         }
         OperandCode::Ew_Sw => {
-            let opwidth = 2;
             let modrm = read_modrm(words)?;
 
             // check r
@@ -9165,7 +9136,7 @@ fn unlikely_operands<
                     RegSpec { bank: RegisterBank::W, num: modrm & 7};
                 instruction.operands[0] = OperandSpec::RegMMM;
             } else {
-                instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
                 instruction.mem_size = 2;
             }
         },
@@ -9204,24 +9175,24 @@ fn unlikely_operands<
             }
         },
         OperandCode::CVT_AA => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             instruction.operands[0] = OperandSpec::Nothing;
             instruction.operand_count = 0;
-            instruction.opcode = match opwidth {
-                2 => { Opcode::CBW },
-                4 => { Opcode::CWDE },
-                8 => { Opcode::CDQE },
+            instruction.opcode = match bank {
+                RegisterBank::W => { Opcode::CBW },
+                RegisterBank::D => { Opcode::CWDE },
+                RegisterBank::Q => { Opcode::CDQE },
                 _ => { unreachable!("invalid operation width"); },
             }
         }
         OperandCode::CVT_DA => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
             instruction.operands[0] = OperandSpec::Nothing;
             instruction.operand_count = 0;
-            instruction.opcode = match opwidth {
-                2 => { Opcode::CWD },
-                4 => { Opcode::CDQ },
-                8 => { Opcode::CQO },
+            instruction.opcode = match bank {
+                RegisterBank::W => { Opcode::CWD },
+                RegisterBank::D => { Opcode::CDQ },
+                RegisterBank::Q => { Opcode::CQO },
                 _ => { unreachable!("invalid operation width"); },
             }
         }
@@ -9268,13 +9239,13 @@ fn unlikely_operands<
             } else {
                 unreachable!("r <= 8");
             }
-            instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
         }
         OperandCode::ModRM_0x0f01 => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
             let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             if r == 0 {
@@ -9314,7 +9285,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::SGDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 1 {
                 let mod_bits = modrm >> 6;
@@ -9369,7 +9340,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::SIDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 2 {
                 let mod_bits = modrm >> 6;
@@ -9408,7 +9379,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::LGDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 3 {
                 let mod_bits = modrm >> 6;
@@ -9472,7 +9443,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::LIDT;
                     instruction.operand_count = 1;
                     instruction.mem_size = 63;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 4 {
                 // TODO: this permits storing only to word-size registers
@@ -9480,7 +9451,7 @@ fn unlikely_operands<
                 instruction.opcode = Opcode::SMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             } else if r == 5 {
                 let mod_bits = modrm >> 6;
                 if mod_bits != 0b11 {
@@ -9488,7 +9459,7 @@ fn unlikely_operands<
                         return Err(DecodeError::InvalidOpcode);
                     }
                     instruction.opcode = Opcode::RSTORSSP;
-                    instruction.operands[0] = read_E(words, instruction, modrm, 8, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
                     instruction.mem_size = 8;
                     instruction.operand_count = 1;
                     return Ok(());
@@ -9588,7 +9559,7 @@ fn unlikely_operands<
                 instruction.opcode = Opcode::LMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             } else if r == 7 {
                 let mod_bits = modrm >> 6;
                 let m = modrm & 7;
@@ -9673,7 +9644,7 @@ fn unlikely_operands<
                     instruction.opcode = Opcode::INVLPG;
                     instruction.operand_count = 1;
                     instruction.mem_size = 1;
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else {
                 unreachable!("r <= 8");
@@ -9698,7 +9669,7 @@ fn unlikely_operands<
                             return Err(DecodeError::InvalidOpcode);
                         }
                     };
-                    instruction.operands[0] = read_E(words, instruction, modrm, 1 /* opwidth */, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::B /* opwidth */, sink)?;
                     instruction.mem_size = 64;
                     instruction.operand_count = 1;
                 } else {
@@ -9710,8 +9681,8 @@ fn unlikely_operands<
                             return Err(DecodeError::InvalidOpcode);
                         }
                     };
-                    let opwidth = if instruction.prefixes.rex_unchecked().w() { 8 } else { 4 };
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    let bank = if instruction.prefixes.rex_unchecked().w() { RegisterBank::Q } else { RegisterBank::D };
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                     instruction.operand_count = 1;
                 }
 
@@ -9746,14 +9717,14 @@ fn unlikely_operands<
                         return Err(DecodeError::InvalidOpcode);
                     }
                     instruction.opcode = Opcode::PTWRITE;
-                    let opwidth = if instruction.prefixes.rex_unchecked().w() {
-                        8
+                    let bank = if instruction.prefixes.rex_unchecked().w() {
+                        RegisterBank::Q
                     } else {
-                        4
+                        RegisterBank::D
                     };
-                    instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+                    instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                     if instruction.operands[0] != OperandSpec::RegMMM {
-                        instruction.mem_size = opwidth;
+                        instruction.mem_size = bank as u8;
                     }
                     instruction.operand_count = 1;
                     return Ok(());
@@ -9831,7 +9802,7 @@ fn unlikely_operands<
                     match r {
                         6 => {
                             instruction.opcode = Opcode::CLRSSBSY;
-                            instruction.operands[0] = read_E(words, instruction, modrm, 8, sink)?;
+                            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
                             instruction.operand_count = 1;
                             instruction.mem_size = 8;
                             return Ok(());
@@ -9908,7 +9879,7 @@ fn unlikely_operands<
             }
         }
         OperandCode::ModRM_0x0fba => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vq, instruction.prefixes);
+            let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
             let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
             match r {
@@ -9932,9 +9903,9 @@ fn unlikely_operands<
                 }
             }
 
-            instruction.operands[0] = read_E(words, instruction, modrm, opwidth, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
             if instruction.operands[0] != OperandSpec::RegMMM {
-                instruction.mem_size = opwidth;
+                instruction.mem_size = bank as u8;
             }
 
             instruction.imm = read_imm_signed(words, 1)? as u64;
@@ -10006,12 +9977,8 @@ fn unlikely_operands<
             instruction.operand_count = 2;
         }
         OperandCode::AX_Ib => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
-            instruction.regs[0] = if opwidth == 4 {
-               RegSpec::eax()
-            } else {
-               RegSpec::ax()
-            };
+            instruction.regs[0].num = 0;
+            instruction.regs[0].bank = bank_from_prefixes_64(SizeCode::vd, instruction.prefixes);
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
@@ -10024,23 +9991,15 @@ fn unlikely_operands<
             instruction.operand_count = 2;
         }
         OperandCode::Ib_AX => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
-            instruction.regs[0] = if opwidth == 4 {
-                RegSpec::eax()
-            } else {
-                RegSpec::ax()
-            };
+            instruction.regs[0].num = 0;
+            instruction.regs[0].bank = bank_from_prefixes_64(SizeCode::vd, instruction.prefixes);
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
         }
         OperandCode::AX_DX => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
-            instruction.regs[0] = if opwidth == 4 {
-                RegSpec::eax()
-            } else {
-                RegSpec::ax()
-            };
+            instruction.regs[0].num = 0;
+            instruction.regs[0].bank = bank_from_prefixes_64(SizeCode::vd, instruction.prefixes);
             instruction.regs[1] = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegMMM;
@@ -10054,12 +10013,8 @@ fn unlikely_operands<
             instruction.operand_count = 2;
         }
         OperandCode::DX_AX => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
-            instruction.regs[0] = if opwidth == 4 {
-                RegSpec::eax()
-            } else {
-                RegSpec::ax()
-            };
+            instruction.regs[0].num = 0;
+            instruction.regs[0].bank = bank_from_prefixes_64(SizeCode::vd, instruction.prefixes);
             instruction.regs[1] = RegSpec::dx();
             instruction.operands[0] = OperandSpec::RegMMM;
             instruction.operands[1] = OperandSpec::RegRRR;
@@ -10554,7 +10509,7 @@ fn decode_x87<
         OperandCodeX87::St_Ew => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 2, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
@@ -10563,7 +10518,7 @@ fn decode_x87<
         OperandCodeX87::St_Mm => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10573,7 +10528,7 @@ fn decode_x87<
         OperandCodeX87::St_Mq => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10583,7 +10538,7 @@ fn decode_x87<
         OperandCodeX87::St_Md => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10593,7 +10548,7 @@ fn decode_x87<
         OperandCodeX87::St_Mw => {
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.regs[0] = RegSpec::st(0);
-            instruction.operands[1] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[1] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[1] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10601,7 +10556,7 @@ fn decode_x87<
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ew => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 2, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             instruction.operand_count = 1;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
@@ -10641,7 +10596,7 @@ fn decode_x87<
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mm_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10651,7 +10606,7 @@ fn decode_x87<
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mq_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10661,7 +10616,7 @@ fn decode_x87<
             instruction.operand_count = 2;
         }
         OperandCodeX87::Md_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10671,7 +10626,7 @@ fn decode_x87<
             instruction.operand_count = 2;
         }
         OperandCodeX87::Mw_St => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -10681,7 +10636,7 @@ fn decode_x87<
             instruction.operand_count = 2;
         }
         OperandCodeX87::Ex87S => {
-            instruction.operands[0] = read_E(words, instruction, modrm, 4, sink)?;
+            instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.operand_count = 1;
             if instruction.operands[0] == OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
@@ -10696,7 +10651,7 @@ fn decode_x87<
     Ok(())
 }
 
-#[inline]
+#[inline(always)]
 fn read_num<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
     match width {
         1 => { bytes.next().ok().ok_or(DecodeError::ExhaustedInput).map(|x| x as u64) }
@@ -10754,6 +10709,32 @@ fn read_imm_signed<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yax
 #[inline]
 fn read_imm_unsigned<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
     read_num(bytes, width)
+}
+
+#[inline]
+fn bank_from_prefixes_64(interpretation: SizeCode, prefixes: Prefixes) -> RegisterBank {
+    match interpretation {
+        SizeCode::b => RegisterBank::B,
+        SizeCode::vd => {
+            if prefixes.rex_unchecked().w() || !prefixes.operand_size() { RegisterBank::D } else { RegisterBank::W }
+        },
+        SizeCode::vq => {
+            if prefixes.operand_size() {
+                RegisterBank::W
+            } else {
+                RegisterBank::Q
+            }
+        },
+        SizeCode::vqp => {
+            if prefixes.rex_unchecked().w() {
+                RegisterBank::Q
+            } else if prefixes.operand_size() {
+                RegisterBank::W
+            } else {
+                RegisterBank::D
+            }
+        },
+    }
 }
 
 #[inline]

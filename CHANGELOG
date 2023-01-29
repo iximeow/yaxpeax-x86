@@ -8,6 +8,8 @@
   * discovered that `jna` and `jnb` are named what they are, instead of
     `jbe`/`jae` like their `setcc` an `cmovcc` counterparts. sorry. these will
     become `jbe` and `jae` in 2.x.
+* fix incorrect decode of a0/a1/a2/a3 mov register when rex.b is set
+  (rex.b would select register 8, but the register is unconditionally A)
 
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)

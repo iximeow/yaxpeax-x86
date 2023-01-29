@@ -605,7 +605,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operands[2] = OperandSpec::ImmU8;
@@ -640,7 +640,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 8, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             if mem_oper != OperandSpec::RegMMM {
@@ -657,7 +657,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             if mem_oper != OperandSpec::RegMMM {
@@ -674,7 +674,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 8, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             if mem_oper != OperandSpec::RegMMM {
@@ -691,7 +691,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
             if mem_oper != OperandSpec::RegMMM {
@@ -708,7 +708,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::D);
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if let OperandSpec::RegMMM = mem_oper {
                 instruction.regs[1].bank = RegisterBank::X;
             } else {
@@ -727,7 +727,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::Q);
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if let OperandSpec::RegMMM = mem_oper {
                 instruction.regs[1].bank = RegisterBank::X;
             } else {
@@ -1178,7 +1178,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = mem_oper;
@@ -1192,7 +1192,7 @@ fn read_vex_operands<
             let modrm = read_modrm(words)?;
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), RegisterBank::X);
-            let mem_oper = read_E(words, instruction, modrm, 8, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = mem_oper;
@@ -1307,60 +1307,60 @@ fn read_vex_operands<
         }
         VEXOperandCode::G_V_E => {
             let modrm = read_modrm(words)?;
-            let (opwidth, bank) = if instruction.prefixes.vex_unchecked().w() {
-                (8, RegisterBank::Q)
+            let bank = if instruction.prefixes.vex_unchecked().w() {
+                RegisterBank::Q
             } else {
-                (4, RegisterBank::D)
+                RegisterBank::D
             };
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex_unchecked().x(), bank);
             instruction.regs[3].bank = bank;
-            let mem_oper = read_E(words, instruction, modrm, opwidth, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, bank, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = mem_oper;
             if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = opwidth;
+                instruction.mem_size = bank as u8;
             }
             instruction.operand_count = 3;
             Ok(())
         }
         VEXOperandCode::G_E_V => {
             let modrm = read_modrm(words)?;
-            let (opwidth, bank) = if instruction.prefixes.vex_unchecked().w() {
-                (8, RegisterBank::Q)
+            let bank = if instruction.prefixes.vex_unchecked().w() {
+                RegisterBank::Q
             } else {
-                (4, RegisterBank::D)
+                RegisterBank::D
             };
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex_unchecked().x(), bank);
             instruction.regs[3].bank = bank;
-            let mem_oper = read_E(words, instruction, modrm, opwidth, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, bank, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             instruction.operands[2] = OperandSpec::RegVex;
             if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = opwidth;
+                instruction.mem_size = bank as u8;
             }
             instruction.operand_count = 3;
             Ok(())
         }
         VEXOperandCode::G_E_Ib => {
             let modrm = read_modrm(words)?;
-            let (opwidth, bank) = if instruction.prefixes.vex_unchecked().w() {
-                (8, RegisterBank::Q)
+            let bank = if instruction.prefixes.vex_unchecked().w() {
+                RegisterBank::Q
             } else {
-                (4, RegisterBank::D)
+                RegisterBank::D
             };
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex_unchecked().x(), bank);
-            let mem_oper = read_E(words, instruction, modrm, opwidth, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, bank, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             instruction.imm = read_imm_unsigned(words, 1)?;
             instruction.operands[2] = OperandSpec::ImmI8;
             if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = opwidth;
+                instruction.mem_size = bank as u8;
             }
             instruction.operand_count = 3;
             Ok(())
@@ -1382,19 +1382,19 @@ fn read_vex_operands<
                     return Err(DecodeError::InvalidOpcode);
                 }
             };
-            let (opwidth, bank) = if instruction.prefixes.vex_unchecked().w() {
-                (8, RegisterBank::Q)
+            let bank = if instruction.prefixes.vex_unchecked().w() {
+                RegisterBank::Q
             } else {
-                (4, RegisterBank::D)
+                RegisterBank::D
             };
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex_unchecked().x(), bank);
-            let mem_oper = read_E(words, instruction, modrm, opwidth, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, bank, sink)?;
             instruction.operands[0] = OperandSpec::RegVex;
             instruction.operands[1] = mem_oper;
             instruction.operand_count = 2;
             if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = opwidth;
+                instruction.mem_size = bank as u8;
             }
             instruction.regs[3].bank = bank;
             Ok(())
@@ -1413,7 +1413,7 @@ fn read_vex_operands<
                     return Err(DecodeError::InvalidOpcode);
                 }
             };
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             if let OperandSpec::RegMMM = mem_oper {
                 return Err(DecodeError::InvalidOperand);
             }
@@ -1515,7 +1515,7 @@ fn read_vex_operands<
                 RegSpec::from_parts((modrm >> 3) & 7,instruction.prefixes.vex_unchecked().x(), RegisterBank::X);
             instruction.regs[3].bank = RegisterBank::X;
             // TODO: but the memory access is word-sized
-            let mem_oper = read_E(words, instruction, modrm, 4, sink)?;
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::D, sink)?;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::RegVex;
             instruction.operands[2] = mem_oper;
