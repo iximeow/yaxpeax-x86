@@ -7218,20 +7218,20 @@ fn read_operands<
             };
         },
         3 => {
-            if modrm == 0xf8 {
-                instruction.opcode = Opcode::XABORT;
-                instruction.imm = read_imm_signed(words, 1)? as u64;
-                sink.record(
-                    words.offset() as u32 * 8 - 8,
-                    words.offset() as u32 * 8 - 1,
-                    InnerDescription::Number("imm", instruction.imm as i64)
-                        .with_id(words.offset() as u32 * 8 - 8)
-                );
-                instruction.operands[0] = OperandSpec::ImmI8;
-                instruction.operand_count = 1;
-                return Ok(());
-            }
             if (modrm & 0b00111000) != 0 {
+                if modrm == 0xf8 {
+                    instruction.opcode = Opcode::XABORT;
+                    instruction.imm = read_imm_signed(words, 1)? as u64;
+                    sink.record(
+                        words.offset() as u32 * 8 - 8,
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(words.offset() as u32 * 8 - 8)
+                    );
+                    instruction.operands[0] = OperandSpec::ImmI8;
+                    instruction.operand_count = 1;
+                    return Ok(());
+                }
                 sink.record(
                     modrm_start + 3,
                     modrm_start + 5,
@@ -7254,32 +7254,32 @@ fn read_operands<
 
         }
         4 => {
-            if modrm == 0xf8 {
-                instruction.opcode = Opcode::XBEGIN;
-                instruction.imm = if opwidth == 2 {
-                    let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
-                    sink.record(
-                        words.offset() as u32 * 8 - 16,
-                        words.offset() as u32 * 8 - 1,
-                        InnerDescription::Number("imm", instruction.imm as i64)
-                            .with_id(words.offset() as u32 * 8 - 16)
-                    );
-                    imm
-                } else {
-                    let imm = read_imm_signed(words, 4)? as i32 as i64 as u64;
-                    sink.record(
-                        words.offset() as u32 * 8 - 32,
-                        words.offset() as u32 * 8 - 1,
-                        InnerDescription::Number("imm", instruction.imm as i64)
-                            .with_id(words.offset() as u32 * 8 - 32)
-                    );
-                    imm
-                };
-                instruction.operands[0] = OperandSpec::ImmI32;
-                instruction.operand_count = 1;
-                return Ok(());
-            }
             if (modrm & 0b00111000) != 0 {
+                if modrm == 0xf8 {
+                    instruction.opcode = Opcode::XBEGIN;
+                    instruction.imm = if opwidth == 2 {
+                        let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
+                        sink.record(
+                            words.offset() as u32 * 8 - 16,
+                            words.offset() as u32 * 8 - 1,
+                            InnerDescription::Number("imm", instruction.imm as i64)
+                                .with_id(words.offset() as u32 * 8 - 16)
+                        );
+                        imm
+                    } else {
+                        let imm = read_imm_signed(words, 4)? as i32 as i64 as u64;
+                        sink.record(
+                            words.offset() as u32 * 8 - 32,
+                            words.offset() as u32 * 8 - 1,
+                            InnerDescription::Number("imm", instruction.imm as i64)
+                                .with_id(words.offset() as u32 * 8 - 32)
+                        );
+                        imm
+                    };
+                    instruction.operands[0] = OperandSpec::ImmI32;
+                    instruction.operand_count = 1;
+                    return Ok(());
+                }
                 sink.record(
                     modrm_start + 3,
                     modrm_start + 5,
