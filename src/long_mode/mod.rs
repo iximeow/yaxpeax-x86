@@ -1073,14 +1073,22 @@ const XSAVE: [Opcode; 10] = [
 #[non_exhaustive]
 #[repr(u32)]
 pub enum Opcode {
-    ADD,
+    ADD = 0,
     OR,
     ADC,
     SBB,
     AND,
-    XOR,
     SUB,
+    XOR,
     CMP,
+    ROL = 8,
+    ROR,
+    RCL,
+    RCR,
+    SHL,
+    SHR,
+    SAL,
+    SAR,
     Invalid,
     XADD,
     BT,
@@ -1130,15 +1138,7 @@ pub enum Opcode {
     MOVZX,
     MOVSX,
     MOVSXD,
-    SAR,
-    SAL,
-    SHR,
     SHRD,
-    SHL,
-    RCR,
-    RCL,
-    ROR,
-    ROL,
     INC,
     DEC,
     HLT,
@@ -5394,16 +5394,19 @@ fn base_opcode_map(v: u8) -> Opcode {
     }
 }
 
-const BITWISE_OPCODE_MAP: [Opcode; 8] = [
-    Opcode::ROL,
-    Opcode::ROR,
-    Opcode::RCL,
-    Opcode::RCR,
-    Opcode::SHL,
-    Opcode::SHR,
-    Opcode::SAL,
-    Opcode::SAR
-];
+fn bitwise_opcode_map(v: u8) -> Opcode {
+    match v {
+        0 => Opcode::ROL,
+        1 => Opcode::ROR,
+        2 => Opcode::RCL,
+        3 => Opcode::RCR,
+        4 => Opcode::SHL,
+        5 => Opcode::SHR,
+        6 => Opcode::SAL,
+        7 => Opcode::SAR,
+        _ => { unsafe { unreachable_unchecked() } }
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Interpretation {
@@ -7304,7 +7307,7 @@ fn read_operands<
         },
         5 => {
             instruction.operands[0] = mem_oper;
-            instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
+            instruction.opcode = bitwise_opcode_map((modrm >> 3) & 7);
             sink.record(
                 modrm_start + 3,
                 modrm_start + 5,
@@ -7323,7 +7326,7 @@ fn read_operands<
         }
         7 => {
             instruction.operands[0] = mem_oper;
-            instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
+            instruction.opcode = bitwise_opcode_map((modrm >> 3) & 7);
             sink.record(
                 modrm_start + 3,
                 modrm_start + 5,
@@ -7342,7 +7345,7 @@ fn read_operands<
         }
         9 => {
             instruction.operands[0] = mem_oper;
-            instruction.opcode = BITWISE_OPCODE_MAP[((modrm >> 3) & 7) as usize].clone();
+            instruction.opcode = bitwise_opcode_map((modrm >> 3) & 7);
             sink.record(
                 modrm_start + 3,
                 modrm_start + 5,
