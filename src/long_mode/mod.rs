@@ -5708,6 +5708,7 @@ const OPCODES: [OpcodeRecord; 256] = [
 ];
 
 #[allow(non_snake_case)]
+#[inline(always)]
 pub(self) fn read_E<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
