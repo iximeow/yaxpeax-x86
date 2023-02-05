@@ -102,7 +102,7 @@ enum VEXOperandCode {
     MXCSR,
 }
 
-#[inline(never)]
+#[inline(always)]
 pub(crate) fn three_byte_vex<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
@@ -224,6 +224,7 @@ pub(crate) fn three_byte_vex<
     read_vex_instruction(m, words, instruction, p, sink)
 }
 
+#[inline(always)]
 pub(crate) fn two_byte_vex<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
