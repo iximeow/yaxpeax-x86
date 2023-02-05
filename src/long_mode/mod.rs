@@ -4876,7 +4876,6 @@ impl OperandCodeBuilder {
     }
 
     const fn op0_is_rrr_and_embedded_instructions(mut self) -> Self {
-        self = self.set_embedded_instructions();
         self.bits |= 0x2000;
         self
     }
@@ -4895,13 +4894,13 @@ impl OperandCodeBuilder {
         self.bits & 0x4000 != 0
     }
 
-    fn get_embedded_instructions(&self) -> Result<ZOperandInstructions, EmbeddedOperandInstructions> {
+    fn get_embedded_instructions(&self) -> Option<ZOperandInstructions> {
         // 0x4000 indicates embedded instructions
         // 0x3fff > 0x0080 indicates the embedded instructions are a Z-style operand
-        if self.bits & 0x7f80 <= 0x407f {
-            Ok(ZOperandInstructions { bits: self.bits })
+        if self.has_embedded_instructions() {
+            Some(ZOperandInstructions { bits: self.bits })
         } else {
-            Err(EmbeddedOperandInstructions { bits: self.bits })
+            None
         }
     }
 
@@ -5048,7 +5047,6 @@ enum OperandCode {
 
     Eb_R0 = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(0)
@@ -5117,46 +5115,39 @@ enum OperandCode {
     // encode immediates?
     ModRM_0xc0_Eb_Ib = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(5)
         .bits(),
     ModRM_0xc1_Ev_Ib = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(5)
         .bits(),
     ModRM_0xd0_Eb_1 = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(7)
         .bits(),
     ModRM_0xd1_Ev_1 = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(7)
         .bits(),
     ModRM_0xd2_Eb_CL = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(9)
         .bits(),
     ModRM_0xd3_Ev_CL = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(9)
         .bits(),
     ModRM_0x80_Eb_Ib = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .with_imm(false, 0)
         .byte_operands()
@@ -5164,7 +5155,6 @@ enum OperandCode {
         .bits(),
     ModRM_0x83_Ev_Ibs = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .with_imm(false, 0)
         .operand_case(26)
@@ -5172,65 +5162,55 @@ enum OperandCode {
     // this would be Eb_Ivs, 0x8e
     ModRM_0x81_Ev_Ivs = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(2)
         .bits(),
     ModRM_0xc6_Eb_Ib = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(3)
         .bits(),
     ModRM_0xc7_Ev_Iv = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(4)
         .bits(),
     ModRM_0xfe_Eb = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(13)
         .bits(),
     ModRM_0x8f_Ev = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(8)
         .bits(),
     // gap, 0x94
     ModRM_0xff_Ev = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(14)
         .bits(),
     ModRM_0x0f18 = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(58)
         .bits(),
     ModRM_0xf6 = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .byte_operands()
         .operand_case(11)
         .bits(),
     ModRM_0xf7 = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(11)
         .bits(),
     Ev = OperandCodeBuilder::new()
         .read_modrm()
-        .set_embedded_instructions()
         .read_E()
         .operand_case(0)
         .bits(),
@@ -6591,9 +6571,9 @@ fn read_with_annotations<
     let mut next_rec = OPCODES[nextb as usize];
     instruction.prefixes = Prefixes::new(0);
 
-    const RAXRAXRAXRAX: [RegSpec; 4] = [RegSpec::rax(); 4];
+//    const RAXRAXRAXRAX: [RegSpec; 4] = [RegSpec::rax(); 4];
     // default x86_64 registers to `[rax; 4]`
-    instruction.regs = RAXRAXRAXRAX;
+    instruction.regs[0] = RegSpec::rax(); // = RAXRAXRAXRAX;
     // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
 
@@ -6614,6 +6594,50 @@ fn read_with_annotations<
                     core::ptr::read_volatile(&OPCODES[nextb as usize])
                 };
                 prefixes.rex_from(b);
+
+                let record = next_rec;
+                if let Interpretation::Instruction(opc) = record.0 {
+                    if words.offset() > 1 {
+                        sink.record(
+                            words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                            InnerDescription::Boundary("prefixes end")
+                                .with_id(words.offset() as u32 * 8 - 9)
+                        );
+                    }
+                    if opc != Opcode::Invalid {
+                        sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                            desc: InnerDescription::Opcode(opc),
+                            id: words.offset() as u32 * 8 - 8,
+                        });
+                    }
+                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
+                        desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
+                        id: words.offset() as u32 * 8 - 8 + 1,
+                    });
+                    instruction.mem_size = 0;
+                    instruction.operand_count = 2;
+                    break record;
+                } else if b == 0x0f {
+                    if words.offset() > 1 {
+                        sink.record(
+                            words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
+                            InnerDescription::Boundary("prefixes end")
+                                .with_id(words.offset() as u32 * 8 - 9)
+                        );
+                    }
+                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                    instruction.mem_size = 0;
+                    instruction.operand_count = 2;
+                    if b == 0x38 {
+                        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                        break read_0f38_opcode(b, prefixes);
+                    } else if b == 0x3a {
+                        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+                        break read_0f3a_opcode(b, prefixes);
+                    } else {
+                        break read_0f_opcode(b, prefixes);
+                    }
+                }
             } else if let Interpretation::Instruction(opc) = record.0 {
                 if words.offset() > 1 {
                     sink.record(
@@ -6745,6 +6769,7 @@ fn read_with_annotations<
 
         record.1
     };
+
     read_operands(decoder, words, instruction, record, sink)?;
 
     if instruction.prefixes.lock() {
@@ -7007,157 +7032,149 @@ fn read_operands<
         }
     }
 
-    if operand_code.has_embedded_instructions() {
-        match operand_code.get_embedded_instructions() {
-            Ok(z_operand_code) => {
-                let reg = z_operand_code.reg();
-                match z_operand_code.category() {
-                    0 => {
-                        // these are Zv_R
-                        let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
-                        instruction.regs[0] =
-                            RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
-                        instruction.mem_size = 8;
-                        sink.record(
-                            opcode_start + 0,
-                            opcode_start + 2,
-                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
-                                .with_id(opcode_start + 2)
-                        );
-                        if instruction.prefixes.rex_unchecked().b() {
-                            sink.record(
-                                opcode_start + 0,
-                                opcode_start + 2,
-                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
-                                    .with_id(opcode_start + 2)
-                            );
-                        }
-                        instruction.operand_count = 1;
-                    }
-                    1 => {
-                        // Zv_AX
-                        // in 64-bit mode, rex.b is able to make "nop" into an `xchg`, as in `4190`
-                        // aka `xchg eax, r8d.
-                        if reg == 0 && !instruction.prefixes.rex_unchecked().b() {
-                            instruction.opcode = Opcode::NOP;
-                            instruction.operand_count = 0;
-                            return Ok(());
-                        }
-                        let bank = instruction.prefixes.vqp_size();
-                        // always *ax, but size is determined by prefixes (or lack thereof)
-                        instruction.regs[0] =
-                            RegSpec::from_parts(0, false, bank);
-                        instruction.operands[1] = OperandSpec::RegMMM;
-                        instruction.regs[1] =
-                            RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
-                        sink.record(
-                            opcode_start,
-                            opcode_start + 2,
-                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
-                                .with_id(opcode_start + 1)
-                        );
-                        if instruction.prefixes.rex_unchecked().b() {
-                            sink.record(
-                                opcode_start,
-                                opcode_start + 2,
-                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
-                                    .with_id(opcode_start + 1)
-                            );
-                        }
-                        sink.record(
-                            opcode_start + 3,
-                            opcode_start + 7,
-                            InnerDescription::Misc("opcode selects `eax` operand")
-                                .with_id(opcode_start + 2)
-                        );
-                        if opwidth == 2 {
-                            sink.record(
-                                opcode_start + 3,
-                                opcode_start + 7,
-                                InnerDescription::Misc("operand-size prefix override selects `ax`")
-                                    .with_id(opcode_start + 2)
-                            );
-                        } else if opwidth == 8 {
-                            sink.record(
-                                opcode_start + 3,
-                                opcode_start + 7,
-                                InnerDescription::Misc("rex.w prefix selects `rax`")
-                                    .with_id(opcode_start + 2)
-                            );
-                        }
-                    }
-                    2 => {
-                        // these are Zb_Ib_R
-                        instruction.regs[0] =
-                            RegSpec::gp_from_parts_byte(reg, instruction.prefixes.rex_unchecked().b(), instruction.prefixes.rex_unchecked().present());
-                        sink.record(
-                            opcode_start,
-                            opcode_start + 2,
-                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
-                                .with_id(opcode_start + 1)
-                        );
-                        if instruction.prefixes.rex_unchecked().b() {
-                            sink.record(
-                                opcode_start,
-                                opcode_start + 2,
-                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
-                                    .with_id(opcode_start + 1)
-                            );
-                        }
-                        instruction.imm =
-                            read_imm_unsigned(words, 1)?;
-                        sink.record(
-                            words.offset() as u32 * 8 - 8,
-                            words.offset() as u32 * 8 - 1,
-                            InnerDescription::Number("imm", instruction.imm as i64)
-                                .with_id(words.offset() as u32 * 8 - 8));
-                        instruction.operands[1] = OperandSpec::ImmU8;
-                    }
-                    3 => {
-                        // category == 3, Zv_Ivq_R
-                        let bank = instruction.prefixes.vqp_size();
-                        instruction.regs[0] =
-                            RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
-                        sink.record(
-                            opcode_start,
-                            opcode_start + 2,
-                            InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
-                                .with_id(opcode_start + 2)
-                        );
-                        if instruction.prefixes.rex_unchecked().b() {
-                            sink.record(
-                                opcode_start,
-                                opcode_start + 2,
-                                InnerDescription::Misc("rex.b selects register `zzz` + 8")
-                                    .with_id(opcode_start + 2)
-                            );
-                        }
-                        instruction.imm =
-                            read_imm_ivq(words, bank as u8)?;
-                        instruction.operands[1] = match bank as u8 {
-                            2 => OperandSpec::ImmI16,
-                            4 => OperandSpec::ImmI32,
-                            8 => OperandSpec::ImmI64,
-                            _ => unsafe { unreachable_unchecked() }
-                        };
-                        sink.record(
-                            words.offset() as u32 * 8 - (8 * bank as u8 as u32),
-                            words.offset() as u32 * 8 - 1,
-                            InnerDescription::Number("imm", instruction.imm as i64)
-                                .with_id(words.offset() as u32 * 8 - (8 * bank as u8 as u32) + 1)
-                        );
-                    }
-                    _ => {
-                        unreachable!("bad category");
-                    }
+    if let Some(z_operand_code) = operand_code.get_embedded_instructions() {
+        let reg = z_operand_code.reg();
+        match z_operand_code.category() {
+            0 => {
+                // these are Zv_R
+                let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
+                instruction.regs[0] =
+                    RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                instruction.mem_size = 8;
+                sink.record(
+                    opcode_start + 0,
+                    opcode_start + 2,
+                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                        .with_id(opcode_start + 2)
+                );
+                if instruction.prefixes.rex_unchecked().b() {
+                    sink.record(
+                        opcode_start + 0,
+                        opcode_start + 2,
+                        InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                            .with_id(opcode_start + 2)
+                    );
                 }
-                return Ok(());
-            },
-            // EmbeddedOperandInstructions but those are entirely handled in the fall-through
-            // below. one day this may grow to be an `Err(the_operand_instructions)` though, so for
-            // a simpler diff the above is pre-`match`/`Ok`'d.
-            _ => {}
+                instruction.operand_count = 1;
+            }
+            1 => {
+                // Zv_AX
+                // in 64-bit mode, rex.b is able to make "nop" into an `xchg`, as in `4190`
+                // aka `xchg eax, r8d.
+                if reg == 0 && !instruction.prefixes.rex_unchecked().b() {
+                    instruction.opcode = Opcode::NOP;
+                    instruction.operand_count = 0;
+                    return Ok(());
+                }
+                let bank = instruction.prefixes.vqp_size();
+                // always *ax, but size is determined by prefixes (or lack thereof)
+                instruction.regs[0] =
+                    RegSpec::from_parts(0, false, bank);
+                instruction.operands[1] = OperandSpec::RegMMM;
+                instruction.regs[1] =
+                    RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                sink.record(
+                    opcode_start,
+                    opcode_start + 2,
+                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                        .with_id(opcode_start + 1)
+                );
+                if instruction.prefixes.rex_unchecked().b() {
+                    sink.record(
+                        opcode_start,
+                        opcode_start + 2,
+                        InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                            .with_id(opcode_start + 1)
+                    );
+                }
+                sink.record(
+                    opcode_start + 3,
+                    opcode_start + 7,
+                    InnerDescription::Misc("opcode selects `eax` operand")
+                        .with_id(opcode_start + 2)
+                );
+                if opwidth == 2 {
+                    sink.record(
+                        opcode_start + 3,
+                        opcode_start + 7,
+                        InnerDescription::Misc("operand-size prefix override selects `ax`")
+                            .with_id(opcode_start + 2)
+                    );
+                } else if opwidth == 8 {
+                    sink.record(
+                        opcode_start + 3,
+                        opcode_start + 7,
+                        InnerDescription::Misc("rex.w prefix selects `rax`")
+                            .with_id(opcode_start + 2)
+                    );
+                }
+            }
+            2 => {
+                // these are Zb_Ib_R
+                instruction.regs[0] =
+                    RegSpec::gp_from_parts_byte(reg, instruction.prefixes.rex_unchecked().b(), instruction.prefixes.rex_unchecked().present());
+                sink.record(
+                    opcode_start,
+                    opcode_start + 2,
+                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                        .with_id(opcode_start + 1)
+                );
+                if instruction.prefixes.rex_unchecked().b() {
+                    sink.record(
+                        opcode_start,
+                        opcode_start + 2,
+                        InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                            .with_id(opcode_start + 1)
+                    );
+                }
+                instruction.imm =
+                    read_imm_unsigned(words, 1)?;
+                sink.record(
+                    words.offset() as u32 * 8 - 8,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - 8));
+                instruction.operands[1] = OperandSpec::ImmU8;
+            }
+            3 => {
+                // category == 3, Zv_Ivq_R
+                let bank = instruction.prefixes.vqp_size();
+                instruction.regs[0] =
+                    RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                sink.record(
+                    opcode_start,
+                    opcode_start + 2,
+                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                        .with_id(opcode_start + 2)
+                );
+                if instruction.prefixes.rex_unchecked().b() {
+                    sink.record(
+                        opcode_start,
+                        opcode_start + 2,
+                        InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                            .with_id(opcode_start + 2)
+                    );
+                }
+                instruction.imm =
+                    read_imm_ivq(words, bank as u8)?;
+                instruction.operands[1] = match bank as u8 {
+                    2 => OperandSpec::ImmI16,
+                    4 => OperandSpec::ImmI32,
+                    8 => OperandSpec::ImmI64,
+                    _ => unsafe { unreachable_unchecked() }
+                };
+                sink.record(
+                    words.offset() as u32 * 8 - (8 * bank as u8 as u32),
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - (8 * bank as u8 as u32) + 1)
+                );
+            }
+            _ => {
+                unreachable!("bad category");
+            }
         }
+        return Ok(());
     }
 
 //    match operand_code {
