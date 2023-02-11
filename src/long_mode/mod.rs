@@ -5014,19 +5014,13 @@ impl OperandCodeBuilder {
     // SIZE IS DECIDED BY THE FOLLOWING TABLE:
     // 0: 1 BYTE
     // 1: 4 BYTES
-    const fn with_imm(mut self, only_imm: bool, size: u8) -> Self {
+    const fn only_imm(mut self) -> Self {
         self.bits |= 0x100;
-        self.bits |= (size as u16) << 6;
-        self.bits |= (only_imm as u16) << 7;
         self
     }
 
-    fn has_imm(&self) -> Option<(bool, u8)> {
-        if self.bits & 0x100 != 0 {
-            Some(((self.bits & 0x80) != 0, (self.bits as u8 >> 6) & 1))
-        } else {
-            None
-        }
+    fn has_imm(&self) -> bool {
+        self.bits & 0x100 != 0
     }
 }
 
@@ -5041,13 +5035,15 @@ pub struct OperandCodeWrapper { code: OperandCode }
 enum OperandCase {
     Internal = 0, // handled internally and completely by embedded rules.
     Gv_M = 1, // "internal", but must be distinguished from Gv_Ev
-    Nothing = 2, // no operands. this is distinct from `Internal`: `Internal` may specify one or two operands depending on embedded rules.
-    SingleMMMOper = 3, // one operand, disregard rrr bits of modrm.
-    BaseOpWithI8 = 4,
-    BaseOpWithIv = 5,
-    MovI8 = 6,
-    MovIv = 7,
-    BitwiseWithI8 = 8,
+    Ibs = 2,
+    Jvds = 3,
+    Nothing = 4, // no operands. this is distinct from `Internal`: `Internal` may specify one or two operands depending on embedded rules.
+    SingleMMMOper = 5, // one operand, disregard rrr bits of modrm.
+    BaseOpWithI8 = 6,
+    BaseOpWithIv = 7,
+    MovI8 = 8,
+    MovIv = 9,
+    BitwiseWithI8 = 10,
 //    BitwiseWithIv = 9,
     ShiftBy1_b,
     ShiftBy1_v,
@@ -5245,9 +5241,9 @@ enum OperandCode {
     Ivs = OperandCodeBuilder::new().operand_case(OperandCase::Ivs).bits(),
     I_3 = OperandCodeBuilder::new().operand_case(OperandCase::I_3).bits(),
     Nothing = OperandCodeBuilder::new().operand_case(OperandCase::Nothing).bits(),
-    Ib = OperandCodeBuilder::new().with_imm(false, 0).operand_case(OperandCase::Ib).bits(),
-    Ibs = OperandCodeBuilder::new().with_imm(true, 0).operand_case(OperandCase::Internal).bits(),
-    Jvds = OperandCodeBuilder::new().with_imm(true, 1).operand_case(OperandCase::Internal).bits(),
+    Ib = OperandCodeBuilder::new().operand_case(OperandCase::Ib).bits(),
+    Ibs = OperandCodeBuilder::new().only_imm().operand_case(OperandCase::Ibs).bits(),
+    Jvds = OperandCodeBuilder::new().only_imm().operand_case(OperandCase::Jvds).bits(),
     Yv_Xv = OperandCodeBuilder::new().operand_case(OperandCase::Yv_Xv).bits(),
 
     x87_d8 = OperandCodeBuilder::new().operand_case(OperandCase::x87_d8).bits(),
@@ -5265,10 +5261,10 @@ enum OperandCode {
         .byte_operands()
         .operand_case(OperandCase::SingleMMMOper)
         .bits(),
-    AL_Ib = OperandCodeBuilder::new().operand_case(OperandCase::AL_Ib).with_imm(false, 0).bits(),
-    AX_Ib = OperandCodeBuilder::new().operand_case(OperandCase::AX_Ib).with_imm(false, 0).bits(),
-    Ib_AL = OperandCodeBuilder::new().operand_case(OperandCase::Ib_AL).with_imm(false, 0).bits(),
-    Ib_AX = OperandCodeBuilder::new().operand_case(OperandCase::Ib_AX).with_imm(false, 0).bits(),
+    AL_Ib = OperandCodeBuilder::new().operand_case(OperandCase::AL_Ib).bits(),
+    AX_Ib = OperandCodeBuilder::new().operand_case(OperandCase::AX_Ib).bits(),
+    Ib_AL = OperandCodeBuilder::new().operand_case(OperandCase::Ib_AL).bits(),
+    Ib_AX = OperandCodeBuilder::new().operand_case(OperandCase::Ib_AX).bits(),
     AX_DX = OperandCodeBuilder::new().operand_case(OperandCase::AX_DX).bits(),
     AL_DX = OperandCodeBuilder::new().operand_case(OperandCase::AL_DX).bits(),
     DX_AX = OperandCodeBuilder::new().operand_case(OperandCase::DX_AX).bits(),
@@ -5363,14 +5359,12 @@ enum OperandCode {
     ModRM_0x80_Eb_Ib = OperandCodeBuilder::new()
         .read_modrm()
         .read_E()
-        .with_imm(false, 0)
         .byte_operands()
         .operand_case(OperandCase::BaseOpWithI8)
         .bits(),
     ModRM_0x83_Ev_Ibs = OperandCodeBuilder::new()
         .read_modrm()
         .read_E()
-        .with_imm(false, 0)
         .operand_case(OperandCase::ModRM_0x83)
         .bits(),
     // this would be Eb_Ivs, 0x8e
@@ -5475,7 +5469,7 @@ enum OperandCode {
     AL_Ob = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(OperandCase::AL_Ob).bits(),
     AL_Xb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(OperandCase::AL_Xb).bits(),
     AX_Ov = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(OperandCase::AX_Ov).bits(),
-    AL_Ibs = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().with_imm(false, 0).byte_operands().operand_case(OperandCase::AL_Ibs).bits(),
+    AL_Ibs = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().byte_operands().operand_case(OperandCase::AL_Ibs).bits(),
     AX_Ivd = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().operand_case(OperandCase::AX_Ivd).bits(),
 
     Eb_Gb = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().byte_operands().only_modrm_operands().mem_reg().operand_case(OperandCase::Internal).bits(),
@@ -5485,7 +5479,7 @@ enum OperandCode {
     Gv_M = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().only_modrm_operands().reg_mem().operand_case(OperandCase::Gv_M).bits(),
     MOVDIR64B = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(OperandCase::MOVDIR64B).bits(),
     M_Gv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(OperandCase::M_Gv).bits(),
-    Gv_Ev_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().with_imm(false, 0).reg_mem().operand_case(OperandCase::Gv_Ev_Ib).bits(),
+    Gv_Ev_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(OperandCase::Gv_Ev_Ib).bits(),
     Gv_Ev_Iv = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_E().reg_mem().operand_case(OperandCase::Gv_Ev_Iv).bits(),
     Rv_Gmm_Ib = OperandCodeBuilder::new().op0_is_rrr_and_embedded_instructions().read_modrm().read_E().reg_mem().operand_case(OperandCase::Rv_Gmm_Ib).bits(),
     // gap, 0x9a
@@ -7178,10 +7172,10 @@ fn read_operands<
         instruction.operands[1] = mem_oper;
     }
 
-    if let Some((only_imm, immsz)) = operand_code.has_imm() {
-        instruction.imm =
-            read_imm_signed(words, 1 << (immsz * 2))? as u64;
-        if immsz == 0 {
+    if operand_code.has_imm() {
+        if operand_code.operand_case_handler_index() == OperandCase::Ibs {
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
             sink.record(
                 words.offset() as u32 * 8 - 8,
                 words.offset() as u32 * 8 - 1,
@@ -7189,31 +7183,21 @@ fn read_operands<
                     .with_id(words.offset() as u32 * 8),
             );
         } else {
+            instruction.imm =
+                read_imm_signed(words, 4)? as u64;
             sink.record(
                 words.offset() as u32 * 8 - 32,
                 words.offset() as u32 * 8 - 1,
                 InnerDescription::Number("4-byte immediate", instruction.imm as i64)
                     .with_id(words.offset() as u32 * 8),
             );
-        }
-        if only_imm {
-            if immsz == 0 {
-                instruction.operands[0] = OperandSpec::ImmI8;
-            } else {
-                sink.record(
-                    words.offset() as u32 * 8 - 32,
-                    words.offset() as u32 * 8 - 1,
-                    InnerDescription::Number("4-byte immediate", instruction.imm as i64)
-                        .with_id(words.offset() as u32 * 8),
-                );
-                if instruction.opcode == Opcode::CALL {
-                    instruction.mem_size = 8;
-                }
-                instruction.operands[0] = OperandSpec::ImmI32;
+            if instruction.opcode == Opcode::CALL {
+                instruction.mem_size = 8;
             }
-            instruction.operand_count = 1;
-            return Ok(());
+            instruction.operands[0] = OperandSpec::ImmI32;
         }
+        instruction.operand_count = 1;
+        return Ok(());
     }
 
     if let Some(z_operand_code) = operand_code.get_embedded_instructions() {
@@ -7366,7 +7350,8 @@ fn read_operands<
 
 //    match operand_code {
     match operand_code.operand_case_handler_index() {
-        OperandCase::Internal | OperandCase::Gv_M => {
+        OperandCase::Internal | OperandCase::Gv_M |
+        OperandCase::Ibs | OperandCase::Jvds => {
         }
         OperandCase::SingleMMMOper => {
             instruction.operands[0] = mem_oper;
@@ -7374,6 +7359,14 @@ fn read_operands<
         },
         OperandCase::BaseOpWithI8 => {
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::ImmI8;
 
@@ -7817,6 +7810,14 @@ fn read_operands<
         OperandCase::AL_Ibs => {
             instruction.regs[0] =
                 RegSpec::al();
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             sink.record(
                 modrm_start as u32 - 8,
                 modrm_start as u32 - 1,
@@ -7872,6 +7873,14 @@ fn read_operands<
         OperandCase::ModRM_0x83 => {
             instruction.operands[0] = mem_oper;
             instruction.opcode = base_opcode_map((modrm >> 3) & 7);
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             sink.record(
                 modrm_start + 3,
                 modrm_start + 5,
@@ -8212,6 +8221,14 @@ fn read_operands<
             instruction.regs[1].bank = RegisterBank::X;
         },
         OperandCase::Gv_Ev_Ib => {
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[2] = OperandSpec::ImmI8;
             instruction.operand_count = 3;
         }
@@ -9451,6 +9468,14 @@ fn read_operands<
             }
         }
         OperandCase::Ib => {
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operand_count = 1;
         }
@@ -10226,6 +10251,14 @@ fn read_operands<
         OperandCase::AL_Ib => {
             instruction.regs[0] =
                 RegSpec::al();
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
@@ -10233,6 +10266,14 @@ fn read_operands<
         OperandCase::AX_Ib => {
             instruction.regs[0].num = 0;
             instruction.regs[0].bank = bank_from_prefixes_64(SizeCode::vd, instruction.prefixes);
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = OperandSpec::ImmU8;
             instruction.operand_count = 2;
@@ -10240,6 +10281,14 @@ fn read_operands<
         OperandCase::Ib_AL => {
             instruction.regs[0] =
                 RegSpec::al();
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
@@ -10247,6 +10296,14 @@ fn read_operands<
         OperandCase::Ib_AX => {
             instruction.regs[0].num = 0;
             instruction.regs[0].bank = bank_from_prefixes_64(SizeCode::vd, instruction.prefixes);
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
             instruction.operands[0] = OperandSpec::ImmU8;
             instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operand_count = 2;
