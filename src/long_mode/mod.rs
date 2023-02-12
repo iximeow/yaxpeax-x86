@@ -5176,7 +5176,7 @@ enum OperandCode {
 
     ModRM_0x0f00 = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0f00).bits(),
     ModRM_0x0f01 = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0f01).bits(),
-    ModRM_0x0f0d = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0f0d).bits(),
+    ModRM_0x0f0d = OperandCodeBuilder::new().read_E().operand_case(OperandCase::ModRM_0x0f0d).bits(),
     ModRM_0x0f0f = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0f0f).bits(), // 3dnow
     ModRM_0x0fae = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0fae).bits(),
     ModRM_0x0fba = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0fba).bits(),
@@ -8106,12 +8106,11 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
                 instruction.regs[1].bank = RegisterBank::X;
+            } else {
+                instruction.mem_size = 16;
             }
             instruction.imm =
                 read_num(words, 1)? as u8 as u64;
-            if instruction.operands[1] != OperandSpec::RegMMM {
-                instruction.mem_size = 16;
-            }
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
         }
@@ -8434,8 +8433,7 @@ fn read_operands<
             }
         }
         OperandCase::ModRM_0x0f0d => {
-            let modrm = read_modrm(words)?;
-            let r = (modrm >> 3) & 0b111;
+            let r = instruction.regs[0].num & 0b111;
 
             let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
 
@@ -8447,9 +8445,11 @@ fn read_operands<
                     instruction.opcode = Opcode::NOP;
                 }
             }
-            instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
+            instruction.operands[0] = mem_oper;
             if instruction.operands[0] != OperandSpec::RegMMM {
                 instruction.mem_size = 64;
+            } else {
+                instruction.regs[1].bank = bank;
             }
             instruction.operand_count = 1;
         }
