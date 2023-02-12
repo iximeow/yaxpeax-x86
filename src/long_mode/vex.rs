@@ -293,7 +293,7 @@ pub(crate) fn two_byte_vex<
     read_vex_instruction(VEXOpcodeMap::Map0F, words, instruction, p, sink)
 }
 
-#[inline]
+#[inline(always)]
 fn read_vex_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
@@ -1562,7 +1562,7 @@ fn read_vex_operands<
     }
 }
 
-#[inline]
+#[inline(never)]
 fn read_vex_instruction<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,

@@ -4638,13 +4638,6 @@ impl Prefixes {
     #[inline]
     fn unset_operand_size(&mut self) {
         self.bits = self.bits & !0x1;
-        /* TODO
-        if self.rex.w() {
-            self.vqp_size = RegisterBank::Q;
-        } else {
-            self.vqp_size = RegisterBank::D;
-        }
-        */
     }
     #[inline]
     fn address_size(&self) -> bool { self.bits & 0x2 == 2 }
@@ -6303,215 +6296,6 @@ fn read_M<
     Ok(op_spec)
 }
 
-#[inline(always)]
-fn read_0f_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
-    // seems like f2 takes priority, then f3, then 66, then "no prefix".  for SOME instructions an
-    // invalid prefix is in fact an invalid instruction. so just duplicate for the four kinds of
-    // opcode lists.
-    if prefixes.repnz() {
-        REPNZ_0F_CODES[opcode as usize]
-    } else if prefixes.rep() {
-        REP_0F_CODES[opcode as usize]
-    } else if prefixes.operand_size() {
-        OPERAND_SIZE_0F_CODES[opcode as usize]
-    } else {
-        NORMAL_0F_CODES[opcode as usize]
-    }
-}
-
-fn read_0f38_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
-    if prefixes.rep() {
-        return match opcode {
-            0xd8 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38d8),
-            0xdc => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38dc),
-            0xdd => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38dd),
-            0xde => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38de),
-            0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38df),
-            0xf6 => OpcodeRecord(Interpretation::Instruction(Opcode::ADOX), OperandCode::Gv_Ev),
-            0xf8 => {
-                prefixes.unset_operand_size();
-                OpcodeRecord(Interpretation::Instruction(Opcode::ENQCMDS), OperandCode::INV_Gv_M)
-            },
-            0xfa => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38fa),
-            0xfb => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38fb),
-            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-        };
-    }
-
-    if prefixes.repnz() {
-        return match opcode {
-            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::CRC32), OperandCode::Gv_Eb),
-            0xf1 => OpcodeRecord(Interpretation::Instruction(Opcode::CRC32), OperandCode::Gdq_Ev),
-            0xf8 => {
-                prefixes.unset_operand_size();
-                OpcodeRecord(Interpretation::Instruction(Opcode::ENQCMD), OperandCode::INV_Gv_M)
-            },
-            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-        };
-    }
-
-    if prefixes.operand_size() {
-        // leave operand size present for `movbe`
-        if opcode != 0xf0 && opcode != 0xf1 {
-            prefixes.unset_operand_size();
-        }
-
-        return match opcode {
-            0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFB), OperandCode::G_E_xmm),
-            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDW), OperandCode::G_E_xmm),
-            0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDD), OperandCode::G_E_xmm),
-            0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDSW), OperandCode::G_E_xmm),
-            0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::PMADDUBSW), OperandCode::G_E_xmm),
-            0x05 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBW), OperandCode::G_E_xmm),
-            0x06 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBD), OperandCode::G_E_xmm),
-            0x07 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBSW), OperandCode::G_E_xmm),
-            0x08 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNB), OperandCode::G_E_xmm),
-            0x09 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNW), OperandCode::G_E_xmm),
-            0x0a => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGND), OperandCode::G_E_xmm),
-            0x0b => OpcodeRecord(Interpretation::Instruction(Opcode::PMULHRSW), OperandCode::G_E_xmm),
-            0x10 => OpcodeRecord(Interpretation::Instruction(Opcode::PBLENDVB), OperandCode::G_E_xmm),
-            0x14 => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDVPS), OperandCode::G_E_xmm),
-            0x15 => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDVPD), OperandCode::G_E_xmm),
-            0x17 => OpcodeRecord(Interpretation::Instruction(Opcode::PTEST), OperandCode::G_E_xmm),
-            0x1c => OpcodeRecord(Interpretation::Instruction(Opcode::PABSB), OperandCode::G_E_xmm),
-            0x1d => OpcodeRecord(Interpretation::Instruction(Opcode::PABSW), OperandCode::G_E_xmm),
-            0x1e => OpcodeRecord(Interpretation::Instruction(Opcode::PABSD), OperandCode::G_E_xmm),
-            0x20 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXBW), OperandCode::PMOVX_G_E_xmm),
-            0x21 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXBD), OperandCode::PMOVX_G_E_xmm),
-            0x22 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXBQ), OperandCode::PMOVX_G_E_xmm),
-            0x23 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXWD), OperandCode::PMOVX_G_E_xmm),
-            0x24 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXWQ), OperandCode::PMOVX_G_E_xmm),
-            0x25 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXDQ), OperandCode::PMOVX_G_E_xmm),
-            0x28 => OpcodeRecord(Interpretation::Instruction(Opcode::PMULDQ), OperandCode::G_E_xmm),
-            0x29 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPEQQ), OperandCode::G_E_xmm),
-            0x2a => OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTDQA), OperandCode::G_M_xmm),
-            0x2b => OpcodeRecord(Interpretation::Instruction(Opcode::PACKUSDW), OperandCode::G_E_xmm),
-            0x30 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXBW), OperandCode::PMOVX_G_E_xmm),
-            0x31 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXBD), OperandCode::PMOVX_G_E_xmm),
-            0x32 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXBQ), OperandCode::PMOVX_G_E_xmm),
-            0x33 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXWD), OperandCode::PMOVX_G_E_xmm),
-            0x34 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXWQ), OperandCode::PMOVX_G_E_xmm),
-            0x35 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXDQ), OperandCode::PMOVX_G_E_xmm),
-            0x37 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTQ), OperandCode::G_E_xmm),
-            0x38 => OpcodeRecord(Interpretation::Instruction(Opcode::PMINSB), OperandCode::G_E_xmm),
-            0x39 => OpcodeRecord(Interpretation::Instruction(Opcode::PMINSD), OperandCode::G_E_xmm),
-            0x3a => OpcodeRecord(Interpretation::Instruction(Opcode::PMINUW), OperandCode::G_E_xmm),
-            0x3b => OpcodeRecord(Interpretation::Instruction(Opcode::PMINUD), OperandCode::G_E_xmm),
-            0x3c => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXSB), OperandCode::G_E_xmm),
-            0x3d => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXSD), OperandCode::G_E_xmm),
-            0x3e => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXUW), OperandCode::G_E_xmm),
-            0x3f => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXUD), OperandCode::G_E_xmm),
-            0x40 => OpcodeRecord(Interpretation::Instruction(Opcode::PMULLD), OperandCode::G_E_xmm),
-            0x41 => OpcodeRecord(Interpretation::Instruction(Opcode::PHMINPOSUW), OperandCode::G_E_xmm),
-            0x80 => OpcodeRecord(Interpretation::Instruction(Opcode::INVEPT), OperandCode::INV_Gv_M),
-            0x81 => OpcodeRecord(Interpretation::Instruction(Opcode::INVVPID), OperandCode::INV_Gv_M),
-            0x82 => OpcodeRecord(Interpretation::Instruction(Opcode::INVPCID), OperandCode::INV_Gv_M),
-            0xcf => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8MULB), OperandCode::G_E_xmm),
-            0xdb => OpcodeRecord(Interpretation::Instruction(Opcode::AESIMC), OperandCode::G_E_xmm),
-            0xdc => OpcodeRecord(Interpretation::Instruction(Opcode::AESENC), OperandCode::G_E_xmm),
-            0xdd => OpcodeRecord(Interpretation::Instruction(Opcode::AESENCLAST), OperandCode::G_E_xmm),
-            0xde => OpcodeRecord(Interpretation::Instruction(Opcode::AESDEC), OperandCode::G_E_xmm),
-            0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::AESDECLAST), OperandCode::G_E_xmm),
-            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::Gv_M),
-            0xf1 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::M_Gv),
-            0xf5 => OpcodeRecord(Interpretation::Instruction(Opcode::WRUSS), OperandCode::Mdq_Gdq),
-            0xf6 => OpcodeRecord(Interpretation::Instruction(Opcode::ADCX), OperandCode::Gv_Ev),
-            0xf8 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVDIR64B), OperandCode::MOVDIR64B),
-            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-        };
-    } else {
-        return match opcode {
-            0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFB), OperandCode::G_E_mm),
-            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDW), OperandCode::G_E_mm),
-            0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDD), OperandCode::G_E_mm),
-            0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDSW), OperandCode::G_E_mm),
-            0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::PMADDUBSW), OperandCode::G_E_mm),
-            0x05 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBW), OperandCode::G_E_mm),
-            0x06 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBD), OperandCode::G_E_mm),
-            0x07 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBSW), OperandCode::G_E_mm),
-            0x08 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNB), OperandCode::G_E_mm),
-            0x09 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNW), OperandCode::G_E_mm),
-            0x0a => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGND), OperandCode::G_E_mm),
-            0x0b => OpcodeRecord(Interpretation::Instruction(Opcode::PMULHRSW), OperandCode::G_E_mm),
-            0x1c => OpcodeRecord(Interpretation::Instruction(Opcode::PABSB), OperandCode::G_E_mm),
-            0x1d => OpcodeRecord(Interpretation::Instruction(Opcode::PABSW), OperandCode::G_E_mm),
-            0x1e => OpcodeRecord(Interpretation::Instruction(Opcode::PABSD), OperandCode::G_E_mm),
-            0xc8 => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1NEXTE), OperandCode::G_E_xmm),
-            0xc9 => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1MSG1), OperandCode::G_E_xmm),
-            0xca => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1MSG2), OperandCode::G_E_xmm),
-            0xcb => OpcodeRecord(Interpretation::Instruction(Opcode::SHA256RNDS2), OperandCode::G_E_xmm),
-            0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA256MSG1), OperandCode::G_E_xmm),
-            0xcd => OpcodeRecord(Interpretation::Instruction(Opcode::SHA256MSG2), OperandCode::G_E_xmm),
-            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::Gv_M),
-            0xf1 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::M_Gv),
-            0xf6 => OpcodeRecord(Interpretation::Instruction(Opcode::WRSS), OperandCode::Mdq_Gdq),
-            0xf9 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVDIRI), OperandCode::Md_Gd),
-            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-        };
-    }
-}
-
-fn read_0f3a_opcode(opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
-    if prefixes.rep() {
-        if prefixes != &Prefixes::new(0x10) {
-            return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
-        }
-        return match opcode {
-            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::HRESET), OperandCode::ModRM_0xf30f3af0),
-            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-        };
-    }
-
-    if prefixes.repnz() {
-        return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
-    }
-
-    if prefixes.operand_size() {
-        if opcode == 0x16 && prefixes.rex_unchecked().w() {
-            return OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRQ), OperandCode::G_Ev_xmm_Ib);
-        } else if opcode == 0x22 && prefixes.rex_unchecked().w() {
-            return OpcodeRecord(Interpretation::Instruction(Opcode::PINSRQ), OperandCode::G_Ev_xmm_Ib);
-        }
-
-        return match opcode {
-            0x08 => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDPS), OperandCode::G_E_xmm_Ib),
-            0x09 => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDPD), OperandCode::G_E_xmm_Ib),
-            0x0a => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDSS), OperandCode::G_E_xmm_Ib),
-            0x0b => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDSD), OperandCode::G_E_xmm_Ib),
-            0x0c => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDPS), OperandCode::G_E_xmm_Ib),
-            0x0d => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDPD), OperandCode::G_E_xmm_Ib),
-            0x0e => OpcodeRecord(Interpretation::Instruction(Opcode::PBLENDW), OperandCode::G_E_xmm_Ib),
-            0x0f => OpcodeRecord(Interpretation::Instruction(Opcode::PALIGNR), OperandCode::G_E_xmm_Ib),
-            0x14 => OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRB), OperandCode::G_Ev_xmm_Ib),
-            0x15 => OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRW), OperandCode::G_Ev_xmm_Ib),
-            0x16 => OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRD), OperandCode::G_Ev_xmm_Ib),
-            0x17 => OpcodeRecord(Interpretation::Instruction(Opcode::EXTRACTPS), OperandCode::G_Ev_xmm_Ib),
-            0x20 => OpcodeRecord(Interpretation::Instruction(Opcode::PINSRB), OperandCode::G_Ev_xmm_Ib),
-            0x21 => OpcodeRecord(Interpretation::Instruction(Opcode::INSERTPS), OperandCode::G_Ev_xmm_Ib),
-            0x22 => OpcodeRecord(Interpretation::Instruction(Opcode::PINSRD), OperandCode::G_Ev_xmm_Ib),
-            0x40 => OpcodeRecord(Interpretation::Instruction(Opcode::DPPS), OperandCode::G_E_xmm_Ib),
-            0x41 => OpcodeRecord(Interpretation::Instruction(Opcode::DPPD), OperandCode::G_E_xmm_Ib),
-            0x42 => OpcodeRecord(Interpretation::Instruction(Opcode::MPSADBW), OperandCode::G_E_xmm_Ib),
-            0x44 => OpcodeRecord(Interpretation::Instruction(Opcode::PCLMULQDQ), OperandCode::G_E_xmm_Ib),
-            0x60 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPESTRM), OperandCode::G_E_xmm_Ib),
-            0x61 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPESTRI), OperandCode::G_E_xmm_Ib),
-            0x62 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPISTRM), OperandCode::G_E_xmm_Ib),
-            0x63 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPISTRI), OperandCode::G_E_xmm_Ib),
-//            0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1RNDS4), OperandCode::G_E_xmm_Ib),
-            0xce => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8AFFINEQB), OperandCode::G_E_xmm_Ub),
-            0xcf => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8AFFINEINVQB), OperandCode::G_E_xmm_Ub),
-            0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::AESKEYGENASSIST), OperandCode::G_E_xmm_Ub),
-            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-        };
-    }
-
-    return match opcode {
-        0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1RNDS4), OperandCode::G_E_xmm_Ub),
-        0x0f => OpcodeRecord(Interpretation::Instruction(Opcode::PALIGNR), OperandCode::G_E_mm_Ib),
-        _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    };
-}
-
 /// the actual description for a selection of bits involved in decoding an [`long_mode::Instruction`].
 ///
 /// some prefixes are only identified as an `InnerDescription::Misc` string, while some are full
@@ -6734,12 +6518,12 @@ fn read_opc_hotpath<
         instruction.operand_count = 2;
         *record = if b == 0x38 {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            read_0f38_opcode(b, &mut instruction.prefixes)
+            self.read_0f38_opcode(b, &mut instruction.prefixes)
         } else if b == 0x3a {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            read_0f3a_opcode(b, &mut instruction.prefixes)
+            self.read_0f3a_opcode(b, &mut instruction.prefixes)
         } else {
-            read_0f_opcode(b, &mut instruction.prefixes)
+            self.read_0f_opcode(b, &mut instruction.prefixes)
         };
         if let Interpretation::Instruction(opc) = record.0 {
             instruction.opcode = opc;
@@ -6786,6 +6570,7 @@ fn read_with_annotations<
                     core::ptr::read_volatile(&OPCODES[nextb as usize])
                 };
                 prefixes.rex_from(b);
+                self.rb_size = RegisterBank::rB;
                 if prefixes.rex_unchecked().w() {
                     self.vqp_size = RegisterBank::Q;
                 }
@@ -6825,12 +6610,12 @@ fn read_with_annotations<
                     instruction.operand_count = 2;
                     if b == 0x38 {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break read_0f38_opcode(b, prefixes);
+                        break self.read_0f38_opcode(b, prefixes);
                     } else if b == 0x3a {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break read_0f3a_opcode(b, prefixes);
+                        break self.read_0f3a_opcode(b, prefixes);
                     } else {
-                        break read_0f_opcode(b, prefixes);
+                        break self.read_0f_opcode(b, prefixes);
                     }
                 }
             } else if let Interpretation::Instruction(opc) = record.0 {
@@ -6869,12 +6654,12 @@ fn read_with_annotations<
                     instruction.operand_count = 2;
                     if b == 0x38 {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break read_0f38_opcode(b, prefixes);
+                        break self.read_0f38_opcode(b, prefixes);
                     } else if b == 0x3a {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break read_0f3a_opcode(b, prefixes);
+                        break self.read_0f3a_opcode(b, prefixes);
                     } else {
-                        break read_0f_opcode(b, prefixes);
+                        break self.read_0f_opcode(b, prefixes);
                     }
                 }
                 if b == 0x66 {
@@ -6953,7 +6738,11 @@ fn read_with_annotations<
                 }
                 prefixes.rex_from(0);
                 self.rb_size = RegisterBank::B;
-                self.vqp_size = RegisterBank::D;
+                self.vqp_size = if prefixes.operand_size() {
+                    RegisterBank::W
+                } else {
+                    RegisterBank::D
+                };
             }
             if words.offset() >= 15 {
                 return Err(DecodeError::TooLong);
@@ -7073,7 +6862,7 @@ fn read_avx_prefixed<
 fn read_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
->(self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+>(&mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
     sink.record(
         words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
         InnerDescription::Boundary("opcode ends/operands begin (typically)")
@@ -9911,6 +9700,11 @@ fn read_operands<
 
             if instruction.prefixes.operand_size() && !(instruction.prefixes.rep() || instruction.prefixes.repnz()) {
                 instruction.prefixes.unset_operand_size();
+                if instruction.prefixes.rex_unchecked().w() {
+                    self.vqp_size = RegisterBank::Q;
+                } else {
+                    self.vqp_size = RegisterBank::D;
+                };
                 if modrm < 0xc0 {
                     instruction.opcode = match (modrm >> 3) & 7 {
                         6 => {
@@ -10395,6 +10189,232 @@ fn read_operands<
         }
     };
     Ok(())
+}
+
+#[inline(always)]
+fn read_0f_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
+    // seems like f2 takes priority, then f3, then 66, then "no prefix".  for SOME instructions an
+    // invalid prefix is in fact an invalid instruction. so just duplicate for the four kinds of
+    // opcode lists.
+    if prefixes.repnz() {
+        REPNZ_0F_CODES[opcode as usize]
+    } else if prefixes.rep() {
+        REP_0F_CODES[opcode as usize]
+    } else if prefixes.operand_size() {
+        OPERAND_SIZE_0F_CODES[opcode as usize]
+    } else {
+        NORMAL_0F_CODES[opcode as usize]
+    }
+}
+
+#[inline(always)]
+fn read_0f38_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
+    if prefixes.rep() {
+        return match opcode {
+            0xd8 => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38d8),
+            0xdc => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38dc),
+            0xdd => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38dd),
+            0xde => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38de),
+            0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38df),
+            0xf6 => OpcodeRecord(Interpretation::Instruction(Opcode::ADOX), OperandCode::Gv_Ev),
+            0xf8 => {
+                prefixes.unset_operand_size();
+                if prefixes.rex_unchecked().w() {
+                    self.vqp_size = RegisterBank::Q;
+                } else {
+                    self.vqp_size = RegisterBank::D;
+                }
+                OpcodeRecord(Interpretation::Instruction(Opcode::ENQCMDS), OperandCode::INV_Gv_M)
+            },
+            0xfa => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38fa),
+            0xfb => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38fb),
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    }
+
+    if prefixes.repnz() {
+        return match opcode {
+            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::CRC32), OperandCode::Gv_Eb),
+            0xf1 => OpcodeRecord(Interpretation::Instruction(Opcode::CRC32), OperandCode::Gdq_Ev),
+            0xf8 => {
+                prefixes.unset_operand_size();
+                if prefixes.rex_unchecked().w() {
+                    self.vqp_size = RegisterBank::Q;
+                } else {
+                    self.vqp_size = RegisterBank::D;
+                }
+                OpcodeRecord(Interpretation::Instruction(Opcode::ENQCMD), OperandCode::INV_Gv_M)
+            },
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    }
+
+    if prefixes.operand_size() {
+        // leave operand size present for `movbe`
+        if opcode != 0xf0 && opcode != 0xf1 {
+            prefixes.unset_operand_size();
+            if prefixes.rex_unchecked().w() {
+                self.vqp_size = RegisterBank::Q;
+            } else {
+                self.vqp_size = RegisterBank::D;
+            }
+        }
+
+        return match opcode {
+            0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFB), OperandCode::G_E_xmm),
+            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDW), OperandCode::G_E_xmm),
+            0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDD), OperandCode::G_E_xmm),
+            0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDSW), OperandCode::G_E_xmm),
+            0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::PMADDUBSW), OperandCode::G_E_xmm),
+            0x05 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBW), OperandCode::G_E_xmm),
+            0x06 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBD), OperandCode::G_E_xmm),
+            0x07 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBSW), OperandCode::G_E_xmm),
+            0x08 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNB), OperandCode::G_E_xmm),
+            0x09 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNW), OperandCode::G_E_xmm),
+            0x0a => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGND), OperandCode::G_E_xmm),
+            0x0b => OpcodeRecord(Interpretation::Instruction(Opcode::PMULHRSW), OperandCode::G_E_xmm),
+            0x10 => OpcodeRecord(Interpretation::Instruction(Opcode::PBLENDVB), OperandCode::G_E_xmm),
+            0x14 => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDVPS), OperandCode::G_E_xmm),
+            0x15 => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDVPD), OperandCode::G_E_xmm),
+            0x17 => OpcodeRecord(Interpretation::Instruction(Opcode::PTEST), OperandCode::G_E_xmm),
+            0x1c => OpcodeRecord(Interpretation::Instruction(Opcode::PABSB), OperandCode::G_E_xmm),
+            0x1d => OpcodeRecord(Interpretation::Instruction(Opcode::PABSW), OperandCode::G_E_xmm),
+            0x1e => OpcodeRecord(Interpretation::Instruction(Opcode::PABSD), OperandCode::G_E_xmm),
+            0x20 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXBW), OperandCode::PMOVX_G_E_xmm),
+            0x21 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXBD), OperandCode::PMOVX_G_E_xmm),
+            0x22 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXBQ), OperandCode::PMOVX_G_E_xmm),
+            0x23 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXWD), OperandCode::PMOVX_G_E_xmm),
+            0x24 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXWQ), OperandCode::PMOVX_G_E_xmm),
+            0x25 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVSXDQ), OperandCode::PMOVX_G_E_xmm),
+            0x28 => OpcodeRecord(Interpretation::Instruction(Opcode::PMULDQ), OperandCode::G_E_xmm),
+            0x29 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPEQQ), OperandCode::G_E_xmm),
+            0x2a => OpcodeRecord(Interpretation::Instruction(Opcode::MOVNTDQA), OperandCode::G_M_xmm),
+            0x2b => OpcodeRecord(Interpretation::Instruction(Opcode::PACKUSDW), OperandCode::G_E_xmm),
+            0x30 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXBW), OperandCode::PMOVX_G_E_xmm),
+            0x31 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXBD), OperandCode::PMOVX_G_E_xmm),
+            0x32 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXBQ), OperandCode::PMOVX_G_E_xmm),
+            0x33 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXWD), OperandCode::PMOVX_G_E_xmm),
+            0x34 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXWQ), OperandCode::PMOVX_G_E_xmm),
+            0x35 => OpcodeRecord(Interpretation::Instruction(Opcode::PMOVZXDQ), OperandCode::PMOVX_G_E_xmm),
+            0x37 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPGTQ), OperandCode::G_E_xmm),
+            0x38 => OpcodeRecord(Interpretation::Instruction(Opcode::PMINSB), OperandCode::G_E_xmm),
+            0x39 => OpcodeRecord(Interpretation::Instruction(Opcode::PMINSD), OperandCode::G_E_xmm),
+            0x3a => OpcodeRecord(Interpretation::Instruction(Opcode::PMINUW), OperandCode::G_E_xmm),
+            0x3b => OpcodeRecord(Interpretation::Instruction(Opcode::PMINUD), OperandCode::G_E_xmm),
+            0x3c => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXSB), OperandCode::G_E_xmm),
+            0x3d => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXSD), OperandCode::G_E_xmm),
+            0x3e => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXUW), OperandCode::G_E_xmm),
+            0x3f => OpcodeRecord(Interpretation::Instruction(Opcode::PMAXUD), OperandCode::G_E_xmm),
+            0x40 => OpcodeRecord(Interpretation::Instruction(Opcode::PMULLD), OperandCode::G_E_xmm),
+            0x41 => OpcodeRecord(Interpretation::Instruction(Opcode::PHMINPOSUW), OperandCode::G_E_xmm),
+            0x80 => OpcodeRecord(Interpretation::Instruction(Opcode::INVEPT), OperandCode::INV_Gv_M),
+            0x81 => OpcodeRecord(Interpretation::Instruction(Opcode::INVVPID), OperandCode::INV_Gv_M),
+            0x82 => OpcodeRecord(Interpretation::Instruction(Opcode::INVPCID), OperandCode::INV_Gv_M),
+            0xcf => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8MULB), OperandCode::G_E_xmm),
+            0xdb => OpcodeRecord(Interpretation::Instruction(Opcode::AESIMC), OperandCode::G_E_xmm),
+            0xdc => OpcodeRecord(Interpretation::Instruction(Opcode::AESENC), OperandCode::G_E_xmm),
+            0xdd => OpcodeRecord(Interpretation::Instruction(Opcode::AESENCLAST), OperandCode::G_E_xmm),
+            0xde => OpcodeRecord(Interpretation::Instruction(Opcode::AESDEC), OperandCode::G_E_xmm),
+            0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::AESDECLAST), OperandCode::G_E_xmm),
+            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::Gv_M),
+            0xf1 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::M_Gv),
+            0xf5 => OpcodeRecord(Interpretation::Instruction(Opcode::WRUSS), OperandCode::Mdq_Gdq),
+            0xf6 => OpcodeRecord(Interpretation::Instruction(Opcode::ADCX), OperandCode::Gv_Ev),
+            0xf8 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVDIR64B), OperandCode::MOVDIR64B),
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    } else {
+        return match opcode {
+            0x00 => OpcodeRecord(Interpretation::Instruction(Opcode::PSHUFB), OperandCode::G_E_mm),
+            0x01 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDW), OperandCode::G_E_mm),
+            0x02 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDD), OperandCode::G_E_mm),
+            0x03 => OpcodeRecord(Interpretation::Instruction(Opcode::PHADDSW), OperandCode::G_E_mm),
+            0x04 => OpcodeRecord(Interpretation::Instruction(Opcode::PMADDUBSW), OperandCode::G_E_mm),
+            0x05 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBW), OperandCode::G_E_mm),
+            0x06 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBD), OperandCode::G_E_mm),
+            0x07 => OpcodeRecord(Interpretation::Instruction(Opcode::PHSUBSW), OperandCode::G_E_mm),
+            0x08 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNB), OperandCode::G_E_mm),
+            0x09 => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGNW), OperandCode::G_E_mm),
+            0x0a => OpcodeRecord(Interpretation::Instruction(Opcode::PSIGND), OperandCode::G_E_mm),
+            0x0b => OpcodeRecord(Interpretation::Instruction(Opcode::PMULHRSW), OperandCode::G_E_mm),
+            0x1c => OpcodeRecord(Interpretation::Instruction(Opcode::PABSB), OperandCode::G_E_mm),
+            0x1d => OpcodeRecord(Interpretation::Instruction(Opcode::PABSW), OperandCode::G_E_mm),
+            0x1e => OpcodeRecord(Interpretation::Instruction(Opcode::PABSD), OperandCode::G_E_mm),
+            0xc8 => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1NEXTE), OperandCode::G_E_xmm),
+            0xc9 => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1MSG1), OperandCode::G_E_xmm),
+            0xca => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1MSG2), OperandCode::G_E_xmm),
+            0xcb => OpcodeRecord(Interpretation::Instruction(Opcode::SHA256RNDS2), OperandCode::G_E_xmm),
+            0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA256MSG1), OperandCode::G_E_xmm),
+            0xcd => OpcodeRecord(Interpretation::Instruction(Opcode::SHA256MSG2), OperandCode::G_E_xmm),
+            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::Gv_M),
+            0xf1 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVBE), OperandCode::M_Gv),
+            0xf6 => OpcodeRecord(Interpretation::Instruction(Opcode::WRSS), OperandCode::Mdq_Gdq),
+            0xf9 => OpcodeRecord(Interpretation::Instruction(Opcode::MOVDIRI), OperandCode::Md_Gd),
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    }
+}
+
+#[inline(always)]
+fn read_0f3a_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecord {
+    if prefixes.rep() {
+        if prefixes != &Prefixes::new(0x10) {
+            return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
+        }
+        return match opcode {
+            0xf0 => OpcodeRecord(Interpretation::Instruction(Opcode::HRESET), OperandCode::ModRM_0xf30f3af0),
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    }
+
+    if prefixes.repnz() {
+        return OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing);
+    }
+
+    if prefixes.operand_size() {
+        if opcode == 0x16 && prefixes.rex_unchecked().w() {
+            return OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRQ), OperandCode::G_Ev_xmm_Ib);
+        } else if opcode == 0x22 && prefixes.rex_unchecked().w() {
+            return OpcodeRecord(Interpretation::Instruction(Opcode::PINSRQ), OperandCode::G_Ev_xmm_Ib);
+        }
+
+        return match opcode {
+            0x08 => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDPS), OperandCode::G_E_xmm_Ib),
+            0x09 => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDPD), OperandCode::G_E_xmm_Ib),
+            0x0a => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDSS), OperandCode::G_E_xmm_Ib),
+            0x0b => OpcodeRecord(Interpretation::Instruction(Opcode::ROUNDSD), OperandCode::G_E_xmm_Ib),
+            0x0c => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDPS), OperandCode::G_E_xmm_Ib),
+            0x0d => OpcodeRecord(Interpretation::Instruction(Opcode::BLENDPD), OperandCode::G_E_xmm_Ib),
+            0x0e => OpcodeRecord(Interpretation::Instruction(Opcode::PBLENDW), OperandCode::G_E_xmm_Ib),
+            0x0f => OpcodeRecord(Interpretation::Instruction(Opcode::PALIGNR), OperandCode::G_E_xmm_Ib),
+            0x14 => OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRB), OperandCode::G_Ev_xmm_Ib),
+            0x15 => OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRW), OperandCode::G_Ev_xmm_Ib),
+            0x16 => OpcodeRecord(Interpretation::Instruction(Opcode::PEXTRD), OperandCode::G_Ev_xmm_Ib),
+            0x17 => OpcodeRecord(Interpretation::Instruction(Opcode::EXTRACTPS), OperandCode::G_Ev_xmm_Ib),
+            0x20 => OpcodeRecord(Interpretation::Instruction(Opcode::PINSRB), OperandCode::G_Ev_xmm_Ib),
+            0x21 => OpcodeRecord(Interpretation::Instruction(Opcode::INSERTPS), OperandCode::G_Ev_xmm_Ib),
+            0x22 => OpcodeRecord(Interpretation::Instruction(Opcode::PINSRD), OperandCode::G_Ev_xmm_Ib),
+            0x40 => OpcodeRecord(Interpretation::Instruction(Opcode::DPPS), OperandCode::G_E_xmm_Ib),
+            0x41 => OpcodeRecord(Interpretation::Instruction(Opcode::DPPD), OperandCode::G_E_xmm_Ib),
+            0x42 => OpcodeRecord(Interpretation::Instruction(Opcode::MPSADBW), OperandCode::G_E_xmm_Ib),
+            0x44 => OpcodeRecord(Interpretation::Instruction(Opcode::PCLMULQDQ), OperandCode::G_E_xmm_Ib),
+            0x60 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPESTRM), OperandCode::G_E_xmm_Ib),
+            0x61 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPESTRI), OperandCode::G_E_xmm_Ib),
+            0x62 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPISTRM), OperandCode::G_E_xmm_Ib),
+            0x63 => OpcodeRecord(Interpretation::Instruction(Opcode::PCMPISTRI), OperandCode::G_E_xmm_Ib),
+//            0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1RNDS4), OperandCode::G_E_xmm_Ib),
+            0xce => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8AFFINEQB), OperandCode::G_E_xmm_Ub),
+            0xcf => OpcodeRecord(Interpretation::Instruction(Opcode::GF2P8AFFINEINVQB), OperandCode::G_E_xmm_Ub),
+            0xdf => OpcodeRecord(Interpretation::Instruction(Opcode::AESKEYGENASSIST), OperandCode::G_E_xmm_Ub),
+            _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+        };
+    }
+
+    return match opcode {
+        0xcc => OpcodeRecord(Interpretation::Instruction(Opcode::SHA1RNDS4), OperandCode::G_E_xmm_Ub),
+        0x0f => OpcodeRecord(Interpretation::Instruction(Opcode::PALIGNR), OperandCode::G_E_mm_Ib),
+        _ => OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
+    };
 }
 }
 
