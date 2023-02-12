@@ -7078,7 +7078,6 @@ fn read_operands<
     }
 
     let mut modrm = 0;
-    let mut opwidth = 0;
     let mut mem_oper = OperandSpec::Nothing;
     if operand_code.has_read_E() {
         let bank;
@@ -7087,11 +7086,9 @@ fn read_operands<
             // further, this is an vdq E
             bank = instruction.prefixes.vqp_size();
             instruction.mem_size = bank as u8;
-            opwidth = bank as u8;
         } else {
             bank = instruction.prefixes.rb_size();
             instruction.mem_size = 1;
-            opwidth = 1;
         };
         modrm = read_modrm(words)?;
         instruction.regs[0].bank = bank;
@@ -7182,6 +7179,8 @@ fn read_operands<
                     InnerDescription::Misc("opcode selects `eax` operand")
                         .with_id(opcode_start + 2)
                 );
+                // TODO: hmm
+                let opwidth = 0;
                 if opwidth == 2 {
                     sink.record(
                         opcode_start + 3,
@@ -7313,6 +7312,7 @@ fn read_operands<
                 InnerDescription::Opcode(instruction.opcode)
                     .with_id(modrm_start - 8)
             );
+            let opwidth = instruction.regs[0].bank as u8;
             if opwidth == 8 {
                 instruction.imm = read_imm_signed(words, 4)? as u64;
                 sink.record(
@@ -7338,8 +7338,8 @@ fn read_operands<
             };
         },
         OperandCase::MovI8 => {
-            if (modrm & 0b00111000) != 0 {
-                if modrm == 0xf8 {
+            if instruction.regs[0].num & 0b0111 != 0 {
+                if mem_oper == OperandSpec::RegMMM && instruction.regs[1].num & 0b0111 == 0 {
                     instruction.opcode = Opcode::XABORT;
                     instruction.imm = read_imm_signed(words, 1)? as u64;
                     sink.record(
@@ -7374,8 +7374,9 @@ fn read_operands<
 
         }
         OperandCase::MovIv => {
-            if (modrm & 0b00111000) != 0 {
-                if modrm == 0xf8 {
+            let opwidth = instruction.regs[0].bank as u8;
+            if instruction.regs[0].num & 0b0111 != 0 {
+                if mem_oper == OperandSpec::RegMMM && instruction.regs[1].num & 0b0111 == 0 {
                     instruction.opcode = Opcode::XBEGIN;
                     instruction.imm = if opwidth == 2 {
                         let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
@@ -7428,7 +7429,7 @@ fn read_operands<
         },
         OperandCase::BitwiseWithI8 => {
             instruction.operands[0] = mem_oper;
-            instruction.opcode = bitwise_opcode_map((modrm >> 3) & 7);
+            instruction.opcode = bitwise_opcode_map(instruction.regs[0].num & 0b0111);
             sink.record(
                 modrm_start + 3,
                 modrm_start + 5,
@@ -7484,6 +7485,7 @@ fn read_operands<
             instruction.operands[1] = OperandSpec::RegRRR;
         },
         OperandCase::ModRM_0xf6_0xf7 => {
+            let opwidth = instruction.regs[0].bank as u8;
             instruction.operands[0] = mem_oper;
             const TABLE: [Opcode; 8] = [
                 Opcode::TEST, Opcode::TEST, Opcode::NOT, Opcode::NEG,
