@@ -254,6 +254,7 @@ pub(crate) fn read_evex<
     Ok(())
 }
 
+#[inline(always)]
 fn deny_broadcast(inst: &Instruction) -> Result<(), DecodeError> {
   if inst.prefixes.evex_unchecked().broadcast() {
     Err(DecodeError::InvalidOperand)
@@ -262,6 +263,7 @@ fn deny_broadcast(inst: &Instruction) -> Result<(), DecodeError> {
   }
 }
 
+#[inline(always)]
 fn deny_z(inst: &Instruction) -> Result<(), DecodeError> {
   if inst.prefixes.evex_unchecked().merge() {
     Err(DecodeError::InvalidOperand)
@@ -270,6 +272,7 @@ fn deny_z(inst: &Instruction) -> Result<(), DecodeError> {
   }
 }
 
+#[inline(always)]
 fn deny_vex_reg(inst: &Instruction) -> Result<(), DecodeError> {
   if inst.regs[3].num != 0 {
     Err(DecodeError::InvalidOperand)
@@ -279,6 +282,7 @@ fn deny_vex_reg(inst: &Instruction) -> Result<(), DecodeError> {
 }
 
 #[allow(non_snake_case)]
+#[inline(always)]
 fn ensure_W(inst: &Instruction, w: u8) -> Result<(), DecodeError> {
   if inst.prefixes.evex_unchecked().vex().w() ^ (w != 0) {
     Err(DecodeError::InvalidOpcode)
@@ -287,6 +291,7 @@ fn ensure_W(inst: &Instruction, w: u8) -> Result<(), DecodeError> {
   }
 }
 
+#[inline(always)]
 fn deny_mask_reg(inst: &Instruction) -> Result<(), DecodeError> {
   if inst.prefixes.evex_unchecked().mask_reg() != 0 {
     Err(DecodeError::InvalidOperand)
@@ -295,6 +300,7 @@ fn deny_mask_reg(inst: &Instruction) -> Result<(), DecodeError> {
   }
 }
 
+#[inline(always)]
 fn check_mask_reg(inst: &Instruction) -> Result<(), DecodeError> {
   // if an operand is to be zeroed on mask bits but mask register 0 is
   // selected, this instruction is nonsense and will #UD
@@ -305,6 +311,7 @@ fn check_mask_reg(inst: &Instruction) -> Result<(), DecodeError> {
   }
 }
 
+#[inline(always)]
 fn apply_broadcast(inst: &mut Instruction, item_size: u8, reg_size: u8) {
   if inst.prefixes.evex_unchecked().broadcast() {
     inst.mem_size = item_size;
@@ -313,6 +320,7 @@ fn apply_broadcast(inst: &mut Instruction, item_size: u8, reg_size: u8) {
   }
 }
 
+#[inline(always)]
 fn set_rrr(inst: &mut Instruction, modrm: u8) {
   inst.regs[0].num = (modrm >> 3) & 7;
   if inst.prefixes.evex_unchecked().vex().r() {
@@ -323,6 +331,7 @@ fn set_rrr(inst: &mut Instruction, modrm: u8) {
   }
 }
 
+#[inline(always)]
 fn set_reg_sizes(inst: &mut Instruction, size: RegisterBank) {
   inst.regs[0].bank = size;
   inst.regs[3].bank = size;
@@ -333,6 +342,7 @@ fn set_reg_sizes(inst: &mut Instruction, size: RegisterBank) {
   }
 }
 
+#[inline(always)]
 fn regs_size(inst: &Instruction) -> u8 {
   if inst.prefixes.evex_unchecked().lp() {
     64
@@ -343,6 +353,7 @@ fn regs_size(inst: &Instruction) -> u8 {
   }
 }
 
+#[inline(always)]
 fn set_reg_sizes_from_ll(inst: &mut Instruction) -> Result<(), DecodeError> {
   if inst.prefixes.evex_unchecked().lp() {
     if inst.prefixes.evex_unchecked().vex().l() {

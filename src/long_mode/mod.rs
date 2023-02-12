@@ -6806,40 +6806,6 @@ fn read_avx_prefixed<
     return Ok(());
 }
 
-/* likely cases
-        OperandCode::Eb_R0 => 0
-        _op @ OperandCode::ModRM_0x80_Eb_Ib => 1
-        _op @ OperandCode::ModRM_0x81_Ev_Ivs => 2
-        op @ OperandCode::ModRM_0xc6_Eb_Ib => 3
-        op @ OperandCode::ModRM_0xc7_Ev_Iv => 4
-        op @ OperandCode::ModRM_0xc0_Eb_Ib => 5
-        op @ OperandCode::ModRM_0xc1_Ev_Ib => 6
-        op @ OperandCode::ModRM_0xd0_Eb_1 => 7
-        op @ OperandCode::ModRM_0xd1_Ev_1 => 8
-        op @ OperandCode::ModRM_0xd2_Eb_CL => 9
-        op @ OperandCode::ModRM_0xd3_Ev_CL => 10
-        _op @ OperandCode::ModRM_0xf6 => 11
-        _op @ OperandCode::ModRM_0xf7 => 12
-        OperandCode::ModRM_0xfe_Eb => 13
-        OperandCode::ModRM_0xff_Ev => 14
-        OperandCode::Gv_Eb => 15
-        OperandCode::Gv_Ew => 16
-        OperandCode::Gdq_Ed => 17
-        OperandCode::Ev => 18
-        OperandCode::E_G_xmm => 19
-        op @ OperandCode::G_M_xmm => 20
-        op @ OperandCode::G_E_xmm => 21
-        OperandCode::G_E_xmm_Ib => 22
-        OperandCode::AL_Ibs => 23
-        OperandCode::AX_Ivd => 24
-        OperandCode::Ivs => 25
-        OperandCode::ModRM_0x83_Ev_Ibs => 26
-        OperandCode::I_3 => 27
-        OperandCode::Nothing => 28
-        OperandCode::G_E_mm_Ib => 29
-        OperandCode::ModRM_0x8f_Ev => 30
-
- */
 #[inline(always)]
 fn read_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
