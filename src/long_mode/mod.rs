@@ -4169,7 +4169,7 @@ impl Default for InstDecoder {
 impl Decoder<Arch> for InstDecoder {
     fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        read_with_annotations(self, words, &mut instr, &mut NullSink)?;
+        DecodeCtx::new().read_with_annotations(self, words, &mut instr, &mut NullSink)?;
 
         instr.length = words.offset() as u8;
         if words.offset() > 15 {
@@ -4196,7 +4196,7 @@ impl AnnotatingDecoder<Arch> for InstDecoder {
         T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
         S: DescriptionSink<Self::FieldDescription>
     >(&self, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        read_with_annotations(self, words, instr, sink)?;
+        DecodeCtx::new().read_with_annotations(self, words, instr, sink)?;
 
         instr.length = words.offset() as u8;
         if words.offset() > 15 {
@@ -4470,8 +4470,6 @@ pub struct Prefixes {
     rex: PrefixRex,
     segment: Segment,
     evex_data: EvexData,
-    vqp_size: RegisterBank,
-    rb_size: RegisterBank,
 }
 
 /// the `avx512`-related data from an [`evex`](https://en.wikipedia.org/wiki/EVEX_prefix) prefix.
@@ -4548,8 +4546,6 @@ impl Prefixes {
             rex: PrefixRex { bits: 0 },
             segment: Segment::DS,
             evex_data: EvexData { bits: 0 },
-            vqp_size: RegisterBank::D,
-            rb_size: RegisterBank::B,
         }
     }
     #[inline]
@@ -4567,16 +4563,17 @@ impl Prefixes {
     #[inline]
     fn set_operand_size(&mut self) {
         self.bits = self.bits | 0x1;
-        self.vqp_size = RegisterBank::W;
     }
     #[inline]
     fn unset_operand_size(&mut self) {
         self.bits = self.bits & !0x1;
+        /* TODO
         if self.rex.w() {
             self.vqp_size = RegisterBank::Q;
         } else {
             self.vqp_size = RegisterBank::D;
         }
+        */
     }
     #[inline]
     fn address_size(&self) -> bool { self.bits & 0x2 == 2 }
@@ -4659,21 +4656,6 @@ impl Prefixes {
     #[inline]
     fn rex_from(&mut self, bits: u8) {
         self.rex.bits = bits;
-        self.rb_size = RegisterBank::rB;
-    }
-
-    #[inline(always)]
-    fn vqp_size(&self) -> RegisterBank {
-        if self.rex.w() {
-            RegisterBank::Q
-        } else {
-            self.vqp_size
-        }
-    }
-
-    #[inline(always)]
-    fn rb_size(&self) -> RegisterBank {
-        self.rb_size
     }
 
     #[inline]
@@ -6586,16 +6568,46 @@ impl fmt::Display for FieldDescription {
     }
 }
 
+#[derive(Copy, Clone)]
+struct DecodeCtx {
+    check_lock: bool,
+    vqp_size: RegisterBank,
+    rb_size: RegisterBank,
+}
+
+impl DecodeCtx {
+    fn new() -> Self {
+        DecodeCtx {
+            check_lock: false,
+            vqp_size: RegisterBank::D,
+            rb_size: RegisterBank::B,
+        }
+    }
+
+    #[inline(always)]
+    fn vqp_size(&self) -> RegisterBank {
+        self.vqp_size
+    }
+
+    #[inline(always)]
+    fn rb_size(&self) -> RegisterBank {
+        self.rb_size
+    }
+
 fn read_opc_hotpath<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(mut b: u8, nextb: &mut u8, record: &mut OpcodeRecord, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<bool, DecodeError> {
+>(&mut self, mut b: u8, nextb: &mut u8, record: &mut OpcodeRecord, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<bool, DecodeError> {
     if b >= 0x40 && b < 0x50 {
         sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
             desc: InnerDescription::RexPrefix(b),
             id: words.offset() as u32 * 8 - 8,
         });
         instruction.prefixes.rex_from(b);
+        if instruction.prefixes.rex_unchecked().w() {
+            self.vqp_size = RegisterBank::Q;
+        }
+        self.rb_size = RegisterBank::rB;
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
         *record = unsafe {
             core::ptr::read_volatile(&OPCODES[b as usize])
@@ -6610,6 +6622,7 @@ fn read_opc_hotpath<
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
         instruction.prefixes.set_operand_size();
+        self.vqp_size = RegisterBank::W;
     }
 
     if let Interpretation::Instruction(opc) = record.0 {
@@ -6670,7 +6683,7 @@ fn read_opc_hotpath<
 fn read_with_annotations<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
+>(mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
@@ -6682,7 +6695,7 @@ fn read_with_annotations<
     // default operands to [RegRRR, Nothing, Nothing, Nothing]
     instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
 
-    let record: OperandCode = if read_opc_hotpath(nextb, &mut nextb, &mut next_rec, words, instruction, sink)? {
+    let record: OperandCode = if self.read_opc_hotpath(nextb, &mut nextb, &mut next_rec, words, instruction, sink)? {
         next_rec.1
     } else {
         let prefixes = &mut instruction.prefixes;
@@ -6699,6 +6712,9 @@ fn read_with_annotations<
                     core::ptr::read_volatile(&OPCODES[nextb as usize])
                 };
                 prefixes.rex_from(b);
+                if prefixes.rex_unchecked().w() {
+                    self.vqp_size = RegisterBank::Q;
+                }
 
                 let record = next_rec;
                 if let Interpretation::Instruction(opc) = record.0 {
@@ -6793,6 +6809,7 @@ fn read_with_annotations<
                         id: words.offset() as u32 * 8 - 8,
                     });
                     prefixes.set_operand_size();
+                    self.vqp_size = RegisterBank::W;
                 } else if b == 0x67 {
                     sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                         desc: InnerDescription::Misc("address size override (to 32 bits)"),
@@ -6845,8 +6862,9 @@ fn read_with_annotations<
                                 id: words.offset() as u32 * 8 - 8,
                             });
                             prefixes.set_lock();
+                            self.check_lock = true;
                         },
-                        _ => { return read_avx_prefixed(b, words, instruction, sink); }
+                        _ => { return self.read_avx_prefixed(b, words, instruction, sink); }
                     }
                 }
                 nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
@@ -6860,7 +6878,8 @@ fn read_with_annotations<
                     });
                 }
                 prefixes.rex_from(0);
-                prefixes.rb_size = RegisterBank::B;
+                self.rb_size = RegisterBank::B;
+                self.vqp_size = RegisterBank::D;
             }
             if words.offset() >= 15 {
                 return Err(DecodeError::TooLong);
@@ -6876,9 +6895,9 @@ fn read_with_annotations<
         record.1
     };
 
-    read_operands(decoder, words, instruction, record, sink)?;
+    self.read_operands(decoder, words, instruction, record, sink)?;
 
-    if instruction.prefixes.lock() {
+    if self.check_lock {
         if (instruction.opcode as u32) < 0x1000 || !instruction.operands[0].is_memory() {
             return Err(DecodeError::InvalidPrefixes);
         }
@@ -6886,11 +6905,12 @@ fn read_with_annotations<
 
     Ok(())
 }
+
 #[inline(never)]
 fn read_avx_prefixed<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(b: u8, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
+>(self, b: u8, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     if instruction.prefixes.vex_invalid() {
         // rex and then vex is invalid! reject it.
         return Err(DecodeError::InvalidPrefixes);
@@ -6979,7 +6999,7 @@ fn read_avx_prefixed<
 fn read_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
->(decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+>(self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
     sink.record(
         words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
         InnerDescription::Boundary("opcode ends/operands begin (typically)")
@@ -6993,12 +7013,12 @@ fn read_operands<
         // cool! we can precompute width and know we need to read_E.
         let bank = if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            let bank = instruction.prefixes.vqp_size();
+            let bank = self.vqp_size();
             instruction.regs[0].bank = bank;
             instruction.mem_size = bank as u8;
             bank
         } else {
-            let bank = instruction.prefixes.rb_size();
+            let bank = self.rb_size();
             instruction.regs[0].bank = bank;
             instruction.mem_size = 1;
             bank
@@ -7084,10 +7104,10 @@ fn read_operands<
         // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
-            bank = instruction.prefixes.vqp_size();
+            bank = self.vqp_size();
             instruction.mem_size = bank as u8;
         } else {
-            bank = instruction.prefixes.rb_size();
+            bank = self.rb_size();
             instruction.mem_size = 1;
         };
         modrm = read_modrm(words)?;
@@ -7152,7 +7172,7 @@ fn read_operands<
                     instruction.operand_count = 0;
                     return Ok(());
                 }
-                let bank = instruction.prefixes.vqp_size();
+                let bank = self.vqp_size();
                 // always *ax, but size is determined by prefixes (or lack thereof)
                 instruction.regs[0] =
                     RegSpec::from_parts(0, false, bank);
@@ -7202,7 +7222,7 @@ fn read_operands<
                 instruction.regs[0] =
                     RegSpec {
                         num: reg + if instruction.prefixes.rex_unchecked().b() { 0b1000 } else { 0 },
-                        bank: instruction.prefixes.rb_size()
+                        bank: self.rb_size()
                     };
                 sink.record(
                     opcode_start,
@@ -7229,7 +7249,7 @@ fn read_operands<
             }
             3 => {
                 // category == 3, Zv_Ivq_R
-                let bank = instruction.prefixes.vqp_size();
+                let bank = self.vqp_size();
                 instruction.regs[0] =
                     RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
                 sink.record(
@@ -7598,7 +7618,7 @@ fn read_operands<
             instruction.operand_count = 1;
         }
         OperandCase::Gv_Eb => {
-            let w = instruction.prefixes.rb_size();
+            let w = self.rb_size();
 
             instruction.operands[1] = mem_oper;
             sink.record(
@@ -7750,7 +7770,7 @@ fn read_operands<
             instruction.operands[1] = OperandSpec::ImmI8;
         }
         OperandCase::AX_Ivd => {
-            let bank = instruction.prefixes.vqp_size();
+            let bank = self.vqp_size();
             let numwidth = if bank as u8 == 8 { 4 } else { bank as u8 };
             instruction.regs[0] =
                 RegSpec::gp_from_parts_non_byte(0, false, bank);
@@ -8149,7 +8169,7 @@ fn read_operands<
             instruction.operand_count = 3;
         }
         OperandCase::Gv_Ev_Iv => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vqp, instruction.prefixes);
+            let opwidth = self.vqp_size() as u8;
             let numwidth = if opwidth == 8 { 4 } else { opwidth };
             instruction.imm =
                 read_imm_signed(words, numwidth)? as u64;
@@ -8220,7 +8240,7 @@ fn read_operands<
             } else {
                 instruction.mem_size = 2;
             }
-            instruction.regs[0].bank = instruction.prefixes.vqp_size();
+            instruction.regs[0].bank = self.vqp_size();
         },
         OperandCase::Gdq_Ev => {
             instruction.operands[1] = mem_oper;
@@ -10301,6 +10321,7 @@ fn read_operands<
         }
     };
     Ok(())
+}
 }
 
 fn decode_x87<
