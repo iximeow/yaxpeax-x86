@@ -7122,6 +7122,35 @@ fn read_operands<
         return Ok(());
     }
 
+    if operand_code.has_imm() {
+        if operand_code.operand_case_handler_index() == OperandCase::Ibs {
+            instruction.imm =
+                read_imm_signed(words, 1)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 8,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
+            instruction.operands[0] = OperandSpec::ImmI8;
+        } else {
+            instruction.imm =
+                read_imm_signed(words, 4)? as u64;
+            sink.record(
+                words.offset() as u32 * 8 - 32,
+                words.offset() as u32 * 8 - 1,
+                InnerDescription::Number("4-byte immediate", instruction.imm as i64)
+                    .with_id(words.offset() as u32 * 8),
+            );
+            if instruction.opcode == Opcode::CALL {
+                instruction.mem_size = 8;
+            }
+            instruction.operands[0] = OperandSpec::ImmI32;
+        }
+        instruction.operand_count = 1;
+        return Ok(());
+    }
+
     let mut modrm = 0;
     let mut opwidth = 0;
     let mut mem_oper = OperandSpec::Nothing;
@@ -7164,35 +7193,6 @@ fn read_operands<
             read_M(words, instruction, modrm, sink)?
         };
         instruction.operands[1] = mem_oper;
-    }
-
-    if operand_code.has_imm() {
-        if operand_code.operand_case_handler_index() == OperandCase::Ibs {
-            instruction.imm =
-                read_imm_signed(words, 1)? as u64;
-            sink.record(
-                words.offset() as u32 * 8 - 8,
-                words.offset() as u32 * 8 - 1,
-                InnerDescription::Number("1-byte immediate", instruction.imm as i64)
-                    .with_id(words.offset() as u32 * 8),
-            );
-            instruction.operands[0] = OperandSpec::ImmI8;
-        } else {
-            instruction.imm =
-                read_imm_signed(words, 4)? as u64;
-            sink.record(
-                words.offset() as u32 * 8 - 32,
-                words.offset() as u32 * 8 - 1,
-                InnerDescription::Number("4-byte immediate", instruction.imm as i64)
-                    .with_id(words.offset() as u32 * 8),
-            );
-            if instruction.opcode == Opcode::CALL {
-                instruction.mem_size = 8;
-            }
-            instruction.operands[0] = OperandSpec::ImmI32;
-        }
-        instruction.operand_count = 1;
-        return Ok(());
     }
 
     if let Some(z_operand_code) = operand_code.get_embedded_instructions() {
