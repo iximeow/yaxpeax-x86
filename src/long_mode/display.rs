@@ -360,7 +360,6 @@ const MNEMONICS: &[&'static str] = &[
     "sub",
     "xor",
     "cmp",
-
     "rol",
     "ror",
     "rcl",
@@ -369,13 +368,20 @@ const MNEMONICS: &[&'static str] = &[
     "shr",
     "sal",
     "sar",
-
-    "invalid",
-    "xadd",
-    "bt",
-    "bts",
     "btc",
     "btr",
+    "bts",
+    "cmpxchg",
+    "cmpxchg8b",
+    "cmpxchg16b",
+    "dec",
+    "inc",
+    "neg",
+    "not",
+    "xadd",
+    "xchg",
+    "invalid",
+    "bt",
     "bsf",
     "bsr",
     "tzcnt",
@@ -420,8 +426,8 @@ const MNEMONICS: &[&'static str] = &[
     "movsx",
     "movsxd",
     "shrd",
-    "inc",
-    "dec",
+//    "inc",
+//    "dec",
     "hlt",
     "call",
     "callf",
@@ -435,7 +441,7 @@ const MNEMONICS: &[&'static str] = &[
     "prefetch0",
     "prefetch1",
     "prefetch2",
-    "xchg",
+//    "xchg",
     "popf",
     "int",
     "into",
@@ -503,9 +509,9 @@ const MNEMONICS: &[&'static str] = &[
     "div",
     "idiv",
     "mul",
-    "neg",
-    "not",
-    "cmpxchg",
+//    "neg",
+//    "not",
+//    "cmpxchg",
     "seto",
     "setno",
     "setb",
@@ -590,6 +596,7 @@ const MNEMONICS: &[&'static str] = &[
     "movdq2q",
     "rsqrtss",
     "rcpss",
+
     "andn",
     "bextr",
     "blsi",
@@ -620,10 +627,13 @@ const MNEMONICS: &[&'static str] = &[
     "enclu",
     "rdpkru",
     "wrpkru",
+
     "rdpru",
     "clzero",
+
     "rdseed",
     "rdrand",
+
     "addps",
     "addpd",
     "andnps",
@@ -764,6 +774,7 @@ const MNEMONICS: &[&'static str] = &[
     "vmwrite",
     "xorps",
     "xorpd",
+
     "vmovddup",
     "vpshuflw",
     "vpshufhw",
@@ -772,6 +783,7 @@ const MNEMONICS: &[&'static str] = &[
     "vaddsubps",
     "vcvtpd2dq",
     "vlddqu",
+
     "vcomisd",
     "vcomiss",
     "vucomisd",
@@ -1114,6 +1126,7 @@ const MNEMONICS: &[&'static str] = &[
     "vzeroall",
     "vldmxcsr",
     "vstmxcsr",
+
     "pclmulqdq",
     "aeskeygenassist",
     "aesimc",
@@ -1194,6 +1207,7 @@ const MNEMONICS: &[&'static str] = &[
     "phaddw",
     "hsubpd",
     "haddpd",
+
     "sha1rnds4",
     "sha1nexte",
     "sha1msg1",
@@ -1201,6 +1215,7 @@ const MNEMONICS: &[&'static str] = &[
     "sha256rnds2",
     "sha256msg1",
     "sha256msg2",
+
     "lzcnt",
     "clgi",
     "stgi",
@@ -1212,15 +1227,20 @@ const MNEMONICS: &[&'static str] = &[
     "invlpga",
     "invlpgb",
     "tlbsync",
+
     "movbe",
+
     "adcx",
     "adox",
+
     "prefetchw",
+
     "rdpid",
-    "cmpxchg8b",
-    "cmpxchg16b",
+//    "cmpxchg8b",
+//    "cmpxchg16b",
     "vmptrld",
     "vmptrst",
+
     "bzhi",
     "mulx",
     "shlx",
@@ -1235,10 +1255,12 @@ const MNEMONICS: &[&'static str] = &[
     "xsavec64",
     "xsaves",
     "xsaves64",
+
     "rdfsbase",
     "rdgsbase",
     "wrfsbase",
     "wrgsbase",
+
     "crc32",
     "salc",
     "xlat",
@@ -1335,12 +1357,17 @@ const MNEMONICS: &[&'static str] = &[
     "fxtract",
     "fyl2x",
     "fyl2xp1",
+
     "loopnz",
     "loopz",
     "loop",
     "jrcxz",
+
+    // started shipping in Tremont, 2020 sept 23
     "movdir64b",
     "movdiri",
+
+    // started shipping in Tiger Lake, 2020 sept 2
     "aesdec128kl",
     "aesdec256kl",
     "aesdecwide128kl",
@@ -1360,8 +1387,8 @@ const MNEMONICS: &[&'static str] = &[
     "femms",
     "pi2fw",
     "pi2fd",
-    "pi2iw",
-    "pi2id",
+    "pf2iw",
+    "pf2id",
     "pmulhrw",
     "pfcmpge",
     "pfmin",
@@ -1388,7 +1415,7 @@ const MNEMONICS: &[&'static str] = &[
     "enqcmd",
     "enqcmds",
 
-    // INVPCID,
+    // INVPCID
     "invept",
     "invvpid",
     "invpcid",
@@ -1715,8 +1742,6 @@ const MNEMONICS: &[&'static str] = &[
     "bndldx",
     "bndstx",
 
-
-
     "vgf2p8affineqb",
     "vgf2p8affineinvqb",
     "vpshrdq",
@@ -1805,6 +1830,7 @@ const MNEMONICS: &[&'static str] = &[
     "vpandnq",
     "vpandd",
     "vpandq",
+
     "psmash",
     "pvalidate",
     "rmpadjust",
@@ -1814,7 +1840,7 @@ const MNEMONICS: &[&'static str] = &[
 impl Opcode {
     fn name(&self) -> &'static str {
         unsafe {
-            MNEMONICS.get_kinda_unchecked(*self as usize)
+            MNEMONICS.get_kinda_unchecked((*self as usize) & 0xfff)
         }
     }
 }
