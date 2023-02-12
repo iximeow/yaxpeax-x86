@@ -5017,7 +5017,8 @@ enum OperandCase {
     ShiftBy1_v,
     BitwiseByCL,
     ModRM_0x8f,
-    ModRM_0xf6_0xf7,
+    ModRM_0xf6,
+    ModRM_0xf7,
     ModRM_0xfe,
     ModRM_0xff,
     Gv_Eb,
@@ -5378,12 +5379,12 @@ enum OperandCode {
         .read_modrm()
         .read_E()
         .byte_operands()
-        .operand_case(OperandCase::ModRM_0xf6_0xf7)
+        .operand_case(OperandCase::ModRM_0xf6)
         .bits(),
     ModRM_0xf7 = OperandCodeBuilder::new()
         .read_modrm()
         .read_E()
-        .operand_case(OperandCase::ModRM_0xf6_0xf7)
+        .operand_case(OperandCase::ModRM_0xf7)
         .bits(),
     Ev = OperandCodeBuilder::new()
         .read_modrm()
@@ -7367,7 +7368,36 @@ fn read_operands<
             );
             instruction.operands[1] = OperandSpec::RegRRR;
         },
-        OperandCase::ModRM_0xf6_0xf7 => {
+        OperandCase::ModRM_0xf6 => {
+            instruction.operands[0] = mem_oper;
+            const TABLE: [Opcode; 8] = [
+                Opcode::TEST, Opcode::TEST, Opcode::NOT, Opcode::NEG,
+                Opcode::MUL, Opcode::IMUL, Opcode::DIV, Opcode::IDIV,
+            ];
+            let rrr = (modrm >> 3) & 7;
+            instruction.opcode = TABLE[rrr as usize];
+            sink.record(
+                modrm_start + 3,
+                modrm_start + 5,
+                InnerDescription::Opcode(instruction.opcode)
+                    .with_id(modrm_start - 8)
+            );
+            if rrr < 2 {
+                instruction.opcode = Opcode::TEST;
+                instruction.imm = read_imm_signed(words, 1)? as u64;
+                instruction.operands[1] = OperandSpec::ImmI8;
+                sink.record(
+                    modrm_start + 8,
+                    modrm_start + 8 + 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(modrm_start + 8)
+                );
+            } else {
+                instruction.operand_count = 1;
+            }
+
+        },
+        OperandCase::ModRM_0xf7 => {
             let opwidth = instruction.regs[0].bank as u8;
             instruction.operands[0] = mem_oper;
             const TABLE: [Opcode; 8] = [
