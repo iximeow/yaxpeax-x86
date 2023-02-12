@@ -9,9 +9,9 @@ Build.metric(
 )
 
 Build.run({"cargo", "build"}, {step="build"}) -- `run` automatically records stdout and stderr to log files named after the command
-Build.run({"cargo", "test"}, {step="test", name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
-Build.run({"cargo", "test", "--no-default-features"}, {step="test", name="test nostdlib/nofmt"})
-Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {step="test", name="test nostdlib/fmt"})
+-- Build.run({"cargo", "test"}, {step="test", name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
+-- Build.run({"cargo", "test", "--no-default-features"}, {step="test", name="test nostdlib/nofmt"})
+-- Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {step="test", name="test nostdlib/fmt"})
 
 Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", "x86_64-unknown-linux-gnu"}, {step="ffi_build", cwd="ffi/"})
 
