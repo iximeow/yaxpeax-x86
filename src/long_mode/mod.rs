@@ -7200,7 +7200,7 @@ fn read_operands<
         },
         OperandCase::MovI8 => {
             if self.rrr != 0 {
-                if mem_oper == OperandSpec::RegMMM && self.rrr == 0 {
+                if mem_oper == OperandSpec::RegMMM && instruction.regs[1].num & 0b0111 == 0 {
                     instruction.opcode = Opcode::XABORT;
                     instruction.imm = read_imm_signed(words, 1)? as u64;
                     sink.record(
@@ -7237,7 +7237,7 @@ fn read_operands<
         OperandCase::MovIv => {
             let opwidth = instruction.regs[0].bank as u8;
             if self.rrr != 0 {
-                if mem_oper == OperandSpec::RegMMM && self.rrr == 0 {
+                if mem_oper == OperandSpec::RegMMM && instruction.regs[1].num & 0b0111 == 0 {
                     instruction.opcode = Opcode::XBEGIN;
                     instruction.imm = if opwidth == 2 {
                         let imm = read_imm_signed(words, 2)? as i16 as i64 as u64;
