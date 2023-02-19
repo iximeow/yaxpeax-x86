@@ -4557,8 +4557,11 @@ impl Prefixes {
     fn set_lock(&mut self) { self.bits |= 0x4 }
     #[inline]
     pub fn lock(&self) -> bool { self.bits & 0x4 == 4 }
+    #[deprecated(since = "0.0.1", note = "pub fn cs has never returned `bool` indicating the current selector is `cs`. use `selects_cs` for this purpose, until 2.x that will correct `pub fn cs`.")]
     #[inline]
-    pub fn cs(&mut self) { self.segment = Segment::CS }
+    pub fn cs(&mut self) {}
+    #[inline]
+    pub fn selects_cs(&self) -> bool { self.segment == Segment::CS }
     #[inline]
     pub fn ds(&self) -> bool { self.segment == Segment::DS }
     #[inline]
