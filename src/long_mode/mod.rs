@@ -4197,6 +4197,77 @@ impl AnnotatingDecoder<Arch> for InstDecoder {
 }
 
 impl Opcode {
+    /// check if the instruction is one of x86's sixteen conditional jump instructions. use this
+    /// rather than `opcode.to_string().starts_with("j") && opcode != Opcode::JMP`, thank you.
+    pub fn is_jcc(&self) -> bool {
+        match self {
+            Opcode::JO |
+            Opcode::JNO |
+            Opcode::JB |
+            Opcode::JNB |
+            Opcode::JZ |
+            Opcode::JNZ |
+            Opcode::JA |
+            Opcode::JNA |
+            Opcode::JS |
+            Opcode::JNS |
+            Opcode::JP |
+            Opcode::JNP |
+            Opcode::JL |
+            Opcode::JGE |
+            Opcode::JG |
+            Opcode::JLE => true,
+            _ => false,
+        }
+    }
+
+    /// check if the instruction is one of x86's sixteen conditional move instructions.
+    pub fn is_cmovcc(&self) -> bool {
+        match self {
+            Opcode::CMOVO |
+            Opcode::CMOVNO |
+            Opcode::CMOVB |
+            Opcode::CMOVNB |
+            Opcode::CMOVZ |
+            Opcode::CMOVNZ |
+            Opcode::CMOVA |
+            Opcode::CMOVNA |
+            Opcode::CMOVS |
+            Opcode::CMOVNS |
+            Opcode::CMOVP |
+            Opcode::CMOVNP |
+            Opcode::CMOVL |
+            Opcode::CMOVGE |
+            Opcode::CMOVG |
+            Opcode::CMOVLE => true,
+            _ => false,
+        }
+    }
+
+    /// check if the instruction is one of x86's sixteen conditional set instructions.
+    pub fn is_setcc(&self) -> bool {
+        match self {
+            Opcode::SETO |
+            Opcode::SETNO |
+            Opcode::SETB |
+            Opcode::SETAE |
+            Opcode::SETZ |
+            Opcode::SETNZ |
+            Opcode::SETA |
+            Opcode::SETBE |
+            Opcode::SETS |
+            Opcode::SETNS |
+            Opcode::SETP |
+            Opcode::SETNP |
+            Opcode::SETL |
+            Opcode::SETGE |
+            Opcode::SETG |
+            Opcode::SETLE => true,
+            _ => false
+        }
+
+    }
+
     /// get the [`ConditionCode`] for this instruction, if it is in fact conditional. x86's
     /// conditional instructions are `Jcc`, `CMOVcc`, andd `SETcc`.
     pub fn condition(&self) -> Option<ConditionCode> {

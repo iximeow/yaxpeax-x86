@@ -2,6 +2,7 @@ extern crate rand;
 
 mod regspec;
 mod operand;
+mod opcode;
 #[cfg(feature="fmt")]
 mod display;
 #[cfg(feature="std")]

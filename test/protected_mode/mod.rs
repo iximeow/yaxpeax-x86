@@ -1,5 +1,6 @@
 mod regspec;
 mod operand;
+mod opcode;
 #[cfg(feature="fmt")]
 mod display;
 mod evex_generated;

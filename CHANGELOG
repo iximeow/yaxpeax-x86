@@ -4,6 +4,10 @@
   * this "getter" would in fact set the selected segment to `cs`. it has never
     actually returned a `bool`, like other selector-checking methods on
     `Prefixes`.
+* add `Opcode::is_jcc`, `Opcode::is_setcc`, and `Opcode::is_cmovcc` helpers
+  * discovered that `jna` and `jnb` are named what they are, instead of
+    `jbe`/`jae` like their `setcc` an `cmovcc` counterparts. sorry. these will
+    become `jbe` and `jae` in 2.x.
 
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)

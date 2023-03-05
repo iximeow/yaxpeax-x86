@@ -1,4 +1,5 @@
 mod operand;
+mod opcode;
 
 use std::fmt::Write;
 
