@@ -1,22 +1,25 @@
-if not Build.environment.has("rustup")
-then
-  Build.error("i don't know i want to handle dependencies yet")
-end
+Build.dependencies({"git", "make", "rustc", "cargo"})
 
 Build.metric(
   "nightly version",
-  "rustc --version"
+  string.gsub(Build.check_output({"rustc", "--version"}).stdout, '^%s*(.*)%s*$', '%1')
 )
 
-Build.run({"cargo", "build"}, {step="build"}) -- `run` automatically records stdout and stderr to log files named after the command
-Build.run({"cargo", "test"}, {step="test", name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
-Build.run({"cargo", "test", "--no-default-features"}, {step="test", name="test nostdlib/nofmt"})
-Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {step="test", name="test nostdlib/fmt"})
+Step.start("crate")
+Step.push("build")
+Build.run({"cargo", "build"}) -- `run` automatically records stdout and stderr to log files named after the command
+Step.advance("test")
+Build.run({"cargo", "test"}, {name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
+Build.run({"cargo", "test", "--no-default-features"}, {name="test nostdlib/nofmt"})
+Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {name="test nostdlib/fmt"})
 
-Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", "x86_64-unknown-linux-gnu"}, {step="ffi_build", cwd="ffi/"})
+Step.start("ffi")
+Step.push("build")
+Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", Build.environment.vars.native_rust_triple}, {cwd="ffi/"})
 
-sopath = "ffi/target/x86_64-unknown-linux-gnu/release/libyaxpeax_x86_ffi_long_mode.so"
-Build.run({"ls", sopath}, {step="ffi_validate"})
+Step.advance("validate")
+sopath = "ffi/target/" .. Build.environment.vars.native_rust_triple .. "/release/libyaxpeax_x86_ffi_long_mode.so"
+Build.run({"ls", sopath})
 Build.metric(
   "libyaxpeax_x86_ffi_long_mode.so size (bytes)",
   Build.environment.size(sopath)
@@ -24,11 +27,13 @@ Build.metric(
 Build.artifact(sopath)
 
 -- now run some perf numbers...
+Step.start("perf")
 Build.run({"git", "clone", "https://github.com/athre0z/disas-bench.git", "disas-bench"})
 Build.run({"git", "submodule", "update", "--recursive", "--init"}, {cwd="disas-bench"})
 Build.run({"git", "remote", "add", "dev", "../../.."}, {cwd="disas-bench/libs/yaxpeax"})
 Build.run({"git", "fetch", "-a", "dev"}, {cwd="disas-bench/libs/yaxpeax"})
 Build.run({"git", "checkout", Build.sha}, {cwd="disas-bench/libs/yaxpeax"})
+Step.push("build")
 Build.run({"make", "make-bench-yaxpeax"}, {cwd="disas-bench/bench/yaxpeax"})
 
 Build.metric(
@@ -42,6 +47,7 @@ Build.metric(
 )
 
 -- fmt
+Step.advance("fmt")
 bench_start = Build.now_ms()
 
 Build.run({"./bench-yaxpeax-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
@@ -50,6 +56,7 @@ bench_end = Build.now_ms()
 Build.metric("fmt runtime (ms)", bench_end - bench_start)
 
 -- no-fmt
+Step.advance("no-fmt")
 bench_start = Build.now_ms()
 
 Build.run({"./bench-yaxpeax-no-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
