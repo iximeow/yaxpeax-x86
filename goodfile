@@ -18,10 +18,10 @@ Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {name
 
 Step.start("ffi")
 Step.push("build")
-Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", "x86_64-unknown-linux-gnu"}, {cwd="ffi/"})
+Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", Build.environment.vars.native_rust_triple}, {cwd="ffi/"})
 
 Step.advance("validate")
-sopath = "ffi/target/x86_64-unknown-linux-gnu/release/libyaxpeax_x86_ffi_long_mode.so"
+sopath = "ffi/target/" .. Build.environment.vars.native_rust_triple .. "/release/libyaxpeax_x86_ffi_long_mode.so"
 Build.run({"ls", sopath})
 Build.metric(
   "libyaxpeax_x86_ffi_long_mode.so size (bytes)",
