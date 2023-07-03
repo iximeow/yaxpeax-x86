@@ -1,11 +1,8 @@
-if not Build.environment.has("rustup")
-then
-  Build.error("i don't know i want to handle dependencies yet")
-end
+Build.dependencies({"git", "make", "rustc", "cargo"})
 
 Build.metric(
   "nightly version",
-  "rustc --version"
+  string.gsub(Build.check_output({"rustc", "--version"}).stdout, '^%s*(.*)%s*$', '%1')
 )
 
 Step.start("crate")
