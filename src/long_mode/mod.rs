@@ -5098,7 +5098,7 @@ enum OperandCase {
     AX_Ov,
     G_xmm_E_mm,
     G_xmm_U_mm,
-    U_mm_G_xmm,
+    G_mm_U_xmm,
     Rv_Gmm_Ib,
     G_xmm_Edq,
     G_xmm_Eq,
@@ -5445,7 +5445,7 @@ enum OperandCode {
     // gap, 0x9a
     G_xmm_E_mm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_E_mm).bits(),
     G_xmm_U_mm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_U_mm).bits(),
-    U_mm_G_xmm = OperandCodeBuilder::new().read_E().mem_reg().operand_case(OperandCase::U_mm_G_xmm).bits(),
+    G_mm_U_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_mm_U_xmm).bits(),
     G_xmm_Edq = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_Edq).bits(),
     G_xmm_Eq = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_Eq).bits(),
     G_mm_E_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_mm_E_xmm).bits(),
@@ -8955,7 +8955,7 @@ fn read_operands<
                 return Err(DecodeError::InvalidOperand);
             }
         }
-        OperandCase::U_mm_G_xmm => {
+        OperandCase::G_mm_U_xmm => {
             instruction.regs[1].bank = RegisterBank::X;
             if mem_oper == OperandSpec::RegMMM {
                 instruction.regs[0].bank = RegisterBank::MM;
@@ -11235,7 +11235,7 @@ const REPNZ_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
-    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQ2Q), OperandCode::U_mm_G_xmm),
+    OpcodeRecord(Interpretation::Instruction(Opcode::MOVDQ2Q), OperandCode::G_mm_U_xmm),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
