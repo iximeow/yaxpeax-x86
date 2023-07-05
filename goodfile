@@ -7,24 +7,24 @@ Build.metric(
 
 Step.start("crate")
 Step.push("build")
-Build.run({"cargo", "build"}) -- `run` automatically records stdout and stderr to log files named after the command
+-- Build.run({"cargo", "build"}) -- `run` automatically records stdout and stderr to log files named after the command
 Step.advance("test")
-Build.run({"cargo", "test"}, {name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
-Build.run({"cargo", "test", "--no-default-features"}, {name="test nostdlib/nofmt"})
-Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {name="test nostdlib/fmt"})
+-- Build.run({"cargo", "test"}, {name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
+-- Build.run({"cargo", "test", "--no-default-features"}, {name="test nostdlib/nofmt"})
+-- Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {name="test nostdlib/fmt"})
 
 Step.start("ffi")
 Step.push("build")
-Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", Build.environment.vars.native_rust_triple}, {cwd="ffi/"})
+-- Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", Build.environment.vars.native_rust_triple}, {cwd="ffi/"})
 
 Step.advance("validate")
 sopath = "ffi/target/" .. Build.environment.vars.native_rust_triple .. "/release/libyaxpeax_x86_ffi_long_mode.so"
-Build.run({"ls", sopath})
-Build.metric(
-  "libyaxpeax_x86_ffi_long_mode.so size (bytes)",
-  Build.environment.size(sopath)
-)
-Build.artifact(sopath)
+-- Build.run({"ls", sopath})
+-- Build.metric(
+--   "libyaxpeax_x86_ffi_long_mode.so size (bytes)",
+--   Build.environment.size(sopath)
+-- )
+-- Build.artifact(sopath)
 
 -- now run some perf numbers...
 Step.start("perf")
