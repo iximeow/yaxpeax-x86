@@ -5259,8 +5259,8 @@ enum OperandCode {
 //    ModRM_0x0f38 = OperandCodeBuilder::new().read_modrm().operand_case(53).bits(),
 //    ModRM_0x0f3a = OperandCodeBuilder::new().read_modrm().operand_case(54).bits(),
     ModRM_0x0f71 = OperandCodeBuilder::new().read_E().operand_case(OperandCase::ModRM_0x0f71).bits(),
-    ModRM_0x0f72 = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0f72).bits(),
-    ModRM_0x0f73 = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x0f73).bits(),
+    ModRM_0x0f72 = OperandCodeBuilder::new().read_E().operand_case(OperandCase::ModRM_0x0f72).bits(),
+    ModRM_0x0f73 = OperandCodeBuilder::new().read_E().operand_case(OperandCase::ModRM_0x0f73).bits(),
     ModRM_0xf20f78 = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0xf20f78).bits(),
     ModRM_0x660f78 = OperandCodeBuilder::new().read_modrm().operand_case(OperandCase::ModRM_0x660f78).bits(),
     ModRM_0xf30f1e = OperandCodeBuilder::new().operand_case(OperandCase::ModRM_0xf30f1e).bits(),
@@ -5425,7 +5425,7 @@ enum OperandCode {
     Mdq_Gdq = OperandCodeBuilder::new().read_E().mem_reg().operand_case(OperandCase::Mdq_Gdq).bits(),
     G_E_xmm_Ib = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_E_xmm_Ib).bits(),
     G_E_xmm_Ub = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_E_xmm_Ub).bits(),
-    G_U_xmm_Ub = OperandCodeBuilder::new().read_E().deny_regmmm().operand_case(OperandCase::G_U_xmm_Ub).bits(),
+    G_U_xmm_Ub = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_U_xmm_Ub).bits(),
     AL_Ob = OperandCodeBuilder::new().operand_case(OperandCase::AL_Ob).bits(),
     AL_Xb = OperandCodeBuilder::new().operand_case(OperandCase::AL_Xb).bits(),
     AX_Ov = OperandCodeBuilder::new().operand_case(OperandCase::AX_Ov).bits(),
@@ -7833,6 +7833,9 @@ fn read_operands<
             }
         }
         OperandCase::G_U_xmm_Ub => {
+            if mem_oper != OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
             instruction.operands[1] = mem_oper;
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::X;
@@ -8602,7 +8605,6 @@ fn read_operands<
             }
 
             if instruction.prefixes.operand_size() {
-                // TODO: should this respect rex.w? it did not before, does now.
                 instruction.regs[1].bank = RegisterBank::X;
             } else {
                 instruction.regs[1].bank = RegisterBank::MM;
@@ -8619,14 +8621,11 @@ fn read_operands<
                 return Err(DecodeError::InvalidOperand);
             }
 
-            instruction.operand_count = 2;
-
-            let modrm = read_modrm(words)?;
-            if modrm & 0xc0 != 0xc0 {
+            if mem_oper != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
 
-            let r = (modrm >> 3) & 7;
+            let r = instruction.regs[0].num & 0b0111;
             match r {
                 2 => {
                     instruction.opcode = Opcode::PSRLD;
@@ -8643,11 +8642,12 @@ fn read_operands<
             }
 
             if instruction.prefixes.operand_size() {
-                instruction.regs[1] = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
-                instruction.regs[1] = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b0111;
             }
-            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.operands[0] = mem_oper;
             instruction.imm = read_imm_signed(words, 1)? as u64;
             instruction.operands[1] = OperandSpec::ImmU8;
         },
@@ -8656,14 +8656,11 @@ fn read_operands<
                 return Err(DecodeError::InvalidOperand);
             }
 
-            instruction.operand_count = 2;
-
-            let modrm = read_modrm(words)?;
-            if modrm & 0xc0 != 0xc0 {
+            if mem_oper != OperandSpec::RegMMM {
                 return Err(DecodeError::InvalidOperand);
             }
 
-            let r = (modrm >> 3) & 7;
+            let r = instruction.regs[0].num & 0b0111;
             match r {
                 2 => {
                     instruction.opcode = Opcode::PSRLQ;
@@ -8689,11 +8686,12 @@ fn read_operands<
             }
 
             if instruction.prefixes.operand_size() {
-                instruction.regs[1] = RegSpec { bank: RegisterBank::X, num: modrm & 7 };
+                instruction.regs[1].bank = RegisterBank::X;
             } else {
-                instruction.regs[1] = RegSpec { bank: RegisterBank::MM, num: modrm & 7 };
+                instruction.regs[1].bank = RegisterBank::MM;
+                instruction.regs[1].num &= 0b0111;
             }
-            instruction.operands[0] = OperandSpec::RegMMM;
+            instruction.operands[0] = mem_oper;
             instruction.imm = read_imm_signed(words, 1)? as u64;
             instruction.operands[1] = OperandSpec::ImmU8;
         },
@@ -8817,6 +8815,7 @@ fn read_operands<
         OperandCase::G_mm_E => {
             instruction.regs[0].bank = RegisterBank::MM;
             instruction.regs[0].num &= 0b111;
+            instruction.operands[1] = mem_oper;
             if mem_oper == OperandSpec::RegMMM {
                 instruction.regs[1].bank = RegisterBank::MM;
                 instruction.regs[1].num &= 0b111;
@@ -8865,7 +8864,7 @@ fn read_operands<
             }
         }
         OperandCase::E_G_mm => {
-            instruction.operands[1] = instruction.operands[0];
+            instruction.operands[1] = OperandSpec::RegRRR;
             instruction.operands[0] = mem_oper;
             instruction.regs[0].bank = RegisterBank::MM;
             instruction.regs[0].num &= 0b111;
