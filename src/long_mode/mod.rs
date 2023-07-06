@@ -6531,9 +6531,9 @@ fn read_with_annotations<
 
 //    const RAXRAXRAXRAX: [RegSpec; 4] = [RegSpec::rax(); 4];
     // default x86_64 registers to `[rax; 4]`
-    instruction.regs[0] = RegSpec::rax(); // = RAXRAXRAXRAX;
-    // default operands to [RegRRR, Nothing, Nothing, Nothing]
-    instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
+//    instruction.regs = RAXRAXRAXRAX;
+    instruction.regs[1] = RegSpec::rax();
+    instruction.regs[2] = RegSpec::rax();
 
     let record: OperandCode = if self.read_opc_hotpath(nextb, &mut nextb, &mut next_rec, words, instruction, sink)? {
         next_rec.1
@@ -6859,10 +6859,12 @@ fn read_operands<
         } else {
             read_M(words, instruction, modrm, sink)?
         };
-        instruction.operands[1] = mem_oper;
         if !operand_code.has_reg_mem() {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
+        } else {
+            instruction.operands[1] = mem_oper;
+            instruction.operands[0] = OperandSpec::RegRRR;
         }
         return Ok(());
     }
@@ -6938,10 +6940,12 @@ fn read_operands<
         } else {
             read_M(words, instruction, modrm, sink)?
         };
-        instruction.operands[1] = mem_oper;
         if !operand_code.has_reg_mem() {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
+        } else {
+            instruction.operands[1] = mem_oper;
+            instruction.operands[0] = OperandSpec::RegRRR;
         }
     }
 
@@ -7093,6 +7097,10 @@ fn read_operands<
             }
         }
         return Ok(());
+    }
+
+    if !operand_code.has_read_E() {
+        instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
     }
 
 //    match operand_code {
