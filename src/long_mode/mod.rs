@@ -6483,8 +6483,6 @@ fn read_opc_hotpath<
             desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
             id: words.offset() as u32 * 8 - 8 + 1,
         });
-        instruction.mem_size = 0;
-        instruction.operand_count = 2;
         instruction.opcode = opc;
         return Ok(true);
     } else if b == 0x0f {
@@ -6496,8 +6494,6 @@ fn read_opc_hotpath<
             );
         }
         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        instruction.mem_size = 0;
-        instruction.operand_count = 2;
         *record = if b == 0x38 {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
             self.read_0f38_opcode(b, &mut instruction.prefixes)
@@ -6576,8 +6572,6 @@ fn read_with_annotations<
                         desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
                         id: words.offset() as u32 * 8 - 8 + 1,
                     });
-                    instruction.mem_size = 0;
-                    instruction.operand_count = 2;
                     break record;
                 } else if b == 0x0f {
                     if words.offset() > 1 {
@@ -6588,8 +6582,6 @@ fn read_with_annotations<
                         );
                     }
                     let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                    instruction.mem_size = 0;
-                    instruction.operand_count = 2;
                     if b == 0x38 {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                         break self.read_0f38_opcode(b, prefixes);
@@ -6618,8 +6610,6 @@ fn read_with_annotations<
                     desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
                     id: words.offset() as u32 * 8 - 8 + 1,
                 });
-                instruction.mem_size = 0;
-                instruction.operand_count = 2;
                 break record;
             } else {
                 let b = nextb;
@@ -6632,8 +6622,6 @@ fn read_with_annotations<
                         );
                     }
                     let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                    instruction.mem_size = 0;
-                    instruction.operand_count = 2;
                     if b == 0x38 {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
                         break self.read_0f38_opcode(b, prefixes);
@@ -6866,10 +6854,12 @@ fn read_operands<
             instruction.operands[1] = mem_oper;
             instruction.operands[0] = OperandSpec::RegRRR;
         }
+        instruction.operand_count = 2;
         return Ok(());
     }
 
     if operand_code.has_imm() {
+        instruction.mem_size = 0;
         if operand_code.operand_case_handler_index() == OperandCase::Ibs {
             instruction.imm =
                 read_imm_signed(words, 1)? as u64;
@@ -6947,9 +6937,12 @@ fn read_operands<
             instruction.operands[1] = mem_oper;
             instruction.operands[0] = OperandSpec::RegRRR;
         }
+    } else {
+        instruction.mem_size = 0;
     }
 
     if let Some(z_operand_code) = operand_code.get_embedded_instructions() {
+        instruction.operands[0] = OperandSpec::RegRRR;
         let reg = z_operand_code.reg();
         match z_operand_code.category() {
             0 => {
@@ -7027,6 +7020,7 @@ fn read_operands<
                             .with_id(opcode_start + 2)
                     );
                 }
+                instruction.operand_count = 2;
             }
             2 => {
                 // these are Zb_Ib_R
@@ -7057,6 +7051,7 @@ fn read_operands<
                     InnerDescription::Number("imm", instruction.imm as i64)
                         .with_id(words.offset() as u32 * 8 - 8));
                 instruction.operands[1] = OperandSpec::ImmU8;
+                instruction.operand_count = 2;
             }
             3 => {
                 // category == 3, Zv_Ivq_R
@@ -7091,6 +7086,7 @@ fn read_operands<
                     InnerDescription::Number("imm", instruction.imm as i64)
                         .with_id(words.offset() as u32 * 8 - (8 * bank as u8 as u32) + 1)
                 );
+                instruction.operand_count = 2;
             }
             _ => {
                 unreachable!("bad category");
@@ -7102,6 +7098,7 @@ fn read_operands<
     if !operand_code.has_read_E() {
         instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
     }
+    instruction.operand_count = 2;
 
 //    match operand_code {
     match operand_code.operand_case_handler_index() {
