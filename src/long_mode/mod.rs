@@ -5438,7 +5438,7 @@ enum OperandCode {
     Gv_Ev = OperandCodeBuilder::new().read_E().only_modrm_operands().reg_mem().operand_case(OperandCase::Internal).bits(),
     Gv_M = OperandCodeBuilder::new().read_E().only_modrm_operands().reg_mem().deny_regmmm().operand_case(OperandCase::Gv_M).bits(),
     MOVDIR64B = OperandCodeBuilder::new().read_E().reg_mem().deny_regmmm().operand_case(OperandCase::MOVDIR64B).bits(),
-    M_Gv = OperandCodeBuilder::new().read_E().mem_reg().deny_regmmm().operand_case(OperandCase::Internal).bits(),
+    M_Gv = OperandCodeBuilder::new().read_E().only_modrm_operands().mem_reg().deny_regmmm().operand_case(OperandCase::Internal).bits(),
     Gv_Ev_Ib = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gv_Ev_Ib).bits(),
     Gv_Ev_Iv = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gv_Ev_Iv).bits(),
     Rv_Gmm_Ib = OperandCodeBuilder::new().read_modrm().read_E().reg_mem().operand_case(OperandCase::Rv_Gmm_Ib).bits(),
@@ -7105,6 +7105,7 @@ fn read_operands<
 
 //    match operand_code {
     match operand_code.operand_case_handler_index() {
+        // these operand cases are all `only_*`, and are unreachable here..
         OperandCase::Internal | OperandCase::Gv_M |
         OperandCase::Ibs | OperandCase::Jvds => {
         }
