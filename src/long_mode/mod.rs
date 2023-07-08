@@ -4688,7 +4688,7 @@ impl Prefixes {
          * || instruction.prefixes.rep()
          * || instruction.prefixes.repnz() {
          */
-        (self.bits & 0b1100_1001) > 0 || (self.rex.bits > 0)
+        (self.bits & 0b1100_0101) > 0 || (self.rex.bits > 0)
     }
     #[inline]
     pub fn vex(&self) -> Option<PrefixVex> {
