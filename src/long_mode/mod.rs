@@ -6275,6 +6275,8 @@ fn read_M<
     Ok(op_spec)
 }
 
+// well, ya forgot to make the enum non-exhausitve, and now adding variants to describe vex and
+// evex operand codes would be a breaking change. TODO for 2.x ....
 /// the actual description for a selection of bits involved in decoding an [`long_mode::Instruction`].
 ///
 /// some prefixes are only identified as an `InnerDescription::Misc` string, while some are full
