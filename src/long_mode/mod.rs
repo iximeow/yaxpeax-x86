@@ -6407,6 +6407,34 @@ impl fmt::Display for FieldDescription {
     }
 }
 
+#[inline(always)]
+fn record_opcode_record_found<
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>,
+>(words: &mut T, sink: &mut S, opc: Opcode, code: OperandCode, opc_length: u32) {
+    let offset = words.offset() as u32;
+    let opcode_start_bit = (offset - opc_length) * 8;
+    let opcode_end_bit = offset * 8 - 1;
+
+    if offset > opc_length {
+        sink.record(
+            opcode_start_bit - 1, opcode_start_bit - 1,
+            InnerDescription::Boundary("prefixes end")
+                .with_id(opcode_start_bit)
+        );
+    }
+    if opc != Opcode::Invalid {
+        sink.record(opcode_start_bit, opcode_end_bit, FieldDescription {
+            desc: InnerDescription::Opcode(opc),
+            id: offset * 8 - opc_length * 8,
+        });
+    }
+    sink.record(opcode_start_bit, opcode_end_bit, FieldDescription {
+        desc: InnerDescription::OperandCode(OperandCodeWrapper { code }),
+        id: offset * 8 - opc_length * 8 + 1,
+    });
+}
+
 #[derive(Copy, Clone)]
 struct DecodeCtx {
     check_lock: bool,
@@ -6467,44 +6495,23 @@ fn read_opc_hotpath<
     }
 
     if let Interpretation::Instruction(opc) = record.0 {
-        if words.offset() > 1 {
-            sink.record(
-                words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
-                InnerDescription::Boundary("prefixes end")
-                    .with_id(words.offset() as u32 * 8 - 9)
-            );
-        }
-        if opc != Opcode::Invalid {
-            sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                desc: InnerDescription::Opcode(opc),
-                id: words.offset() as u32 * 8 - 8,
-            });
-        }
-        sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-            desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
-            id: words.offset() as u32 * 8 - 8 + 1,
-        });
+        record_opcode_record_found(words, sink, opc, record.1, 1);
         instruction.opcode = opc;
         return Ok(true);
     } else if b == 0x0f {
-        if words.offset() > 1 {
-            sink.record(
-                words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
-                InnerDescription::Boundary("prefixes end")
-                    .with_id(words.offset() as u32 * 8 - 9)
-            );
-        }
         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        *record = if b == 0x38 {
+        let (r, len) = if b == 0x38 {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            self.read_0f38_opcode(b, &mut instruction.prefixes)
+            (self.read_0f38_opcode(b, &mut instruction.prefixes), 3)
         } else if b == 0x3a {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-            self.read_0f3a_opcode(b, &mut instruction.prefixes)
+            (self.read_0f3a_opcode(b, &mut instruction.prefixes), 3)
         } else {
-            self.read_0f_opcode(b, &mut instruction.prefixes)
+            (self.read_0f_opcode(b, &mut instruction.prefixes), 2)
         };
+        *record = r;
         if let Interpretation::Instruction(opc) = record.0 {
+            record_opcode_record_found(words, sink, opc, record.1, len);
             instruction.opcode = opc;
         } else {
             unsafe { unreachable_unchecked(); }
@@ -6537,7 +6544,7 @@ fn read_with_annotations<
     } else {
         let prefixes = &mut instruction.prefixes;
         let record = loop {
-            let record = next_rec;
+            let mut record = next_rec;
             if nextb >= 0x40 && nextb < 0x50 {
                 let b = nextb;
                 sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
@@ -6548,69 +6555,15 @@ fn read_with_annotations<
                 next_rec = unsafe {
                     core::ptr::read_volatile(&OPCODES[nextb as usize])
                 };
+                record = next_rec;
                 prefixes.rex_from(b);
                 self.rb_size = RegisterBank::rB;
                 if prefixes.rex_unchecked().w() {
                     self.vqp_size = RegisterBank::Q;
                 }
-
-                let record = next_rec;
-                if let Interpretation::Instruction(opc) = record.0 {
-                    if words.offset() > 1 {
-                        sink.record(
-                            words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
-                            InnerDescription::Boundary("prefixes end")
-                                .with_id(words.offset() as u32 * 8 - 9)
-                        );
-                    }
-                    if opc != Opcode::Invalid {
-                        sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                            desc: InnerDescription::Opcode(opc),
-                            id: words.offset() as u32 * 8 - 8,
-                        });
-                    }
-                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                        desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
-                        id: words.offset() as u32 * 8 - 8 + 1,
-                    });
-                    break record;
-                } else if b == 0x0f {
-                    if words.offset() > 1 {
-                        sink.record(
-                            words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
-                            InnerDescription::Boundary("prefixes end")
-                                .with_id(words.offset() as u32 * 8 - 9)
-                        );
-                    }
-                    let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                    if b == 0x38 {
-                        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break self.read_0f38_opcode(b, prefixes);
-                    } else if b == 0x3a {
-                        let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break self.read_0f3a_opcode(b, prefixes);
-                    } else {
-                        break self.read_0f_opcode(b, prefixes);
-                    }
-                }
-            } else if let Interpretation::Instruction(opc) = record.0 {
-                if words.offset() > 1 {
-                    sink.record(
-                        words.offset() as u32 * 8 - 8 - 1, words.offset() as u32 * 8 - 8 - 1,
-                        InnerDescription::Boundary("prefixes end")
-                            .with_id(words.offset() as u32 * 8 - 9)
-                    );
-                }
-                if opc != Opcode::Invalid {
-                    sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                        desc: InnerDescription::Opcode(opc),
-                        id: words.offset() as u32 * 8 - 8,
-                    });
-                }
-                sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
-                    desc: InnerDescription::OperandCode(OperandCodeWrapper { code: record.1 }),
-                    id: words.offset() as u32 * 8 - 8 + 1,
-                });
+            }
+            if let Interpretation::Instruction(opc) = record.0 {
+                record_opcode_record_found(words, sink, opc, record.1, 1);
                 break record;
             } else {
                 let b = nextb;
@@ -6623,15 +6576,19 @@ fn read_with_annotations<
                         );
                     }
                     let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                    if b == 0x38 {
+                    let (rec, len) = if b == 0x38 {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break self.read_0f38_opcode(b, prefixes);
+                        (self.read_0f38_opcode(b, prefixes), 3)
                     } else if b == 0x3a {
                         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-                        break self.read_0f3a_opcode(b, prefixes);
+                        (self.read_0f3a_opcode(b, prefixes), 3)
                     } else {
-                        break self.read_0f_opcode(b, prefixes);
+                        (self.read_0f_opcode(b, prefixes), 2)
+                    };
+                    if let Interpretation::Instruction(opc) = record.0 {
+                        record_opcode_record_found(words, sink, opc, record.1, len);
                     }
+                    break rec;
                 }
                 if b == 0x66 {
                     sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
