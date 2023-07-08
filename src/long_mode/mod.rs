@@ -6172,51 +6172,6 @@ fn read_M<
                 .with_id(modrm_start + 2)
         );
         return read_sib(words, instr, modrm, sink);
-    } else if mmm == 5 && modbits == 0b00 {
-        sink.record(
-            modrm_start + 6,
-            modrm_start + 7,
-            InnerDescription::Misc("rip-relative reference")
-                .with_id(modrm_start + 0)
-        );
-        sink.record(
-            modrm_start + 0,
-            modrm_start + 2,
-            InnerDescription::Misc("rip-relative reference")
-                .with_id(modrm_start + 0)
-        );
-        if instr.prefixes.address_size() {
-            sink.record(
-                modrm_start + 6,
-                modrm_start + 7,
-                InnerDescription::Misc("address-size override selects `eip` instead")
-                    .with_id(modrm_start + 1)
-            );
-            sink.record(
-                modrm_start + 0,
-                modrm_start + 2,
-                InnerDescription::Misc("address-size override selects `eip` instead")
-                    .with_id(modrm_start + 1)
-            );
-        }
-
-        let disp = read_num(words, 4)? as i32;
-
-        sink.record(
-            modrm_start + 8,
-            modrm_start + 8 + 32,
-            InnerDescription::Number("displacement", disp as i64)
-                .with_id(modrm_start + 3)
-        );
-
-        instr.regs[1] =
-            if !instr.prefixes.address_size() { RegSpec::rip() } else { RegSpec::eip() };
-        if disp == 0 {
-            OperandSpec::Deref
-        } else {
-            instr.disp = disp as i64 as u64;
-            OperandSpec::RegDisp
-        }
     } else {
         let mut r = 0;
         if instr.prefixes.rex_unchecked().b() {
@@ -6231,13 +6186,60 @@ fn read_M<
         );
 
         if modbits == 0b00 {
-            sink.record(
-                modrm_start + 6,
-                modrm_start + 7,
-                InnerDescription::Misc("memory operand is [reg] with no displacement, register selected by `mmm` (mod bits: 00)")
-                    .with_id(modrm_start + 0)
-            );
-            OperandSpec::Deref
+            if mmm == 5 {
+                sink.record(
+                    modrm_start + 6,
+                    modrm_start + 7,
+                    InnerDescription::Misc("rip-relative reference")
+                        .with_id(modrm_start + 0)
+                );
+                sink.record(
+                    modrm_start + 0,
+                    modrm_start + 2,
+                    InnerDescription::Misc("rip-relative reference")
+                        .with_id(modrm_start + 0)
+                );
+                if instr.prefixes.address_size() {
+                    sink.record(
+                        modrm_start + 6,
+                        modrm_start + 7,
+                        InnerDescription::Misc("address-size override selects `eip` instead")
+                            .with_id(modrm_start + 1)
+                    );
+                    sink.record(
+                        modrm_start + 0,
+                        modrm_start + 2,
+                        InnerDescription::Misc("address-size override selects `eip` instead")
+                            .with_id(modrm_start + 1)
+                    );
+                }
+
+                let disp = read_num(words, 4)? as i32;
+
+                sink.record(
+                    modrm_start + 8,
+                    modrm_start + 8 + 32,
+                    InnerDescription::Number("displacement", disp as i64)
+                        .with_id(modrm_start + 3)
+                );
+
+                instr.regs[1] =
+                    if !instr.prefixes.address_size() { RegSpec::rip() } else { RegSpec::eip() };
+                if disp == 0 {
+                    OperandSpec::Deref
+                } else {
+                    instr.disp = disp as i64 as u64;
+                    OperandSpec::RegDisp
+                }
+            } else {
+                sink.record(
+                    modrm_start + 6,
+                    modrm_start + 7,
+                    InnerDescription::Misc("memory operand is [reg] with no displacement, register selected by `mmm` (mod bits: 00)")
+                        .with_id(modrm_start + 0)
+                );
+                OperandSpec::Deref
+            }
         } else {
             let disp_start = words.offset();
             let disp = if modbits == 0b01 {
