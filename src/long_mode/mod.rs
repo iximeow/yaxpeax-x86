@@ -5915,12 +5915,12 @@ fn read_modrm_reg<
 fn read_sib_disp<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(instr: &Instruction, words: &mut T, modbits: u8, sibbyte: u8, sink: &mut S) -> Result<i32, DecodeError> {
+>(instr: &Instruction, words: &mut T, modrm: u8, sibbyte: u8, sink: &mut S) -> Result<i32, DecodeError> {
     let sib_start = words.offset() as u32 * 8 - 8;
     let modbit_addr = words.offset() as u32 * 8 - 10;
     let disp_start = words.offset() as u32 * 8;
 
-    let disp = if modbits == 0b00 {
+    let disp = if modrm < 0b01_000_000 { // modbits == 0b00
         if (sibbyte & 7) == 0b101 {
             sink.record(modbit_addr, modbit_addr + 1,
                 InnerDescription::Misc("4-byte displacement").with_id(sib_start + 0));
@@ -5933,7 +5933,7 @@ fn read_sib_disp<
         } else {
             0
         }
-    } else if modbits == 0b01 {
+    } else if modrm < 0b10_000_000 { // modbits == 0b01
         sink.record(modbit_addr, modbit_addr + 1,
             InnerDescription::Misc("1-byte displacement").with_id(sib_start + 0));
         if instr.prefixes.evex().is_some() {
@@ -5966,9 +5966,8 @@ fn read_sib<
     let modrm_start = words.offset() as u32 * 8 - 8;
     let sib_start = words.offset() as u32 * 8;
 
-    let modbits = modrm >> 6;
     let sibbyte = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-    let disp = read_sib_disp(instr, words, modbits, sibbyte, sink)?;
+    let disp = read_sib_disp(instr, words, modrm, sibbyte, sink)?;
     instr.disp = disp as u32 as u64;
 
     let mut r = 0;
@@ -6000,7 +5999,7 @@ fn read_sib<
                     InnerDescription::Misc("iii + rex.x selects no index register")
                         .with_id(sib_start + 0)
                 );
-                if modbits == 0b00 {
+                if modrm < 0b01_000_000 {
                     sink.record(
                         modrm_start + 6,
                         modrm_start + 7,
@@ -6024,7 +6023,7 @@ fn read_sib<
                     InnerDescription::RegisterNumber("iii", instr.regs[2].num & 0b111, instr.regs[2])
                         .with_id(sib_start + 0)
                 );
-                if modbits == 0 {
+                if modrm < 0b01_000_000 {
                     sink.record(
                         modrm_start + 6,
                         modrm_start + 7,
@@ -6077,7 +6076,7 @@ fn read_sib<
                     InnerDescription::Misc("iii + rex.x selects no index register")
                         .with_id(sib_start + 0)
                 );
-                if modbits == 0b00 {
+                if modrm < 0b01_000_000 {
                     sink.record(
                         modrm_start + 6,
                         modrm_start + 7,
@@ -6101,7 +6100,7 @@ fn read_sib<
                     InnerDescription::RegisterNumber("iii", instr.regs[2].num & 0b111, instr.regs[2])
                         .with_id(sib_start + 0)
                 );
-                if modbits == 0 {
+                if modrm < 0b01_000_000 {
                     sink.record(
                         modrm_start + 6,
                         modrm_start + 7,
@@ -6162,7 +6161,6 @@ fn read_M<
 >(words: &mut T, instr: &mut Instruction, modrm: u8, sink: &mut S) -> Result<OperandSpec, DecodeError> {
     let modrm_start = words.offset() as u32 * 8 - 8;
 
-    let modbits = modrm >> 6;
     let mmm = modrm & 7;
     let op_spec = if mmm == 4 {
         sink.record(
@@ -6173,11 +6171,10 @@ fn read_M<
         );
         return read_sib(words, instr, modrm, sink);
     } else {
-        let mut r = 0;
+        instr.regs[1].num = mmm;
         if instr.prefixes.rex_unchecked().b() {
-            r = 0b1000;
+            instr.regs[1].num |= 0b1000;
         }
-        instr.regs[1].num = r | mmm;
         sink.record(
             modrm_start,
             modrm_start + 2,
@@ -6185,7 +6182,7 @@ fn read_M<
                 .with_id(modrm_start + 2)
         );
 
-        if modbits == 0b00 {
+        if modrm < 0b01_000_000 { // modbits == 0b00
             if mmm == 5 {
                 sink.record(
                     modrm_start + 6,
@@ -6242,7 +6239,7 @@ fn read_M<
             }
         } else {
             let disp_start = words.offset();
-            let disp = if modbits == 0b01 {
+            let disp = if modrm < 0b10_000_000 { // modbits == 0b01 (not 0b00, as detected above)
                 sink.record(
                     modrm_start + 6,
                     modrm_start + 7,
