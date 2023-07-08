@@ -10,6 +10,14 @@
     become `jbe` and `jae` in 2.x.
 * fix incorrect decode of a0/a1/a2/a3 mov register when rex.b is set
   (rex.b would select register 8, but the register is unconditionally A)
+* fix incorrect handling of some variants of gather instructions,
+  vpgatherdq, vpgatherqq, vgatherdps, vgatherdpd, vgatherqps, vgatherqpd.
+  errors were any of:
+  * reporting qword loads when loads are dword-wide
+  * reporting dword loads when loads are qword-wide
+  * reporting ymm register sizes when sizes are actually xmm
+  * reporting xmm register sizes when sizes are actually ymm
+  * reporting index register as ymm when it is actually xmm
 
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)

@@ -676,7 +676,11 @@ fn read_vex_operands<
                 if instruction.opcode == Opcode::VMOVLPD || instruction.opcode == Opcode::VMOVHPD || instruction.opcode == Opcode::VMOVHPS {
                     instruction.mem_size = 8;
                 } else {
-                    instruction.mem_size = 16;
+                    if L {
+                        instruction.mem_size = 32;
+                    } else {
+                        instruction.mem_size = 16;
+                    }
                 }
             }
             instruction.operands[0] = mem_oper;
@@ -1076,7 +1080,11 @@ fn read_vex_operands<
                 if instruction.opcode == Opcode::VMOVLPD || instruction.opcode == Opcode::VMOVHPD || instruction.opcode == Opcode::VMOVHPS {
                     instruction.mem_size = 8;
                 } else {
-                    instruction.mem_size = 16;
+                    if L {
+                        instruction.mem_size = 32;
+                    } else {
+                        instruction.mem_size = 16;
+                    }
                 }
             }
             instruction.operands[0] = mem_oper;
@@ -1102,7 +1110,11 @@ fn read_vex_operands<
             instruction.imm = read_imm_unsigned(words, 1)?;
             instruction.operands[3] = OperandSpec::ImmU8;
             if mem_oper != OperandSpec::RegMMM {
-                instruction.mem_size = 16;
+                if L {
+                    instruction.mem_size = 32;
+                } else {
+                    instruction.mem_size = 16;
+                }
             }
             instruction.operand_count = 4;
             Ok(())
@@ -1123,12 +1135,18 @@ fn read_vex_operands<
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             if mem_oper != OperandSpec::RegMMM {
-                if [Opcode::VBROADCASTSS, Opcode::VUCOMISS, Opcode::VCOMISS].contains(&instruction.opcode)  {
-                    instruction.mem_size = 4;
-                } else if [Opcode::VMOVDDUP, Opcode::VUCOMISD, Opcode::VCOMISD, Opcode::VCVTPS2PD, Opcode::VMOVQ].contains(&instruction.opcode)  {
-                    instruction.mem_size = 8;
+                if L {
+                    instruction.mem_size = 32;
                 } else {
                     instruction.mem_size = 16;
+                }
+
+                if instruction.opcode == Opcode::VMOVDDUP && !L {
+                    instruction.mem_size = 8;
+                } else if [Opcode::VBROADCASTSS, Opcode::VUCOMISS, Opcode::VCOMISS].contains(&instruction.opcode)  {
+                    instruction.mem_size = 4;
+                } else if [Opcode::VUCOMISD, Opcode::VCOMISD, Opcode::VCVTPS2PD, Opcode::VMOVQ].contains(&instruction.opcode)  {
+                    instruction.mem_size = 8;
                 };
             }
             instruction.operand_count = 2;
@@ -1154,7 +1172,11 @@ fn read_vex_operands<
                 } else if [Opcode::VSQRTSD, Opcode::VADDSD, Opcode::VMULSD, Opcode::VSUBSD, Opcode::VMINSD, Opcode::VDIVSD, Opcode::VMAXSD].contains(&instruction.opcode) {
                     instruction.mem_size = 8;
                 } else {
-                    instruction.mem_size = 16;
+                    if L {
+                        instruction.mem_size = 32;
+                    } else {
+                        instruction.mem_size = 16;
+                    }
                 }
             }
             instruction.operand_count = 3;
@@ -1264,7 +1286,13 @@ fn read_vex_operands<
             #[allow(non_snake_case)]
             let L = instruction.prefixes.vex_unchecked().l();
 
-            let bank = if L {
+            let bank = if L && instruction.opcode != Opcode::VGATHERQPS && instruction.opcode != Opcode::VPGATHERQD {
+                RegisterBank::Y
+            } else {
+                RegisterBank::X
+            };
+
+            let index_bank = if L {
                 RegisterBank::Y
             } else {
                 RegisterBank::X
@@ -1274,12 +1302,17 @@ fn read_vex_operands<
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), bank);
             let mem_oper = read_E(words, instruction, modrm, bank, sink)?;
-            instruction.regs[2].bank = bank;
+            if instruction.opcode == Opcode::VPGATHERDQ {
+                instruction.regs[2].bank = RegisterBank::X;
+            } else {
+                instruction.regs[2].bank = index_bank;
+            }
+            instruction.regs[3].bank = bank;
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             instruction.operands[2] = OperandSpec::RegVex;
             if mem_oper != OperandSpec::RegMMM {
-                if instruction.opcode == Opcode::VPGATHERDD {
+                if instruction.opcode == Opcode::VPGATHERDD || instruction.opcode == Opcode::VPGATHERQD || instruction.opcode == Opcode::VGATHERDPS || instruction.opcode == Opcode::VGATHERQPS {
                     instruction.mem_size = 4;
                 } else {
                     instruction.mem_size = 8;
@@ -2529,8 +2562,8 @@ fn read_vex_instruction<
                     }),
                     0x08 => (Opcode::VROUNDPS, VEXOperandCode::G_E_xyLmm_imm8),
                     0x09 => (Opcode::VROUNDPD, VEXOperandCode::G_E_xyLmm_imm8),
-                    0x0A => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xyLmm_imm8),
-                    0x0B => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xyLmm_imm8),
+                    0x0A => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xmm_imm8),
+                    0x0B => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xmm_imm8),
                     0x0C => (Opcode::VBLENDPS, VEXOperandCode::G_V_E_xyLmm_imm8),
                     0x0D => (Opcode::VBLENDPD, VEXOperandCode::G_V_E_xyLmm_imm8),
                     0x0E => (Opcode::VPBLENDW, VEXOperandCode::G_V_E_xyLmm_imm8),
