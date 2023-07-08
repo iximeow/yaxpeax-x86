@@ -311,8 +311,8 @@ fn test_modrm_decode() {
             desc.to_string().contains("memory operand is [reg]") &&
             desc.to_string().contains("mod bits: 00")
         }),
-        AnnotationCheck::exact(11, 13, InnerDescription::RegisterNumber("rrr", 1, RegSpec::ecx())),
         AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("mmm", 0, RegSpec::rax())),
+        AnnotationCheck::exact(11, 13, InnerDescription::RegisterNumber("rrr", 1, RegSpec::ecx())),
         AnnotationCheck::no_extra(),
     ]);
     test_annotations(&[0x66, 0x0f, 0x38, 0x00, 0xc1], "pshufb xmm0, xmm1", &[
