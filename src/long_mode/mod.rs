@@ -2559,12 +2559,6 @@ impl PartialEq for Instruction {
 #[derive(Debug, Clone, Copy, Eq)]
 pub struct Instruction {
     pub prefixes: Prefixes,
-    /*
-    modrm_rrr: RegSpec,
-    modrm_mmm: RegSpec, // doubles as sib_base
-    sib_index: RegSpec,
-    vex_reg: RegSpec,
-    */
     regs: [RegSpec; 4],
     scale: u8,
     length: u8,
@@ -6977,9 +6971,43 @@ fn read_operands<
             }
             3 => {
                 // category == 3, Zv_Ivq_R
-                let bank = self.vqp_size();
-                instruction.regs[0] =
-                    RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                if instruction.prefixes.rex_unchecked().w() {
+                    instruction.regs[0] =
+                        RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), RegisterBank::Q);
+                    instruction.imm = read_num(words, 8)? as u64;
+                    instruction.operands[1] = OperandSpec::ImmI64;
+                    let width = 8;
+                    sink.record(
+                        words.offset() as u32 * 8 - (8 * width as u32),
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(words.offset() as u32 * 8 - (8 * width as u32) + 1)
+                    );
+                } else if instruction.prefixes.operand_size() {
+                    instruction.regs[0] =
+                        RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), RegisterBank::W);
+                    instruction.imm = read_num(words, 2)? as u16 as u64;
+                    instruction.operands[1] = OperandSpec::ImmI16;
+                    let width = 2;
+                    sink.record(
+                        words.offset() as u32 * 8 - (8 * width as u32),
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(words.offset() as u32 * 8 - (8 * width as u32) + 1)
+                    );
+                } else {
+                    instruction.regs[0] =
+                        RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), RegisterBank::D);
+                    instruction.imm = read_num(words, 4)? as u32 as u64;
+                    instruction.operands[1] = OperandSpec::ImmI32;
+                    let width = 4;
+                    sink.record(
+                        words.offset() as u32 * 8 - (8 * width as u32),
+                        words.offset() as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(words.offset() as u32 * 8 - (8 * width as u32) + 1)
+                    );
+                }
                 sink.record(
                     opcode_start,
                     opcode_start + 2,
@@ -6994,26 +7022,6 @@ fn read_operands<
                             .with_id(opcode_start + 2)
                     );
                 }
-                instruction.imm =
-                    read_imm_ivq(words, bank as u8)?;
-                const TBL: [OperandSpec; 9] = [
-                    OperandSpec::ImmI16,
-                    OperandSpec::ImmI16,
-                    OperandSpec::ImmI16,
-                    OperandSpec::ImmI32,
-                    OperandSpec::ImmI32,
-                    OperandSpec::ImmI64,
-                    OperandSpec::ImmI64,
-                    OperandSpec::ImmI64,
-                    OperandSpec::ImmI64,
-                ];
-                instruction.operands[1] = *TBL.get(bank as usize).unwrap_or_else(|| unsafe { unreachable_unchecked() } );
-                sink.record(
-                    words.offset() as u32 * 8 - (8 * bank as u8 as u32),
-                    words.offset() as u32 * 8 - 1,
-                    InnerDescription::Number("imm", instruction.imm as i64)
-                        .with_id(words.offset() as u32 * 8 - (8 * bank as u8 as u32) + 1)
-                );
                 instruction.operand_count = 2;
             }
             _ => {
@@ -7073,17 +7081,8 @@ fn read_operands<
                 InnerDescription::Opcode(instruction.opcode)
                     .with_id(modrm_start - 8)
             );
-            let opwidth = instruction.regs[0].bank as u8;
-            if opwidth == 8 {
-                instruction.imm = read_imm_signed(words, 4)? as u64;
-                sink.record(
-                    words.offset() as u32 * 8 - 32,
-                    words.offset() as u32 * 8 - 1,
-                    InnerDescription::Number("imm", instruction.imm as i64)
-                        .with_id(words.offset() as u32 * 8 - 32)
-                );
-                instruction.operands[1] = OperandSpec::ImmI64;
-            } else {
+            if self.vqp_size == RegisterBank::W {
+                let opwidth = 2;
                 instruction.imm = read_imm_signed(words, opwidth)? as u64;
                 sink.record(
                     words.offset() as u32 * 8 - (opwidth as u32 * 8),
@@ -7091,12 +7090,22 @@ fn read_operands<
                     InnerDescription::Number("imm", instruction.imm as i64)
                         .with_id(words.offset() as u32 * 8 - (opwidth as u32 * 8))
                 );
-                if opwidth == 4 {
-                    instruction.operands[1] = OperandSpec::ImmI32;
+                instruction.operands[1] = OperandSpec::ImmI16;
+            } else {
+                let opwidth = 4;
+                instruction.imm = read_imm_signed(words, opwidth)? as u64;
+                sink.record(
+                    words.offset() as u32 * 8 - (opwidth as u32 * 8),
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - (opwidth as u32 * 8))
+                );
+                if self.vqp_size == RegisterBank::Q {
+                    instruction.operands[1] = OperandSpec::ImmI64;
                 } else {
-                    instruction.operands[1] = OperandSpec::ImmI16;
+                    instruction.operands[1] = OperandSpec::ImmI32;
                 }
-            };
+            }
         },
         OperandCase::MovI8 => {
             if self.rrr != 0 {
@@ -7135,8 +7144,8 @@ fn read_operands<
 
         }
         OperandCase::MovIv => {
-            let opwidth = instruction.regs[0].bank as u8;
             if self.rrr != 0 {
+                let opwidth = instruction.regs[0].bank as u8;
                 if mem_oper == OperandSpec::RegMMM && instruction.regs[1].num & 0b0111 == 0 {
                     instruction.opcode = Opcode::XBEGIN;
                     instruction.imm = if opwidth == 2 {
@@ -7173,20 +7182,29 @@ fn read_operands<
 
             instruction.operands[0] = mem_oper;
             instruction.opcode = Opcode::MOV;
-            let numwidth = if opwidth == 8 { 4 } else { opwidth };
-            instruction.imm = read_imm_signed(words, numwidth)? as u64;
-            instruction.operands[1] = match opwidth {
-                2 => OperandSpec::ImmI16,
-                4 => OperandSpec::ImmI32,
-                8 => OperandSpec::ImmI64,
-                _ => unsafe { unreachable_unchecked() }
-            };
-            sink.record(
-                modrm_start + 8,
-                modrm_start + numwidth as u32 * 8 - 1,
-                InnerDescription::Number("imm", instruction.imm as i64)
-                    .with_id(modrm_start + 8)
-            );
+            if self.vqp_size == RegisterBank::W {
+                instruction.imm = read_imm_signed(words, 2)? as u64;
+                sink.record(
+                    modrm_start + 8,
+                    modrm_start + 2 as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(modrm_start + 8)
+                );
+                instruction.operands[1] = OperandSpec::ImmI16;
+            } else {
+                instruction.imm = read_imm_signed(words, 4)? as u64;
+                sink.record(
+                    modrm_start + 8,
+                    modrm_start + 4 as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(modrm_start + 8)
+                );
+                if self.vqp_size == RegisterBank::Q {
+                    instruction.operands[1] = OperandSpec::ImmI64;
+                } else {
+                    instruction.operands[1] = OperandSpec::ImmI32;
+                }
+            }
         },
         OperandCase::BitwiseWithI8 => {
             instruction.operands[0] = mem_oper;
@@ -7274,7 +7292,6 @@ fn read_operands<
 
         },
         OperandCase::ModRM_0xf7 => {
-            let opwidth = instruction.regs[0].bank as u8;
             instruction.operands[0] = mem_oper;
             const TABLE: [Opcode; 8] = [
                 Opcode::TEST, Opcode::TEST, Opcode::NOT, Opcode::NEG,
@@ -7288,21 +7305,29 @@ fn read_operands<
                     .with_id(modrm_start - 8)
             );
             if self.rrr < 2 {
-                instruction.opcode = Opcode::TEST;
-                let numwidth = if opwidth == 8 { 4 } else { opwidth };
-                instruction.imm = read_imm_signed(words, numwidth)? as u64;
-                instruction.operands[1] = match opwidth {
-                    2 => OperandSpec::ImmI16,
-                    4 => OperandSpec::ImmI32,
-                    8 => OperandSpec::ImmI64,
-                    _ => unsafe { unreachable_unchecked() }
+                if self.vqp_size == RegisterBank::W {
+                    instruction.imm = read_imm_signed(words, 2)? as u64;
+                    instruction.operands[1] = OperandSpec::ImmI16;
+                    sink.record(
+                        modrm_start + 8,
+                        modrm_start + 8 + 2 as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(modrm_start + 8)
+                    );
+                } else {
+                    instruction.imm = read_imm_signed(words, 4)? as u64;
+                    sink.record(
+                        modrm_start + 8,
+                        modrm_start + 8 + 4 as u32 * 8 - 1,
+                        InnerDescription::Number("imm", instruction.imm as i64)
+                            .with_id(modrm_start + 8)
+                    );
+                    if self.vqp_size == RegisterBank::Q {
+                        instruction.operands[1] = OperandSpec::ImmI64;
+                    } else {
+                        instruction.operands[1] = OperandSpec::ImmI32;
+                    }
                 };
-                sink.record(
-                    modrm_start + 8,
-                    modrm_start + 8 + numwidth as u32 * 8 - 1,
-                    InnerDescription::Number("imm", instruction.imm as i64)
-                        .with_id(modrm_start + 8)
-                );
             } else {
                 instruction.operand_count = 1;
             }
@@ -7554,21 +7579,29 @@ fn read_operands<
             );
         }
         OperandCase::Ivs => {
-            let opwidth = imm_width_from_prefixes_64(SizeCode::vd, instruction.prefixes);
-            instruction.imm =
-                read_imm_unsigned(words, opwidth)?;
-            instruction.operands[0] = match opwidth {
-                2 => OperandSpec::ImmI16,
-                4 => OperandSpec::ImmI32,
-                8 => OperandSpec::ImmI64,
-                _ => unsafe { unreachable_unchecked() }
-            };
-            sink.record(
-                words.offset() as u32 * 8 - opwidth as u32 * 8,
-                words.offset() as u32 * 8 - 1,
-                InnerDescription::Number("imm", instruction.imm as i64)
-                    .with_id(words.offset() as u32 * 8 - opwidth as u32 * 8 + 1)
-            );
+            if instruction.prefixes.rex_unchecked().w() || !instruction.prefixes.operand_size() {
+                instruction.imm = read_imm_unsigned(words, 4)?;
+                instruction.operands[0] = OperandSpec::ImmI32;
+
+                let opwidth = 4;
+                sink.record(
+                    words.offset() as u32 * 8 - opwidth as u32 * 8,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - opwidth as u32 * 8 + 1)
+                );
+            } else {
+                instruction.imm = read_imm_unsigned(words, 2)?;
+                instruction.operands[0] = OperandSpec::ImmI16;
+
+                let opwidth = 2;
+                sink.record(
+                    words.offset() as u32 * 8 - opwidth as u32 * 8,
+                    words.offset() as u32 * 8 - 1,
+                    InnerDescription::Number("imm", instruction.imm as i64)
+                        .with_id(words.offset() as u32 * 8 - opwidth as u32 * 8 + 1)
+                );
+            }
             instruction.operand_count = 1;
         },
         OperandCase::ModRM_0x83 => {
@@ -10780,24 +10813,6 @@ fn read_num<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_ar
     }
 }
 
-#[inline]
-fn read_imm_ivq<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, width: u8) -> Result<u64, DecodeError> {
-    match width {
-        2 => {
-            Ok(read_num(bytes, 2)? as u16 as u64)
-        },
-        4 => {
-            Ok(read_num(bytes, 4)? as u32 as u64)
-        },
-        8 => {
-            Ok(read_num(bytes, 8)? as u64)
-        },
-        _ => {
-            unsafe { unreachable_unchecked(); }
-        }
-    }
-}
-
 #[inline(always)]
 fn read_imm_signed<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(bytes: &mut T, num_width: u8) -> Result<i64, DecodeError> {
     if num_width == 1 {
@@ -10836,32 +10851,6 @@ fn bank_from_prefixes_64(interpretation: SizeCode, prefixes: Prefixes) -> Regist
                 RegisterBank::W
             } else {
                 RegisterBank::D
-            }
-        },
-    }
-}
-
-#[inline]
-fn imm_width_from_prefixes_64(interpretation: SizeCode, prefixes: Prefixes) -> u8 {
-    match interpretation {
-        SizeCode::b => 1,
-        SizeCode::vd => {
-            if prefixes.rex_unchecked().w() || !prefixes.operand_size() { 4 } else { 2 }
-        },
-        SizeCode::vq => {
-            if prefixes.operand_size() {
-                2
-            } else {
-                8
-            }
-        },
-        SizeCode::vqp => {
-            if prefixes.rex_unchecked().w() {
-                8
-            } else if prefixes.operand_size() {
-                2
-            } else {
-                4
             }
         },
     }
