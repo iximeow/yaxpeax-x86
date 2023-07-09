@@ -467,48 +467,7 @@ impl OperandSpec {
         }
     }
     fn is_memory(&self) -> bool {
-        match self {
-            OperandSpec::DispU32 |
-            OperandSpec::DispU64 |
-            OperandSpec::Deref |
-            OperandSpec::Deref_esi |
-            OperandSpec::Deref_edi |
-            OperandSpec::Deref_rsi |
-            OperandSpec::Deref_rdi |
-            OperandSpec::RegDisp |
-            OperandSpec::RegScale |
-            OperandSpec::RegScaleDisp |
-            OperandSpec::RegIndexBaseScale |
-            OperandSpec::RegIndexBaseScaleDisp |
-            OperandSpec::Deref_mask |
-            OperandSpec::RegDisp_mask |
-            OperandSpec::RegScale_mask |
-            OperandSpec::RegScaleDisp_mask |
-            OperandSpec::RegIndexBaseScale_mask |
-            OperandSpec::RegIndexBaseScaleDisp_mask => {
-                true
-            },
-            OperandSpec::ImmI8 |
-            OperandSpec::ImmI16 |
-            OperandSpec::ImmI32 |
-            OperandSpec::ImmI64 |
-            OperandSpec::ImmU8 |
-            OperandSpec::ImmU16 |
-            OperandSpec::RegRRR |
-            OperandSpec::RegRRR_maskmerge |
-            OperandSpec::RegRRR_maskmerge_sae |
-            OperandSpec::RegRRR_maskmerge_sae_noround |
-            OperandSpec::RegMMM |
-            OperandSpec::RegMMM_maskmerge |
-            OperandSpec::RegMMM_maskmerge_sae_noround |
-            OperandSpec::RegVex |
-            OperandSpec::RegVex_maskmerge |
-            OperandSpec::Reg4 |
-            OperandSpec::ImmInDispField |
-            OperandSpec::Nothing => {
-                false
-            }
-        }
+        (*self as u8) & 0x80 != 0
     }
 }
 
@@ -2659,60 +2618,61 @@ impl std::error::Error for DecodeError {
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u8)]
 enum OperandSpec {
-    Nothing,
+    Nothing = 0,
     // the register in regs[0]
-    RegRRR,
+    RegRRR = 0x01,
     // the register in regs[0] and is EVEX-encoded (may have a mask register, is merged or
     // zeroed)
-    RegRRR_maskmerge,
+    RegRRR_maskmerge = 0x41,
     // the register in regs[0] and is EVEX-encoded (may have a mask register, is merged or
     // zeroed). additionally, this instruction has exceptions suppressed with a potentially
     // custom rounding mode.
-    RegRRR_maskmerge_sae,
+    RegRRR_maskmerge_sae = 0x58,
     // the register in regs[0] and is EVEX-encoded (may have a mask register, is merged or
     // zeroed). additionally, this instruction has exceptions suppressed.
-    RegRRR_maskmerge_sae_noround,
+    RegRRR_maskmerge_sae_noround = 0x59,
     // the register in modrm_mmm (eg modrm mod bits were 11)
-    RegMMM,
+    RegMMM = 0x02,
     // same as `RegRRR`: the register is modrm's `mmm` bits, and may be masked.
-    RegMMM_maskmerge,
-    RegMMM_maskmerge_sae_noround,
+    RegMMM_maskmerge = 0x42,
+    RegMMM_maskmerge_sae_noround = 0x5a,
     // the register selected by vex-vvvv bits
-    RegVex,
-    RegVex_maskmerge,
+    RegVex = 0x03,
+    RegVex_maskmerge = 0x43,
     // the register selected by a handful of avx2 vex-coded instructions,
     // stuffed in imm4.
-    Reg4,
-    ImmI8,
-    ImmI16,
-    ImmI32,
-    ImmI64,
-    ImmU8,
-    ImmU16,
+    Reg4 = 0x04,
+    ImmI8 = 0x05,
+    ImmI16 = 0x06,
+    ImmI32 = 0x07,
+    ImmI64 = 0x08,
+    ImmU8 = 0x09,
+    ImmU16 = 0x0a,
     // ENTER is a two-immediate instruction, where the first immediate is stored in the disp field.
     // for this case, a second immediate-style operand is needed.
     // turns out `insertq` and `extrq` are also two-immediate instructions, so this is generalized
     // to cover them too.
-    ImmInDispField,
-    DispU32,
-    DispU64,
-    Deref,
-    Deref_esi,
-    Deref_edi,
-    Deref_rsi,
-    Deref_rdi,
-    RegDisp,
-    RegScale,
-    RegScaleDisp,
-    RegIndexBaseScale,
-    RegIndexBaseScaleDisp,
-    Deref_mask,
-    RegDisp_mask,
-    RegScale_mask,
-    RegScaleDisp_mask,
-    RegIndexBaseScale_mask,
-    RegIndexBaseScaleDisp_mask,
+    ImmInDispField = 0x0b,
+    DispU32 = 0x8c,
+    DispU64 = 0x8d,
+    Deref = 0x8e,
+    Deref_esi = 0x8f,
+    Deref_edi = 0x90,
+    Deref_rsi = 0x91,
+    Deref_rdi = 0x92,
+    RegDisp = 0x93,
+    RegScale = 0x94,
+    RegScaleDisp = 0x95,
+    RegIndexBaseScale = 0x96,
+    RegIndexBaseScaleDisp = 0x97,
+    Deref_mask = 0xce,
+    RegDisp_mask = 0xd3,
+    RegScale_mask = 0xd4,
+    RegScaleDisp_mask = 0xd5,
+    RegIndexBaseScale_mask = 0xd6,
+    RegIndexBaseScaleDisp_mask = 0xd7,
 }
 
 // the Hash, Eq, and PartialEq impls here are possibly misleading.
