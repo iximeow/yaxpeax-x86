@@ -7018,7 +7018,7 @@ fn read_operands<
     }
 
     if !operand_code.has_read_E() {
-        instruction.operands = unsafe { core::mem::transmute(0x00_00_00_01) };
+        instruction.operands = [OperandSpec::RegRRR, OperandSpec::Nothing, OperandSpec::Nothing, OperandSpec::Nothing];
     }
     instruction.operand_count = 2;
 
