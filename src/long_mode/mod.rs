@@ -6996,12 +6996,18 @@ fn read_operands<
                 }
                 instruction.imm =
                     read_imm_ivq(words, bank as u8)?;
-                instruction.operands[1] = match bank as u8 {
-                    2 => OperandSpec::ImmI16,
-                    4 => OperandSpec::ImmI32,
-                    8 => OperandSpec::ImmI64,
-                    _ => unsafe { unreachable_unchecked() }
-                };
+                const TBL: [OperandSpec; 9] = [
+                    OperandSpec::ImmI16,
+                    OperandSpec::ImmI16,
+                    OperandSpec::ImmI16,
+                    OperandSpec::ImmI32,
+                    OperandSpec::ImmI32,
+                    OperandSpec::ImmI64,
+                    OperandSpec::ImmI64,
+                    OperandSpec::ImmI64,
+                    OperandSpec::ImmI64,
+                ];
+                instruction.operands[1] = *TBL.get(bank as usize).unwrap_or_else(|| unsafe { unreachable_unchecked() } );
                 sink.record(
                     words.offset() as u32 * 8 - (8 * bank as u8 as u32),
                     words.offset() as u32 * 8 - 1,
