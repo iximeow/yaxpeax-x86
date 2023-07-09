@@ -8517,20 +8517,15 @@ fn read_operands<
             }
 
             let r = instruction.regs[0].num & 0b0111;
-            match r {
-                2 => {
-                    instruction.opcode = Opcode::PSRLW;
-                }
-                4 => {
-                    instruction.opcode = Opcode::PSRAW;
-                }
-                6 => {
-                    instruction.opcode = Opcode::PSLLW;
-                }
-                _ => {
-                    return Err(DecodeError::InvalidOpcode);
-                }
+            const TBL: [Opcode; 8] = [
+                Opcode::Invalid, Opcode::Invalid, Opcode::PSRLW, Opcode::Invalid,
+                Opcode::PSRAW, Opcode::Invalid, Opcode::PSLLW, Opcode::Invalid,
+            ];
+            let opc = TBL[r as usize];
+            if opc == Opcode::Invalid {
+                return Err(DecodeError::InvalidOpcode);
             }
+            instruction.opcode = opc;
 
             if instruction.prefixes.operand_size() {
                 instruction.regs[1].bank = RegisterBank::X;
@@ -8554,20 +8549,15 @@ fn read_operands<
             }
 
             let r = instruction.regs[0].num & 0b0111;
-            match r {
-                2 => {
-                    instruction.opcode = Opcode::PSRLD;
-                }
-                4 => {
-                    instruction.opcode = Opcode::PSRAD;
-                }
-                6 => {
-                    instruction.opcode = Opcode::PSLLD;
-                }
-                _ => {
-                    return Err(DecodeError::InvalidOpcode);
-                }
+            const TBL: [Opcode; 8] = [
+                Opcode::Invalid, Opcode::Invalid, Opcode::PSRLD, Opcode::Invalid,
+                Opcode::PSRAD, Opcode::Invalid, Opcode::PSLLD, Opcode::Invalid,
+            ];
+            let opc = TBL[r as usize];
+            if opc == Opcode::Invalid {
+                return Err(DecodeError::InvalidOpcode);
             }
+            instruction.opcode = opc;
 
             if instruction.prefixes.operand_size() {
                 instruction.regs[1].bank = RegisterBank::X;
@@ -9183,28 +9173,13 @@ fn read_operands<
 
                     instruction.operands[0] = OperandSpec::Nothing;
                     instruction.operand_count = 0;
-                    match m {
-                        0b000 => {
-                            instruction.opcode = Opcode::ENCLV;
-                        },
-                        0b001 => {
-                            instruction.opcode = Opcode::VMCALL;
-                        },
-                        0b010 => {
-                            instruction.opcode = Opcode::VMLAUNCH;
-                        },
-                        0b011 => {
-                            instruction.opcode = Opcode::VMRESUME;
-                        },
-                        0b100 => {
-                            instruction.opcode = Opcode::VMXOFF;
-                        },
-                        0b101 => {
-                            instruction.opcode = Opcode::PCONFIG;
-                        },
-                        _ => {
-                            return Err(DecodeError::InvalidOpcode);
-                        }
+                    const TBL: [Opcode; 8] = [
+                        Opcode::ENCLV, Opcode::VMCALL, Opcode::VMLAUNCH, Opcode::VMRESUME,
+                        Opcode::VMXOFF, Opcode::PCONFIG, Opcode::Invalid, Opcode::Invalid,
+                    ];
+                    instruction.opcode = TBL[m as usize];
+                    if instruction.opcode == Opcode::Invalid {
+                        return Err(DecodeError::InvalidOpcode);
                     }
                 } else {
                     instruction.opcode = Opcode::SGDT;
@@ -9812,25 +9787,13 @@ fn read_operands<
             let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
             let modrm = read_modrm(words)?;
             let r = (modrm >> 3) & 7;
-            match r {
-                0 | 1 | 2 | 3 => {
-                    return Err(DecodeError::InvalidOpcode);
-                },
-                4 => {
-                    instruction.opcode = Opcode::BT;
-                }
-                5 => {
-                    instruction.opcode = Opcode::BTS;
-                }
-                6 => {
-                    instruction.opcode = Opcode::BTR;
-                }
-                7 => {
-                    instruction.opcode = Opcode::BTC;
-                }
-                _ => {
-                    unreachable!("r < 8");
-                }
+            const TBL: [Opcode; 8] = [
+                Opcode::Invalid, Opcode::Invalid, Opcode::Invalid, Opcode::Invalid,
+                Opcode::BT, Opcode::BTS, Opcode::BTR, Opcode::BTC
+            ];
+            instruction.opcode = TBL[r as usize];
+            if instruction.opcode == Opcode::Invalid {
+                return Err(DecodeError::InvalidOpcode);
             }
 
             instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
