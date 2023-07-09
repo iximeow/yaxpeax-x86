@@ -5789,7 +5789,6 @@ const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord(Interpretation::Instruction(Opcode::CLD), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::STD), OperandCode::Nothing),
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xfe_Eb),
-    // TODO: test 0xff /3
     OpcodeRecord(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xff_Ev),
 ];
 
