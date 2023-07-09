@@ -6466,9 +6466,7 @@ impl DecodeCtx {
 fn read_opc_hotpath<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(&mut self, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<Result<OperandCode, (u8, OpcodeRecord)>, DecodeError> {
-    let mut b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-
+>(&mut self, mut b: u8, nextb: &mut u8, record: &mut OpcodeRecord, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<bool, DecodeError> {
     if b >= 0x40 && b < 0x50 {
         sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
             desc: InnerDescription::RexPrefix(b),
@@ -6480,7 +6478,7 @@ fn read_opc_hotpath<
         }
         self.rb_size = RegisterBank::rB;
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        record = unsafe {
+        *record = unsafe {
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
     } else if b == 0x66 {
@@ -6489,24 +6487,20 @@ fn read_opc_hotpath<
             id: words.offset() as u32 * 8 - 8,
         });
         b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        record = unsafe {
+        *record = unsafe {
             core::ptr::read_volatile(&OPCODES[b as usize])
         };
         instruction.prefixes.set_operand_size();
         self.vqp_size = RegisterBank::W;
-    } else {
-        record = unsafe {
-            core::ptr::read_volatile(&OPCODES[b as usize])
-        };
     }
 
     if let Interpretation::Instruction(opc) = record.0 {
         record_opcode_record_found(words, sink, opc, record.1, 1);
         instruction.opcode = opc;
-        return Ok(Ok(record.1));
+        return Ok(true);
     } else if b == 0x0f {
         let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
-        let (record, len) = if b == 0x38 {
+        let (r, len) = if b == 0x38 {
             let b = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
             (self.read_0f38_opcode(b, &mut instruction.prefixes), 3)
         } else if b == 0x3a {
@@ -6515,15 +6509,17 @@ fn read_opc_hotpath<
         } else {
             (self.read_0f_opcode(b, &mut instruction.prefixes), 2)
         };
+        *record = r;
         if let Interpretation::Instruction(opc) = record.0 {
             record_opcode_record_found(words, sink, opc, record.1, len);
             instruction.opcode = opc;
         } else {
             unsafe { unreachable_unchecked(); }
         }
-        return Ok(Ok(record.1));
+        return Ok(true);
     } else {
-        return Ok(Err((b, record)));
+        *nextb = b;
+        return Ok(false);
     }
 }
 
@@ -6533,6 +6529,8 @@ fn read_with_annotations<
     S: DescriptionSink<FieldDescription>,
 >(mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     words.mark();
+    let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+    let mut next_rec = OPCODES[nextb as usize];
     instruction.prefixes = Prefixes::new(0);
 
 //    const RAXRAXRAXRAX: [RegSpec; 4] = [RegSpec::rax(); 4];
@@ -6541,10 +6539,9 @@ fn read_with_annotations<
     instruction.regs[1] = RegSpec::rax();
     instruction.regs[2] = RegSpec::rax();
 
-    let hotpath_res = self.read_opc_hotpath(words, instruction, sink)?;
-    let record: OperandCode = match hotpath_res {
-        Ok(code) => code,
-        Err((mut nextb, mut next_rec)) => {
+    let record: OperandCode = if self.read_opc_hotpath(nextb, &mut nextb, &mut next_rec, words, instruction, sink)? {
+        next_rec.1
+    } else {
         let prefixes = &mut instruction.prefixes;
         let record = loop {
             let mut record = next_rec;
@@ -6687,7 +6684,6 @@ fn read_with_annotations<
         }
 
         record.1
-    }
     };
 
     self.read_operands(decoder, words, instruction, record, sink)?;
