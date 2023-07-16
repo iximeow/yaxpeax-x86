@@ -1356,12 +1356,12 @@ const MNEMONICS: &[&'static str] = &[
     "fyl2x",
     "fyl2xp1",
 
-   "loopnz",
+    "loopnz",
     "loopz",
     "loop",
     "jecxz",
 
-   "pusha",
+    "pusha",
     "popa",
     "bound",
     "arpl",
