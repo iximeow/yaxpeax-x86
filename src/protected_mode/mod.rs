@@ -4557,6 +4557,17 @@ impl Prefixes {
     #[inline]
     fn vex_unchecked(&self) -> PrefixVex { PrefixVex { bits: self.vex.bits } }
     #[inline]
+    fn vex_invalid(&self) -> bool {
+        /*
+         * if instruction.prefixes.rex_unchecked().present() // but no rex outside 64-bit mode
+         * || instruction.prefixes.lock()
+         * || instruction.prefixes.operand_size()
+         * || instruction.prefixes.rep()
+         * || instruction.prefixes.repnz() {
+         */
+        (self.bits & 0b1100_0101) > 0
+    }
+    #[inline]
     pub fn vex(&self) -> Option<PrefixVex> {
         let vex = self.vex_unchecked();
         if vex.present() {
@@ -5772,12 +5783,12 @@ fn read_modrm_reg<
 fn read_sib_disp<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(instr: &Instruction, words: &mut T, modbits: u8, sibbyte: u8, sink: &mut S) -> Result<i32, DecodeError> {
+>(instr: &Instruction, words: &mut T, modrm: u8, sibbyte: u8, sink: &mut S) -> Result<i32, DecodeError> {
     let sib_start = words.offset() as u32 * 8 - 8;
     let modbit_addr = words.offset() as u32 * 8 - 10;
     let disp_start = words.offset() as u32 * 8;
 
-    let disp = if modbits == 0b00 {
+    let disp = if modrm < 0b01_000_000 { // modbits == 0b00
         if (sibbyte & 7) == 0b101 {
             sink.record(modbit_addr, modbit_addr + 1,
                 InnerDescription::Misc("4-byte displacement").with_id(sib_start + 0));
@@ -5790,7 +5801,7 @@ fn read_sib_disp<
         } else {
             0
         }
-    } else if modbits == 0b01 {
+    } else if modrm < 0b10_000_000 { // modbits == 0b01
         sink.record(modbit_addr, modbit_addr + 1,
             InnerDescription::Misc("1-byte displacement").with_id(sib_start + 0));
         if instr.prefixes.evex().is_some() {
@@ -5823,13 +5834,12 @@ fn read_sib<
     let modrm_start = words.offset() as u32 * 8 - 8;
     let sib_start = words.offset() as u32 * 8;
 
-    let modbits = modrm >> 6;
     let sibbyte = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
+    let disp = read_sib_disp(instr, words, modrm, sibbyte, sink)?;
+    instr.disp = disp as u32;
+
     instr.regs[1].num |= sibbyte & 7;
     instr.regs[2].num |= (sibbyte >> 3) & 7;
-
-    let disp = read_sib_disp(instr, words, modbits, sibbyte, sink)?;
-    instr.disp = disp as u32;
 
     let scale = 1u8 << (sibbyte >> 6);
     instr.scale = scale;
@@ -6310,7 +6320,7 @@ impl InnerDescription {
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "fmt")] {
+    if #[cfg(feature="fmt")] {
         impl fmt::Display for InnerDescription {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self {
@@ -6355,6 +6365,7 @@ cfg_if::cfg_if! {
     }
 }
 
+// TODO: this derive ought to be `feature=fmt`..
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FieldDescription {
     desc: InnerDescription,
@@ -6638,39 +6649,7 @@ fn read_with_annotations<
 
     Ok(())
 }
-/* likely cases
-        OperandCode::Eb_R0 => 0
-        _op @ OperandCode::ModRM_0x80_Eb_Ib => 1
-        _op @ OperandCode::ModRM_0x81_Ev_Ivs => 2
-        op @ OperandCode::ModRM_0xc6_Eb_Ib => 3
-        op @ OperandCode::ModRM_0xc7_Ev_Iv => 4
-        op @ OperandCode::ModRM_0xc0_Eb_Ib => 5
-        op @ OperandCode::ModRM_0xc1_Ev_Ib => 6
-        op @ OperandCode::ModRM_0xd0_Eb_1 => 7
-        op @ OperandCode::ModRM_0xd1_Ev_1 => 8
-        op @ OperandCode::ModRM_0xd2_Eb_CL => 9
-        op @ OperandCode::ModRM_0xd3_Ev_CL => 10
-        _op @ OperandCode::ModRM_0xf6 => 11
-        _op @ OperandCode::ModRM_0xf7 => 12
-        OperandCode::ModRM_0xfe_Eb => 13
-        OperandCode::ModRM_0xff_Ev => 14
-        OperandCode::Gv_Eb => 15
-        OperandCode::Gv_Ew => 16
-        OperandCode::Ev => 18
-        OperandCode::E_G_xmm => 19
-        op @ OperandCode::G_M_xmm => 20
-        op @ OperandCode::G_E_xmm => 21
-        OperandCode::G_E_xmm_Ib => 22
-        OperandCode::AL_Ibs => 23
-        OperandCode::AX_Ivd => 24
-        OperandCode::Ivs => 25
-        OperandCode::ModRM_0x83_Ev_Ibs => 26
-        OperandCode::I_3 => 27
-        OperandCode::Nothing => 28
-        OperandCode::G_E_mm_Ib => 29
-        OperandCode::ModRM_0x8f_Ev => 30
 
- */
 fn read_operands<
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
@@ -7686,7 +7665,7 @@ fn read_operands<
             let modrm = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
             if modrm & 0b11000000 == 0b11000000 {
                 // interpret the c4 as a vex prefix
-                if instruction.prefixes.lock() || instruction.prefixes.operand_size() || instruction.prefixes.rep() || instruction.prefixes.repnz() {
+                if instruction.prefixes.vex_invalid() {
                     // prefixes and then vex is invalid! reject it.
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
@@ -7719,7 +7698,7 @@ fn read_operands<
             let modrm = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
             if (modrm & 0b1100_0000) == 0b1100_0000 {
                 // interpret the c5 as a vex prefix
-                if instruction.prefixes.lock() || instruction.prefixes.operand_size() || instruction.prefixes.rep() || instruction.prefixes.repnz() {
+                if instruction.prefixes.vex_invalid() {
                     // prefixes and then vex is invalid! reject it.
                     return Err(DecodeError::InvalidPrefixes);
                 } else {
