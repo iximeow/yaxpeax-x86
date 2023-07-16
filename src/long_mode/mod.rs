@@ -5518,12 +5518,6 @@ impl OpcodeRecord {
     }
 }
 
-#[test]
-fn opcode_record_size() {
-    // there are more than 256 opcodes...
-//    assert_eq!(core::mem::size_of::<OpcodeRecord>(), 4);
-}
-
 const OPCODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::ADD), OperandCode::Eb_Gb),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::ADD), OperandCode::Ev_Gv),

@@ -18,6 +18,8 @@
   * reporting ymm register sizes when sizes are actually xmm
   * reporting xmm register sizes when sizes are actually ymm
   * reporting index register as ymm when it is actually xmm
+* extended support for some newer instructions (pconfig, movdir64b) from just
+  64-bit to all decode modes
 
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)
