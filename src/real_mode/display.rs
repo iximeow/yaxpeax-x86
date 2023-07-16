@@ -105,9 +105,11 @@ impl fmt::Display for Segment {
 // register names are grouped by indices scaled by 16.
 // xmm, ymm, zmm all get two indices.
 const REG_NAMES: &[&'static str] = &[
-    "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi",
-    "ax", "cx", "dx", "bx", "sp", "bp", "si", "di",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
+    "ax", "cx", "dx", "bx", "sp", "bp", "si", "di",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi",
     "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7",
     "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7",
     "es", "cs", "ss", "ds", "fs", "gs", "", "",
@@ -346,20 +348,36 @@ impl fmt::Display for Opcode {
 }
 
 const MNEMONICS: &[&'static str] = &[
-    "invalid",
     "add",
     "or",
     "adc",
     "sbb",
     "and",
-    "xor",
     "sub",
+    "xor",
     "cmp",
-    "xadd",
-    "bt",
-    "bts",
+    "rol",
+    "ror",
+    "rcl",
+    "rcr",
+    "shl",
+    "shr",
+    "sal",
+    "sar",
     "btc",
     "btr",
+    "bts",
+    "cmpxchg",
+    "cmpxchg8b",
+    "cmpxchg16b",
+    "dec",
+    "inc",
+    "neg",
+    "not",
+    "xadd",
+    "xchg",
+    "invalid",
+    "bt",
     "bsf",
     "bsr",
     "tzcnt",
@@ -403,17 +421,9 @@ const MNEMONICS: &[&'static str] = &[
     "movzx",
     "movsx",
     "movsxd",
-    "sar",
-    "sal",
-    "shr",
     "shrd",
-    "shl",
-    "rcr",
-    "rcl",
-    "ror",
-    "rol",
-    "inc",
-    "dec",
+//  " inc",
+//  " dec",
     "hlt",
     "call",
     "callf",
@@ -427,7 +437,7 @@ const MNEMONICS: &[&'static str] = &[
     "prefetch0",
     "prefetch1",
     "prefetch2",
-    "xchg",
+//  " xchg",
     "popf",
     "int",
     "into",
@@ -495,9 +505,9 @@ const MNEMONICS: &[&'static str] = &[
     "div",
     "idiv",
     "mul",
-    "neg",
-    "not",
-    "cmpxchg",
+//  " neg",
+//  " not",
+//  " cmpxchg",
     "seto",
     "setno",
     "setb",
@@ -584,7 +594,8 @@ const MNEMONICS: &[&'static str] = &[
     "movdq2q",
     "rsqrtss",
     "rcpss",
-    "andn",
+
+   "andn",
     "bextr",
     "blsi",
     "blsmsk",
@@ -614,11 +625,14 @@ const MNEMONICS: &[&'static str] = &[
     "enclu",
     "rdpkru",
     "wrpkru",
-    "rdpru",
+
+   "rdpru",
     "clzero",
-    "rdseed",
+
+   "rdseed",
     "rdrand",
-    "addps",
+
+   "addps",
     "addpd",
     "andnps",
     "andnpd",
@@ -758,6 +772,7 @@ const MNEMONICS: &[&'static str] = &[
     "vmwrite",
     "xorps",
     "xorpd",
+
     "vmovddup",
     "vpshuflw",
     "vpshufhw",
@@ -766,6 +781,7 @@ const MNEMONICS: &[&'static str] = &[
     "vaddsubps",
     "vcvtpd2dq",
     "vlddqu",
+
     "vcomisd",
     "vcomiss",
     "vucomisd",
@@ -1108,6 +1124,7 @@ const MNEMONICS: &[&'static str] = &[
     "vzeroall",
     "vldmxcsr",
     "vstmxcsr",
+
     "pclmulqdq",
     "aeskeygenassist",
     "aesimc",
@@ -1188,6 +1205,7 @@ const MNEMONICS: &[&'static str] = &[
     "phaddw",
     "hsubpd",
     "haddpd",
+
     "sha1rnds4",
     "sha1nexte",
     "sha1msg1",
@@ -1195,6 +1213,7 @@ const MNEMONICS: &[&'static str] = &[
     "sha256rnds2",
     "sha256msg1",
     "sha256msg2",
+
     "lzcnt",
     "clgi",
     "stgi",
@@ -1206,15 +1225,20 @@ const MNEMONICS: &[&'static str] = &[
     "invlpga",
     "invlpgb",
     "tlbsync",
+
     "movbe",
+
     "adcx",
     "adox",
+
     "prefetchw",
+
     "rdpid",
-    "cmpxchg8b",
-    "cmpxchg16b",
+//  " cmpxchg8b",
+//  " cmpxchg16b",
     "vmptrld",
     "vmptrst",
+
     "bzhi",
     "mulx",
     "shlx",
@@ -1229,10 +1253,12 @@ const MNEMONICS: &[&'static str] = &[
     "xsavec64",
     "xsaves",
     "xsaves64",
+
     "rdfsbase",
     "rdgsbase",
     "wrfsbase",
     "wrgsbase",
+
     "crc32",
     "salc",
     "xlat",
@@ -1329,10 +1355,12 @@ const MNEMONICS: &[&'static str] = &[
     "fxtract",
     "fyl2x",
     "fyl2xp1",
+
     "loopnz",
     "loopz",
     "loop",
     "jcxz",
+
     "pusha",
     "popa",
     "bound",
@@ -1343,8 +1371,12 @@ const MNEMONICS: &[&'static str] = &[
     "daa",
     "aam",
     "aad",
+
+    // started shipping in tremont, 2020 sept 23
     "movdir64b",
     "movdiri",
+
+    // started shipping in tiger lake, 2020 sept 2
     "aesdec128kl",
     "aesdec256kl",
     "aesdecwide128kl",
@@ -1364,8 +1396,8 @@ const MNEMONICS: &[&'static str] = &[
     "femms",
     "pi2fw",
     "pi2fd",
-    "pi2iw",
-    "pi2id",
+    "pf2iw",
+    "pf2id",
     "pmulhrw",
     "pfcmpge",
     "pfmin",
@@ -1388,24 +1420,24 @@ const MNEMONICS: &[&'static str] = &[
     "pswapd",
     "pavgusb",
 
-    // ENQCMD
+    // enqcmd
     "enqcmd",
     "enqcmds",
 
-    // INVPCID,
+    // invpcid
     "invept",
     "invvpid",
     "invpcid",
 
-    // PTWRITE
+    // ptwrite
     "ptwrite",
 
-    // GFNI
+    // gfni
     "gf2p8affineqb",
     "gf2p8affineinvqb",
     "gf2p8mulb",
 
-    // CET
+    // cet
     "wruss",
     "wrss",
     "incssp",
@@ -1416,29 +1448,29 @@ const MNEMONICS: &[&'static str] = &[
     "endbr64",
     "endbr32",
 
-    // TDX
+    // tdx
     "tdcall",
     "seamret",
     "seamops",
     "seamcall",
 
-    // WAITPKG
+    // waitpkg
     "tpause",
     "umonitor",
     "umwait",
 
-    // UINTR
+    // uintr
     "uiret",
     "testui",
     "clui",
     "stui",
     "senduipi",
 
-    // TSXLDTRK
+    // tsxldtrk
     "xsusldtrk",
     "xresldtrk",
 
-    // AVX512F
+    // avx512f
     "valignd",
     "valignq",
     "vblendmpd",
@@ -1559,7 +1591,7 @@ const MNEMONICS: &[&'static str] = &[
     "vshufi32x4",
     "vshufi64x2",
 
-    // AVX512DQ
+    // avx512dq
     "vcvttpd2qq",
     "vcvtpd2qq",
     "vcvttpd2uqq",
@@ -1591,7 +1623,7 @@ const MNEMONICS: &[&'static str] = &[
     "vreducesd",
     "vreducess",
 
-    // AVX512BW
+    // avx512bw
     "vdbpsadbw",
     "vmovdqu8",
     "vmovdqu16",
@@ -1618,7 +1650,7 @@ const MNEMONICS: &[&'static str] = &[
     "vptestmb",
     "vptestmw",
 
-    // AVX512CD
+    // avx512cd
     "vpbroadcastm",
     "vpconflictd",
     "vpconflictq",
@@ -1678,7 +1710,7 @@ const MNEMONICS: &[&'static str] = &[
     "kxnorq",
     "kxorq",
 
-    // AVX512ER
+    // avx512er
     "vexp2pd",
     "vexp2ps",
     "vexp2sd",
@@ -1692,7 +1724,7 @@ const MNEMONICS: &[&'static str] = &[
     "vrsqrt28sd",
     "vrsqrt28ss",
 
-    // AVX512PF
+    // avx512pf
     "vgatherpf0dpd",
     "vgatherpf0dps",
     "vgatherpf0qpd",
@@ -1710,7 +1742,7 @@ const MNEMONICS: &[&'static str] = &[
     "vscatterpf1qpd",
     "vscatterpf1qps",
 
-    // MPX
+    // mpx
     "bndmk",
     "bndcl",
     "bndcu",
@@ -1718,8 +1750,6 @@ const MNEMONICS: &[&'static str] = &[
     "bndmov",
     "bndldx",
     "bndstx",
-
-
 
     "vgf2p8affineqb",
     "vgf2p8affineinvqb",
@@ -1809,6 +1839,7 @@ const MNEMONICS: &[&'static str] = &[
     "vpandnq",
     "vpandd",
     "vpandq",
+
     "psmash",
     "pvalidate",
     "rmpadjust",
@@ -1818,7 +1849,7 @@ const MNEMONICS: &[&'static str] = &[
 impl Opcode {
     fn name(&self) -> &'static str {
         unsafe {
-            MNEMONICS.get_kinda_unchecked(*self as usize)
+            MNEMONICS.get_kinda_unchecked(*self as usize & 0xfff)
         }
     }
 }
