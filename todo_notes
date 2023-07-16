@@ -1,0 +1,11 @@
+cvttsd2si xmm9, xmm15
+should be... cvttsd2si ecx, xmm15
+
+vcvttsd2si, vcvtsd2si,
+sd2si is decoded as if some loads could be only 4 bytes, all are 8...
+ss2si is decdoed as if some loads could be 8 bytes, all are 4...
+
+movdir64b is decodable in protected mode, real mode
+pconfig is decodable in protected mode, real mode
+
+lsl seems just... wrong. check alternate prefixes in 32-/61-bit
