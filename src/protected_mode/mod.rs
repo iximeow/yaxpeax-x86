@@ -4960,6 +4960,7 @@ enum OperandCase {
     G_xmm_Ed,
     G_mm_E_xmm,
     Gd_U_xmm,
+    Gd_Eq_xmm,
     Gv_E_xmm,
     G_xmm_Ew_Ib,
     G_E_xmm_Ub,
@@ -5298,6 +5299,7 @@ enum OperandCode {
     G_xmm_Ed = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_Ed).bits(),
     G_mm_E_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_mm_E_xmm).bits(),
     Gd_U_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gd_U_xmm).bits(),
+    Gd_Eq_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gd_Eq_xmm).bits(),
     Gv_E_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gv_E_xmm).bits(),
     //= 0x816f, // mirror G_xmm_Ed, but also read an immediate
     G_xmm_Ew_Ib = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_Ew_Ib).bits(),
@@ -7625,9 +7627,6 @@ fn read_operands<
         }
         OperandCase::PMOVX_G_E_xmm => {
             instruction.regs[0].bank = RegisterBank::X;
-            if instruction.opcode == Opcode::CVTTSD2SI || instruction.opcode == Opcode::CVTSD2SI {
-                instruction.regs[0].bank = RegisterBank::D;
-            }
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operands[1] = mem_oper;
             if instruction.operands[1] != OperandSpec::RegMMM {
@@ -8903,6 +8902,13 @@ fn read_operands<
             }
             instruction.regs[0].bank = RegisterBank::D;
             instruction.regs[1].bank = RegisterBank::X;
+        }
+        OperandCase::Gd_Eq_xmm => {
+            if instruction.operands[1] == OperandSpec::RegMMM {
+                instruction.regs[1].bank = RegisterBank::X;
+            } else {
+                instruction.mem_size = 8;
+            }
         }
         OperandCase::Gv_E_xmm => {
             if instruction.operands[1] == OperandSpec::RegMMM {
@@ -10781,8 +10787,8 @@ const REPNZ_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::CVTSI2SD), OperandCode::G_xmm_Ed),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::MOVNTSD), OperandCode::M_G_xmm),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::CVTTSD2SI), OperandCode::PMOVX_G_E_xmm),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::CVTSD2SI), OperandCode::PMOVX_G_E_xmm),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::CVTTSD2SI), OperandCode::Gd_Eq_xmm),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::CVTSD2SI), OperandCode::Gd_Eq_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
 
