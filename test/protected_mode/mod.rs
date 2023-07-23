@@ -1840,6 +1840,8 @@ fn test_vex() {
     test_instr(&[0xc4, 0b110_00001, 0b0_1111_010, 0x2c, 0b11_001_010], "vcvttss2si ecx, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b0_1111_110, 0x2c, 0b11_001_010], "vcvttss2si ecx, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_110, 0x2c, 0b11_001_010], "vcvttss2si ecx, xmm2");
+    test_instr(&[0xc4, 0b110_00001, 0b0_1111_110, 0x2c, 0b00_001_010], "vcvttss2si ecx, dword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b1_1111_110, 0x2c, 0b00_001_010], "vcvttss2si ecx, dword [edx]");
     test_instr(&[0xc5, 0b1_1111_010, 0x2c, 0b11_001_010], "vcvttss2si ecx, xmm2");
     test_instr(&[0xc5, 0b1_1111_010, 0x2c, 0b00_001_010], "vcvttss2si ecx, dword [edx]");
     test_instr(&[0xc5, 0b1_1111_110, 0x2c, 0b11_001_010], "vcvttss2si ecx, xmm2");
@@ -1856,6 +1858,7 @@ fn test_vex() {
     test_instr(&[0xc4, 0b110_00001, 0b0_1111_110, 0x2d, 0b00_001_010], "vcvtss2si ecx, dword [edx]");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_110, 0x2d, 0b00_001_010], "vcvtss2si ecx, dword [edx]");
     test_instr(&[0xc5, 0b1_1111_010, 0x2d, 0b11_001_010], "vcvtss2si ecx, xmm2");
+    test_instr(&[0xc5, 0b1_1111_010, 0x2d, 0b00_001_010], "vcvtss2si ecx, dword [edx]");
     test_instr(&[0xc5, 0b1_1111_110, 0x2d, 0b11_001_010], "vcvtss2si ecx, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b0_1111_011, 0x2d, 0b11_001_010], "vcvtsd2si ecx, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b0_1111_011, 0x2d, 0b00_001_010], "vcvtsd2si ecx, qword [edx]");
@@ -1969,8 +1972,16 @@ fn test_vex() {
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_101, 0x5a, 0b11_001_010], "vcvtpd2ps xmm1, ymm2");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_011, 0x5a, 0b11_001_010], "vcvtsd2ss xmm1, xmm0, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_111, 0x5a, 0b11_001_010], "vcvtsd2ss xmm1, xmm0, xmm2");
+    test_instr(&[0xc4, 0b110_00001, 0b1_1111_011, 0x5a, 0b00_001_010], "vcvtsd2ss xmm1, xmm0, qword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b1_1111_111, 0x5a, 0b00_001_010], "vcvtsd2ss xmm1, xmm0, qword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b0_1111_011, 0x5a, 0b00_001_010], "vcvtsd2ss xmm1, xmm0, qword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b0_1111_111, 0x5a, 0b00_001_010], "vcvtsd2ss xmm1, xmm0, qword [edx]");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_010, 0x5a, 0b11_001_010], "vcvtss2sd xmm1, xmm0, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_110, 0x5a, 0b11_001_010], "vcvtss2sd xmm1, xmm0, xmm2");
+    test_instr(&[0xc4, 0b110_00001, 0b1_1111_010, 0x5a, 0b00_001_010], "vcvtss2sd xmm1, xmm0, dword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b1_1111_010, 0x5a, 0b00_001_010], "vcvtss2sd xmm1, xmm0, dword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b0_1111_110, 0x5a, 0b00_001_010], "vcvtss2sd xmm1, xmm0, dword [edx]");
+    test_instr(&[0xc4, 0b110_00001, 0b0_1111_110, 0x5a, 0b00_001_010], "vcvtss2sd xmm1, xmm0, dword [edx]");
 
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_001, 0x5b, 0b11_001_010], "vcvtps2dq xmm1, xmm2");
     test_instr(&[0xc4, 0b110_00001, 0b1_1111_101, 0x5b, 0b11_001_010], "vcvtps2dq ymm1, ymm2");

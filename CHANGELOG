@@ -21,6 +21,10 @@
 * extended support for some newer instructions (pconfig, movdir64b) from just
   64-bit to all decode modes
 * fix cvttsd2si/cvtsd2si reporting xmm registers as destinations in 64-bit mode
+* fix inconsistently-reported memory access size of vcvt{,t}{sd,si} across
+  encodings and bitness
+  * in some cases, instructions loading a single-precision float reported 8-byte loads
+  * in some cases, instructions loading a double-precision float reported 4-byte loads
 
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)
