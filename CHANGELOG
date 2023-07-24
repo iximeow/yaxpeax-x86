@@ -1,4 +1,4 @@
-## unreleased
+## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates
 * address incorrect behavior of `Prefixes::cs()`
   * this "getter" would in fact set the selected segment to `cs`. it has never
