@@ -25,6 +25,11 @@
   encodings and bitness
   * in some cases, instructions loading a single-precision float reported 8-byte loads
   * in some cases, instructions loading a double-precision float reported 4-byte loads
+* fix register sizes for lar/lsl
+  * 16 bits are read from the source register, but x86 docs state that the
+    source register is written as 16-bit, 32-bit, or 64-bit, as prefixes dictate.
+    memory is always written as `word [addr]`, which was correct before and
+    remains the case.
 
 ## 1.1.5
 * fix several typos across crate docs - thank you Bruce! (aka github user waywardmonkeys)

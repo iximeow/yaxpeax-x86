@@ -2567,12 +2567,20 @@ fn strange_prefixing() {
 
 #[test]
 fn prefixed_0f() {
-    test_display(&[0x0f, 0x02, 0xc0], "lar eax, ax");
-    test_display(&[0x48, 0x0f, 0x02, 0xc0], "lar rax, ax");
-    test_display(&[0x0f, 0x03, 0xc0], "lsl eax, eax");
-    // capstone says `lsl rax, rax`, but xed says `rax, eax`. intel docs also say second reg should
+    test_display(&[0x0f, 0x02, 0x01], "lar eax, word [rcx]");
+    test_display(&[0x0f, 0x02, 0xc1], "lar eax, ecx");
+    test_display(&[0x4f, 0x0f, 0x02, 0x01], "lar r8, word [r9]");
+    test_display(&[0x4f, 0x0f, 0x02, 0xc1], "lar r8, r9");
+    test_display(&[0x66, 0x0f, 0x02, 0x01], "lar ax, word [rcx]");
+    test_display(&[0x66, 0x0f, 0x02, 0xc1], "lar ax, cx");
+    test_display(&[0x0f, 0x03, 0x01], "lsl eax, word [rcx]");
+    test_display(&[0x0f, 0x03, 0xc1], "lsl eax, ecx");
+    test_display(&[0x48, 0x0f, 0x03, 0x01], "lsl rax, word [rcx]");
+    // capstone says `lsl rax, rcx`, but xed says `rax, ecx`. intel docs also say second reg should
     // be dword.
-    test_display(&[0x48, 0x0f, 0x03, 0xc0], "lsl rax, eax");
+    test_display(&[0x48, 0x0f, 0x03, 0xc1], "lsl rax, ecx");
+    test_display(&[0x66, 0x0f, 0x03, 0x01], "lsl ax, word [rcx]");
+    test_display(&[0x66, 0x0f, 0x03, 0xc1], "lsl ax, cx");
     test_display(&[0x0f, 0x05], "syscall");
     test_display(&[0x48, 0x0f, 0x05], "syscall");
     test_display(&[0x66, 0x0f, 0x05], "syscall");

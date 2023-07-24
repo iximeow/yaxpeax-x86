@@ -2270,8 +2270,14 @@ fn strange_prefixing() {
 
 #[test]
 fn prefixed_0f() {
-    test_display(&[0x0f, 0x02, 0xc0], "lar eax, ax");
-    test_display(&[0x0f, 0x03, 0xc0], "lsl eax, eax");
+    test_display(&[0x0f, 0x02, 0x01], "lar eax, word [ecx]");
+    test_display(&[0x0f, 0x02, 0xc1], "lar eax, ecx");
+    test_display(&[0x66, 0x0f, 0x02, 0x01], "lar ax, word [ecx]");
+    test_display(&[0x66, 0x0f, 0x02, 0xc1], "lar ax, cx");
+    test_display(&[0x0f, 0x03, 0x01], "lsl eax, word [ecx]");
+    test_display(&[0x0f, 0x03, 0xc1], "lsl eax, ecx");
+    test_display(&[0x66, 0x0f, 0x03, 0x01], "lsl ax, word [ecx]");
+    test_display(&[0x66, 0x0f, 0x03, 0xc1], "lsl ax, cx");
     test_display(&[0x0f, 0x05], "syscall");
     test_display(&[0x66, 0x0f, 0x05], "syscall");
     test_display(&[0x0f, 0x06], "clts");

@@ -4936,6 +4936,7 @@ enum OperandCase {
     AX_Ib,
     Ib_AL,
     Ib_AX,
+    Gv_Ew_LAR,
     Gv_Ew_LSL,
 //    Gdq_Ev,
     Gd_Ev,
@@ -5266,6 +5267,7 @@ enum OperandCode {
     Zv_Iv_R7 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_Iv_R, 7).bits(),
     Gv_Eb = OperandCodeBuilder::new().read_E().operand_case(OperandCase::Gv_Eb).bits(),
     Gv_Ew = OperandCodeBuilder::new().read_E().operand_case(OperandCase::Gv_Ew).bits(),
+    Gv_Ew_LAR = OperandCodeBuilder::new().read_E().operand_case(OperandCase::Gv_Ew_LAR).bits(),
     Gv_Ew_LSL = OperandCodeBuilder::new().read_E().operand_case(OperandCase::Gv_Ew_LSL).bits(),
 //    Gdq_Ed = OperandCodeBuilder::new().read_E().operand_case(OperandCase::Gdq_Ed).bits(),
     Gd_Ed = OperandCodeBuilder::new().read_E().operand_case(OperandCase::Gd_Ed).bits(),
@@ -7940,12 +7942,31 @@ fn read_operands<
             instruction.regs[1].bank = RegisterBank::MM;
             instruction.regs[1].num &= 0b111;
         },
+        OperandCase::Gv_Ew_LAR => {
+            instruction.operands[1] = mem_oper;
+            // lar is weird. a segment selector is taken from the source register, which means
+            // either we read the low 16-bits of a register or read 16 bits from a memory operand.
+            // for whatever reason, the intel manual writes a source register as a dword/qword for
+            // larger modes even though the upper 16 bits would be ignored.
+            //
+            // so the registers are correct by the time we're here, we might just need to override
+            // mem size as well.
+            if instruction.operands[1] != OperandSpec::RegMMM {
+                instruction.mem_size = 2;
+            }
+            instruction.regs[0].bank = if instruction.prefixes.operand_size() {
+                RegisterBank::W
+            } else {
+                RegisterBank::D
+            };
+        },
         OperandCase::Gv_Ew_LSL => {
             instruction.operands[1] = mem_oper;
-            // lsl is weird. the full register width is written, but only the low 16 bits are used.
-            if instruction.operands[1] == OperandSpec::RegMMM {
-                instruction.regs[1].bank = RegisterBank::D;
-            } else {
+            // lsl is weird. a segment selector is taken from the source register, which means
+            // either we read the low 16-bits of a register or read 16 bits from a memory operand.
+            // for whatever reason, the intel manual writes a source register as a dword for larger
+            // modes even though the upper 16 bits would be ignored.
+            if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 2;
             }
             instruction.regs[0].bank = if instruction.prefixes.operand_size() {
@@ -10743,7 +10764,7 @@ fn read_modrm<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_
 const REPNZ_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew_LAR),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::SYSCALL), OperandCode::Nothing),
@@ -11019,7 +11040,7 @@ const REPNZ_0F_CODES: [OpcodeRecord; 256] = [
 const REP_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew_LAR),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::SYSCALL), OperandCode::Nothing),
@@ -11295,7 +11316,7 @@ const REP_0F_CODES: [OpcodeRecord; 256] = [
 const OPERAND_SIZE_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew_LAR),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::SYSCALL), OperandCode::Nothing),
@@ -11568,7 +11589,7 @@ const OPERAND_SIZE_0F_CODES: [OpcodeRecord; 256] = [
 const NORMAL_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f00),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f01),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LAR), OperandCode::Gv_Ew_LAR),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::LSL), OperandCode::Gv_Ew_LSL),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::SYSCALL), OperandCode::Nothing),
