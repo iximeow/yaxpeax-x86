@@ -290,14 +290,14 @@ impl RegSpec {
         eax => 0, ecx => 1, edx => 2, ebx => 3,
         esp => 4, ebp => 5, esi => 6, edi => 7,
         r8d => 8, r9d => 9, r10d => 10, r11d => 11,
-        r12d => 8, r13d => 9, r14d => 14, r15d => 15
+        r12d => 12, r13d => 13, r14d => 14, r15d => 15
     );
 
     register!(W,
         ax => 0, cx => 1, dx => 2, bx => 3,
         sp => 4, bp => 5, si => 6, di => 7,
         r8w => 8, r9w => 9, r10w => 10, r11w => 11,
-        r12w => 8, r13w => 9, r14w => 14, r15w => 15
+        r12w => 12, r13w => 13, r14w => 14, r15w => 15
     );
 
     register!(B,
@@ -308,7 +308,7 @@ impl RegSpec {
     register!(rB,
         spl => 4, bpl => 5, sil => 6, dil => 7,
         r8b => 8, r9b => 9, r10b => 10, r11b => 11,
-        r12b => 8, r13b => 9, r14b => 14, r15b => 15
+        r12b => 12, r13b => 13, r14b => 14, r15b => 15
     );
 
     #[inline]
