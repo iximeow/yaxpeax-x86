@@ -13,6 +13,9 @@
   instructions are otherwise decoded correctly.)
 * fix incorrect register selection for `vpmovm2*` with `rex.b` set (would select
   registers "k8" through "k15", but should be masked down to "k0".."k7".)
+* fix incorrect register selection for `vpbroadcastm{b2q,w2d}` with `rex.b`
+  set. basically the same bug as `vpmovm2*`; would select registers "k8".."k15",
+  but should have been masked to "k0".."k7".
 * fix incorrect register selection for `vpmov*2m` with `rex.r` set. similar to
   above, except 64-bit only: in 32- and 16-bit modes, this case was and continues
   to be a `bound` instruction. in 64-bit mode, this would disassemble as a

@@ -1332,11 +1332,12 @@ fn test_misc() {
 
 #[test]
 fn evex() {
+    // vpbroadcastmw2d. similar to `vpmovm2*`, out-of-range `k` are just masked down.
+    test_display(&[0x62, 0xd2, 0x7e, 0x28, 0x3a, 0xca], "vpbroadcastmw2d ymm1, k2");
     // vpmovm2b (and larger forms). for some reason the source operand is a mask register but uses
     // modrm bits as a register selector. out-of-range `k` seem to just get masked down..
     test_display(&[0x62, 0xd2, 0x7e, 0x08, 0x28, 0xc2], "vpmovm2b xmm0, k2");
     test_display(&[0x62, 0xf2, 0x7e, 0x08, 0x28, 0xc1], "vpmovm2b xmm0, k1");
-
     // vpmovb2m (and larger forms). out-of-range `k` are invalid in 64-bit mode, are part of the
     // `bound` instruction for 32- and 16-bit modes.
     test_display(&[0x62, 0x72, 0x7e /* , 0x28, 0x29, 0xfd */], "bound esi, qword [edx + 0x7e]");

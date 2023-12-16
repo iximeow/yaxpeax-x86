@@ -18401,11 +18401,12 @@ fn test_invalid_sequences() {
     test_invalid(&[0xf3, 0xf2, 0x0f, 0xae, 0x8f, 0x54, 0x3c, 0x58, 0xb7]);
     test_invalid(&[0xff, 0xd8]);
 
+    // vpbroadcastmw2d. similar to `vpmovm2*`, out-of-range `k` are just masked down.
+    test_display(&[0x62, 0xd2, 0x7e, 0x28, 0x3a, 0xca], "vpbroadcastmw2d ymm1, k2");
     // vpmovm2b (and larger forms). for some reason the source operand is a mask register but uses
     // modrm bits as a register selector. out-of-range `k` seem to just get masked down..
     test_display(&[0x62, 0xd2, 0x7e, 0x08, 0x28, 0xc2], "vpmovm2b xmm0, k2");
     test_display(&[0x62, 0xf2, 0x7e, 0x08, 0x28, 0xc1], "vpmovm2b xmm0, k1");
-
     // vpmovb2m (and larger forms). out-of-range `k` are invalid in 64-bit mode, are part of the
     // `bound` instruction for 32- and 16-bit modes.
     test_display(&[0x62, 0x72, 0x7e /* , 0x28, 0x29, 0xfd */], "bound si, dword [bp + si * 1 + 0x7e]");

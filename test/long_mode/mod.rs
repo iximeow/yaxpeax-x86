@@ -1466,6 +1466,8 @@ fn evex() {
     test_display(&[0x62, 0xf2, 0x7d, 0x08, 0x2a, 0x44, 0x40, 0x01], "vmovntdqa xmm0, xmmword [rax + rax * 2 + 0x10]");
     test_invalid(&[0x62, 0xf2, 0x7d, 0x1d, 0x66, 0x50, 0x01, 0x11]);
 
+    // vpbroadcastmw2d. similar to `vpmovm2*`, out-of-range `k` are just masked down.
+    test_display(&[0x62, 0xd2, 0x7e, 0x28, 0x3a, 0xca], "vpbroadcastmw2d ymm1, k2");
     // vpmovm2b (and larger forms). for some reason the source operand is a mask register but uses
     // modrm bits as a register selector. out-of-range `k` seem to just get masked down..
     test_display(&[0x62, 0xd2, 0x7e, 0x08, 0x28, 0xc2], "vpmovm2b xmm0, k2");

@@ -2872,6 +2872,8 @@ pub(crate) fn read_evex_operands<
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         instruction.regs[1].bank = RegisterBank::K;
+        // only 8 mask registers, `xed` suggests that any invalid bits are masked out???
+        instruction.regs[1].num &= 0b111;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
@@ -2897,6 +2899,8 @@ pub(crate) fn read_evex_operands<
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         instruction.regs[1].bank = RegisterBank::K;
+        // only 8 mask registers, `xed` suggests that any invalid bits are masked out???
+        instruction.regs[1].num &= 0b111;
       } else {
         return Err(DecodeError::InvalidOperand);
       }
