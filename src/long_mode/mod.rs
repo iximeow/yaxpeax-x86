@@ -789,15 +789,15 @@ pub struct RegisterClass {
 }
 
 const REGISTER_CLASS_NAMES: &[&'static str] = &[
-    "qword",
+    "BUG. PLEASE REPORT.",
+    "byte",
+    "word",
     "BUG. PLEASE REPORT.",
     "dword",
     "BUG. PLEASE REPORT.",
-    "word",
-    "BUG. PLEASE REPORT.",
-    "byte",
-    "BUG. PLEASE REPORT.",
     "rex-byte",
+    "BUG. PLEASE REPORT.",
+    "qword",
     "BUG. PLEASE REPORT.",
     "cr",
     "BUG. PLEASE REPORT.",

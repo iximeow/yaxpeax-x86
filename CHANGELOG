@@ -1,4 +1,4 @@
-## 1.3.0
+## 1.2.1
 
 * fix incorrect register numbers used in `RegSpec::r12()` and `RegSpec::r13()`
   and smaller-size variants (thank you @tokatoka!)
@@ -22,6 +22,9 @@
   `vpmov*2m` with nonsense `k8..k15` selected. to real hardware, this bit
   sequence is an invalid instruction, and so it is now invalid to yaxpeax-x86
   as well.
+* fix incorrect `RegisterBank` names in `long_mode`. in a previous
+  reorganization register bank numbers were changed and the names were updated to
+  match for `protected_mode` and `real_mode`, but `long_mode` was overlooked.
 
 ## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates
