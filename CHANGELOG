@@ -1,3 +1,10 @@
+## 1.2.1
+
+* fix incorrect register numbers used in `RegSpec::r12()` and `RegSpec::r13()`
+  and smaller-size variants
+* start fixing synonyms of registers from `rex.w` on byte-size instructions
+  with register number <4
+
 ## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates
 * address incorrect behavior of `Prefixes::cs()`
