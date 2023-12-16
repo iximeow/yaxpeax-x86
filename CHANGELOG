@@ -1,9 +1,13 @@
-## 1.2.1
+## 1.3.0
 
 * fix incorrect register numbers used in `RegSpec::r12()` and `RegSpec::r13()`
-  and smaller-size variants
-* start fixing synonyms of registers from `rex.w` on byte-size instructions
-  with register number <4
+  and smaller-size variants (thank you @tokatoka!)
+* fix synonyms of registers from `rex.w` on byte-size operands with register
+  number <4
+* adjust misleading docs on `register_class::B` and `register_class::RB`: being
+  in register class `B` does not imply that there was no `rex.w` on the
+  instruction - `rex.w` may have been present but the register number may have
+  been <4 such that `B` was an appropriate register class anyway.
 
 ## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates
