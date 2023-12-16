@@ -32,3 +32,15 @@ name = "display_c_does_not_panic"
 path = "fuzz_targets/display_c_does_not_panic.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "does_not_decode_invalid_registers"
+path = "fuzz_targets/does_not_decode_invalid_registers.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "small_reg_is_always_old_bank_if_possible"
+path = "fuzz_targets/small_reg_is_always_old_bank_if_possible.rs"
+test = false
+doc = false

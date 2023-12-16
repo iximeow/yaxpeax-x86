@@ -883,9 +883,9 @@ pub mod register_class {
     pub const D: RegisterClass = RegisterClass { kind: RegisterBank::D };
     /// word registers: ax through r15w
     pub const W: RegisterClass = RegisterClass { kind: RegisterBank::W };
-    /// byte registers: al, cl, dl, bl, ah, ch, dh, bh. `B` registers do *not* have a rex prefix.
+    /// byte registers: al, cl, dl, bl, ah, ch, dh, bh.
     pub const B: RegisterClass = RegisterClass { kind: RegisterBank::B };
-    /// byte registers with rex prefix present: al through r15b. `RB` registers have a rex prefix.
+    /// byte registers added in x86_64: spl through r15b.
     pub const RB: RegisterClass = RegisterClass { kind: RegisterBank::rB };
     /// control registers cr0 through cr15.
     pub const CR: RegisterClass = RegisterClass { kind: RegisterBank::CR};
@@ -6730,18 +6730,27 @@ fn read_operands<
 
     if operand_code.is_only_modrm_operands() {
         let bank;
+        let modrm = read_modrm(words)?;
+        let rrr = (modrm >> 3) & 7;
+        self.rrr = rrr;
+        let num = rrr + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+        instruction.regs[0].num = num;
+
         // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
             bank = self.vqp_size();
             instruction.mem_size = bank as u8;
+            instruction.regs[0].bank = bank;
         } else {
-            bank = self.rb_size();
             instruction.mem_size = 1;
+            bank = self.rb_size();
+            if num < 4 {
+                instruction.regs[0].bank = RegisterBank::B;
+            } else {
+                instruction.regs[0].bank = bank;
+            }
         };
-        let modrm = read_modrm(words)?;
-        instruction.regs[0].bank = bank;
-        instruction.regs[0].num = ((modrm >> 3) & 7) + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
 
         // for some encodings, the rrr field selects an opcode, not an operand
         if operand_code.bits() != OperandCode::ModRM_0xc1_Ev_Ib as u16 && operand_code.bits() != OperandCode::ModRM_0xff_Ev as u16 {
@@ -6767,6 +6776,11 @@ fn read_operands<
         } else {
             read_M(words, instruction, modrm, sink)?
         };
+        if mem_oper == OperandSpec::RegMMM {
+            if instruction.regs[1].bank == RegisterBank::rB && instruction.regs[1].num < 4 {
+                instruction.regs[1].bank = RegisterBank::B;
+            }
+        }
         if !operand_code.has_reg_mem() {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
@@ -6811,20 +6825,27 @@ fn read_operands<
     let mut mem_oper = OperandSpec::Nothing;
     if operand_code.has_read_E() {
         let bank;
+        let modrm = read_modrm(words)?;
+        let rrr = (modrm >> 3) & 7;
+        self.rrr = rrr;
+        let num = rrr + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
+        instruction.regs[0].num = num;
+
         // cool! we can precompute width and know we need to read_E.
         if !operand_code.has_byte_operands() {
             // further, this is an vdq E
             bank = self.vqp_size();
             instruction.mem_size = bank as u8;
+            instruction.regs[0].bank = bank;
         } else {
-            bank = self.rb_size();
             instruction.mem_size = 1;
+            bank = self.rb_size();
+            if num < 4 {
+                instruction.regs[0].bank = RegisterBank::B;
+            } else {
+                instruction.regs[0].bank = bank;
+            }
         };
-        let modrm = read_modrm(words)?;
-        instruction.regs[0].bank = bank;
-        let rrr = (modrm >> 3) & 7;
-        self.rrr = rrr;
-        instruction.regs[0].num = rrr + if instruction.prefixes.rex_unchecked().r() { 0b1000 } else { 0 };
 
         // for some encodings, the rrr field selects an opcode, not an operand
         if operand_code.bits() != OperandCode::ModRM_0xc1_Ev_Ib as u16 && operand_code.bits() != OperandCode::ModRM_0xff_Ev as u16 {
@@ -6850,6 +6871,11 @@ fn read_operands<
         } else {
             read_M(words, instruction, modrm, sink)?
         };
+        if mem_oper == OperandSpec::RegMMM {
+            if instruction.regs[1].bank == RegisterBank::rB && instruction.regs[1].num < 4 {
+                instruction.regs[1].bank = RegisterBank::B;
+            }
+        }
         if !operand_code.has_reg_mem() {
             instruction.operands[0] = mem_oper;
             instruction.operands[1] = OperandSpec::RegRRR;
@@ -6944,11 +6970,13 @@ fn read_operands<
             }
             2 => {
                 // these are Zb_Ib_R
-                instruction.regs[0] =
-                    RegSpec {
-                        num: reg + if instruction.prefixes.rex_unchecked().b() { 0b1000 } else { 0 },
-                        bank: self.rb_size()
-                    };
+                let num = reg + if instruction.prefixes.rex_unchecked().b() { 0b1000 } else { 0 };
+                let bank = if num < 4 {
+                    RegisterBank::B
+                } else {
+                    self.rb_size()
+                };
+                instruction.regs[0] = RegSpec { num, bank };
                 sink.record(
                     opcode_start,
                     opcode_start + 2,
@@ -7425,7 +7453,11 @@ fn read_operands<
             );
             if instruction.operands[1] == OperandSpec::RegMMM {
                 instruction.mem_size = 0;
-                instruction.regs[1].bank = w;
+                if instruction.regs[1].num < 4 {
+                    instruction.regs[1].bank = RegisterBank::B;
+                } else {
+                    instruction.regs[1].bank = w;
+                }
             } else {
                 instruction.mem_size = 1;
             }

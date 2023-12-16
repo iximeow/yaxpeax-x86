@@ -3456,6 +3456,36 @@ fn from_reports() {
     test_display(&[0xf3, 0x0f, 0x1e, 0x0f], "nop dword [rdi], ecx");
 }
 
+/// the first four single byte registers (`al`, `cl`, `dl`, `bl`) can be described as either the
+/// first four registers of the old `B` bank (`al..bh`) or the first four registers of the new `rB`
+/// bank, used when `rex.w` is present on the instruction. `RegSpec` relies on the bank matching to
+/// compare equality, as well as for `Hash` and `Ord` to work correctly, so having two spellings of
+/// the register `al` (and friends) can be a correctness issue for dependent code.
+#[test]
+fn register_synonyms_use_old_bank() {
+    // a few instructions where adding a rex.w prefix would yield a synonymous byte-size register
+    let cases: &'static [&'static [u8]] = &[
+        &[0x30, 0x00],
+        &[0x30, 0xc1],
+        &[0x0f, 0xb6, 0xc0],
+        &[0x0f, 0xbe, 0xc0],
+        &[0xb2, 0xff], // from `does_not_decode_invalid_registers` fuzz target 🎉
+    ];
+
+    for case in cases.iter() {
+        let mut case_with_rexw: Vec<u8> = vec![0x48];
+        case_with_rexw.extend_from_slice(case);
+
+        let mut reader = yaxpeax_arch::U8Reader::new(case);
+        let no_rexw = InstDecoder::default().decode(&mut reader).expect("can disassemble test instruction");
+
+        let mut reader = yaxpeax_arch::U8Reader::new(case);
+        let with_rexw = InstDecoder::default().decode(&mut reader).expect("can disassemble test instruction");
+
+        assert_eq!(no_rexw, with_rexw);
+    }
+}
+
 mod reg_specs {
     use yaxpeax_x86::long_mode::RegSpec;
 
