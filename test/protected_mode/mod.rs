@@ -3132,8 +3132,95 @@ fn from_reports() {
     test_display(&[0xf3, 0x0f, 0x1e, 0x0f], "nop dword [edi], ecx");
 }
 
-mod reg_masks {
+mod reg_specs {
     use yaxpeax_x86::protected_mode::RegSpec;
+
+    #[test]
+    fn reg_specs_are_correct() {
+        #[cfg(feature = "fmt")]
+        {
+            let cases: Vec<(RegSpec, &'static str)> = vec![
+                (RegSpec::d(0), "eax"), (RegSpec::eax(), "eax"),
+                (RegSpec::d(1), "ecx"), (RegSpec::ecx(), "ecx"),
+                (RegSpec::d(2), "edx"), (RegSpec::edx(), "edx"),
+                (RegSpec::d(3), "ebx"), (RegSpec::ebx(), "ebx"),
+                (RegSpec::d(4), "esp"), (RegSpec::esp(), "esp"),
+                (RegSpec::d(5), "ebp"), (RegSpec::ebp(), "ebp"),
+                (RegSpec::d(6), "esi"), (RegSpec::esi(), "esi"),
+                (RegSpec::d(7), "edi"), (RegSpec::edi(), "edi"),
+
+                (RegSpec::w(0), "ax"), (RegSpec::ax(), "ax"),
+                (RegSpec::w(1), "cx"), (RegSpec::cx(), "cx"),
+                (RegSpec::w(2), "dx"), (RegSpec::dx(), "dx"),
+                (RegSpec::w(3), "bx"), (RegSpec::bx(), "bx"),
+                (RegSpec::w(4), "sp"), (RegSpec::sp(), "sp"),
+                (RegSpec::w(5), "bp"), (RegSpec::bp(), "bp"),
+                (RegSpec::w(6), "si"), (RegSpec::si(), "si"),
+                (RegSpec::w(7), "di"), (RegSpec::di(), "di"),
+
+                (RegSpec::b(0), "al"), (RegSpec::al(), "al"),
+                (RegSpec::b(1), "cl"), (RegSpec::cl(), "cl"),
+                (RegSpec::b(2), "dl"), (RegSpec::dl(), "dl"),
+                (RegSpec::b(3), "bl"), (RegSpec::bl(), "bl"),
+                (RegSpec::b(4), "ah"), (RegSpec::ah(), "ah"),
+                (RegSpec::b(5), "ch"), (RegSpec::ch(), "ch"),
+                (RegSpec::b(6), "dh"), (RegSpec::dh(), "dh"),
+                (RegSpec::b(7), "bh"), (RegSpec::bh(), "bh"),
+
+                (RegSpec::eip(), "eip"),
+                (RegSpec::eflags(), "eflags"),
+                (RegSpec::es(), "es"), (RegSpec::cs(), "cs"),
+                (RegSpec::ss(), "ss"), (RegSpec::ds(), "ds"),
+                (RegSpec::fs(), "fs"), (RegSpec::gs(), "gs"),
+
+                (RegSpec::mask(0), "k0"),
+                (RegSpec::mask(1), "k1"),
+                (RegSpec::mask(2), "k2"),
+                (RegSpec::mask(3), "k3"),
+                (RegSpec::mask(4), "k4"),
+                (RegSpec::mask(5), "k5"),
+                (RegSpec::mask(6), "k6"),
+                (RegSpec::mask(7), "k7"),
+            ];
+
+            for (reg, name) in cases.iter() {
+                assert_eq!(reg.name(), *name);
+            }
+        }
+
+        let cases: Vec<(RegSpec, RegSpec)> = vec![
+            (RegSpec::d(0), RegSpec::eax()),
+            (RegSpec::d(1), RegSpec::ecx()),
+            (RegSpec::d(2), RegSpec::edx()),
+            (RegSpec::d(3), RegSpec::ebx()),
+            (RegSpec::d(4), RegSpec::esp()),
+            (RegSpec::d(5), RegSpec::ebp()),
+            (RegSpec::d(6), RegSpec::esi()),
+            (RegSpec::d(7), RegSpec::edi()),
+
+            (RegSpec::w(0), RegSpec::ax()),
+            (RegSpec::w(1), RegSpec::cx()),
+            (RegSpec::w(2), RegSpec::dx()),
+            (RegSpec::w(3), RegSpec::bx()),
+            (RegSpec::w(4), RegSpec::sp()),
+            (RegSpec::w(5), RegSpec::bp()),
+            (RegSpec::w(6), RegSpec::si()),
+            (RegSpec::w(7), RegSpec::di()),
+
+            (RegSpec::b(0), RegSpec::al()),
+            (RegSpec::b(1), RegSpec::cl()),
+            (RegSpec::b(2), RegSpec::dl()),
+            (RegSpec::b(3), RegSpec::bl()),
+            (RegSpec::b(4), RegSpec::ah()),
+            (RegSpec::b(5), RegSpec::ch()),
+            (RegSpec::b(6), RegSpec::dh()),
+            (RegSpec::b(7), RegSpec::bh()),
+        ];
+
+        for (reg1, reg2) in cases.iter() {
+            assert_eq!(reg1, reg2);
+        }
+    }
 
     #[test]
     #[should_panic]

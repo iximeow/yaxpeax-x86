@@ -3456,8 +3456,195 @@ fn from_reports() {
     test_display(&[0xf3, 0x0f, 0x1e, 0x0f], "nop dword [rdi], ecx");
 }
 
-mod reg_masks {
+mod reg_specs {
     use yaxpeax_x86::long_mode::RegSpec;
+
+    #[test]
+    fn reg_specs_are_correct() {
+        #[cfg(feature = "fmt")]
+        {
+            let cases: Vec<(RegSpec, &'static str)> = vec![
+                (RegSpec::q(0), "rax"), (RegSpec::rax(), "rax"),
+                (RegSpec::q(1), "rcx"), (RegSpec::rcx(), "rcx"),
+                (RegSpec::q(2), "rdx"), (RegSpec::rdx(), "rdx"),
+                (RegSpec::q(3), "rbx"), (RegSpec::rbx(), "rbx"),
+                (RegSpec::q(4), "rsp"), (RegSpec::rsp(), "rsp"),
+                (RegSpec::q(5), "rbp"), (RegSpec::rbp(), "rbp"),
+                (RegSpec::q(6), "rsi"), (RegSpec::rsi(), "rsi"),
+                (RegSpec::q(7), "rdi"), (RegSpec::rdi(), "rdi"),
+                (RegSpec::q(8), "r8"), (RegSpec::r8(), "r8"),
+                (RegSpec::q(9), "r9"), (RegSpec::r9(), "r9"),
+                (RegSpec::q(10), "r10"), (RegSpec::r10(), "r10"),
+                (RegSpec::q(11), "r11"), (RegSpec::r11(), "r11"),
+                (RegSpec::q(12), "r12"), (RegSpec::r12(), "r12"),
+                (RegSpec::q(13), "r13"), (RegSpec::r13(), "r13"),
+                (RegSpec::q(14), "r14"), (RegSpec::r14(), "r14"),
+                (RegSpec::q(15), "r15"), (RegSpec::r15(), "r15"),
+
+                (RegSpec::d(0), "eax"), (RegSpec::eax(), "eax"),
+                (RegSpec::d(1), "ecx"), (RegSpec::ecx(), "ecx"),
+                (RegSpec::d(2), "edx"), (RegSpec::edx(), "edx"),
+                (RegSpec::d(3), "ebx"), (RegSpec::ebx(), "ebx"),
+                (RegSpec::d(4), "esp"), (RegSpec::esp(), "esp"),
+                (RegSpec::d(5), "ebp"), (RegSpec::ebp(), "ebp"),
+                (RegSpec::d(6), "esi"), (RegSpec::esi(), "esi"),
+                (RegSpec::d(7), "edi"), (RegSpec::edi(), "edi"),
+                (RegSpec::d(8), "r8d"), (RegSpec::r8d(), "r8d"),
+                (RegSpec::d(9), "r9d"), (RegSpec::r9d(), "r9d"),
+                (RegSpec::d(10), "r10d"), (RegSpec::r10d(), "r10d"),
+                (RegSpec::d(11), "r11d"), (RegSpec::r11d(), "r11d"),
+                (RegSpec::d(12), "r12d"), (RegSpec::r12d(), "r12d"),
+                (RegSpec::d(13), "r13d"), (RegSpec::r13d(), "r13d"),
+                (RegSpec::d(14), "r14d"), (RegSpec::r14d(), "r14d"),
+                (RegSpec::d(15), "r15d"), (RegSpec::r15d(), "r15d"),
+
+                (RegSpec::w(0), "ax"), (RegSpec::ax(), "ax"),
+                (RegSpec::w(1), "cx"), (RegSpec::cx(), "cx"),
+                (RegSpec::w(2), "dx"), (RegSpec::dx(), "dx"),
+                (RegSpec::w(3), "bx"), (RegSpec::bx(), "bx"),
+                (RegSpec::w(4), "sp"), (RegSpec::sp(), "sp"),
+                (RegSpec::w(5), "bp"), (RegSpec::bp(), "bp"),
+                (RegSpec::w(6), "si"), (RegSpec::si(), "si"),
+                (RegSpec::w(7), "di"), (RegSpec::di(), "di"),
+                (RegSpec::w(8), "r8w"), (RegSpec::r8w(), "r8w"),
+                (RegSpec::w(9), "r9w"), (RegSpec::r9w(), "r9w"),
+                (RegSpec::w(10), "r10w"), (RegSpec::r10w(), "r10w"),
+                (RegSpec::w(11), "r11w"), (RegSpec::r11w(), "r11w"),
+                (RegSpec::w(12), "r12w"), (RegSpec::r12w(), "r12w"),
+                (RegSpec::w(13), "r13w"), (RegSpec::r13w(), "r13w"),
+                (RegSpec::w(14), "r14w"), (RegSpec::r14w(), "r14w"),
+                (RegSpec::w(15), "r15w"), (RegSpec::r15w(), "r15w"),
+
+                (RegSpec::b(0), "al"), (RegSpec::al(), "al"),
+                (RegSpec::b(1), "cl"), (RegSpec::cl(), "cl"),
+                (RegSpec::b(2), "dl"), (RegSpec::dl(), "dl"),
+                (RegSpec::b(3), "bl"), (RegSpec::bl(), "bl"),
+                (RegSpec::b(4), "ah"), (RegSpec::ah(), "ah"),
+                (RegSpec::b(5), "ch"), (RegSpec::ch(), "ch"),
+                (RegSpec::b(6), "dh"), (RegSpec::dh(), "dh"),
+                (RegSpec::b(7), "bh"), (RegSpec::bh(), "bh"),
+
+                (RegSpec::rb(0), "al"), (RegSpec::al(), "al"),
+                (RegSpec::rb(1), "cl"), (RegSpec::cl(), "cl"),
+                (RegSpec::rb(2), "dl"), (RegSpec::dl(), "dl"),
+                (RegSpec::rb(3), "bl"), (RegSpec::bl(), "bl"),
+                (RegSpec::rb(4), "spl"), (RegSpec::spl(), "spl"),
+                (RegSpec::rb(5), "bpl"), (RegSpec::bpl(), "bpl"),
+                (RegSpec::rb(6), "sil"), (RegSpec::sil(), "sil"),
+                (RegSpec::rb(7), "dil"), (RegSpec::dil(), "dil"),
+                (RegSpec::rb(8), "r8b"), (RegSpec::r8b(), "r8b"),
+                (RegSpec::rb(9), "r9b"), (RegSpec::r9b(), "r9b"),
+                (RegSpec::rb(10), "r10b"), (RegSpec::r10b(), "r10b"),
+                (RegSpec::rb(11), "r11b"), (RegSpec::r11b(), "r11b"),
+                (RegSpec::rb(12), "r12b"), (RegSpec::r12b(), "r12b"),
+                (RegSpec::rb(13), "r13b"), (RegSpec::r13b(), "r13b"),
+                (RegSpec::rb(14), "r14b"), (RegSpec::r14b(), "r14b"),
+                (RegSpec::rb(15), "r15b"), (RegSpec::r15b(), "r15b"),
+
+                (RegSpec::rip(), "rip"), (RegSpec::eip(), "eip"),
+                (RegSpec::rflags(), "rflags"), (RegSpec::eflags(), "eflags"),
+                (RegSpec::es(), "es"), (RegSpec::cs(), "cs"),
+                (RegSpec::ss(), "ss"), (RegSpec::ds(), "ds"),
+                (RegSpec::fs(), "fs"), (RegSpec::gs(), "gs"),
+
+                (RegSpec::mask(0), "k0"),
+                (RegSpec::mask(1), "k1"),
+                (RegSpec::mask(2), "k2"),
+                (RegSpec::mask(3), "k3"),
+                (RegSpec::mask(4), "k4"),
+                (RegSpec::mask(5), "k5"),
+                (RegSpec::mask(6), "k6"),
+                (RegSpec::mask(7), "k7"),
+            ];
+
+            for (reg, name) in cases.iter() {
+                assert_eq!(reg.name(), *name);
+            }
+        }
+
+        let cases: Vec<(RegSpec, RegSpec)> = vec![
+            (RegSpec::q(0), RegSpec::rax()),
+            (RegSpec::q(1), RegSpec::rcx()),
+            (RegSpec::q(2), RegSpec::rdx()),
+            (RegSpec::q(3), RegSpec::rbx()),
+            (RegSpec::q(4), RegSpec::rsp()),
+            (RegSpec::q(5), RegSpec::rbp()),
+            (RegSpec::q(6), RegSpec::rsi()),
+            (RegSpec::q(7), RegSpec::rdi()),
+            (RegSpec::q(8), RegSpec::r8()),
+            (RegSpec::q(9), RegSpec::r9()),
+            (RegSpec::q(10), RegSpec::r10()),
+            (RegSpec::q(11), RegSpec::r11()),
+            (RegSpec::q(12), RegSpec::r12()),
+            (RegSpec::q(13), RegSpec::r13()),
+            (RegSpec::q(14), RegSpec::r14()),
+            (RegSpec::q(15), RegSpec::r15()),
+
+            (RegSpec::d(0), RegSpec::eax()),
+            (RegSpec::d(1), RegSpec::ecx()),
+            (RegSpec::d(2), RegSpec::edx()),
+            (RegSpec::d(3), RegSpec::ebx()),
+            (RegSpec::d(4), RegSpec::esp()),
+            (RegSpec::d(5), RegSpec::ebp()),
+            (RegSpec::d(6), RegSpec::esi()),
+            (RegSpec::d(7), RegSpec::edi()),
+            (RegSpec::d(8), RegSpec::r8d()),
+            (RegSpec::d(9), RegSpec::r9d()),
+            (RegSpec::d(10), RegSpec::r10d()),
+            (RegSpec::d(11), RegSpec::r11d()),
+            (RegSpec::d(12), RegSpec::r12d()),
+            (RegSpec::d(13), RegSpec::r13d()),
+            (RegSpec::d(14), RegSpec::r14d()),
+            (RegSpec::d(15), RegSpec::r15d()),
+
+            (RegSpec::w(0), RegSpec::ax()),
+            (RegSpec::w(1), RegSpec::cx()),
+            (RegSpec::w(2), RegSpec::dx()),
+            (RegSpec::w(3), RegSpec::bx()),
+            (RegSpec::w(4), RegSpec::sp()),
+            (RegSpec::w(5), RegSpec::bp()),
+            (RegSpec::w(6), RegSpec::si()),
+            (RegSpec::w(7), RegSpec::di()),
+            (RegSpec::w(8), RegSpec::r8w()),
+            (RegSpec::w(9), RegSpec::r9w()),
+            (RegSpec::w(10), RegSpec::r10w()),
+            (RegSpec::w(11), RegSpec::r11w()),
+            (RegSpec::w(12), RegSpec::r12w()),
+            (RegSpec::w(13), RegSpec::r13w()),
+            (RegSpec::w(14), RegSpec::r14w()),
+            (RegSpec::w(15), RegSpec::r15w()),
+
+            (RegSpec::b(0), RegSpec::al()),
+            (RegSpec::b(1), RegSpec::cl()),
+            (RegSpec::b(2), RegSpec::dl()),
+            (RegSpec::b(3), RegSpec::bl()),
+            (RegSpec::b(4), RegSpec::ah()),
+            (RegSpec::b(5), RegSpec::ch()),
+            (RegSpec::b(6), RegSpec::dh()),
+            (RegSpec::b(7), RegSpec::bh()),
+
+            (RegSpec::rb(0), RegSpec::al()),
+            (RegSpec::rb(1), RegSpec::cl()),
+            (RegSpec::rb(2), RegSpec::dl()),
+            (RegSpec::rb(3), RegSpec::bl()),
+            (RegSpec::rb(4), RegSpec::spl()),
+            (RegSpec::rb(5), RegSpec::bpl()),
+            (RegSpec::rb(6), RegSpec::sil()),
+            (RegSpec::rb(7), RegSpec::dil()),
+            (RegSpec::rb(8), RegSpec::r8b()),
+            (RegSpec::rb(9), RegSpec::r9b()),
+            (RegSpec::rb(10), RegSpec::r10b()),
+            (RegSpec::rb(11), RegSpec::r11b()),
+            (RegSpec::rb(12), RegSpec::r12b()),
+            (RegSpec::rb(13), RegSpec::r13b()),
+            (RegSpec::rb(14), RegSpec::r14b()),
+            (RegSpec::rb(15), RegSpec::r15b()),
+        ];
+
+        for (reg1, reg2) in cases.iter() {
+            assert_eq!(reg1, reg2);
+        }
+    }
 
     #[test]
     #[should_panic]

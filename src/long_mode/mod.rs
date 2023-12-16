@@ -236,9 +236,15 @@ impl RegSpec {
             panic!("invalid x86 rex-byte reg {}", num);
         }
 
+        let bank = if num < 4 {
+            RegisterBank::B
+        } else {
+            RegisterBank::rB
+        };
+
         RegSpec {
             num,
-            bank: RegisterBank::rB
+            bank,
         }
     }
 
@@ -283,7 +289,7 @@ impl RegSpec {
         rax => 0, rcx => 1, rdx => 2, rbx => 3,
         rsp => 4, rbp => 5, rsi => 6, rdi => 7,
         r8 => 8, r9 => 9, r10 => 10, r11 => 11,
-        r12 => 8, r13 => 9, r14 => 14, r15 => 15
+        r12 => 12, r13 => 13, r14 => 14, r15 => 15
     );
 
     register!(D,
