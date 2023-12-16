@@ -3442,6 +3442,11 @@ fn test_sevsnp() {
     test_display(&[0xf2, 0x0f, 0x01, 0xfe], "rmpupdate");
 }
 
+#[test]
+fn test_keylocker() {
+    test_display(&[0xf3, 0x0f, 0x38, 0xdd, 0x03], "aesdec128kl xmm0, m384b [rbx]");
+}
+
 // some test cases are best just lifted from llvm or gcc.
 #[test]
 fn from_llvm() {

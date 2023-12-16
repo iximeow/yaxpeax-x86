@@ -146,7 +146,7 @@ const MEM_SIZE_STRINGS: [&'static str; 64] = [
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ymmword",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
-    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
+    "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "m384b",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "BUG",
     "BUG", "BUG", "BUG", "BUG", "BUG", "BUG", "ptr", "zmmword",
 ];

@@ -8,6 +8,9 @@
   in register class `B` does not imply that there was no `rex.w` on the
   instruction - `rex.w` may have been present but the register number may have
   been <4 such that `B` was an appropriate register class anyway.
+* fix missing memory access size text for 128-bit keylocker instructions (would
+  have text like "aesdec128kl xmm0, BUG [rcx]" rather than "..., m384b [rcx]".
+  instructions are otherwise decoded correctly.)
 
 ## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates
