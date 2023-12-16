@@ -11,6 +11,8 @@
 * fix missing memory access size text for 128-bit keylocker instructions (would
   have text like "aesdec128kl xmm0, BUG [rcx]" rather than "..., m384b [rcx]".
   instructions are otherwise decoded correctly.)
+* fix incorrect register selection for `vpmovm2*` with `rex.b` set (would select
+  registers "k8" through "k15", but should be masked down to "k0".."k7".)
 
 ## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates
