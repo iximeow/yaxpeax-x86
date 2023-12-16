@@ -18406,6 +18406,11 @@ fn test_invalid_sequences() {
     test_display(&[0x62, 0xd2, 0x7e, 0x08, 0x28, 0xc2], "vpmovm2b xmm0, k2");
     test_display(&[0x62, 0xf2, 0x7e, 0x08, 0x28, 0xc1], "vpmovm2b xmm0, k1");
 
+    // vpmovb2m (and larger forms). out-of-range `k` are invalid in 64-bit mode, are part of the
+    // `bound` instruction for 32- and 16-bit modes.
+    test_display(&[0x62, 0x72, 0x7e /* , 0x28, 0x29, 0xfd */], "bound si, dword [bp + si * 1 + 0x7e]");
+    test_display(&[0x62, 0xf2, 0x7e, 0x28, 0x29, 0xfd], "vpmovb2m k7, ymm5");
+
 }
 
 #[test]

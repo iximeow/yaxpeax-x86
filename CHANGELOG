@@ -13,6 +13,12 @@
   instructions are otherwise decoded correctly.)
 * fix incorrect register selection for `vpmovm2*` with `rex.b` set (would select
   registers "k8" through "k15", but should be masked down to "k0".."k7".)
+* fix incorrect register selection for `vpmov*2m` with `rex.r` set. similar to
+  above, except 64-bit only: in 32- and 16-bit modes, this case was and continues
+  to be a `bound` instruction. in 64-bit mode, this would disassemble as a
+  `vpmov*2m` with nonsense `k8..k15` selected. to real hardware, this bit
+  sequence is an invalid instruction, and so it is now invalid to yaxpeax-x86
+  as well.
 
 ## 1.2.0
 * fix incorrect old yaxpeax-arch version selection for ffi crates

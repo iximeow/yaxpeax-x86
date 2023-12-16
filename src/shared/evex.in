@@ -2810,6 +2810,9 @@ pub(crate) fn read_evex_operands<
       if mem_oper == OperandSpec::RegMMM {
         instruction.mem_size = 0;
         instruction.regs[0].bank = RegisterBank::K;
+        if instruction.regs[0].num > 7 {
+          return Err(DecodeError::InvalidOperand);
+        }
       } else {
         return Err(DecodeError::InvalidOperand);
       }

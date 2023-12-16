@@ -1470,6 +1470,10 @@ fn evex() {
     // modrm bits as a register selector. out-of-range `k` seem to just get masked down..
     test_display(&[0x62, 0xd2, 0x7e, 0x08, 0x28, 0xc2], "vpmovm2b xmm0, k2");
     test_display(&[0x62, 0xf2, 0x7e, 0x08, 0x28, 0xc1], "vpmovm2b xmm0, k1");
+    // vpmovb2m (and larger forms). out-of-range `k` are invalid in 64-bit mode, are part of the
+    // `bound` instruction for 32- and 16-bit modes.
+    test_invalid(&[0x62, 0x72, 0x7e, 0x28, 0x29, 0xfd]);
+    test_display(&[0x62, 0xf2, 0x7e, 0x28, 0x29, 0xfd], "vpmovb2m k7, ymm5");
 
     test_display(&[0x62, 0x12, 0x7d, 0x06, 0xa0, 0x04, 0x2f], "vpscatterdd dword [r15 + xmm29 * 1], k6, xmm8");
     test_display(&[0x62, 0x12, 0x7d, 0x06, 0xa0, 0x14, 0x0f], "vpscatterdd dword [r15 + xmm25 * 1], k6, xmm10");
