@@ -1,3 +1,10 @@
+## 1.2.2
+
+* fix `hreset` reporting two operands, with a second operand of `Nothing`.
+  this is not exactly a *bug*, there is in fact no second operand and libraries
+  probably ought to handle `Nothing` identically to having no operand reported
+  at all. but `yaxpeax-x86` intends to not report superfluous operands.
+
 ## 1.2.1
 
 * fix incorrect register numbers used in `RegSpec::r12()` and `RegSpec::r13()`

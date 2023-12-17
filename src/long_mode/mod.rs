@@ -8812,6 +8812,7 @@ fn read_operands<
             instruction.opcode = Opcode::HRESET;
             instruction.imm = read_num(words, 1)?;
             instruction.operands[0] = OperandSpec::ImmU8;
+            instruction.operand_count = 1;
         }
         OperandCase::G_mm_Edq => {
             instruction.regs[0].bank = RegisterBank::MM;

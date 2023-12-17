@@ -18414,6 +18414,15 @@ fn test_invalid_sequences() {
 
 }
 
+// some test cases are best just lifted from llvm or gcc.
+#[test]
+fn from_llvm() {
+    test_display(&[0xf3, 0x0f, 0x3a, 0xf0, 0xc0, 0x01], "hreset 0x1");
+    let mut reader = yaxpeax_arch::U8Reader::new(&[0xf3, 0x0f, 0x3a, 0xf0, 0xc0, 0x01]);
+    let hreset = InstDecoder::default().decode(&mut reader).expect("can disassemble test instruction");
+    assert_eq!(hreset.operand_count(), 1);
+}
+
 #[test]
 fn from_reports() {
     // negative compressed evex displacements should not overflow and panic
