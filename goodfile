@@ -68,8 +68,7 @@ if Build.environment.has("perf") then
     measurements[name] = tonumber(count)
   end
 
-  insts, good, bad, ms = perf_out.stdout:match("Disassembled (%d*) instructions %((%d) good, (%d) bad), (%d) ms")
-  println("got " .. insts .. " insts in " .. ms .. "ms")
+  insts, good, bad, ms = perf_out.stdout:match("Disassembled (%d*) instructions %((%d*) valid, (%d*) bad%), (%d*) ms")
 
   measurements["decoded"] = tonumber(insts)
   measurements["elapsed_ms"] = tonumber(ms)
