@@ -60,27 +60,25 @@ if Build.environment.has("perf") then
   -- TODO: roll this up into some perf tools in the lua env. for now, if perf
   -- event paranoid is >2 then we'll probably just fail the build trying and
   -- failing to run perf.
-  if tonumber(perf_setting.stdout) < 3 then
-    perf_out = Build.check_output({"perf", "stat", "-x", ";", "-e", "cycles,instructions", "./bench-yaxpeax-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
+  perf_out = Build.check_output({"perf", "stat", "-x", ";", "-e", "cycles,instructions", "./bench-yaxpeax-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
 
-    measurements = {}
+  measurements = {}
 
-    for count, unit, name in perf_out.stderr:gmatch("([^;]*);([^;]*);([^;]*)[^\n]*\n?") do
-      measurements[name] = tonumber(count)
-    end
-
-    insts, good, bad, ms = perf_out.stdout:match("Disassembled (%d*) instructions %((%d) good, (%d) bad), (%d) ms")
-
-    measurements["decoded"] = tonumber(insts)
-    measurements["elapsed_ms"] = tonumber(ms)
-
-    ipc = measurements["instructions"] / measurements["cycles"]
-    Build.metric("no-fmt IPC", string.format("%.3f", ipc))
-    inst_per_decode = measurements["instructions"] / measurements["decoded"]
-    Build.metric("no-fmt instructions/decode", string.format("%.1f", inst_per_decode))
-    ms_per_decode = measurements["elapsed_ms"] / measurements["decoded"]
-    Build.metric("no-fmt ns/decode", string.format("%.2f", ms_per_decode * 1000000000))
+  for count, unit, name in perf_out.stderr:gmatch("([^;]*);([^;]*);([^;]*)[^\n]*\n?") do
+    measurements[name] = tonumber(count)
   end
+
+  insts, good, bad, ms = perf_out.stdout:match("Disassembled (%d*) instructions %((%d) good, (%d) bad), (%d) ms")
+
+  measurements["decoded"] = tonumber(insts)
+  measurements["elapsed_ms"] = tonumber(ms)
+
+  ipc = measurements["instructions"] / measurements["cycles"]
+  Build.metric("no-fmt IPC", string.format("%.3f", ipc))
+  inst_per_decode = measurements["instructions"] / measurements["decoded"]
+  Build.metric("no-fmt instructions/decode", string.format("%.1f", inst_per_decode))
+  ms_per_decode = measurements["elapsed_ms"] / measurements["decoded"]
+  Build.metric("no-fmt ns/decode", string.format("%.2f", ms_per_decode * 1000000000))
 end
 
 -- no-fmt
