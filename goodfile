@@ -78,7 +78,7 @@ if Build.environment.has("perf") then
   inst_per_decode = measurements["instructions:u"] / measurements["decoded"]
   Build.metric("no-fmt instructions/decode", string.format("%.1f", inst_per_decode))
   ms_per_decode = measurements["elapsed_ms"] / measurements["decoded"]
-  Build.metric("no-fmt ns/decode", string.format("%.2f", ms_per_decode * 1000000000))
+  Build.metric("no-fmt ns/decode", string.format("%.2f", ms_per_decode * 1000000))
 end
 
 -- no-fmt
