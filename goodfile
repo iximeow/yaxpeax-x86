@@ -1,0 +1,100 @@
+Build.dependencies({"git", "make", "rustc", "cargo"})
+
+Build.metric(
+  "nightly version",
+  string.gsub(Build.check_output({"rustc", "--version"}).stdout, '^%s*(.*)%s*$', '%1')
+)
+
+Step.start("crate")
+Step.push("build")
+Build.run({"cargo", "build"}) -- `run` automatically records stdout and stderr to log files named after the command
+Step.advance("test")
+Build.run({"cargo", "test"}, {name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
+-- 1.0.0 did not consistently build even tests with --no-default-features
+-- Build.run({"cargo", "test", "--no-default-features"}, {name="test nostdlib/nofmt"})
+-- Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {name="test nostdlib/fmt"})
+
+function ffi_build_metrics()
+  Step.start("ffi")
+  Step.push("build")
+  Build.run({"cargo", "+nightly", "build", "-Z", "build-std", "--release", "--no-default-features", "--target", Build.environment.vars.native_rust_triple}, {cwd="ffi/"})
+
+  Step.advance("validate")
+  sopath = "ffi/target/" .. Build.environment.vars.native_rust_triple .. "/release/libyaxpeax_x86_ffi_long_mode.so"
+  Build.run({"ls", sopath})
+  Build.metric(
+    "libyaxpeax_x86_ffi_long_mode.so size (bytes)",
+    Build.environment.size(sopath)
+  )
+  Build.artifact(sopath)
+end
+
+if pcall(ffi_build_metrics) then
+  -- great, ffi build worked
+else
+  print("could not build/test ffi, is this version < 1.1.5?")
+end
+
+-- now run some perf numbers...
+Step.start("perf")
+Build.run({"git", "clone", "https://github.com/athre0z/disas-bench.git", "disas-bench"})
+Build.run({"git", "submodule", "update", "--recursive", "--init"}, {cwd="disas-bench"})
+Build.run({"git", "remote", "add", "dev", "../../.."}, {cwd="disas-bench/libs/yaxpeax"})
+Build.run({"git", "fetch", "-a", "dev"}, {cwd="disas-bench/libs/yaxpeax"})
+Build.run({"git", "checkout", Build.sha}, {cwd="disas-bench/libs/yaxpeax"})
+Step.push("build")
+Build.run({"make", "make-bench-yaxpeax"}, {cwd="disas-bench/bench/yaxpeax"})
+
+Build.metric(
+  "bench-yaxpeax-fmt size (bytes)",
+  Build.environment.size("disas-bench/bench/yaxpeax/bench-yaxpeax-fmt")
+)
+
+Build.metric(
+  "bench-yaxpeax-no-fmt size (bytes)",
+  Build.environment.size("disas-bench/bench/yaxpeax/bench-yaxpeax-no-fmt")
+)
+
+-- fmt
+Step.advance("fmt")
+bench_start = Build.now_ms()
+
+Build.run({"./bench-yaxpeax-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
+
+bench_end = Build.now_ms()
+Build.metric("fmt runtime (ms)", bench_end - bench_start)
+
+if Build.environment.has("perf") then
+  perf_setting = Build.check_output({"cat", "/proc/sys/kernel/perf_event_paranoid"})
+  -- TODO: roll this up into some perf tools in the lua env. for now, if perf
+  -- event paranoid is >2 then we'll probably just fail the build trying and
+  -- failing to run perf.
+  perf_out = Build.check_output({"perf", "stat", "-x", ";", "-e", "cycles,instructions", "./bench-yaxpeax-no-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
+
+  measurements = {}
+
+  for count, unit, name in perf_out.stderr:gmatch("([^;]*);([^;]*);([^;]*)[^\n]*\n?") do
+    measurements[name] = tonumber(count)
+  end
+
+  insts, good, bad, ms = perf_out.stdout:match("Disassembled (%d*) instructions %((%d*) valid, (%d*) bad%), (%d*) ms")
+
+  measurements["decoded"] = tonumber(insts)
+  measurements["elapsed_ms"] = tonumber(ms)
+
+  ipc = measurements["instructions:u"] / measurements["cycles:u"]
+  Build.metric("no-fmt IPC", string.format("%.3f", ipc))
+  inst_per_decode = measurements["instructions:u"] / measurements["decoded"]
+  Build.metric("no-fmt instructions/decode", string.format("%.1f", inst_per_decode))
+  ms_per_decode = measurements["elapsed_ms"] / measurements["decoded"]
+  Build.metric("no-fmt ns/decode", string.format("%.2f", ms_per_decode * 1000000))
+end
+
+-- no-fmt
+Step.advance("no-fmt")
+bench_start = Build.now_ms()
+
+Build.run({"./bench-yaxpeax-no-fmt", "20", "0x400", "0x2460400", "../../input/xul.dll"}, {cwd="disas-bench/bench/yaxpeax"})
+
+bench_end = Build.now_ms()
+Build.metric("no-fmt runtime (ms)", bench_end - bench_start)
