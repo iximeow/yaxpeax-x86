@@ -24,13 +24,11 @@ the decoders provided by `yaxpeax-x86` are designed to be usable in a `no_std` s
 
 yaxpeax-x86 decodes long-mode (`amd64`/`x86_64`), protected-mode (`x86`/`x86_32`), and real-mode (`x86_16`) instructions. the most part, ISA extensions decode equivalently across modes; this is the full list of extensions that are supported:
 
-`3dnow`\*, `sse`\*, `sse2`\*, `sse3`, `ssse3`, `sse4.1`, `sse4.2`, `sse4a`, `avx`, `avx2`, `avx512`\*\*, `syscall`, `cmpxchg16b`, `fma3`, `aesni`, `popcnt`, `rdrand`, `xsave`, `sgx`, `monitor`, `movbe`, `sgx`, `bmi1`, `bmi2`, `invpcid`, `mpx`, `adx`, `clflushopt`, `pcommit`, `sha`, `gfni`, `pclmulqdq`, `rdtscp`, `abm`, `xop`, `skinit`, `tbm`, `svm`, `f16c`, `fma4`, `tsx`, `enqcmd`\*\*\*, `uintr`\*\*\*, `keylocker`\*\*\*, `store_direct`\*\*\*, `cet`\*\*\*, `sev/snp`\*\*\*
+`3dnow`, `sse`\*, `sse2`\*, `sse3`, `ssse3`, `sse4.1`, `sse4.2`, `sse4a`, `avx`, `avx2`, `avx512`\*\*, `syscall`, `cmpxchg16b`, `fma3`, `aesni`, `popcnt`, `rdrand`, `xsave`, `sgx`, `monitor`, `movbe`, `sgx`, `bmi1`, `bmi2`, `invpcid`, `mpx`, `adx`, `clflushopt`, `pcommit`, `sha`, `gfni`, `pclmulqdq`, `rdtscp`, `abm`, `xop`, `skinit`, `tbm`, `svm`, `f16c`, `fma4`, `tsx`, `enqcmd`, `uintr`, `keylocker`, `store_direct`, `cet`, `sev/snp`
 
-\*: `3dnow`, `sse`, and `sse2` are non-optional in `x86_64`, so it is not permitted to construct a decoder that rejects them. `x86_32` and `x86_16` could have features to reject these instructions for true `8086` and `i386` compatibility, but currently do not.
+\*: `sse`, and `sse2` are non-optional in `x86_64`, so it is not permitted to construct a decoder that rejects them. `x86_32` and `x86_16` could have features to reject these instructions for true `8086` and `i386` compatibility, but currently do not.
 
 \*\*: `avx512` is fully supported, but decoders rejecting subgroups of the `avx512` family are not. if you need granular `avx512` compatibility controls, please file an issue.
-
-\*\*\*: i ran out of space for feature bits. `InstDecoder` is currently a `u64` and all 64 bits are used for x86 features mapping to `cpuid` bits. supporting these as optional instructions would require growing this to a pair of `u64`. since the typical case is to decode everything, these are decoded regardless of `InstDecoder` settings. growing `InstDecoder` to an `u128` is likely acceptable, but has not yet been profiled.
 
 ### very fast
 when hooked up to [`disas-bench`](https://github.com/iximeow/disas-bench#results), `yaxpeax_x86::long_mode` has shown roughly 250mb/s decode throughput and on some hardware is the fastest software x86 decoder available. the likely path through the decoder, through `<yaxpeax_x86::amd64::InstDecoder as yaxpeax_arch::Decoder>::decode_into``, is an average of 58 cycles on a zen2 core.

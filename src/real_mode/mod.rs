@@ -3,6 +3,9 @@ mod evex;
 #[cfg(feature = "fmt")]
 mod display;
 pub mod uarch;
+mod isa_settings;
+
+pub use isa_settings::IsaSettings;
 
 pub use crate::MemoryAccessSize;
 
@@ -2707,73 +2710,7 @@ impl LengthedInstruction for Instruction {
 /// the design requiring that.
 #[derive(PartialEq, Copy, Clone, Eq, Hash, PartialOrd, Ord)]
 pub struct InstDecoder {
-    // extensions tracked here:
-    //  0. SSE3
-    //  1. SSSE3
-    //  2. monitor (intel-only?)
-    //  3. vmx (some atom chips still lack it)
-    //  4. fma3 (intel haswell/broadwell+, amd piledriver+)
-    //  5. cmpxchg16b (some amd are missing this one)
-    //  6. sse4.1
-    //  7. sse4.2
-    //  8. movbe
-    //  9. popcnt (independent of BMI)
-    // 10. aesni
-    // 11. xsave (xsave, xrestor, xsetbv, xgetbv)
-    // 12. rdrand (intel ivybridge+, amd ..??)
-    // 13. sgx (eadd, eblock, ecreate, edbgrd, edbgwr, einit, eldb, eldu, epa, eremove, etrace,
-    //     ewb, eenter, eexit, egetkey, ereport, eresume)
-    // 14. bmi1 (intel haswell+, amd jaguar+)
-    // 15. avx2 (intel haswell+, amd excavator+)
-    // 16. bmi2 (intel ?, amd ?)
-    // 17. invpcid
-    // 18. mpx
-    // 19. avx512_f
-    // 20. avx512_dq
-    // 21. rdseed
-    // 22. adx
-    // 23. avx512_fma
-    // 24. pcommit
-    // 25. clflushopt
-    // 26. clwb
-    // 27. avx512_pf
-    // 28. avx512_er
-    // 29. avx512_cd
-    // 30. sha
-    // 31. avx512_bw
-    // 32. avx512_vl
-    // 33. prefetchwt1
-    // 34. avx512_vbmi
-    // 35. avx512_vbmi2
-    // 36. gfni (galois field instructions)
-    // 37. vaes
-    // 38. pclmulqdq
-    // 39. avx_vnni
-    // 40. avx512_bitalg
-    // 41. avx512_vpopcntdq
-    // 42. avx512_4vnniw
-    // 43. avx512_4fmaps
-    // 44. cx8 // cmpxchg8 - is this actually optional in x86?
-    // 45. syscall // syscall/sysret - actually optional in x86?
-    // 46. rdtscp // actually optional in x86?
-    // 47. abm (lzcnt, popcnt)
-    // 48. sse4a
-    // 49. 3dnowprefetch // actually optional?
-    // 50. xop
-    // 51. skinit
-    // 52. tbm
-    // 53. intel quirks
-    // 54. amd quirks
-    // 55. avx (intel ?, amd ?)
-    // 56. amd-v/svm
-    // 57. lahfsahf
-    // 58. cmov
-    // 59. f16c
-    // 60. fma4
-    // 61. prefetchw
-    // 62. tsx
-    // 63. lzcnt
-    flags: u64,
+    flags: [u64; 2],
 }
 
 impl InstDecoder {
@@ -2783,7 +2720,7 @@ impl InstDecoder {
     /// and any instructions defined by extensions.
     pub fn minimal() -> Self {
         InstDecoder {
-            flags: 0,
+            flags: [0, 0],
         }
     }
 
@@ -2795,1311 +2732,32 @@ impl InstDecoder {
         let mut reader = yaxpeax_arch::U8Reader::new(data);
         self.decode(&mut reader)
     }
+}
 
-    pub fn sse3(&self) -> bool {
-        self.flags & (1 << 0) != 0
-    }
-
-    pub fn with_sse3(mut self) -> Self {
-        self.flags |= 1 << 0;
-        self
-    }
-
-    pub fn ssse3(&self) -> bool {
-        self.flags & (1 << 1) != 0
-    }
-
-    pub fn with_ssse3(mut self) -> Self {
-        self.flags |= 1 << 1;
-        self
-    }
-
-    pub fn monitor(&self) -> bool {
-        self.flags & (1 << 2) != 0
-    }
-
-    pub fn with_monitor(mut self) -> Self {
-        self.flags |= 1 << 2;
-        self
-    }
-
-    pub fn vmx(&self) -> bool {
-        self.flags & (1 << 3) != 0
-    }
-
-    pub fn with_vmx(mut self) -> Self {
-        self.flags |= 1 << 3;
-        self
-    }
-
-    pub fn fma3(&self) -> bool {
-        self.flags & (1 << 4) != 0
-    }
-
-    pub fn with_fma3(mut self) -> Self {
-        self.flags |= 1 << 4;
-        self
-    }
-
-    pub fn cmpxchg16b(&self) -> bool {
-        self.flags & (1 << 5) != 0
-    }
-
-    pub fn with_cmpxchg16b(mut self) -> Self {
-        self.flags |= 1 << 5;
-        self
-    }
-
-    pub fn sse4_1(&self) -> bool {
-        self.flags & (1 << 6) != 0
-    }
-
-    pub fn with_sse4_1(mut self) -> Self {
-        self.flags |= 1 << 6;
-        self
-    }
-
-    pub fn sse4_2(&self) -> bool {
-        self.flags & (1 << 7) != 0
-    }
-
-    pub fn with_sse4_2(mut self) -> Self {
-        self.flags |= 1 << 7;
-        self
-    }
-
-    pub fn with_sse4(self) -> Self {
-        self
-            .with_sse4_1()
-            .with_sse4_2()
-    }
-
-    pub fn movbe(&self) -> bool {
-        self.flags & (1 << 8) != 0
-    }
-
-    pub fn with_movbe(mut self) -> Self {
-        self.flags |= 1 << 8;
-        self
-    }
-
-    pub fn popcnt(&self) -> bool {
-        self.flags & (1 << 9) != 0
-    }
-
-    pub fn with_popcnt(mut self) -> Self {
-        self.flags |= 1 << 9;
-        self
-    }
-
-    pub fn aesni(&self) -> bool {
-        self.flags & (1 << 10) != 0
-    }
-
-    pub fn with_aesni(mut self) -> Self {
-        self.flags |= 1 << 10;
-        self
-    }
-
-    pub fn xsave(&self) -> bool {
-        self.flags & (1 << 11) != 0
-    }
-
-    pub fn with_xsave(mut self) -> Self {
-        self.flags |= 1 << 11;
-        self
-    }
-
-    pub fn rdrand(&self) -> bool {
-        self.flags & (1 << 12) != 0
-    }
-
-    pub fn with_rdrand(mut self) -> Self {
-        self.flags |= 1 << 12;
-        self
-    }
-
-    pub fn sgx(&self) -> bool {
-        self.flags & (1 << 13) != 0
-    }
-
-    pub fn with_sgx(mut self) -> Self {
-        self.flags |= 1 << 13;
-        self
-    }
-
-    pub fn bmi1(&self) -> bool {
-        self.flags & (1 << 14) != 0
-    }
-
-    pub fn with_bmi1(mut self) -> Self {
-        self.flags |= 1 << 14;
-        self
-    }
-
-    pub fn avx2(&self) -> bool {
-        self.flags & (1 << 15) != 0
-    }
-
-    pub fn with_avx2(mut self) -> Self {
-        self.flags |= 1 << 15;
-        self
-    }
-
-    /// `bmi2` indicates support for the `BZHI`, `MULX`, `PDEP`, `PEXT`, `RORX`, `SARX`, `SHRX`,
-    /// and `SHLX` instructions. `bmi2` is implemented in all x86 chips that implement `bmi`,
-    /// except the amd `piledriver` and `steamroller` microarchitectures.
-    pub fn bmi2(&self) -> bool {
-        self.flags & (1 << 16) != 0
-    }
-
-    pub fn with_bmi2(mut self) -> Self {
-        self.flags |= 1 << 16;
-        self
-    }
-
-    pub fn invpcid(&self) -> bool {
-        self.flags & (1 << 17) != 0
-    }
-
-    pub fn with_invpcid(mut self) -> Self {
-        self.flags |= 1 << 17;
-        self
-    }
-
-    pub fn mpx(&self) -> bool {
-        self.flags & (1 << 18) != 0
-    }
-
-    pub fn with_mpx(mut self) -> Self {
-        self.flags |= 1 << 18;
-        self
-    }
-
-    pub fn avx512_f(&self) -> bool {
-        self.flags & (1 << 19) != 0
-    }
-
-    pub fn with_avx512_f(mut self) -> Self {
-        self.flags |= 1 << 19;
-        self
-    }
-
-    pub fn avx512_dq(&self) -> bool {
-        self.flags & (1 << 20) != 0
-    }
-
-    pub fn with_avx512_dq(mut self) -> Self {
-        self.flags |= 1 << 20;
-        self
-    }
-
-    pub fn rdseed(&self) -> bool {
-        self.flags & (1 << 21) != 0
-    }
-
-    pub fn with_rdseed(mut self) -> Self {
-        self.flags |= 1 << 21;
-        self
-    }
-
-    pub fn adx(&self) -> bool {
-        self.flags & (1 << 22) != 0
-    }
-
-    pub fn with_adx(mut self) -> Self {
-        self.flags |= 1 << 22;
-        self
-    }
-
-    pub fn avx512_fma(&self) -> bool {
-        self.flags & (1 << 23) != 0
-    }
-
-    pub fn with_avx512_fma(mut self) -> Self {
-        self.flags |= 1 << 23;
-        self
-    }
-
-    pub fn pcommit(&self) -> bool {
-        self.flags & (1 << 24) != 0
-    }
-
-    pub fn with_pcommit(mut self) -> Self {
-        self.flags |= 1 << 24;
-        self
-    }
-
-    pub fn clflushopt(&self) -> bool {
-        self.flags & (1 << 25) != 0
-    }
-
-    pub fn with_clflushopt(mut self) -> Self {
-        self.flags |= 1 << 25;
-        self
-    }
-
-    pub fn clwb(&self) -> bool {
-        self.flags & (1 << 26) != 0
-    }
-
-    pub fn with_clwb(mut self) -> Self {
-        self.flags |= 1 << 26;
-        self
-    }
-
-    pub fn avx512_pf(&self) -> bool {
-        self.flags & (1 << 27) != 0
-    }
-
-    pub fn with_avx512_pf(mut self) -> Self {
-        self.flags |= 1 << 27;
-        self
-    }
-
-    pub fn avx512_er(&self) -> bool {
-        self.flags & (1 << 28) != 0
-    }
-
-    pub fn with_avx512_er(mut self) -> Self {
-        self.flags |= 1 << 28;
-        self
-    }
-
-    pub fn avx512_cd(&self) -> bool {
-        self.flags & (1 << 29) != 0
-    }
-
-    pub fn with_avx512_cd(mut self) -> Self {
-        self.flags |= 1 << 29;
-        self
-    }
-
-    pub fn sha(&self) -> bool {
-        self.flags & (1 << 30) != 0
-    }
-
-    pub fn with_sha(mut self) -> Self {
-        self.flags |= 1 << 30;
-        self
-    }
-
-    pub fn avx512_bw(&self) -> bool {
-        self.flags & (1 << 31) != 0
-    }
-
-    pub fn with_avx512_bw(mut self) -> Self {
-        self.flags |= 1 << 31;
-        self
-    }
+pub struct DecodeEverything {}
 
-    pub fn avx512_vl(&self) -> bool {
-        self.flags & (1 << 32) != 0
-    }
-
-    pub fn with_avx512_vl(mut self) -> Self {
-        self.flags |= 1 << 32;
-        self
-    }
-
-    pub fn prefetchwt1(&self) -> bool {
-        self.flags & (1 << 33) != 0
-    }
-
-    pub fn with_prefetchwt1(mut self) -> Self {
-        self.flags |= 1 << 33;
-        self
-    }
-
-    pub fn avx512_vbmi(&self) -> bool {
-        self.flags & (1 << 34) != 0
-    }
-
-    pub fn with_avx512_vbmi(mut self) -> Self {
-        self.flags |= 1 << 34;
-        self
-    }
-
-    pub fn avx512_vbmi2(&self) -> bool {
-        self.flags & (1 << 35) != 0
-    }
-
-    pub fn with_avx512_vbmi2(mut self) -> Self {
-        self.flags |= 1 << 35;
-        self
-    }
-
-    pub fn gfni(&self) -> bool {
-        self.flags & (1 << 36) != 0
-    }
-
-    pub fn with_gfni(mut self) -> Self {
-        self.flags |= 1 << 36;
-        self
-    }
-
-    pub fn vaes(&self) -> bool {
-        self.flags & (1 << 37) != 0
-    }
-
-    pub fn with_vaes(mut self) -> Self {
-        self.flags |= 1 << 37;
-        self
-    }
-
-    pub fn pclmulqdq(&self) -> bool {
-        self.flags & (1 << 38) != 0
-    }
-
-    pub fn with_pclmulqdq(mut self) -> Self {
-        self.flags |= 1 << 38;
-        self
-    }
-
-    pub fn avx_vnni(&self) -> bool {
-        self.flags & (1 << 39) != 0
-    }
-
-    pub fn with_avx_vnni(mut self) -> Self {
-        self.flags |= 1 << 39;
-        self
-    }
-
-    pub fn avx512_bitalg(&self) -> bool {
-        self.flags & (1 << 40) != 0
-    }
-
-    pub fn with_avx512_bitalg(mut self) -> Self {
-        self.flags |= 1 << 40;
-        self
-    }
-
-    pub fn avx512_vpopcntdq(&self) -> bool {
-        self.flags & (1 << 41) != 0
-    }
-
-    pub fn with_avx512_vpopcntdq(mut self) -> Self {
-        self.flags |= 1 << 41;
-        self
-    }
-
-    pub fn avx512_4vnniw(&self) -> bool {
-        self.flags & (1 << 42) != 0
-    }
-
-    pub fn with_avx512_4vnniw(mut self) -> Self {
-        self.flags |= 1 << 42;
-        self
-    }
-
-    pub fn avx512_4fmaps(&self) -> bool {
-        self.flags & (1 << 43) != 0
-    }
-
-    pub fn with_avx512_4fmaps(mut self) -> Self {
-        self.flags |= 1 << 43;
-        self
-    }
-
-    /// returns `true` if this `InstDecoder` has **all** `avx512` features enabled.
-    pub fn avx512(&self) -> bool {
-        let avx512_mask =
-            (1 << 19) |
-            (1 << 20) |
-            (1 << 23) |
-            (1 << 27) |
-            (1 << 28) |
-            (1 << 29) |
-            (1 << 31) |
-            (1 << 32) |
-            (1 << 34) |
-            (1 << 35) |
-            (1 << 40) |
-            (1 << 41) |
-            (1 << 42) |
-            (1 << 43);
-
-        (self.flags & avx512_mask) == avx512_mask
-    }
-
-    /// enable all `avx512` features on this `InstDecoder`. no real CPU, at time of writing,
-    /// actually has such a feature combination, but this is a useful overestimate for `avx512`
-    /// generally.
-    pub fn with_avx512(mut self) -> Self {
-        let avx512_mask =
-            (1 << 19) |
-            (1 << 20) |
-            (1 << 23) |
-            (1 << 27) |
-            (1 << 28) |
-            (1 << 29) |
-            (1 << 31) |
-            (1 << 32) |
-            (1 << 34) |
-            (1 << 35) |
-            (1 << 40) |
-            (1 << 41) |
-            (1 << 42) |
-            (1 << 43);
-
-        self.flags |= avx512_mask;
-        self
-    }
-
-    pub fn cx8(&self) -> bool {
-        self.flags & (1 << 44) != 0
-    }
-
-    pub fn with_cx8(mut self) -> Self {
-        self.flags |= 1 << 44;
-        self
-    }
-
-    pub fn syscall(&self) -> bool {
-        self.flags & (1 << 45) != 0
-    }
-
-    pub fn with_syscall(mut self) -> Self {
-        self.flags |= 1 << 45;
-        self
-    }
-
-    pub fn rdtscp(&self) -> bool {
-        self.flags & (1 << 46) != 0
-    }
-
-    pub fn with_rdtscp(mut self) -> Self {
-        self.flags |= 1 << 46;
-        self
-    }
-
-    pub fn abm(&self) -> bool {
-        self.flags & (1 << 47) != 0
-    }
-
-    pub fn with_abm(mut self) -> Self {
-        self.flags |= 1 << 47;
-        self
-    }
-
-    pub fn sse4a(&self) -> bool {
-        self.flags & (1 << 48) != 0
-    }
-
-    pub fn with_sse4a(mut self) -> Self {
-        self.flags |= 1 << 48;
-        self
-    }
-
-    pub fn _3dnowprefetch(&self) -> bool {
-        self.flags & (1 << 49) != 0
-    }
-
-    pub fn with_3dnowprefetch(mut self) -> Self {
-        self.flags |= 1 << 49;
-        self
-    }
-
-    pub fn xop(&self) -> bool {
-        self.flags & (1 << 50) != 0
-    }
-
-    pub fn with_xop(mut self) -> Self {
-        self.flags |= 1 << 50;
-        self
-    }
-
-    pub fn skinit(&self) -> bool {
-        self.flags & (1 << 51) != 0
-    }
-
-    pub fn with_skinit(mut self) -> Self {
-        self.flags |= 1 << 51;
-        self
-    }
-
-    pub fn tbm(&self) -> bool {
-        self.flags & (1 << 52) != 0
-    }
-
-    pub fn with_tbm(mut self) -> Self {
-        self.flags |= 1 << 52;
-        self
-    }
-
-    pub fn intel_quirks(&self) -> bool {
-        self.flags & (1 << 53) != 0
-    }
-
-    pub fn with_intel_quirks(mut self) -> Self {
-        self.flags |= 1 << 53;
-        self
-    }
-
-    pub fn amd_quirks(&self) -> bool {
-        self.flags & (1 << 54) != 0
-    }
-
-    pub fn with_amd_quirks(mut self) -> Self {
-        self.flags |= 1 << 54;
-        self
-    }
-
-    pub fn avx(&self) -> bool {
-        self.flags & (1 << 55) != 0
-    }
-
-    pub fn with_avx(mut self) -> Self {
-        self.flags |= 1 << 55;
-        self
-    }
-
-    pub fn svm(&self) -> bool {
-        self.flags & (1 << 56) != 0
-    }
-
-    pub fn with_svm(mut self) -> Self {
-        self.flags |= 1 << 56;
-        self
-    }
-
-    /// `lahfsahf` is only unset for early revisions of 64-bit amd and intel chips. unfortunately
-    /// the clearest documentation on when these instructions were reintroduced into 64-bit
-    /// architectures seems to be
-    /// [wikipedia](https://en.wikipedia.org/wiki/X86-64#Older_implementations):
-    /// ```text
-    /// Early AMD64 and Intel 64 CPUs lacked LAHF and SAHF instructions in 64-bit mode. AMD
-    /// introduced these instructions (also in 64-bit mode) with their Athlon 64, Opteron and
-    /// Turion 64 revision D processors in March 2005[48][49][50] while Intel introduced the
-    /// instructions with the Pentium 4 G1 stepping in December 2005. The 64-bit version of Windows
-    /// 8.1 requires this feature.[47]
-    /// ```
-    ///
-    /// this puts reintroduction of these instructions somewhere in the middle of prescott and k8
-    /// lifecycles, for intel and amd respectively. because there is no specific uarch where these
-    /// features become enabled, prescott and k8 default to not supporting these instructions,
-    /// where later uarches support these instructions.
-    pub fn lahfsahf(&self) -> bool {
-        self.flags & (1 << 57) != 0
-    }
-
-    pub fn with_lahfsahf(mut self) -> Self {
-        self.flags |= 1 << 57;
-        self
-    }
-
-    pub fn cmov(&self) -> bool {
-        self.flags & (1 << 58) != 0
-    }
-
-    pub fn with_cmov(mut self) -> Self {
-        self.flags |= 1 << 58;
-        self
-    }
-
-    pub fn f16c(&self) -> bool {
-        self.flags & (1 << 59) != 0
-    }
-
-    pub fn with_f16c(mut self) -> Self {
-        self.flags |= 1 << 59;
-        self
-    }
-
-    pub fn fma4(&self) -> bool {
-        self.flags & (1 << 60) != 0
-    }
-
-    pub fn with_fma4(mut self) -> Self {
-        self.flags |= 1 << 60;
-        self
-    }
-
-    pub fn prefetchw(&self) -> bool {
-        self.flags & (1 << 61) != 0
-    }
-
-    pub fn with_prefetchw(mut self) -> Self {
-        self.flags |= 1 << 61;
-        self
-    }
-
-    pub fn tsx(&self) -> bool {
-        self.flags & (1 << 62) != 0
-    }
+impl Decoder<Arch> for DecodeEverything {
+    fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
+        let mut instr = Instruction::invalid();
+        self.decode_into(&mut instr, words)?;
 
-    pub fn with_tsx(mut self) -> Self {
-        self.flags |= 1 << 62;
-        self
+        Ok(instr)
     }
-
-    pub fn lzcnt(&self) -> bool {
-        self.flags & (1 << 63) != 0
+    #[inline(always)]
+    fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
+        self.decode_with_annotation(instr, words, &mut NullSink)
     }
+}
 
-    pub fn with_lzcnt(mut self) -> Self {
-        self.flags |= 1 << 63;
-        self
-    }
+impl AnnotatingDecoder<Arch> for DecodeEverything {
+    type FieldDescription = FieldDescription;
 
-    /// Optionally reject or reinterpret instruction according to the decoder's
-    /// declared extensions.
-    fn revise_instruction(&self, inst: &mut Instruction) -> Result<(), DecodeError> {
-        if inst.prefixes.evex().is_some() {
-            if !self.avx512() {
-                return Err(DecodeError::InvalidOpcode);
-            } else {
-                return Ok(());
-            }
-        }
-        match inst.opcode {
-            Opcode::TZCNT => {
-                if !self.bmi1() {
-                    // tzcnt is only supported if bmi1 is enabled. without bmi1, this decodes as
-                    // bsf.
-                    inst.opcode = Opcode::BSF;
-                }
-            }
-            Opcode::LDDQU |
-            Opcode::ADDSUBPS |
-            Opcode::ADDSUBPD |
-            Opcode::HADDPS |
-            Opcode::HSUBPS |
-            Opcode::HADDPD |
-            Opcode::HSUBPD |
-            Opcode::MOVSHDUP |
-            Opcode::MOVSLDUP |
-            Opcode::MOVDDUP |
-            Opcode::MONITOR |
-            Opcode::MWAIT => {
-                // via Intel section 5.7, SSE3 Instructions
-                if !self.sse3() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::PHADDW |
-            Opcode::PHADDSW |
-            Opcode::PHADDD |
-            Opcode::PHSUBW |
-            Opcode::PHSUBSW |
-            Opcode::PHSUBD |
-            Opcode::PABSB |
-            Opcode::PABSW |
-            Opcode::PABSD |
-            Opcode::PMADDUBSW |
-            Opcode::PMULHRSW |
-            Opcode::PSHUFB |
-            Opcode::PSIGNB |
-            Opcode::PSIGNW |
-            Opcode::PSIGND |
-            Opcode::PALIGNR => {
-                // via Intel section 5.8, SSSE3 Instructions
-                if !self.ssse3() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::PMULLD |
-            Opcode::PMULDQ |
-            Opcode::MOVNTDQA |
-            Opcode::BLENDPD |
-            Opcode::BLENDPS |
-            Opcode::BLENDVPD |
-            Opcode::BLENDVPS |
-            Opcode::PBLENDVB |
-            Opcode::BLENDW |
-            Opcode::PMINUW |
-            Opcode::PMINUD |
-            Opcode::PMINSB |
-            Opcode::PMINSD |
-            Opcode::PMAXUW |
-            Opcode::PMAXUD |
-            Opcode::PMAXSB |
-            Opcode::PMAXSD |
-            Opcode::ROUNDPS |
-            Opcode::ROUNDPD |
-            Opcode::ROUNDSS |
-            Opcode::ROUNDSD |
-            Opcode::PBLENDW |
-            Opcode::EXTRACTPS |
-            Opcode::INSERTPS |
-            Opcode::PINSRB |
-            Opcode::PINSRD |
-            Opcode::PINSRQ |
-            Opcode::PMOVSXBW |
-            Opcode::PMOVZXBW |
-            Opcode::PMOVSXBD |
-            Opcode::PMOVZXBD |
-            Opcode::PMOVSXWD |
-            Opcode::PMOVZXWD |
-            Opcode::PMOVSXBQ |
-            Opcode::PMOVZXBQ |
-            Opcode::PMOVSXWQ |
-            Opcode::PMOVZXWQ |
-            Opcode::PMOVSXDQ |
-            Opcode::PMOVZXDQ |
-            Opcode::DPPS |
-            Opcode::DPPD |
-            Opcode::MPSADBW |
-            Opcode::PHMINPOSUW |
-            Opcode::PTEST |
-            Opcode::PCMPEQQ |
-            Opcode::PEXTRB |
-            Opcode::PEXTRW |
-            Opcode::PEXTRD |
-            Opcode::PEXTRQ |
-            Opcode::PACKUSDW => {
-                // via Intel section 5.10, SSE4.1 Instructions
-                if !self.sse4_1() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::EXTRQ |
-            Opcode::INSERTQ |
-            Opcode::MOVNTSS |
-            Opcode::MOVNTSD => {
-                if !self.sse4a() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::CRC32 |
-            Opcode::PCMPESTRI |
-            Opcode::PCMPESTRM |
-            Opcode::PCMPISTRI |
-            Opcode::PCMPISTRM |
-            Opcode::PCMPGTQ => {
-                // via Intel section 5.11, SSE4.2 Instructions
-                if !self.sse4_2() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::AESDEC |
-            Opcode::AESDECLAST |
-            Opcode::AESENC |
-            Opcode::AESENCLAST |
-            Opcode::AESIMC |
-            Opcode::AESKEYGENASSIST => {
-                // via Intel section 5.12. AESNI AND PCLMULQDQ
-                if !self.aesni() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::PCLMULQDQ => {
-                // via Intel section 5.12. AESNI AND PCLMULQDQ
-                if !self.pclmulqdq() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::XABORT |
-            Opcode::XBEGIN |
-            Opcode::XEND |
-            Opcode::XTEST => {
-                if !self.tsx() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::SHA1MSG1 |
-            Opcode::SHA1MSG2 |
-            Opcode::SHA1NEXTE |
-            Opcode::SHA1RNDS4 |
-            Opcode::SHA256MSG1 |
-            Opcode::SHA256MSG2 |
-            Opcode::SHA256RNDS2 => {
-                if !self.sha() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::ENCLV |
-            Opcode::ENCLS |
-            Opcode::ENCLU => {
-                if !self.sgx() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            // AVX...
-            Opcode::VMOVDDUP |
-            Opcode::VPSHUFLW |
-            Opcode::VPSHUFHW |
-            Opcode::VHADDPS |
-            Opcode::VHSUBPS |
-            Opcode::VADDSUBPS |
-            Opcode::VCVTPD2DQ |
-            Opcode::VLDDQU |
-            Opcode::VCOMISD |
-            Opcode::VCOMISS |
-            Opcode::VUCOMISD |
-            Opcode::VUCOMISS |
-            Opcode::VADDPD |
-            Opcode::VADDPS |
-            Opcode::VADDSD |
-            Opcode::VADDSS |
-            Opcode::VADDSUBPD |
-            Opcode::VBLENDPD |
-            Opcode::VBLENDPS |
-            Opcode::VBLENDVPD |
-            Opcode::VBLENDVPS |
-            Opcode::VBROADCASTF128 |
-            Opcode::VBROADCASTI128 |
-            Opcode::VBROADCASTSD |
-            Opcode::VBROADCASTSS |
-            Opcode::VCMPSD |
-            Opcode::VCMPSS |
-            Opcode::VCMPPD |
-            Opcode::VCMPPS |
-            Opcode::VCVTDQ2PD |
-            Opcode::VCVTDQ2PS |
-            Opcode::VCVTPD2PS |
-            Opcode::VCVTPS2DQ |
-            Opcode::VCVTPS2PD |
-            Opcode::VCVTSS2SD |
-            Opcode::VCVTSI2SS |
-            Opcode::VCVTSI2SD |
-            Opcode::VCVTSD2SI |
-            Opcode::VCVTSD2SS |
-            Opcode::VCVTSS2SI |
-            Opcode::VCVTTPD2DQ |
-            Opcode::VCVTTPS2DQ |
-            Opcode::VCVTTSS2SI |
-            Opcode::VCVTTSD2SI |
-            Opcode::VDIVPD |
-            Opcode::VDIVPS |
-            Opcode::VDIVSD |
-            Opcode::VDIVSS |
-            Opcode::VDPPD |
-            Opcode::VDPPS |
-            Opcode::VEXTRACTF128 |
-            Opcode::VEXTRACTI128 |
-            Opcode::VEXTRACTPS |
-            Opcode::VFMADD132PD |
-            Opcode::VFMADD132PS |
-            Opcode::VFMADD132SD |
-            Opcode::VFMADD132SS |
-            Opcode::VFMADD213PD |
-            Opcode::VFMADD213PS |
-            Opcode::VFMADD213SD |
-            Opcode::VFMADD213SS |
-            Opcode::VFMADD231PD |
-            Opcode::VFMADD231PS |
-            Opcode::VFMADD231SD |
-            Opcode::VFMADD231SS |
-            Opcode::VFMADDSUB132PD |
-            Opcode::VFMADDSUB132PS |
-            Opcode::VFMADDSUB213PD |
-            Opcode::VFMADDSUB213PS |
-            Opcode::VFMADDSUB231PD |
-            Opcode::VFMADDSUB231PS |
-            Opcode::VFMSUB132PD |
-            Opcode::VFMSUB132PS |
-            Opcode::VFMSUB132SD |
-            Opcode::VFMSUB132SS |
-            Opcode::VFMSUB213PD |
-            Opcode::VFMSUB213PS |
-            Opcode::VFMSUB213SD |
-            Opcode::VFMSUB213SS |
-            Opcode::VFMSUB231PD |
-            Opcode::VFMSUB231PS |
-            Opcode::VFMSUB231SD |
-            Opcode::VFMSUB231SS |
-            Opcode::VFMSUBADD132PD |
-            Opcode::VFMSUBADD132PS |
-            Opcode::VFMSUBADD213PD |
-            Opcode::VFMSUBADD213PS |
-            Opcode::VFMSUBADD231PD |
-            Opcode::VFMSUBADD231PS |
-            Opcode::VFNMADD132PD |
-            Opcode::VFNMADD132PS |
-            Opcode::VFNMADD132SD |
-            Opcode::VFNMADD132SS |
-            Opcode::VFNMADD213PD |
-            Opcode::VFNMADD213PS |
-            Opcode::VFNMADD213SD |
-            Opcode::VFNMADD213SS |
-            Opcode::VFNMADD231PD |
-            Opcode::VFNMADD231PS |
-            Opcode::VFNMADD231SD |
-            Opcode::VFNMADD231SS |
-            Opcode::VFNMSUB132PD |
-            Opcode::VFNMSUB132PS |
-            Opcode::VFNMSUB132SD |
-            Opcode::VFNMSUB132SS |
-            Opcode::VFNMSUB213PD |
-            Opcode::VFNMSUB213PS |
-            Opcode::VFNMSUB213SD |
-            Opcode::VFNMSUB213SS |
-            Opcode::VFNMSUB231PD |
-            Opcode::VFNMSUB231PS |
-            Opcode::VFNMSUB231SD |
-            Opcode::VFNMSUB231SS |
-            Opcode::VGATHERDPD |
-            Opcode::VGATHERDPS |
-            Opcode::VGATHERQPD |
-            Opcode::VGATHERQPS |
-            Opcode::VHADDPD |
-            Opcode::VHSUBPD |
-            Opcode::VINSERTF128 |
-            Opcode::VINSERTI128 |
-            Opcode::VINSERTPS |
-            Opcode::VMASKMOVDQU |
-            Opcode::VMASKMOVPD |
-            Opcode::VMASKMOVPS |
-            Opcode::VMAXPD |
-            Opcode::VMAXPS |
-            Opcode::VMAXSD |
-            Opcode::VMAXSS |
-            Opcode::VMINPD |
-            Opcode::VMINPS |
-            Opcode::VMINSD |
-            Opcode::VMINSS |
-            Opcode::VMOVAPD |
-            Opcode::VMOVAPS |
-            Opcode::VMOVD |
-            Opcode::VMOVDQA |
-            Opcode::VMOVDQU |
-            Opcode::VMOVHLPS |
-            Opcode::VMOVHPD |
-            Opcode::VMOVHPS |
-            Opcode::VMOVLHPS |
-            Opcode::VMOVLPD |
-            Opcode::VMOVLPS |
-            Opcode::VMOVMSKPD |
-            Opcode::VMOVMSKPS |
-            Opcode::VMOVNTDQ |
-            Opcode::VMOVNTDQA |
-            Opcode::VMOVNTPD |
-            Opcode::VMOVNTPS |
-            Opcode::VMOVQ |
-            Opcode::VMOVSS |
-            Opcode::VMOVSD |
-            Opcode::VMOVSHDUP |
-            Opcode::VMOVSLDUP |
-            Opcode::VMOVUPD |
-            Opcode::VMOVUPS |
-            Opcode::VMPSADBW |
-            Opcode::VMULPD |
-            Opcode::VMULPS |
-            Opcode::VMULSD |
-            Opcode::VMULSS |
-            Opcode::VPABSB |
-            Opcode::VPABSD |
-            Opcode::VPABSW |
-            Opcode::VPACKSSDW |
-            Opcode::VPACKUSDW |
-            Opcode::VPACKSSWB |
-            Opcode::VPACKUSWB |
-            Opcode::VPADDB |
-            Opcode::VPADDD |
-            Opcode::VPADDQ |
-            Opcode::VPADDSB |
-            Opcode::VPADDSW |
-            Opcode::VPADDUSB |
-            Opcode::VPADDUSW |
-            Opcode::VPADDW |
-            Opcode::VPALIGNR |
-            Opcode::VPAND |
-            Opcode::VANDPD |
-            Opcode::VANDPS |
-            Opcode::VANDNPD |
-            Opcode::VANDNPS |
-            Opcode::VORPD |
-            Opcode::VORPS |
-            Opcode::VPANDN |
-            Opcode::VPAVGB |
-            Opcode::VPAVGW |
-            Opcode::VPBLENDD |
-            Opcode::VPBLENDVB |
-            Opcode::VPBLENDW |
-            Opcode::VPBROADCASTB |
-            Opcode::VPBROADCASTD |
-            Opcode::VPBROADCASTQ |
-            Opcode::VPBROADCASTW |
-            Opcode::VPCLMULQDQ |
-            Opcode::VPCMPEQB |
-            Opcode::VPCMPEQD |
-            Opcode::VPCMPEQQ |
-            Opcode::VPCMPEQW |
-            Opcode::VPCMPGTB |
-            Opcode::VPCMPGTD |
-            Opcode::VPCMPGTQ |
-            Opcode::VPCMPGTW |
-            Opcode::VPCMPESTRI |
-            Opcode::VPCMPESTRM |
-            Opcode::VPCMPISTRI |
-            Opcode::VPCMPISTRM |
-            Opcode::VPERM2F128 |
-            Opcode::VPERM2I128 |
-            Opcode::VPERMD |
-            Opcode::VPERMILPD |
-            Opcode::VPERMILPS |
-            Opcode::VPERMPD |
-            Opcode::VPERMPS |
-            Opcode::VPERMQ |
-            Opcode::VPEXTRB |
-            Opcode::VPEXTRD |
-            Opcode::VPEXTRQ |
-            Opcode::VPEXTRW |
-            Opcode::VPGATHERDD |
-            Opcode::VPGATHERDQ |
-            Opcode::VPGATHERQD |
-            Opcode::VPGATHERQQ |
-            Opcode::VPHADDD |
-            Opcode::VPHADDSW |
-            Opcode::VPHADDW |
-            Opcode::VPMADDUBSW |
-            Opcode::VPHMINPOSUW |
-            Opcode::VPHSUBD |
-            Opcode::VPHSUBSW |
-            Opcode::VPHSUBW |
-            Opcode::VPINSRB |
-            Opcode::VPINSRD |
-            Opcode::VPINSRQ |
-            Opcode::VPINSRW |
-            Opcode::VPMADDWD |
-            Opcode::VPMASKMOVD |
-            Opcode::VPMASKMOVQ |
-            Opcode::VPMAXSB |
-            Opcode::VPMAXSD |
-            Opcode::VPMAXSW |
-            Opcode::VPMAXUB |
-            Opcode::VPMAXUW |
-            Opcode::VPMAXUD |
-            Opcode::VPMINSB |
-            Opcode::VPMINSW |
-            Opcode::VPMINSD |
-            Opcode::VPMINUB |
-            Opcode::VPMINUW |
-            Opcode::VPMINUD |
-            Opcode::VPMOVMSKB |
-            Opcode::VPMOVSXBD |
-            Opcode::VPMOVSXBQ |
-            Opcode::VPMOVSXBW |
-            Opcode::VPMOVSXDQ |
-            Opcode::VPMOVSXWD |
-            Opcode::VPMOVSXWQ |
-            Opcode::VPMOVZXBD |
-            Opcode::VPMOVZXBQ |
-            Opcode::VPMOVZXBW |
-            Opcode::VPMOVZXDQ |
-            Opcode::VPMOVZXWD |
-            Opcode::VPMOVZXWQ |
-            Opcode::VPMULDQ |
-            Opcode::VPMULHRSW |
-            Opcode::VPMULHUW |
-            Opcode::VPMULHW |
-            Opcode::VPMULLQ |
-            Opcode::VPMULLD |
-            Opcode::VPMULLW |
-            Opcode::VPMULUDQ |
-            Opcode::VPOR |
-            Opcode::VPSADBW |
-            Opcode::VPSHUFB |
-            Opcode::VPSHUFD |
-            Opcode::VPSIGNB |
-            Opcode::VPSIGND |
-            Opcode::VPSIGNW |
-            Opcode::VPSLLD |
-            Opcode::VPSLLDQ |
-            Opcode::VPSLLQ |
-            Opcode::VPSLLVD |
-            Opcode::VPSLLVQ |
-            Opcode::VPSLLW |
-            Opcode::VPSRAD |
-            Opcode::VPSRAVD |
-            Opcode::VPSRAW |
-            Opcode::VPSRLD |
-            Opcode::VPSRLDQ |
-            Opcode::VPSRLQ |
-            Opcode::VPSRLVD |
-            Opcode::VPSRLVQ |
-            Opcode::VPSRLW |
-            Opcode::VPSUBB |
-            Opcode::VPSUBD |
-            Opcode::VPSUBQ |
-            Opcode::VPSUBSB |
-            Opcode::VPSUBSW |
-            Opcode::VPSUBUSB |
-            Opcode::VPSUBUSW |
-            Opcode::VPSUBW |
-            Opcode::VPTEST |
-            Opcode::VPUNPCKHBW |
-            Opcode::VPUNPCKHDQ |
-            Opcode::VPUNPCKHQDQ |
-            Opcode::VPUNPCKHWD |
-            Opcode::VPUNPCKLBW |
-            Opcode::VPUNPCKLDQ |
-            Opcode::VPUNPCKLQDQ |
-            Opcode::VPUNPCKLWD |
-            Opcode::VPXOR |
-            Opcode::VRCPPS |
-            Opcode::VROUNDPD |
-            Opcode::VROUNDPS |
-            Opcode::VROUNDSD |
-            Opcode::VROUNDSS |
-            Opcode::VRSQRTPS |
-            Opcode::VRSQRTSS |
-            Opcode::VRCPSS |
-            Opcode::VSHUFPD |
-            Opcode::VSHUFPS |
-            Opcode::VSQRTPD |
-            Opcode::VSQRTPS |
-            Opcode::VSQRTSS |
-            Opcode::VSQRTSD |
-            Opcode::VSUBPD |
-            Opcode::VSUBPS |
-            Opcode::VSUBSD |
-            Opcode::VSUBSS |
-            Opcode::VTESTPD |
-            Opcode::VTESTPS |
-            Opcode::VUNPCKHPD |
-            Opcode::VUNPCKHPS |
-            Opcode::VUNPCKLPD |
-            Opcode::VUNPCKLPS |
-            Opcode::VXORPD |
-            Opcode::VXORPS |
-            Opcode::VZEROUPPER |
-            Opcode::VZEROALL |
-            Opcode::VLDMXCSR |
-            Opcode::VSTMXCSR => {
-                // TODO: check a table for these
-                if !self.avx() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::VAESDEC |
-            Opcode::VAESDECLAST |
-            Opcode::VAESENC |
-            Opcode::VAESENCLAST |
-            Opcode::VAESIMC |
-            Opcode::VAESKEYGENASSIST => {
-                // TODO: check a table for these
-                if !self.avx() || !self.aesni() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::MOVBE => {
-                if !self.movbe() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::POPCNT => {
-                /*
-                 * from the intel SDM:
-                 * ```
-                 * Before an application attempts to use the POPCNT instruction, it must check that
-                 * the processor supports SSE4.2 (if CPUID.01H:ECX.SSE4_2[bit 20] = 1) and POPCNT
-                 * (if CPUID.01H:ECX.POPCNT[bit 23] = 1).
-                 * ```
-                 */
-                if self.intel_quirks() && (self.sse4_2() || self.popcnt()) {
-                    return Ok(());
-                } else if !self.popcnt() {
-                    /*
-                     * elsewhere from the amd APM:
-                     * `Instruction Subsets and CPUID Feature Flags` on page 507 indicates that
-                     * popcnt is present when the popcnt bit is reported by cpuid. this seems to be
-                     * the less quirky default, so `intel_quirks` is considered the outlier, and
-                     * before this default.
-                     * */
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::LZCNT => {
-                /*
-                 * amd APM, `LZCNT` page 212:
-                 * LZCNT is an Advanced Bit Manipulation (ABM) instruction. Support for the LZCNT
-                 * instruction is indicated by CPUID Fn8000_0001_ECX[ABM] = 1.
-                 *
-                 * meanwhile the intel SDM simply states:
-                 * ```
-                 * CPUID.EAX=80000001H:ECX.LZCNT[bit 5]: if 1 indicates the processor supports the
-                 * LZCNT instruction.
-                 * ```
-                 *
-                 * so that's considered the less-quirky (default) case here.
-                 * */
-                if self.amd_quirks() && !self.abm() {
-                    return Err(DecodeError::InvalidOpcode);
-                } else if !self.lzcnt() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::ADCX |
-            Opcode::ADOX => {
-                if !self.adx() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::VMRUN |
-            Opcode::VMLOAD |
-            Opcode::VMSAVE |
-            Opcode::CLGI |
-            Opcode::VMMCALL |
-            Opcode::INVLPGA => {
-                if !self.svm() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::STGI |
-            Opcode::SKINIT => {
-                if !self.svm() || !self.skinit() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::LAHF |
-            Opcode::SAHF => {
-                if !self.lahfsahf() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::VCVTPS2PH |
-            Opcode::VCVTPH2PS => {
-                /*
-                 * from intel SDM:
-                 * ```
-                 * 14.4.1 Detection of F16C Instructions Application using float 16 instruction
-                 *    must follow a detection sequence similar to AVX to ensure: • The OS has
-                 *    enabled YMM state management support, • The processor support AVX as
-                 *    indicated by the CPUID feature flag, i.e. CPUID.01H:ECX.AVX[bit 28] = 1.  •
-                 *    The processor support 16-bit floating-point conversion instructions via a
-                 *    CPUID feature flag (CPUID.01H:ECX.F16C[bit 29] = 1).
-                 * ```
-                 *
-                 * TODO: only the VEX-coded variant of this instruction should be gated on `f16c`.
-                 * the EVEX-coded variant should be gated on `avx512f` or `avx512vl` if not
-                 * EVEX.512-coded.
-                 */
-                if !self.avx() || !self.f16c() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::RDRAND => {
-                if !self.rdrand() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::RDSEED => {
-                if !self.rdseed() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            Opcode::MONITORX | Opcode::MWAITX | // these are gated on the `monitorx` and `mwaitx` cpuid bits, but are AMD-only.
-            Opcode::CLZERO | Opcode::RDPRU => { // again, gated on specific cpuid bits, but AMD-only.
-                if !self.amd_quirks() {
-                    return Err(DecodeError::InvalidOpcode);
-                }
-            }
-            other => {
-                if !self.bmi1() {
-                    if BMI1.contains(&other) {
-                        return Err(DecodeError::InvalidOpcode);
-                    }
-                }
-                if !self.bmi2() {
-                    if BMI2.contains(&other) {
-                        return Err(DecodeError::InvalidOpcode);
-                    }
-                }
-            }
-        }
-        Ok(())
+    #[inline(always)]
+    fn decode_with_annotation<
+        T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+        S: DescriptionSink<Self::FieldDescription>
+    >(&self, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
+        decode_with_annotation(self, instr, words, sink)
     }
 }
 
@@ -4110,7 +2768,7 @@ impl Default for InstDecoder {
     /// instruction defined in any extension.
     fn default() -> Self {
         Self {
-            flags: 0xffffffff_ffffffff,
+            flags: [0xffffffff_ffffffff, 0xffffffff_ffffffff],
         }
     }
 }
@@ -4118,16 +2776,7 @@ impl Default for InstDecoder {
 impl Decoder<Arch> for InstDecoder {
     fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
         let mut instr = Instruction::invalid();
-        DecodeCtx::new().read_with_annotations(self, words, &mut instr, &mut NullSink)?;
-
-        instr.length = words.offset() as u8;
-        if words.offset() > 15 {
-            return Err(DecodeError::TooLong);
-        }
-
-        if self != &InstDecoder::default() {
-            self.revise_instruction(&mut instr)?;
-        }
+        self.decode_into(&mut instr, words)?;
 
         Ok(instr)
     }
@@ -4143,19 +2792,26 @@ impl AnnotatingDecoder<Arch> for InstDecoder {
         T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
         S: DescriptionSink<Self::FieldDescription>
     >(&self, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        DecodeCtx::new().read_with_annotations(self, words, instr, sink)?;
-
-        instr.length = words.offset() as u8;
-        if words.offset() > 15 {
-            return Err(DecodeError::TooLong);
-        }
-
-        if self != &InstDecoder::default() {
-            self.revise_instruction(instr)?;
-        }
-
-        Ok(())
+        decode_with_annotation(self, instr, words, sink)
     }
+}
+
+#[inline(always)]
+fn decode_with_annotation<
+    D: IsaSettings,
+    T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
+    S: DescriptionSink<FieldDescription>
+>(isa_settings: &D, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
+    DecodeCtx::new().read_with_annotations(isa_settings, words, instr, sink)?;
+
+    instr.length = words.offset() as u8;
+    if words.offset() > 15 {
+        return Err(DecodeError::TooLong);
+    }
+
+    isa_settings.revise_instruction(instr)?;
+
+    Ok(())
 }
 
 impl Opcode {
@@ -6739,9 +5395,10 @@ fn read_opc_hotpath<
 #[cfg_attr(feature="profiling", inline(never))]
 #[cfg_attr(not(feature="profiling"), inline(always))]
 fn read_with_annotations<
+    D: IsaSettings,
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(&mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
+>(mut self, isa_settings: &D, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
@@ -6887,7 +5544,7 @@ fn read_with_annotations<
         record.operand()
     };
 
-    self.read_operands(decoder, words, instruction, record, sink)?;
+    self.read_operands(isa_settings, words, instruction, record, sink)?;
 
     if self.check_lock {
         if !instruction.opcode.can_lock() || !instruction.operands[0].is_memory() {
@@ -6901,9 +5558,10 @@ fn read_with_annotations<
 #[cfg_attr(feature="profiling", inline(never))]
 #[cfg_attr(not(feature="profiling"), inline(always))]
 fn read_operands<
+    D: IsaSettings,
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
->(&mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+>(&mut self, isa_settings: &D, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
     sink.record(
         words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
         InnerDescription::Boundary("opcode ends/operands begin (typically)")
@@ -7928,9 +6586,8 @@ fn read_operands<
                     );
                     vex::three_byte_vex(words, modrm, instruction, sink)?;
 
-                    if decoder != &InstDecoder::default() {
-                        decoder.revise_instruction(instruction)?;
-                    }
+                    isa_settings.revise_instruction(instruction)?;
+
                     return Ok(());
                 }
             } else {
@@ -7961,9 +6618,8 @@ fn read_operands<
                     );
                     vex::two_byte_vex(words, modrm, instruction, sink)?;
 
-                    if decoder != &InstDecoder::default() {
-                        decoder.revise_instruction(instruction)?;
-                    }
+                    isa_settings.revise_instruction(instruction)?;
+
                     return Ok(());
                 }
             } else {
@@ -9874,7 +8530,7 @@ fn read_operands<
                         instruction.opcode = Opcode::LFENCE;
                         // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
                         // doesn't say (tested on threadripper)
-                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
+                        if !isa_settings.amd_quirks() && !isa_settings.intel_quirks() {
                             if m != 0 {
                                 return Err(DecodeError::InvalidOperand);
                             }
@@ -9884,7 +8540,7 @@ fn read_operands<
                         instruction.opcode = Opcode::MFENCE;
                         // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
                         // doesn't say (tested on threadripper)
-                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
+                        if !isa_settings.amd_quirks() && !isa_settings.intel_quirks() {
                             if m != 0 {
                                 return Err(DecodeError::InvalidOperand);
                             }
@@ -9894,7 +8550,7 @@ fn read_operands<
                         instruction.opcode = Opcode::SFENCE;
                         // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
                         // doesn't say (tested on threadripper)
-                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
+                        if !isa_settings.amd_quirks() && !isa_settings.intel_quirks() {
                             if m != 0 {
                                 return Err(DecodeError::InvalidOperand);
                             }
