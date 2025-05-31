@@ -11,7 +11,7 @@ fn test_hash() {
     let _: HashMap<RegSpec, u64> = HashMap::new();
 }
 
-#[cfg(features="fmt")]
+#[cfg(feature="fmt")]
 #[test]
 fn test_labels() {
     assert_eq!(RegSpec::rip().name(), "rip");
@@ -22,7 +22,7 @@ fn test_labels() {
     assert_eq!(RegSpec::al().name(), "al");
 }
 
-#[cfg(features="fmt")]
+#[cfg(feature="fmt")]
 #[test]
 fn test_bank_names() {
     assert_eq!(RegSpec::al().class().name(), "byte");
