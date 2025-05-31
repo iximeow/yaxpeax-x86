@@ -141,6 +141,7 @@ gen_isa_settings!(
     #[doc="and `SHLX` instructions. `bmi2` is implemented in all x86_64 chips that implement `bmi`, "]
     #[doc="except the amd `piledriver` and `steamroller` microarchitectures."]
     bmi2, with_bmi2 = 26;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0007_EBX_x0`: \"CLFLUSHOPT instruction support.\""]
     clflushopt, with_clflushopt = 27;
     clwb, with_clwb = 28;
     cmov, with_cmov = 29;
@@ -179,6 +180,7 @@ gen_isa_settings!(
     prefetchw, with_prefetchw = 46;
     prefetchwt1, with_prefetchwt1 = 47;
     rdrand, with_rdrand = 48;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0007_EBX_x0`: \"RDSEED instruction support.\""]
     rdseed, with_rdseed = 49;
     rdtscp, with_rdtscp = 50;
     sgx, with_sgx = 51;
@@ -193,10 +195,33 @@ gen_isa_settings!(
     syscall, with_syscall = 60;
     tbm, with_tbm = 61;
     tsx, with_tsx = 62;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0007_ECX_x0`: \"VAES 256-bit instruction support.\""]
     vaes, with_vaes = 63;
     vmx, with_vmx = 64;
     xop, with_xop = 65;
     xsave, with_xsave = 66;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_000D_EAX_x1`: \"XSAVEC and compact XRSTOR supported.\""]
+    xsavec, with_xsavec = 67;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_000D_EAX_x1`: \"XSAVES, XRSTOR, and XSS are supported.\""]
+    xsaves, with_xsaves = 68;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_000D_EAX_x1`: \"XSAVEOPT is available.\""]
+    xsaveopt, with_xsaveopt = 69;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0007_EAX_x0`: \"FS and GS base read/write instruction support.\""]
+    fsgsbase, with_fsgsbase = 70;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0001_ECX`: \"Support for MWAITX and MONITORX instructions.\""]
+    monitorx, with_monitorx = 71;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0008_EBX`: \"WBNOINVD instruction supported.\""]
+    wbnoinvd, with_wbnoinvd = 72;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0008_EBX`: \"CLZERO instruction supported.\""]
+    clzero, with_clzero = 72;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0007_ECX_x0`: \"RDPID instruction and TSC_AUX MSR support.\""]
+    rdpid, with_rdpid = 73;
+    #[doc="from AMD APM Vol 3 `CPUID Fn0000_0007_ECX_x0`: \"VPCLMULQDQ 256-bit instruction support.\""]
+    vpclmulqdq, with_vpclmulqdq = 74;
+    #[doc="supported in Zen 5, but not mentioned in the AMD APM as of revision 3.36."]
+    movdir64b, with_movdir64b = 75;
+    #[doc="supported in Zen 5, but not mentioned in the AMD APM as of revision 3.36."]
+    enqcmd, with_enqcmd = 76;
 
     {
         sse4 = {
