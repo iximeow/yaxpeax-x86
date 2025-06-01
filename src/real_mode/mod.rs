@@ -5,8 +5,6 @@ mod display;
 pub mod uarch;
 mod isa_settings;
 
-pub use isa_settings::IsaSettings;
-
 pub use crate::MemoryAccessSize;
 
 #[cfg(feature = "fmt")]
@@ -2734,33 +2732,6 @@ impl InstDecoder {
     }
 }
 
-pub struct DecodeEverything {}
-
-impl Decoder<Arch> for DecodeEverything {
-    fn decode<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, words: &mut T) -> Result<Instruction, <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        let mut instr = Instruction::invalid();
-        self.decode_into(&mut instr, words)?;
-
-        Ok(instr)
-    }
-    #[inline(always)]
-    fn decode_into<T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>>(&self, instr: &mut Instruction, words: &mut T) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        self.decode_with_annotation(instr, words, &mut NullSink)
-    }
-}
-
-impl AnnotatingDecoder<Arch> for DecodeEverything {
-    type FieldDescription = FieldDescription;
-
-    #[inline(always)]
-    fn decode_with_annotation<
-        T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
-        S: DescriptionSink<Self::FieldDescription>
-    >(&self, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-        decode_with_annotation(self, instr, words, sink)
-    }
-}
-
 impl Default for InstDecoder {
     /// Instantiates an x86 decoder that probably decodes what you want.
     ///
@@ -2798,18 +2769,17 @@ impl AnnotatingDecoder<Arch> for InstDecoder {
 
 #[inline(always)]
 fn decode_with_annotation<
-    D: IsaSettings,
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
->(isa_settings: &D, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
-    DecodeCtx::new().read_with_annotations(isa_settings, words, instr, sink)?;
+>(decoder: &InstDecoder, instr: &mut Instruction, words: &mut T, sink: &mut S) -> Result<(), <Arch as yaxpeax_arch::Arch>::DecodeError> {
+    DecodeCtx::new().read_with_annotations(decoder, words, instr, sink)?;
 
     instr.length = words.offset() as u8;
     if words.offset() > 15 {
         return Err(DecodeError::TooLong);
     }
 
-    isa_settings.revise_instruction(instr)?;
+    isa_settings::revise_instruction(decoder, instr)?;
 
     Ok(())
 }
@@ -5395,10 +5365,9 @@ fn read_opc_hotpath<
 #[cfg_attr(feature="profiling", inline(never))]
 #[cfg_attr(not(feature="profiling"), inline(always))]
 fn read_with_annotations<
-    D: IsaSettings,
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>,
->(mut self, isa_settings: &D, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
+>(mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, sink: &mut S) -> Result<(), DecodeError> {
     words.mark();
     let mut nextb = words.next().ok().ok_or(DecodeError::ExhaustedInput)?;
     let mut next_rec = OPCODES[nextb as usize];
@@ -5544,7 +5513,7 @@ fn read_with_annotations<
         record.operand()
     };
 
-    self.read_operands(isa_settings, words, instruction, record, sink)?;
+    self.read_operands(decoder, words, instruction, record, sink)?;
 
     if self.check_lock {
         if !instruction.opcode.can_lock() || !instruction.operands[0].is_memory() {
@@ -5558,10 +5527,9 @@ fn read_with_annotations<
 #[cfg_attr(feature="profiling", inline(never))]
 #[cfg_attr(not(feature="profiling"), inline(always))]
 fn read_operands<
-    D: IsaSettings,
     T: Reader<<Arch as yaxpeax_arch::Arch>::Address, <Arch as yaxpeax_arch::Arch>::Word>,
     S: DescriptionSink<FieldDescription>
->(&mut self, isa_settings: &D, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
+>(&mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
     sink.record(
         words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
         InnerDescription::Boundary("opcode ends/operands begin (typically)")
@@ -6586,7 +6554,7 @@ fn read_operands<
                     );
                     vex::three_byte_vex(words, modrm, instruction, sink)?;
 
-                    isa_settings.revise_instruction(instruction)?;
+                    isa_settings::revise_instruction(decoder, instruction)?;
 
                     return Ok(());
                 }
@@ -6618,7 +6586,7 @@ fn read_operands<
                     );
                     vex::two_byte_vex(words, modrm, instruction, sink)?;
 
-                    isa_settings.revise_instruction(instruction)?;
+                    isa_settings::revise_instruction(decoder, instruction)?;
 
                     return Ok(());
                 }
@@ -8530,7 +8498,7 @@ fn read_operands<
                         instruction.opcode = Opcode::LFENCE;
                         // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
                         // doesn't say (tested on threadripper)
-                        if !isa_settings.amd_quirks() && !isa_settings.intel_quirks() {
+                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
                             if m != 0 {
                                 return Err(DecodeError::InvalidOperand);
                             }
@@ -8540,7 +8508,7 @@ fn read_operands<
                         instruction.opcode = Opcode::MFENCE;
                         // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
                         // doesn't say (tested on threadripper)
-                        if !isa_settings.amd_quirks() && !isa_settings.intel_quirks() {
+                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
                             if m != 0 {
                                 return Err(DecodeError::InvalidOperand);
                             }
@@ -8550,7 +8518,7 @@ fn read_operands<
                         instruction.opcode = Opcode::SFENCE;
                         // Intel's manual accepts m != 0, AMD supports m != 0 though the manual
                         // doesn't say (tested on threadripper)
-                        if !isa_settings.amd_quirks() && !isa_settings.intel_quirks() {
+                        if !decoder.amd_quirks() && !decoder.intel_quirks() {
                             if m != 0 {
                                 return Err(DecodeError::InvalidOperand);
                             }

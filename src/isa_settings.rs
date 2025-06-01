@@ -9,7 +9,7 @@
 
 macro_rules! gen_isa_settings {
     (
-        ($inst_ty:ty, $decode_err:ty, $featureful_decoder:ty, $unconditional_decoder:ty, $revise_inst_fn:ident),
+        ($inst_ty:ty, $decode_err:ty, $featureful_decoder:ty),
         $(
             $(#[$doc:meta])*
             $feature:ident,
@@ -39,54 +39,29 @@ macro_rules! gen_isa_settings {
     ) => {
         /// specific decode settings controlling how an x86 byte sequence is interpreted.
         ///
-        /// this currently exists to specify which extensions are to be accepted or rejected. the two
-        /// implementations provided by `yaxpeax-x86` are:
-        /// * [`InstDecoder`], providing configurable enablement or disablement per-extension
-        /// * [`DecodeEverything`], which allows all extensions supported by `yaxpeax-x86`
-        ///
         /// notably, `InstDecoder::default()` and `DecodeEverything` are functionally equivalent in that
         /// they accept all extensions supported by the decoder.
         ///
         /// TODO: many additional extension support flags.
         /// * extended MMX (see `sha256:daee4e23dac983f1744126352d40cc71d47b4a9283a2a1e473837728ca9c51ac`)
         /// * lots of others... tile extensions...
-        pub trait IsaSettings {
+        impl $featureful_decoder {
             $(
                 $(#[$doc])*
-                fn $feature(&self) -> bool;
+                pub fn $feature(&self) -> bool {
+                    let i = $idx as usize;
+                    self.flags[i / 64] & (1 << (i % 64)) != 0
+                }
             )+
 
             $(
                 $(#[$composite_doc])*
-                fn $composite_feature(&self) -> bool {
+                pub fn $composite_feature(&self) -> bool {
                     self.$first_inner_feature()
                         $($(&& self.$inner_feature())+)?
                 }
             )*
 
-            fn revise_instruction(&self, inst: &mut $inst_ty) -> Result<(), $decode_err> {
-                $revise_inst_fn(self, inst)
-            }
-        }
-
-        impl IsaSettings for $unconditional_decoder {
-            $(fn $feature(&self) -> bool { true })+
-
-            fn revise_instruction(&self, _inst: &mut $inst_ty) -> Result<(), $decode_err> {
-                Ok(())
-            }
-        }
-
-        impl IsaSettings for $featureful_decoder {
-            $(
-                fn $feature(&self) -> bool {
-                    let i = $idx as usize;
-                    self.flags[i / 64] & (1 << (i % 64)) != 0
-                }
-            )+
-        }
-
-        impl $featureful_decoder {
             $(
                 $(#[$set_doc])*
                 pub fn $set_feature(mut self) -> Self {
@@ -103,28 +78,14 @@ macro_rules! gen_isa_settings {
                         $($(.$set_inner_feature())+)?
                 }
             )*
-
-            $(
-                $(#[$doc])*
-                pub fn $feature(&self) -> bool {
-                    <Self as IsaSettings>::$feature(self)
-                }
-            )+
-
-            $(
-                $(#[$composite_doc])*
-                pub fn $composite_feature(&self) -> bool {
-                    <Self as IsaSettings>::$composite_feature(self)
-                }
-            )*
         }
     }
 }
 
 macro_rules! gen_arch_isa_settings {
-    ($inst_ty:ty, $decode_err:ty, $featureful_decoder:ty, $unconditional_decoder:ty, $revise_inst_fn:ident) => {
+    ($inst_ty:ty, $decode_err:ty, $featureful_decoder:ty) => {
         gen_isa_settings!(
-            ($inst_ty, $decode_err, $featureful_decoder, $unconditional_decoder, $revise_inst_fn),
+            ($inst_ty, $decode_err, $featureful_decoder),
             _3dnow, with_3dnow = 1;
             _3dnowprefetch, with_3dnowprefetch = 2;
             abm, with_abm = 3;

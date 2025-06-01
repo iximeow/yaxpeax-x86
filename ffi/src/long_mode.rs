@@ -5,7 +5,7 @@ use yaxpeax_x86::long_mode;
 pub unsafe extern "C" fn yaxpeax_x86_64_decode(data: *const u8, length: u64, inst: *mut long_mode::Instruction) -> bool {
     let inst: &mut long_mode::Instruction = core::mem::transmute(inst);
     let mut reader = U8Reader::new(core::slice::from_raw_parts(data as *const u8, length as usize));
-    (yaxpeax_x86::long_mode::DecodeEverything {}).decode_into(inst, &mut reader).is_err()
+    <long_mode::Arch as Arch>::Decoder::default().decode_into(inst, &mut reader).is_err()
 }
 
 #[no_mangle]

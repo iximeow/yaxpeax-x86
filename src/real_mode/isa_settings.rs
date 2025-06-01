@@ -1,13 +1,10 @@
-use super::{BMI1, BMI2, DecodeError, DecodeEverything, InstDecoder, Instruction, Opcode};
+use super::{BMI1, BMI2, DecodeError, InstDecoder, Instruction, Opcode};
 
-crate::isa_settings::gen_arch_isa_settings!(
-    Instruction, DecodeError, InstDecoder, DecodeEverything,
-    revise_instruction
-);
+crate::isa_settings::gen_arch_isa_settings!(Instruction, DecodeError, InstDecoder);
 
 /// optionally reject or reinterpret instruction according to settings for this decode
 /// operation.
-fn revise_instruction<D: IsaSettings + ?Sized>(settings: &D, inst: &mut Instruction) -> Result<(), DecodeError> {
+pub(crate) fn revise_instruction(settings: &InstDecoder, inst: &mut Instruction) -> Result<(), DecodeError> {
     if inst.prefixes.evex().is_some() {
         if !settings.avx512() {
             return Err(DecodeError::InvalidOpcode);
