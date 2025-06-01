@@ -9,7 +9,7 @@
 
 macro_rules! gen_isa_settings {
     (
-        ($inst_ty:ty, $decode_err:ty, $featureful_decoder:ty),
+        ($inst_ty:ty, $opcode:ty, $decode_err:ty, $featureful_decoder:ty),
         $(
             $(#[$doc:meta])*
             $feature:ident,
@@ -38,9 +38,6 @@ macro_rules! gen_isa_settings {
         }
     ) => {
         /// specific decode settings controlling how an x86 byte sequence is interpreted.
-        ///
-        /// notably, `InstDecoder::default()` and `DecodeEverything` are functionally equivalent in that
-        /// they accept all extensions supported by the decoder.
         ///
         /// TODO: many additional extension support flags.
         /// * extended MMX (see `sha256:daee4e23dac983f1744126352d40cc71d47b4a9283a2a1e473837728ca9c51ac`)
@@ -79,13 +76,716 @@ macro_rules! gen_isa_settings {
                 }
             )*
         }
+
+        /// optionally reject or reinterpret instruction according to settings for this decode
+        /// operation.
+        pub(crate) fn revise_instruction(settings: &$featureful_decoder, inst: &mut $inst_ty) -> Result<(), $decode_err> {
+            if inst.prefixes.evex().is_some() {
+                if !settings.avx512() {
+                    return Err(<$decode_err>::InvalidOpcode);
+                } else {
+                    return Ok(());
+                }
+            }
+            match inst.opcode {
+                // original 3dnow instructions. see also
+                // `3DNow-Technology-Manual.pdf`
+                // * sha256: daee4e23dac983f1744126352d40cc71d47b4a9283a2a1e473837728ca9c51ac
+                // * ref: https://www.amd.com/content/dam/amd/en/documents/archived-tech-docs/programmer-references/21928.pdf
+                // * order# 21928
+                <$opcode>::FEMMS |
+                <$opcode>::PAVGUSB |
+                <$opcode>::PFADD |
+                <$opcode>::PFSUB |
+                <$opcode>::PFSUBR |
+                <$opcode>::PFACC |
+                <$opcode>::PFCMPGE |
+                <$opcode>::PFCMPGT |
+                <$opcode>::PFCMPEQ |
+                <$opcode>::PFMAX |
+                <$opcode>::PFMIN |
+                <$opcode>::PI2FD |
+                <$opcode>::PF2ID |
+                <$opcode>::PFRCP |
+                <$opcode>::PFRSQRT |
+                <$opcode>::PFMUL |
+                <$opcode>::PFRCPIT1 |
+                <$opcode>::PFRCPIT2 |
+                <$opcode>::PFRSQIT1 |
+                <$opcode>::PMULHRW => {
+                    if !settings._3dnow() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                // later extension to 3dnow. see also
+                // `AMD-Extensions-to-the-3DNow-and-MMX-Instruction-Sets.pdf`
+                // * sha256: ad847bd6877a682296fc584b4bbee354bf84c57bb97ba57e9c9adfc63cc5f465
+                // * ref: https://refspecs.linuxfoundation.org/AMD-extensions.pdf
+                // * order# 22466
+                <$opcode>::PF2IW |
+                <$opcode>::PFNACC |
+                <$opcode>::PFPNACC |
+                <$opcode>::PI2FW |
+                <$opcode>::PSWAPD => {
+                    if !settings._3dnow() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::TZCNT => {
+                    if !settings.bmi1() {
+                        // tzcnt is only supported if bmi1 is enabled. without bmi1, this decodes as
+                        // bsf.
+                        inst.opcode = <$opcode>::BSF;
+                    }
+                }
+                <$opcode>::LDDQU |
+                <$opcode>::ADDSUBPS |
+                <$opcode>::ADDSUBPD |
+                <$opcode>::HADDPS |
+                <$opcode>::HSUBPS |
+                <$opcode>::HADDPD |
+                <$opcode>::HSUBPD |
+                <$opcode>::MOVSHDUP |
+                <$opcode>::MOVSLDUP |
+                <$opcode>::MOVDDUP |
+                <$opcode>::MONITOR |
+                <$opcode>::MWAIT => {
+                    // via Intel section 5.7, SSE3 Instructions
+                    if !settings.sse3() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::PHADDW |
+                <$opcode>::PHADDSW |
+                <$opcode>::PHADDD |
+                <$opcode>::PHSUBW |
+                <$opcode>::PHSUBSW |
+                <$opcode>::PHSUBD |
+                <$opcode>::PABSB |
+                <$opcode>::PABSW |
+                <$opcode>::PABSD |
+                <$opcode>::PMADDUBSW |
+                <$opcode>::PMULHRSW |
+                <$opcode>::PSHUFB |
+                <$opcode>::PSIGNB |
+                <$opcode>::PSIGNW |
+                <$opcode>::PSIGND |
+                <$opcode>::PALIGNR => {
+                    // via Intel section 5.8, SSSE3 Instructions
+                    if !settings.ssse3() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::PMULLD |
+                <$opcode>::PMULDQ |
+                <$opcode>::MOVNTDQA |
+                <$opcode>::BLENDPD |
+                <$opcode>::BLENDPS |
+                <$opcode>::BLENDVPD |
+                <$opcode>::BLENDVPS |
+                <$opcode>::PBLENDVB |
+                <$opcode>::BLENDW |
+                <$opcode>::PMINUW |
+                <$opcode>::PMINUD |
+                <$opcode>::PMINSB |
+                <$opcode>::PMINSD |
+                <$opcode>::PMAXUW |
+                <$opcode>::PMAXUD |
+                <$opcode>::PMAXSB |
+                <$opcode>::PMAXSD |
+                <$opcode>::ROUNDPS |
+                <$opcode>::ROUNDPD |
+                <$opcode>::ROUNDSS |
+                <$opcode>::ROUNDSD |
+                <$opcode>::PBLENDW |
+                <$opcode>::EXTRACTPS |
+                <$opcode>::INSERTPS |
+                <$opcode>::PINSRB |
+                <$opcode>::PINSRD |
+                <$opcode>::PINSRQ |
+                <$opcode>::PMOVSXBW |
+                <$opcode>::PMOVZXBW |
+                <$opcode>::PMOVSXBD |
+                <$opcode>::PMOVZXBD |
+                <$opcode>::PMOVSXWD |
+                <$opcode>::PMOVZXWD |
+                <$opcode>::PMOVSXBQ |
+                <$opcode>::PMOVZXBQ |
+                <$opcode>::PMOVSXWQ |
+                <$opcode>::PMOVZXWQ |
+                <$opcode>::PMOVSXDQ |
+                <$opcode>::PMOVZXDQ |
+                <$opcode>::DPPS |
+                <$opcode>::DPPD |
+                <$opcode>::MPSADBW |
+                <$opcode>::PHMINPOSUW |
+                <$opcode>::PTEST |
+                <$opcode>::PCMPEQQ |
+                <$opcode>::PEXTRB |
+                <$opcode>::PEXTRW |
+                <$opcode>::PEXTRD |
+                <$opcode>::PEXTRQ |
+                <$opcode>::PACKUSDW => {
+                    // via Intel section 5.10, SSE4.1 Instructions
+                    if !settings.sse4_1() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::EXTRQ |
+                <$opcode>::INSERTQ |
+                <$opcode>::MOVNTSS |
+                <$opcode>::MOVNTSD => {
+                    if !settings.sse4a() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::CRC32 |
+                <$opcode>::PCMPESTRI |
+                <$opcode>::PCMPESTRM |
+                <$opcode>::PCMPISTRI |
+                <$opcode>::PCMPISTRM |
+                <$opcode>::PCMPGTQ => {
+                    // via Intel section 5.11, SSE4.2 Instructions
+                    if !settings.sse4_2() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::AESDEC |
+                <$opcode>::AESDECLAST |
+                <$opcode>::AESENC |
+                <$opcode>::AESENCLAST |
+                <$opcode>::AESIMC |
+                <$opcode>::AESKEYGENASSIST => {
+                    // via Intel section 5.12. AESNI AND PCLMULQDQ
+                    if !settings.aesni() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::PCLMULQDQ => {
+                    // via Intel section 5.12. AESNI AND PCLMULQDQ
+                    if !settings.pclmulqdq() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::XABORT |
+                <$opcode>::XBEGIN |
+                <$opcode>::XEND |
+                <$opcode>::XTEST => {
+                    if !settings.tsx() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::SHA1MSG1 |
+                <$opcode>::SHA1MSG2 |
+                <$opcode>::SHA1NEXTE |
+                <$opcode>::SHA1RNDS4 |
+                <$opcode>::SHA256MSG1 |
+                <$opcode>::SHA256MSG2 |
+                <$opcode>::SHA256RNDS2 => {
+                    if !settings.sha() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::ENCLV |
+                <$opcode>::ENCLS |
+                <$opcode>::ENCLU => {
+                    if !settings.sgx() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                // AVX...
+                <$opcode>::VMOVDDUP |
+                <$opcode>::VPSHUFLW |
+                <$opcode>::VPSHUFHW |
+                <$opcode>::VHADDPS |
+                <$opcode>::VHSUBPS |
+                <$opcode>::VADDSUBPS |
+                <$opcode>::VCVTPD2DQ |
+                <$opcode>::VLDDQU |
+                <$opcode>::VCOMISD |
+                <$opcode>::VCOMISS |
+                <$opcode>::VUCOMISD |
+                <$opcode>::VUCOMISS |
+                <$opcode>::VADDPD |
+                <$opcode>::VADDPS |
+                <$opcode>::VADDSD |
+                <$opcode>::VADDSS |
+                <$opcode>::VADDSUBPD |
+                <$opcode>::VBLENDPD |
+                <$opcode>::VBLENDPS |
+                <$opcode>::VBLENDVPD |
+                <$opcode>::VBLENDVPS |
+                <$opcode>::VBROADCASTF128 |
+                <$opcode>::VBROADCASTI128 |
+                <$opcode>::VBROADCASTSD |
+                <$opcode>::VBROADCASTSS |
+                <$opcode>::VCMPSD |
+                <$opcode>::VCMPSS |
+                <$opcode>::VCMPPD |
+                <$opcode>::VCMPPS |
+                <$opcode>::VCVTDQ2PD |
+                <$opcode>::VCVTDQ2PS |
+                <$opcode>::VCVTPD2PS |
+                <$opcode>::VCVTPS2DQ |
+                <$opcode>::VCVTPS2PD |
+                <$opcode>::VCVTSS2SD |
+                <$opcode>::VCVTSI2SS |
+                <$opcode>::VCVTSI2SD |
+                <$opcode>::VCVTSD2SI |
+                <$opcode>::VCVTSD2SS |
+                <$opcode>::VCVTSS2SI |
+                <$opcode>::VCVTTPD2DQ |
+                <$opcode>::VCVTTPS2DQ |
+                <$opcode>::VCVTTSS2SI |
+                <$opcode>::VCVTTSD2SI |
+                <$opcode>::VDIVPD |
+                <$opcode>::VDIVPS |
+                <$opcode>::VDIVSD |
+                <$opcode>::VDIVSS |
+                <$opcode>::VDPPD |
+                <$opcode>::VDPPS |
+                <$opcode>::VEXTRACTF128 |
+                <$opcode>::VEXTRACTI128 |
+                <$opcode>::VEXTRACTPS |
+                <$opcode>::VFMADD132PD |
+                <$opcode>::VFMADD132PS |
+                <$opcode>::VFMADD132SD |
+                <$opcode>::VFMADD132SS |
+                <$opcode>::VFMADD213PD |
+                <$opcode>::VFMADD213PS |
+                <$opcode>::VFMADD213SD |
+                <$opcode>::VFMADD213SS |
+                <$opcode>::VFMADD231PD |
+                <$opcode>::VFMADD231PS |
+                <$opcode>::VFMADD231SD |
+                <$opcode>::VFMADD231SS |
+                <$opcode>::VFMADDSUB132PD |
+                <$opcode>::VFMADDSUB132PS |
+                <$opcode>::VFMADDSUB213PD |
+                <$opcode>::VFMADDSUB213PS |
+                <$opcode>::VFMADDSUB231PD |
+                <$opcode>::VFMADDSUB231PS |
+                <$opcode>::VFMSUB132PD |
+                <$opcode>::VFMSUB132PS |
+                <$opcode>::VFMSUB132SD |
+                <$opcode>::VFMSUB132SS |
+                <$opcode>::VFMSUB213PD |
+                <$opcode>::VFMSUB213PS |
+                <$opcode>::VFMSUB213SD |
+                <$opcode>::VFMSUB213SS |
+                <$opcode>::VFMSUB231PD |
+                <$opcode>::VFMSUB231PS |
+                <$opcode>::VFMSUB231SD |
+                <$opcode>::VFMSUB231SS |
+                <$opcode>::VFMSUBADD132PD |
+                <$opcode>::VFMSUBADD132PS |
+                <$opcode>::VFMSUBADD213PD |
+                <$opcode>::VFMSUBADD213PS |
+                <$opcode>::VFMSUBADD231PD |
+                <$opcode>::VFMSUBADD231PS |
+                <$opcode>::VFNMADD132PD |
+                <$opcode>::VFNMADD132PS |
+                <$opcode>::VFNMADD132SD |
+                <$opcode>::VFNMADD132SS |
+                <$opcode>::VFNMADD213PD |
+                <$opcode>::VFNMADD213PS |
+                <$opcode>::VFNMADD213SD |
+                <$opcode>::VFNMADD213SS |
+                <$opcode>::VFNMADD231PD |
+                <$opcode>::VFNMADD231PS |
+                <$opcode>::VFNMADD231SD |
+                <$opcode>::VFNMADD231SS |
+                <$opcode>::VFNMSUB132PD |
+                <$opcode>::VFNMSUB132PS |
+                <$opcode>::VFNMSUB132SD |
+                <$opcode>::VFNMSUB132SS |
+                <$opcode>::VFNMSUB213PD |
+                <$opcode>::VFNMSUB213PS |
+                <$opcode>::VFNMSUB213SD |
+                <$opcode>::VFNMSUB213SS |
+                <$opcode>::VFNMSUB231PD |
+                <$opcode>::VFNMSUB231PS |
+                <$opcode>::VFNMSUB231SD |
+                <$opcode>::VFNMSUB231SS |
+                <$opcode>::VGATHERDPD |
+                <$opcode>::VGATHERDPS |
+                <$opcode>::VGATHERQPD |
+                <$opcode>::VGATHERQPS |
+                <$opcode>::VHADDPD |
+                <$opcode>::VHSUBPD |
+                <$opcode>::VINSERTF128 |
+                <$opcode>::VINSERTI128 |
+                <$opcode>::VINSERTPS |
+                <$opcode>::VMASKMOVDQU |
+                <$opcode>::VMASKMOVPD |
+                <$opcode>::VMASKMOVPS |
+                <$opcode>::VMAXPD |
+                <$opcode>::VMAXPS |
+                <$opcode>::VMAXSD |
+                <$opcode>::VMAXSS |
+                <$opcode>::VMINPD |
+                <$opcode>::VMINPS |
+                <$opcode>::VMINSD |
+                <$opcode>::VMINSS |
+                <$opcode>::VMOVAPD |
+                <$opcode>::VMOVAPS |
+                <$opcode>::VMOVD |
+                <$opcode>::VMOVDQA |
+                <$opcode>::VMOVDQU |
+                <$opcode>::VMOVHLPS |
+                <$opcode>::VMOVHPD |
+                <$opcode>::VMOVHPS |
+                <$opcode>::VMOVLHPS |
+                <$opcode>::VMOVLPD |
+                <$opcode>::VMOVLPS |
+                <$opcode>::VMOVMSKPD |
+                <$opcode>::VMOVMSKPS |
+                <$opcode>::VMOVNTDQ |
+                <$opcode>::VMOVNTDQA |
+                <$opcode>::VMOVNTPD |
+                <$opcode>::VMOVNTPS |
+                <$opcode>::VMOVQ |
+                <$opcode>::VMOVSS |
+                <$opcode>::VMOVSD |
+                <$opcode>::VMOVSHDUP |
+                <$opcode>::VMOVSLDUP |
+                <$opcode>::VMOVUPD |
+                <$opcode>::VMOVUPS |
+                <$opcode>::VMPSADBW |
+                <$opcode>::VMULPD |
+                <$opcode>::VMULPS |
+                <$opcode>::VMULSD |
+                <$opcode>::VMULSS |
+                <$opcode>::VPABSB |
+                <$opcode>::VPABSD |
+                <$opcode>::VPABSW |
+                <$opcode>::VPACKSSDW |
+                <$opcode>::VPACKUSDW |
+                <$opcode>::VPACKSSWB |
+                <$opcode>::VPACKUSWB |
+                <$opcode>::VPADDB |
+                <$opcode>::VPADDD |
+                <$opcode>::VPADDQ |
+                <$opcode>::VPADDSB |
+                <$opcode>::VPADDSW |
+                <$opcode>::VPADDUSB |
+                <$opcode>::VPADDUSW |
+                <$opcode>::VPADDW |
+                <$opcode>::VPALIGNR |
+                <$opcode>::VPAND |
+                <$opcode>::VANDPD |
+                <$opcode>::VANDPS |
+                <$opcode>::VANDNPD |
+                <$opcode>::VANDNPS |
+                <$opcode>::VORPD |
+                <$opcode>::VORPS |
+                <$opcode>::VPANDN |
+                <$opcode>::VPAVGB |
+                <$opcode>::VPAVGW |
+                <$opcode>::VPBLENDD |
+                <$opcode>::VPBLENDVB |
+                <$opcode>::VPBLENDW |
+                <$opcode>::VPBROADCASTB |
+                <$opcode>::VPBROADCASTD |
+                <$opcode>::VPBROADCASTQ |
+                <$opcode>::VPBROADCASTW |
+                <$opcode>::VPCLMULQDQ |
+                <$opcode>::VPCMPEQB |
+                <$opcode>::VPCMPEQD |
+                <$opcode>::VPCMPEQQ |
+                <$opcode>::VPCMPEQW |
+                <$opcode>::VPCMPGTB |
+                <$opcode>::VPCMPGTD |
+                <$opcode>::VPCMPGTQ |
+                <$opcode>::VPCMPGTW |
+                <$opcode>::VPCMPESTRI |
+                <$opcode>::VPCMPESTRM |
+                <$opcode>::VPCMPISTRI |
+                <$opcode>::VPCMPISTRM |
+                <$opcode>::VPERM2F128 |
+                <$opcode>::VPERM2I128 |
+                <$opcode>::VPERMD |
+                <$opcode>::VPERMILPD |
+                <$opcode>::VPERMILPS |
+                <$opcode>::VPERMPD |
+                <$opcode>::VPERMPS |
+                <$opcode>::VPERMQ |
+                <$opcode>::VPEXTRB |
+                <$opcode>::VPEXTRD |
+                <$opcode>::VPEXTRQ |
+                <$opcode>::VPEXTRW |
+                <$opcode>::VPGATHERDD |
+                <$opcode>::VPGATHERDQ |
+                <$opcode>::VPGATHERQD |
+                <$opcode>::VPGATHERQQ |
+                <$opcode>::VPHADDD |
+                <$opcode>::VPHADDSW |
+                <$opcode>::VPHADDW |
+                <$opcode>::VPMADDUBSW |
+                <$opcode>::VPHMINPOSUW |
+                <$opcode>::VPHSUBD |
+                <$opcode>::VPHSUBSW |
+                <$opcode>::VPHSUBW |
+                <$opcode>::VPINSRB |
+                <$opcode>::VPINSRD |
+                <$opcode>::VPINSRQ |
+                <$opcode>::VPINSRW |
+                <$opcode>::VPMADDWD |
+                <$opcode>::VPMASKMOVD |
+                <$opcode>::VPMASKMOVQ |
+                <$opcode>::VPMAXSB |
+                <$opcode>::VPMAXSD |
+                <$opcode>::VPMAXSW |
+                <$opcode>::VPMAXUB |
+                <$opcode>::VPMAXUW |
+                <$opcode>::VPMAXUD |
+                <$opcode>::VPMINSB |
+                <$opcode>::VPMINSW |
+                <$opcode>::VPMINSD |
+                <$opcode>::VPMINUB |
+                <$opcode>::VPMINUW |
+                <$opcode>::VPMINUD |
+                <$opcode>::VPMOVMSKB |
+                <$opcode>::VPMOVSXBD |
+                <$opcode>::VPMOVSXBQ |
+                <$opcode>::VPMOVSXBW |
+                <$opcode>::VPMOVSXDQ |
+                <$opcode>::VPMOVSXWD |
+                <$opcode>::VPMOVSXWQ |
+                <$opcode>::VPMOVZXBD |
+                <$opcode>::VPMOVZXBQ |
+                <$opcode>::VPMOVZXBW |
+                <$opcode>::VPMOVZXDQ |
+                <$opcode>::VPMOVZXWD |
+                <$opcode>::VPMOVZXWQ |
+                <$opcode>::VPMULDQ |
+                <$opcode>::VPMULHRSW |
+                <$opcode>::VPMULHUW |
+                <$opcode>::VPMULHW |
+                <$opcode>::VPMULLQ |
+                <$opcode>::VPMULLD |
+                <$opcode>::VPMULLW |
+                <$opcode>::VPMULUDQ |
+                <$opcode>::VPOR |
+                <$opcode>::VPSADBW |
+                <$opcode>::VPSHUFB |
+                <$opcode>::VPSHUFD |
+                <$opcode>::VPSIGNB |
+                <$opcode>::VPSIGND |
+                <$opcode>::VPSIGNW |
+                <$opcode>::VPSLLD |
+                <$opcode>::VPSLLDQ |
+                <$opcode>::VPSLLQ |
+                <$opcode>::VPSLLVD |
+                <$opcode>::VPSLLVQ |
+                <$opcode>::VPSLLW |
+                <$opcode>::VPSRAD |
+                <$opcode>::VPSRAVD |
+                <$opcode>::VPSRAW |
+                <$opcode>::VPSRLD |
+                <$opcode>::VPSRLDQ |
+                <$opcode>::VPSRLQ |
+                <$opcode>::VPSRLVD |
+                <$opcode>::VPSRLVQ |
+                <$opcode>::VPSRLW |
+                <$opcode>::VPSUBB |
+                <$opcode>::VPSUBD |
+                <$opcode>::VPSUBQ |
+                <$opcode>::VPSUBSB |
+                <$opcode>::VPSUBSW |
+                <$opcode>::VPSUBUSB |
+                <$opcode>::VPSUBUSW |
+                <$opcode>::VPSUBW |
+                <$opcode>::VPTEST |
+                <$opcode>::VPUNPCKHBW |
+                <$opcode>::VPUNPCKHDQ |
+                <$opcode>::VPUNPCKHQDQ |
+                <$opcode>::VPUNPCKHWD |
+                <$opcode>::VPUNPCKLBW |
+                <$opcode>::VPUNPCKLDQ |
+                <$opcode>::VPUNPCKLQDQ |
+                <$opcode>::VPUNPCKLWD |
+                <$opcode>::VPXOR |
+                <$opcode>::VRCPPS |
+                <$opcode>::VROUNDPD |
+                <$opcode>::VROUNDPS |
+                <$opcode>::VROUNDSD |
+                <$opcode>::VROUNDSS |
+                <$opcode>::VRSQRTPS |
+                <$opcode>::VRSQRTSS |
+                <$opcode>::VRCPSS |
+                <$opcode>::VSHUFPD |
+                <$opcode>::VSHUFPS |
+                <$opcode>::VSQRTPD |
+                <$opcode>::VSQRTPS |
+                <$opcode>::VSQRTSS |
+                <$opcode>::VSQRTSD |
+                <$opcode>::VSUBPD |
+                <$opcode>::VSUBPS |
+                <$opcode>::VSUBSD |
+                <$opcode>::VSUBSS |
+                <$opcode>::VTESTPD |
+                <$opcode>::VTESTPS |
+                <$opcode>::VUNPCKHPD |
+                <$opcode>::VUNPCKHPS |
+                <$opcode>::VUNPCKLPD |
+                <$opcode>::VUNPCKLPS |
+                <$opcode>::VXORPD |
+                <$opcode>::VXORPS |
+                <$opcode>::VZEROUPPER |
+                <$opcode>::VZEROALL |
+                <$opcode>::VLDMXCSR |
+                <$opcode>::VSTMXCSR => {
+                    // TODO: check a table for these
+                    if !settings.avx() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::VAESDEC |
+                <$opcode>::VAESDECLAST |
+                <$opcode>::VAESENC |
+                <$opcode>::VAESENCLAST |
+                <$opcode>::VAESIMC |
+                <$opcode>::VAESKEYGENASSIST => {
+                    // TODO: check a table for these
+                    if !settings.avx() || !settings.aesni() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::MOVBE => {
+                    if !settings.movbe() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::POPCNT => {
+                    /*
+                     * from the intel SDM:
+                     * ```
+                     * Before an application attempts to use the POPCNT instruction, it must check that
+                     * the processor supports SSE4.2 (if CPUID.01H:ECX.SSE4_2[bit 20] = 1) and POPCNT
+                     * (if CPUID.01H:ECX.POPCNT[bit 23] = 1).
+                     * ```
+                     */
+                    if settings.intel_quirks() && (settings.sse4_2() || settings.popcnt()) {
+                        return Ok(());
+                    } else if !settings.popcnt() {
+                        /*
+                         * elsewhere from the amd APM:
+                         * `Instruction Subsets and CPUID Feature Flags` on page 507 indicates that
+                         * popcnt is present when the popcnt bit is reported by cpuid. this seems to be
+                         * the less quirky default, so `intel_quirks` is considered the outlier, and
+                         * before this default.
+                         * */
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::LZCNT => {
+                    /*
+                     * amd APM, `LZCNT` page 212:
+                     * LZCNT is an Advanced Bit Manipulation (ABM) instruction. Support for the LZCNT
+                     * instruction is indicated by CPUID Fn8000_0001_ECX[ABM] = 1.
+                     *
+                     * meanwhile the intel SDM simply states:
+                     * ```
+                     * CPUID.EAX=80000001H:ECX.LZCNT[bit 5]: if 1 indicates the processor supports the
+                     * LZCNT instruction.
+                     * ```
+                     *
+                     * so that's considered the less-quirky (default) case here.
+                     * */
+                    if settings.amd_quirks() && !settings.abm() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    } else if !settings.lzcnt() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::ADCX |
+                <$opcode>::ADOX => {
+                    if !settings.adx() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::VMRUN |
+                <$opcode>::VMLOAD |
+                <$opcode>::VMSAVE |
+                <$opcode>::CLGI |
+                <$opcode>::VMMCALL |
+                <$opcode>::INVLPGA => {
+                    if !settings.svm() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::STGI |
+                <$opcode>::SKINIT => {
+                    if !settings.svm() || !settings.skinit() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::LAHF |
+                <$opcode>::SAHF => {
+                    if !settings.lahfsahf() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::VCVTPS2PH |
+                <$opcode>::VCVTPH2PS => {
+                    /*
+                     * from intel SDM:
+                     * ```
+                     * 14.4.1 Detection of F16C Instructions Application using float 16 instruction
+                     *    must follow a detection sequence similar to AVX to ensure: • The OS has
+                     *    enabled YMM state management support, • The processor support AVX as
+                     *    indicated by the CPUID feature flag, i.e. CPUID.01H:ECX.AVX[bit 28] = 1.  •
+                     *    The processor support 16-bit floating-point conversion instructions via a
+                     *    CPUID feature flag (CPUID.01H:ECX.F16C[bit 29] = 1).
+                     * ```
+                     *
+                     * TODO: only the VEX-coded variant of this instruction should be gated on `f16c`.
+                     * the EVEX-coded variant should be gated on `avx512f` or `avx512vl` if not
+                     * EVEX.512-coded.
+                     */
+                    if !settings.avx() || !settings.f16c() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::RDRAND => {
+                    if !settings.rdrand() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::RDSEED => {
+                    if !settings.rdseed() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                <$opcode>::MONITORX | <$opcode>::MWAITX | // these are gated on the `monitorx` and `mwaitx` cpuid bits, but are AMD-only.
+                <$opcode>::CLZERO | <$opcode>::RDPRU => { // again, gated on specific cpuid bits, but AMD-only.
+                    if !settings.amd_quirks() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+                other => {
+                    if !settings.bmi1() {
+                        if BMI1.contains(&other) {
+                            return Err(<$decode_err>::InvalidOpcode);
+                        }
+                    }
+                    if !settings.bmi2() {
+                        if BMI2.contains(&other) {
+                            return Err(<$decode_err>::InvalidOpcode);
+                        }
+                    }
+                }
+            }
+            Ok(())
+        }
     }
 }
 
 macro_rules! gen_arch_isa_settings {
-    ($inst_ty:ty, $decode_err:ty, $featureful_decoder:ty) => {
+    ($inst_ty:ty, $opcode:ty, $decode_err:ty, $featureful_decoder:ty) => {
         gen_isa_settings!(
-            ($inst_ty, $decode_err, $featureful_decoder),
+            ($inst_ty, $opcode, $decode_err, $featureful_decoder),
             _3dnow, with_3dnow = 1;
             _3dnowprefetch, with_3dnowprefetch = 2;
             abm, with_abm = 3;

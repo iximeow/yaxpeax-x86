@@ -3,7 +3,6 @@ mod evex;
 #[cfg(feature = "fmt")]
 mod display;
 pub mod uarch;
-mod isa_settings;
 
 pub use crate::MemoryAccessSize;
 
@@ -18,6 +17,10 @@ use yaxpeax_arch::{AddressDiff, Decoder, Reader, LengthedInstruction};
 use yaxpeax_arch::annotation::{AnnotatingDecoder, DescriptionSink, NullSink};
 use yaxpeax_arch::{DecodeError as ArchDecodeError};
 use yaxpeax_arch::safer_unchecked::unreachable_kinda_unchecked as unreachable_unchecked;
+
+// generate InstDecoder settings and `revise_instruction` here. a bit early, but
+// gets it out of the way..
+crate::isa_settings::gen_arch_isa_settings!(Instruction, Opcode, DecodeError, InstDecoder);
 
 use core::fmt;
 impl fmt::Display for DecodeError {
@@ -2865,7 +2868,7 @@ fn decode_with_annotation<
         return Err(DecodeError::TooLong);
     }
 
-    isa_settings::revise_instruction(decoder, instr)?;
+    revise_instruction(decoder, instr)?;
 
     Ok(())
 }
