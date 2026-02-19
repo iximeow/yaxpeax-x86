@@ -3,6 +3,7 @@ mod evex;
 #[cfg(feature = "fmt")]
 mod display;
 pub mod uarch;
+pub mod behavior;
 
 pub use crate::MemoryAccessSize;
 use crate::{Address, Word};
@@ -2957,7 +2958,7 @@ impl Opcode {
     }
 
     /// get the [`ConditionCode`] for this instruction, if it is in fact conditional. x86's
-    /// conditional instructions are `Jcc`, `CMOVcc`, andd `SETcc`.
+    /// conditional instructions are `Jcc`, `CMOVcc`, and `SETcc`.
     pub fn condition(&self) -> Option<ConditionCode> {
         match self {
             Opcode::JO |
