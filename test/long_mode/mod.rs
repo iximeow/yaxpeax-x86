@@ -9,6 +9,8 @@ mod display;
 mod descriptions;
 mod evex_generated;
 mod reuse_test;
+// #[cfg(feature="behavior")]
+mod behavior;
 
 use std::fmt::Write;
 
