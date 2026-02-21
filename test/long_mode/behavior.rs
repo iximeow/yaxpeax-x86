@@ -366,10 +366,6 @@ mod kvm {
     use yaxpeax_x86::long_mode::register_class;
 
     impl<'regs> AccessVisitor for AccessTestCtx<'regs> {
-        fn operand_begin(&mut self) {
-        }
-        fn operand_end(&mut self) {
-        }
         fn register_read(&mut self, reg: RegSpec) {
             self.expected_reg.push(ExpectedRegAccess {
                 write: false,
