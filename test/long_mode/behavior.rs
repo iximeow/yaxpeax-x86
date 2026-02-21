@@ -114,6 +114,9 @@ mod kvm {
             this
         }
 
+        // TODO: seems like there's a KVM bug where if the VM is configured for single-step and the
+        // single-stepped instruction is a read-modify-write to MMIO memory, the single-step
+        // doesn't actually take effect. compare `0x33 0x00` and `0x31 0x00`. what the hell!
         fn set_single_step(&mut self, active: bool) {
             let mut guest_debug = kvm_guest_debug::default();
 
@@ -344,7 +347,6 @@ mod kvm {
 
     struct AccessTestCtx<'regs> {
         regs: &'regs mut kvm_regs,
-        in_operand: bool,
         used_regs: [bool; 16],
         expected_reg: Vec<ExpectedRegAccess>,
         expected_mem: Vec<ExpectedMemAccess>,
@@ -462,13 +464,17 @@ mod kvm {
                 VcpuExit::Debug(info) => {
                     break info.pc;
                 }
+                VcpuExit::Hlt => {
+                    let mut regs = vm.vcpu.get_regs().unwrap();
+                    break regs.rip;
+                }
                 other => {
                     panic!("unhandled exit: {:?} ... after {}", other, exits);
                 }
             }
         };
 
-        if end_pc != expected_end {
+        if end_pc != expected_end - 1 && end_pc != expected_end {
             panic!("single-step ended at {:08x}, expected {:08x}", end_pc, expected_end);
         }
 
@@ -598,17 +604,30 @@ mod kvm {
     }
 
     fn check_behavior(vm: &mut TestVm, inst: &[u8]) {
+        let mut insts = inst.to_vec();
+        // cap things off with a `hlt` to work around single-step sometimes .. not? see comment on
+        // set_single_step. this ensures that even if single-stepping doesn't do the needful, the
+        // next address _will_ get the vCPU back out to us.
+        //
+        // this obviously doesn't work if code is overwritten (so really [TODO] the first page
+        // should be made non-writable), and doesn't work if the one executed instruction is a
+        // call, jump, etc. in those cases the instruction doesn't rmw memory .. .except for
+        // call/ret, where the `rsp` access might. so we might have to just have to skip them?
+        //
+        // alternatively, probably should set up the IDT such that there's a handler for the
+        // exception raised by `TF` that just executes hlt. then everything other than popf will
+        // work out of the box and popf can be caught by kvm single-stepping.
+        insts.push(0xf4);
         let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
             .decode_slice(inst).expect("can decode");
         let behavior = decoded.behavior();
 
         let before_sregs = vm.vcpu.get_sregs().unwrap();
         let mut regs = vm.vcpu.get_regs().unwrap();
-        vm.program(inst, &mut regs);
+        vm.program(insts.as_slice(), &mut regs);
 
         let mut ctx = AccessTestCtx {
             regs: &mut regs,
-            in_operand: false,
             used_regs: [false; 16],
             expected_reg: Vec::new(),
             expected_mem: Vec::new(),
@@ -620,7 +639,7 @@ mod kvm {
 
         vm.set_single_step(true);
 
-        run_with_mem_checks(vm, regs.rip + inst.len().to_linear() as u64, expected_mem);
+        run_with_mem_checks(vm, regs.rip + insts.len() as u64, expected_mem);
 
         let after_regs = vm.vcpu.get_regs().unwrap();
         let after_sregs = vm.vcpu.get_sregs().unwrap();
