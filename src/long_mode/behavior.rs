@@ -349,6 +349,15 @@ impl<'inst> InstBehavior<'inst> {
             }
         }
 
+        if let Some(acc) = self.flags_access() {
+            if acc.is_read() {
+                v.register_read(RegSpec::rflags());
+            }
+            if acc.is_write() {
+                v.register_write(RegSpec::rflags());
+            }
+        }
+
         let operand_access = self.behavior.operand_access;
 
         for i in 0..self.inst.operand_count {
@@ -770,7 +779,7 @@ const GENERAL_RW_R_FLAGWRITE: BehaviorDigest = GENERAL_RW_R
 
 /// test, cmp, with no write but to flags.
 const GENERAL_R_R_FLAGWRITE: BehaviorDigest = GENERAL_RW_R
-    .set_operand(0, Access::ReadWrite)
+    .set_operand(0, Access::Read)
     .set_flags_access(Access::Write);
 
 /// `sbb`, `adc`, etc both read flags and write them.
