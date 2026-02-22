@@ -256,6 +256,18 @@ pub struct OperandIter<'inst> {
     inner: AccessIter<'inst>,
 }
 
+/// enough structure to describe any implicitly-present operand in an x86_64 instruction.
+///
+/// this is (maybe surprisingly, compared to the rest of the isa) relatively tiny: the only
+/// implicit operands to date are register reads/writes, and simple dereference of a register (such
+/// as `[rsp - 8] = ...` in a push).
+struct ImplicitOperand {
+    spec: OperandSpec,
+    reg: RegSpec,
+    disp: i32,
+    write: bool,
+}
+
 impl<'inst> Iterator for OperandIter<'inst> {
     type Item = Operand;
 
@@ -320,6 +332,16 @@ impl<'inst> InstBehavior<'inst> {
         Access::from_bits(flag_acc)
     }
 
+    pub fn implicit_oplist(&self) -> Option<&'static [ImplicitOperand]> {
+        let ops_idx = self.behavior.extra;
+        if ops_idx == 0 {
+            return None;
+        }
+
+        // TODO: ops_idx cannot be out of bounds, so maybe kinda-unchecked here..?
+        Some(&IMPLICIT_OPS_LIST[ops_idx as usize])
+    }
+
     pub fn operand_access(&self, idx: u8) -> Option<Access> {
         if idx >= 4 {
             return None;
@@ -329,7 +351,6 @@ impl<'inst> InstBehavior<'inst> {
         Access::from_bits(op_acc)
     }
 
-    // TODO: this should visit implicit operand lists, flags, same as operand iter.
     pub fn visit_accesses<T: AccessVisitor>(&self, v: &mut T) -> Result<(), ComplexOp> {
         if self.inst.opcode == Opcode::WRMSR {
             return Err(ComplexOp::WRMSR);
@@ -337,7 +358,9 @@ impl<'inst> InstBehavior<'inst> {
 
         fn compute_addr<T: AccessVisitor>(v: &mut T, inst: &Instruction, op_spec: OperandSpec) -> Option<u64> {
             // TODO: test assertions feature?
-            assert!(op_spec.is_memory());
+            if !op_spec.is_memory() {
+                panic!("expected memory operand but got {:?}", op_spec);
+            }
 
             match op_spec {
                 OperandSpec::Deref => {
@@ -345,6 +368,43 @@ impl<'inst> InstBehavior<'inst> {
                 }
                 other => {
                     panic!("not-yet-handled memory operand: {:?}", other);
+                }
+            }
+        }
+
+        if let Some(implicit_oplist) = self.implicit_oplist() {
+            for op in implicit_oplist.iter() {
+                if op.spec == OperandSpec::RegRRR {
+                    if op.write {
+                        v.register_write(op.reg);
+                    } else {
+                        v.register_read(op.reg);
+                    }
+                } else {
+                    let addr = match op.spec {
+                        OperandSpec::Deref => {
+                            v.get_register(op.reg)
+                        },
+                        OperandSpec::Disp => {
+                            if let Some(base) = v.get_register(op.reg) {
+                                Some(base.wrapping_add(op.disp as i64 as u64))
+                            } else {
+                                None
+                            }
+                        }
+                        other => {
+                            panic!("impossible operand spec {:?}", other);
+                        }
+                    };
+
+                    let size = self.inst.mem_size().expect("memory operand implies memory access size")
+                        .bytes_size().expect("non-complex instructions have well-defined bytes_size()");
+
+                    if op.write {
+                        v.memory_write(addr, size as u32);
+                    } else {
+                        v.memory_read(addr, size as u32);
+                    }
                 }
             }
         }
@@ -370,26 +430,66 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::RegRRR => {
                         v.register_read(self.inst.regs[0]);
                     }
+                    OperandSpec::RegMMM => {
+                        v.register_read(self.inst.regs[1]);
+                    }
+                    OperandSpec::ImmI8 |
+                    OperandSpec::ImmU8 |
+                    OperandSpec::ImmI16 |
+                    OperandSpec::ImmU16 |
+                    OperandSpec::ImmI32 |
+                    OperandSpec::ImmI64 |
+                    OperandSpec::ImmInDispField => {
+                        // no register/memory access to report.
+                    }
                     other => {
                         // compute effective address...
                         let addr = compute_addr(v, &self.inst, op_spec);
                         let size = self.inst.mem_size().expect("memory operand implies memory access size")
                             .bytes_size().expect("non-complex instructions have well-defined bytes_size()");
-                        v.memory_read(addr, size as u32);
+                        // `lea` *just* computes the effective address, which we've done above.
+                        // othrwise, the instruction will actually read this memory operand.
+                        if self.inst.opcode != Opcode::LEA {
+                            v.memory_read(addr, size as u32);
+                        }
                     }
                 }
             }
 
             if access.is_write() {
+                // given a register `reg` that an instruction writes, expand it for the purposes of
+                // tracking register writes. x86 zero-extends writes to 32-bit GPRs into 64-bit GPR
+                // writes, so replicate that here.
+                fn apply_x86_zext(mut reg: RegSpec) -> RegSpec {
+                    use super::RegisterBank;
+                    if reg.bank == RegisterBank::D {
+                        reg.bank = RegisterBank::Q;
+                    }
+                    reg
+                }
                 match op_spec {
                     OperandSpec::RegRRR => {
-                        v.register_write(self.inst.regs[0]);
+                        v.register_write(apply_x86_zext(self.inst.regs[0]));
+                    }
+                    OperandSpec::RegMMM => {
+                        v.register_write(apply_x86_zext(self.inst.regs[1]));
+                    }
+                    OperandSpec::ImmI8 |
+                    OperandSpec::ImmU8 |
+                    OperandSpec::ImmI16 |
+                    OperandSpec::ImmU16 |
+                    OperandSpec::ImmI32 |
+                    OperandSpec::ImmI64 |
+                    OperandSpec::ImmInDispField => {
+                        // no register/memory access to report.
                     }
                     other => {
                         // compute effective address...
                         let addr = compute_addr(v, &self.inst, op_spec);
                         let size = self.inst.mem_size().expect("memory operand implies memory access size")
                             .bytes_size().expect("non-complex instructions have well-defined bytes_size()");
+                        // no lea check necessary: the memory access is coded as a read and no
+                        // instruction has a similar "fake" memory write.
                         v.memory_write(addr, size as u32);
                     }
                 }
@@ -435,7 +535,7 @@ pub struct BehaviorDigest {
     // laid out like:
     //
     // |7 6|5 4|3 2|1 0|
-    // |imp_ops|   |FL |PL |
+    // |imp_ops|FL |PL |
     //
     // imp_ops: selector for a `&'static [Operand]` of additional "implicit" operands for the
     //   instruction.
@@ -452,6 +552,7 @@ pub struct BehaviorDigest {
     // describes validity of these bits: fields left `00` must not have a corresponding operand at
     // that offset. fields with no corresponding operand may have bits set.
     operand_access: u8,
+    extra: u16,
 }
 
 impl BehaviorDigest {
@@ -459,6 +560,7 @@ impl BehaviorDigest {
         BehaviorDigest {
             behavior: 0,
             operand_access: 0,
+            extra: 0
         }
     }
 
@@ -491,6 +593,18 @@ impl BehaviorDigest {
         let offset = idx * 2;
         self.operand_access &= !(0b11 << offset);
         self.operand_access |= (access as u8) << offset;
+        self
+    }
+
+    const fn set_implicit_ops(mut self, ops_idx: u16) -> Self {
+        // TODO: this needs much less than a full u16 (much less than |Opcode| even)
+        self.extra = ops_idx;
+        self
+    }
+
+    const fn set_complex(mut self, state: bool) -> Self {
+        self.behavior &= 0b11_10_11_11;
+        self.behavior |= (state as u8) << 4;
         self
     }
 }
@@ -711,9 +825,9 @@ mod test {
         behavior.visit_accesses(&mut ctx).expect("xor eax, [rcx] is not complex");
 
         assert_eq!(ctx.accesses, vec![
+               (RegSpec::rflags(), Access::Write),
                (RegSpec::eax(), Access::Read),
-               // TODO: should this be `rax`? given that x86 zero-extends eax up...
-               (RegSpec::eax(), Access::Write),
+               (RegSpec::rax(), Access::Write),
                (RegSpec::rcx(), Access::Read)
         ]);
         assert_eq!(ctx.mem_accesses, vec![((Some(0x10000), 4), Access::Read)]);
@@ -803,7 +917,8 @@ const GENERAL_RW_R_FLAGREAD: BehaviorDigest = GENERAL_RW_FLAGREAD
 /// `inc`, `dec`, and `neg` have one operand and modify flags.
 const GENERAL_RW_FLAGWRITE: BehaviorDigest = BehaviorDigest::empty()
     .set_pl_any()
-    .set_operand(0, Access::ReadWrite);
+    .set_operand(0, Access::ReadWrite)
+    .set_flags_access(Access::Write);
 
 /// `inc`, `dec`, and `neg` have one operand and modify flags.
 const GENERAL_RW: BehaviorDigest = BehaviorDigest::empty()
@@ -823,6 +938,57 @@ const GENERAL_RW_RW: BehaviorDigest = GENERAL_RW_R
 const GENERAL_RW_RW_FLAGWRITE: BehaviorDigest = GENERAL_RW_RW
     .set_flags_access(Access::Write);
 
+static PUSH_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Disp,
+        reg: RegSpec::rsp(),
+        disp: -8i32,
+        write: true,
+    },
+    // push.. pushes the value (above), then does a RMW on rsp.
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static POP_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref,
+        reg: RegSpec::rsp(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+const PUSH_OPS_IDX: u16 = 1;
+const POP_OPS_IDX: u16 = 2;
+
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 3] = [
+    &[], // implicit ops list 0 is not used
+    PUSH_OPS,
+    POP_OPS,
+];
 
 fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
     use Opcode::*;
@@ -915,10 +1081,17 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         CALLF => { panic!("todo: callf"); },
         JMP => { panic!("todo: jmp"); },
         JMPF => { panic!("todo: jmpf"); },
-        PUSH => { panic!("todo: push"); },
-        POP => { panic!("todo: pop"); },
-        LEA => { panic!("todo: lea"); },
-        NOP => { panic!("todo: nop"); },
+        PUSH => BehaviorDigest::empty()
+            .set_implicit_ops(PUSH_OPS_IDX)
+            .set_pl_any()
+            .set_operand(0, Access::Read),
+        POP => BehaviorDigest::empty()
+            .set_implicit_ops(POP_OPS_IDX)
+            .set_pl_any()
+            .set_operand(0, Access::Write),
+        LEA => GENERAL_W_R,
+        NOP => BehaviorDigest::empty()
+            .set_pl_any(),
         PREFETCHNTA => { panic!("todo: prefetchnta"); },
         PREFETCH0 => { panic!("todo: prefetch0"); },
         PREFETCH1 => { panic!("todo: prefetch1"); },

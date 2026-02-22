@@ -18,7 +18,7 @@ yaxpeax-arch = { version = "0.3.1", default-features = false, features = [] }
 "cfg-if" = "1.0.0"
 
 [dev-dependencies]
-rand = "0.8.4"
+rand = { version = "0.10.0", features = ["thread_rng"] }
 "kvm-ioctls" = "0.24.0"
 "kvm-bindings" = "0.14.0"
 "libc" = "*"

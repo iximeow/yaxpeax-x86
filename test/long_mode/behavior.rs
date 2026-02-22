@@ -7,6 +7,8 @@ mod kvm {
         KVM_GUESTDBG_ENABLE, KVM_GUESTDBG_SINGLESTEP,
     };
 
+    use rand::prelude::*;
+
     /// a test VM for running arbitrary instructions.
     ///
     /// there is one CPU which is configured for long-mode execution. all memory is
@@ -332,17 +334,24 @@ mod kvm {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Copy, Clone)]
     struct ExpectedMemAccess {
         write: bool,
         addr: u64,
         size: u32,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Copy, Clone)]
     struct ExpectedRegAccess {
         write: bool,
         reg: RegSpec,
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    struct UnexpectedRegChange {
+        reg: RegSpec,
+        before: u64,
+        after: u64,
     }
 
     struct AccessTestCtx<'regs> {
@@ -397,7 +406,18 @@ mod kvm {
                         };
                         Some(value)
                     } else {
-                        let value = (kvm_reg_nr as u64 + 1) * 0x100_0000;
+                        // register value allocation is done carefully to keep memory accesses out
+                        // of the first 1G of memory. that keeps test instructions from clobbering
+                        // page tables. registers used for memory access are set to at least to 8G,
+                        // so that disp32 offsets can cause an instruction to access only as early
+                        // as 4G. SIB addressing means the highest address that may be accessed
+                        // could be 8G + 0xf00_0000 + (8G + 0x1000_0000) * 4 + 2G, or somewhere
+                        // around 42G.
+                        //
+                        // since the highest accessible address is (probably) 2^48 or 256T, even in
+                        // the most convoluted case we're always going to be forming canonical
+                        // (lower-half) addresses.
+                        let value = 0x2_0000_0000 + (kvm_reg_nr as u64 + 1) * 0x100_0000;
                         unsafe {
                             (self.regs as *mut _ as *mut u64).offset(kvm_reg_nr as isize).write(value);
                         }
@@ -428,7 +448,8 @@ mod kvm {
         }
     }
 
-    fn run_with_mem_checks(vm: &mut TestVm, expected_end: u64, mut expected_mem: Vec<ExpectedMemAccess>) {
+    fn run_with_mem_checks(vm: &mut TestVm, expected_end: u64, expected_mem: &[ExpectedMemAccess]) {
+        let mut expected_mem = expected_mem.to_vec();
         let mut unexpected_mem = Vec::new();
         let mut exits = 0;
         let end_pc = loop {
@@ -465,7 +486,7 @@ mod kvm {
                     break info.pc;
                 }
                 VcpuExit::Hlt => {
-                    let mut regs = vm.vcpu.get_regs().unwrap();
+                    let regs = vm.vcpu.get_regs().unwrap();
                     break regs.rip;
                 }
                 other => {
@@ -479,7 +500,22 @@ mod kvm {
         }
 
         if !unexpected_mem.is_empty() {
-            panic!("unexpected mem accesses: {:?}", unexpected_mem);
+            eprintln!("memory access surprise!");
+            if expected_mem.is_empty() {
+                eprintln!("expected none");
+            } else {
+                eprintln!("expected:");
+                for acc in expected_mem.iter() {
+                    let rw = if acc.write { "write:" } else { " read:" };
+                    eprintln!("  {} {} bytes at {:08x}", rw, acc.size, acc.addr);
+                }
+            }
+            eprintln!("unexpected:");
+            for (write, addr, size) in unexpected_mem {
+                let rw = if write { "write:" } else { " read:" };
+                eprintln!("  {} {} bytes at {:08x}", rw, size, addr);
+            }
+            panic!("stop");
         }
         return;
     }
@@ -544,7 +580,7 @@ mod kvm {
     }
 
     fn verify_reg(
-        unexpected_regs: &mut Vec<RegSpec>, expected_regs: &[ExpectedRegAccess],
+        unexpected_regs: &mut Vec<UnexpectedRegChange>, expected_regs: &[ExpectedRegAccess],
         changed_reg: RegSpec, before: u64, after: u64,
     ) {
         let diff = before ^ after;
@@ -562,23 +598,56 @@ mod kvm {
                 write_matches_reg(e.reg, diff)
             });
 
-            if let Some(position) = position {
+            if let Some(_position) = position {
                 // nothing to do with it right now
             } else {
-                eprintln!("register {} changed unexpectedly: {:08x} -> {:08x}", changed_reg.name(), before, after);
-                unexpected_regs.push(changed_reg);
+                unexpected_regs.push(UnexpectedRegChange {
+                    reg: changed_reg,
+                    before,
+                    after,
+                });
             }
         }
     }
 
+    fn verify_dontcares(written_regs: &[RegSpec], initial_after_regs: &kvm_regs, now_after_regs: &kvm_regs) {
+        let mut bad = false;
+
+        for reg in written_regs.iter() {
+            assert_eq!(reg.class(), register_class::Q);
+
+            static KVM_REG_LUT: [usize; 16] = [
+                0, 2, 3, 1, 6, 7, 4, 5,
+                8, 9, 10, 11, 12, 13, 14, 15,
+            ];
+            let kvm_reg_nr = KVM_REG_LUT[reg.num() as usize];
+
+            let initial_after = unsafe {
+                (initial_after_regs as *const _ as *const u64).offset(kvm_reg_nr as isize).read()
+            };
+
+            let now_after = unsafe {
+                (now_after_regs as *const _ as *const u64).offset(kvm_reg_nr as isize).read()
+            };
+
+            if initial_after != now_after {
+                eprintln!("register {} changed after permuting dontcares: {:016x} => {:016x}",
+                    reg, initial_after, now_after);
+                bad = true;
+            }
+        }
+
+        if bad {
+            panic!("cared about dontcares");
+        }
+    }
+
     fn verify_reg_changes(
-        expected_regs: Vec<ExpectedRegAccess>,
+        expected_regs: &[ExpectedRegAccess],
         before_regs: kvm_regs, after_regs: kvm_regs,
         before_sregs: kvm_sregs, after_sregs: kvm_sregs
     ) {
         let mut unexpected_regs = Vec::new();
-
-        eprintln!("expecting reg changes: {:?}", expected_regs);
 
         verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::rax(), before_regs.rax, after_regs.rax);
         verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::rcx(), before_regs.rcx, after_regs.rcx);
@@ -599,7 +668,11 @@ mod kvm {
         verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::rflags(), before_regs.rflags, after_regs.rflags);
 
         if !unexpected_regs.is_empty() {
-            panic!("unexpected reg changes: {:?}", unexpected_regs);
+            eprintln!("unexpected reg changes:");
+            for change in unexpected_regs {
+                eprintln!("  {}: {:08x} -> {:08x}", change.reg.name(), change.before, change.after);
+            }
+            panic!("stop");
         }
     }
 
@@ -620,11 +693,35 @@ mod kvm {
         insts.push(0xf4);
         let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
             .decode_slice(inst).expect("can decode");
+        use yaxpeax_arch::LengthedInstruction;
+        assert_eq!(insts.len(), 0.wrapping_offset(decoded.len()) as usize + 1);
         let behavior = decoded.behavior();
+        eprintln!("checking behavior of {}", decoded);
 
         let before_sregs = vm.vcpu.get_sregs().unwrap();
         let mut regs = vm.vcpu.get_regs().unwrap();
+        vm.set_single_step(true);
         vm.program(insts.as_slice(), &mut regs);
+
+        let mut rng = rand::rng();
+
+        regs.rax = rng.next_u64();
+        regs.rbx = rng.next_u64();
+        regs.rcx = rng.next_u64();
+        regs.rdx = rng.next_u64();
+        regs.rsp = rng.next_u64();
+        regs.rbp = rng.next_u64();
+        regs.rsi = rng.next_u64();
+        regs.rdi = rng.next_u64();
+
+        regs.r8 = rng.next_u64();
+        regs.r9 = rng.next_u64();
+        regs.r10 = rng.next_u64();
+        regs.r11 = rng.next_u64();
+        regs.r12 = rng.next_u64();
+        regs.r13 = rng.next_u64();
+        regs.r14 = rng.next_u64();
+        regs.r15 = rng.next_u64();
 
         let mut ctx = AccessTestCtx {
             regs: &mut regs,
@@ -632,19 +729,138 @@ mod kvm {
             expected_reg: Vec::new(),
             expected_mem: Vec::new(),
         };
-        let accesses = behavior.visit_accesses(&mut ctx).expect("can visit accesses");
+        behavior.visit_accesses(&mut ctx).expect("can visit accesses");
         let (expected_reg, expected_mem) = ctx.into_expectations();
+
+        fn compute_dontcares(accesses: &[ExpectedRegAccess]) -> Vec<RegSpec> {
+            // use a bitmap for dontcares, mask out bits as registers are seen to be read.
+            let mut reg_bitmap: u32 = 0xffffffff;
+
+            fn reg_to_gpr(reg: RegSpec) -> Option<u8> {
+                match reg.class() {
+                    register_class::Q |
+                    register_class::D |
+                    register_class::W |
+                    register_class::RB => {
+                        Some(reg.num())
+                    }
+                    register_class::B => {
+                        Some(reg.num() & 0b111)
+                    }
+                    _ => {
+                        None
+                    }
+                }
+            }
+
+            for acc in accesses.iter() {
+                if acc.write {
+                    continue;
+                }
+
+                if let Some(gpr_num) = reg_to_gpr(acc.reg) {
+                    reg_bitmap &= !(1 << gpr_num);
+                }
+            }
+
+            let mut regs = Vec::new();
+
+            for i in 0..16 {
+                if reg_bitmap & (1 << i) != 0 {
+                    regs.push(RegSpec::q(i));
+                }
+            }
+
+            regs
+        }
+
+        fn compute_writes(accesses: &[ExpectedRegAccess]) -> Vec<RegSpec> {
+            // same as dontcares, isk
+            let mut reg_bitmap: u32 = 0x00000000;
+
+            fn reg_to_gpr(reg: RegSpec) -> Option<u8> {
+                match reg.class() {
+                    register_class::Q |
+                    register_class::D |
+                    register_class::W |
+                    register_class::RB => {
+                        Some(reg.num())
+                    }
+                    register_class::B => {
+                        Some(reg.num() & 0b111)
+                    }
+                    _ => {
+                        None
+                    }
+                }
+            }
+
+            for acc in accesses.iter() {
+                if !acc.write {
+                    continue;
+                }
+
+                if let Some(gpr_num) = reg_to_gpr(acc.reg) {
+                    reg_bitmap |= 1 << gpr_num;
+                }
+            }
+
+            let mut regs = Vec::new();
+
+            for i in 0..16 {
+                if reg_bitmap & (1 << i) != 0 {
+                    regs.push(RegSpec::q(i));
+                }
+            }
+
+            regs
+        }
+
+        let dontcare_regs = compute_dontcares(&expected_reg);
+        let written_regs = compute_writes(&expected_reg);
+
+        fn permute_dontcares(dontcare_regs: &[RegSpec], regs: &mut kvm_regs) {
+            let mut rng = rand::rng();
+
+            for reg in dontcare_regs {
+                assert_eq!(reg.class(), register_class::Q);
+
+                static KVM_REG_LUT: [usize; 16] = [
+                    0, 2, 3, 1, 6, 7, 4, 5,
+                    8, 9, 10, 11, 12, 13, 14, 15,
+                ];
+                let kvm_reg_nr = KVM_REG_LUT[reg.num() as usize];
+                let rand = rng.next_u64();
+                unsafe {
+                    (regs as *mut _ as *mut u64).offset(kvm_reg_nr as isize).write(rand);
+                }
+            }
+        }
+
+        permute_dontcares(dontcare_regs.as_slice(), &mut regs);
 
         vm.vcpu.set_regs(&regs).unwrap();
 
-        vm.set_single_step(true);
+        run_with_mem_checks(vm, regs.rip + insts.len() as u64, expected_mem.as_slice());
 
-        run_with_mem_checks(vm, regs.rip + insts.len() as u64, expected_mem);
-
-        let after_regs = vm.vcpu.get_regs().unwrap();
+        let initial_after_regs = vm.vcpu.get_regs().unwrap();
         let after_sregs = vm.vcpu.get_sregs().unwrap();
 
-        verify_reg_changes(expected_reg, regs, after_regs, before_sregs, after_sregs);
+        verify_reg_changes(&expected_reg, regs, initial_after_regs, before_sregs, after_sregs);
+
+        for _ in 0..4 {
+            permute_dontcares(dontcare_regs.as_slice(), &mut regs);
+
+            vm.vcpu.set_regs(&regs).unwrap();
+
+            run_with_mem_checks(vm, regs.rip + insts.len() as u64, expected_mem.as_slice());
+
+            let after_regs = vm.vcpu.get_regs().unwrap();
+            let after_sregs = vm.vcpu.get_sregs().unwrap();
+
+            verify_reg_changes(&expected_reg, regs, after_regs, before_sregs, after_sregs);
+            verify_dontcares(written_regs.as_slice(), &initial_after_regs, &after_regs);
+        }
     }
 
     #[test]
@@ -666,6 +882,28 @@ mod kvm {
     }
 
     #[test]
+    fn kvm_verify_inc() {
+        let mut vm = TestVm::create();
+
+        // `inc eax`
+        let inst: &'static [u8] = &[0xff, 0xc0];
+        check_behavior(&mut vm, inst);
+
+        // `inc dword [rax]`
+        let inst: &'static [u8] = &[0xff, 0x00];
+        check_behavior(&mut vm, inst);
+    }
+
+    #[test]
+    fn kvm_verify_push() {
+        let mut vm = TestVm::create();
+
+        // `push rax`
+        let inst: &'static [u8] = &[0x50];
+        check_behavior(&mut vm, inst);
+    }
+
+    #[test]
     fn behavior_verify_kvm() {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
@@ -679,8 +917,16 @@ mod kvm {
             let inst = word.to_le_bytes();
             let mut reader = U8Reader::new(&inst);
             if decoder.decode_into(&mut buf, &mut reader).is_ok() {
-                eprintln!("checking behavior of {:02x} {:02x}: {}", inst[0], inst[1], buf);
-                check_behavior(&mut vm, &inst);
+                // some instructions may just be one byte, so figure out the length and only check
+                // that many bytes of instructions for specific behavior..
+                use yaxpeax_arch::LengthedInstruction;
+                let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                if inst_len == 1 {
+                    eprintln!("checking behavior of {:02x}: {}", inst[0], buf);
+                } else {
+                    eprintln!("checking behavior of {:02x} {:02x}: {}", inst[0], inst[1], buf);
+                }
+                check_behavior(&mut vm, &inst[..inst_len]);
             }
         }
     }

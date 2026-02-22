@@ -1981,18 +1981,18 @@ const INSTRUCTIONS: [&'static [u8]; 1975] = [
 
 #[test]
 fn test_against_leftover_data() {
-    use super::rand::{thread_rng, Rng};
+    use super::rand::{rngs::ThreadRng, RngExt};
     use yaxpeax_arch::U8Reader;
-    let mut rng = thread_rng();
+    let mut rng = ThreadRng::default();
 
     let decoder = InstDecoder::default();
 
     for _ in 0..100000 {
-        let first_vec = INSTRUCTIONS[rng.gen_range(0..INSTRUCTIONS.len())];
+        let first_vec = INSTRUCTIONS[rng.random_range(0..INSTRUCTIONS.len())];
         let mut first_reader = U8Reader::new(first_vec);
         let first_decode = decoder.decode(&mut first_reader).unwrap();
 
-        let second_vec = INSTRUCTIONS[rng.gen_range(0..INSTRUCTIONS.len())];
+        let second_vec = INSTRUCTIONS[rng.random_range(0..INSTRUCTIONS.len())];
         let mut second_reader = U8Reader::new(second_vec);
         let mut reused_decode = decoder.decode(&mut second_reader).unwrap();
         let mut first_reader = U8Reader::new(first_vec);
