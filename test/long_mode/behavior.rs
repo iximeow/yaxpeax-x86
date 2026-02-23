@@ -107,6 +107,7 @@ mod kvm {
             unsafe {
                 this.configure_identity_paging(&mut vcpu_sregs);
                 this.configure_selectors(&mut vcpu_sregs);
+                this.configure_idt(&mut vcpu_sregs);
             }
 
             vcpu_sregs.efer = 0x0000_0500; // LME | LMA
@@ -138,7 +139,15 @@ mod kvm {
         }
 
         fn gdt_addr(&self) -> GuestAddress {
-            GuestAddress(0)
+            GuestAddress(0x1000)
+        }
+
+        fn idt_addr(&self) -> GuestAddress {
+            GuestAddress(0x2000)
+        }
+
+        fn interrupt_handlers_start(&self) -> GuestAddress {
+            GuestAddress(0x3000)
         }
 
         fn page_table_addr(&self) -> GuestAddress {
@@ -182,14 +191,26 @@ mod kvm {
             // > descriptor table is variable in length and can contain up to 8192 (2^13) 8-byte
             // > descriptors.
 
+            assert!(idx < 4096 / 8);
             let addr = GuestAddress(self.gdt_addr().0 + (idx as u64 * 8));
-            assert!(idx < 8192);
             self.check_range(addr, std::mem::size_of::<u64>() as u64);
 
             // SAFETY: idx * 8 can't overflow isize, and we've asserted the end of the pointer is
             // still inside the allocation (`self.memory`).
             unsafe {
                 self.host_ptr(addr) as *mut u64
+            }
+        }
+
+        // note this returns a u32, but an IDT is four u32. the u32 this points at is the first of
+        // the four for the entry.
+        fn idt_entry_mut(&mut self, idx: u16) -> *mut u32 {
+            let addr = GuestAddress(self.idt_addr().0 + (idx as u64 * 16));
+            assert!(idx < 256);
+            self.check_range(addr, std::mem::size_of::<[u64; 2]>() as u64);
+
+            unsafe {
+                self.host_ptr(addr) as *mut u32
             }
         }
 
@@ -274,19 +295,19 @@ mod kvm {
             sregs.cs.base = 0;
             sregs.cs.limit = 0;
             sregs.cs.selector = 4 * 8;
-            sregs.cs.type_ = 0b1010; // see SDM table 3-1 Code- and Data-Segment Types
+            sregs.cs.type_ = 0b1011; // see SDM table 3-1 Code- and Data-Segment Types
             sregs.cs.present = 1;
             sregs.cs.dpl = 0;
             sregs.cs.db = 0;
             sregs.cs.s = 1;
             sregs.cs.l = 1;
-            sregs.cs.g = 0;
-            sregs.cs.avl = 1;
+            sregs.cs.g = 1;
+            sregs.cs.avl = 0;
 
             sregs.ds.base = 0;
             sregs.ds.limit = 0;
             sregs.ds.selector = 5 * 8;
-            sregs.ds.type_ = 0b0010; // see SDM table 3-1 Code- and Data-Segment Types
+            sregs.ds.type_ = 0b0011; // see SDM table 3-1 Code- and Data-Segment Types
             sregs.ds.present = 1;
             sregs.ds.dpl = 0;
             sregs.ds.db = 1;
@@ -311,26 +332,85 @@ mod kvm {
 
                 let base_mid = (base >> 16) & 0xff;
                 let base_high = (base >> 24) & 0xff;
+                let access_byte = (seg.type_ as u64)
+                    | (seg.s as u64) << 4
+                    | (seg.dpl as u64) << 5
+                    | (seg.present as u64) << 7;
+                let flaglim_byte = lim_high
+                    | (seg.avl as u64) << 4
+                    | (seg.l as u64) << 5
+                    | (seg.db as u64) << 6
+                    | (seg.g as u64) << 7;
                 let desc_high = base_mid
-                    | (seg.type_ as u64) << 8
-                    | (seg.s as u64) << 12
-                    | (seg.dpl as u64) << 13
-                    | (seg.present as u64) << 15
-                    | lim_high << 16
-                    | (seg.avl as u64) << 20
-                    | (seg.l as u64) << 21
-                    | (seg.db as u64) << 22
-                    | (seg.g as u64) << 23
+                    | access_byte << 8
+                    | flaglim_byte << 16
                     | base_high << 24;
 
                 desc_low | (desc_high << 32)
             }
 
             sregs.gdt.base = self.gdt_addr().0;
-            sregs.gdt.limit = 0xffff;
+            sregs.gdt.limit = 0x256 * 8 - 1;
 
-            self.gdt_entry_mut(4).write(encode_segment(&sregs.cs));
+            for i in 0..256 {
+                self.gdt_entry_mut(i).write(encode_segment(&sregs.cs));
+            }
+            let buf = unsafe { (self.gdt_entry_mut(4) as *const [u8; 8]).read() };
+            eprint!("programmed gdt entry ({:016x}) to bytes: ", self.gdt_entry_mut(4) as u64);
+            for b in buf {
+                eprint!("{:02x} ", b);
+            }
+            eprintln!("");
             self.gdt_entry_mut(5).write(encode_segment(&sregs.ds));
+            let buf = unsafe { (self.gdt_entry_mut(5) as *const [u8; 8]).read() };
+            eprint!("programmed gdt entry ({:016x}) to bytes: ", self.gdt_entry_mut(5) as u64);
+            for b in buf {
+                eprint!("{:02x} ", b);
+            }
+            eprintln!("");
+        }
+
+        fn configure_idt(&mut self, sregs: &mut kvm_sregs) {
+            sregs.idt.base = self.idt_addr().0;
+            sregs.idt.limit = 256 * 16 - 1; // IDT is 256 entries of 16 bytes each
+
+            let write_idt_entry = |idt_ptr: *mut u32, interrupt_handler_addr: GuestAddress| {
+                let low_hi = interrupt_handler_addr.0 as u32 & 0xffff_0000 |
+                    1 << 15 |
+                    0b00 << 13 |
+                    0 << 12 |
+                    0b1110 << 8 |
+                    0 << 3 |
+                    0;
+                let low_lo = ((4 * 8) << 16 | interrupt_handler_addr.0 & 0x0000_ffff) as u32;
+                unsafe {
+                    idt_ptr.offset(0).write(low_lo);
+                    idt_ptr.offset(1).write(low_hi);
+                    idt_ptr.offset(2).write((interrupt_handler_addr.0 >> 32) as u32);
+                    idt_ptr.offset(3).write(0); // reserved
+                }
+                unsafe {
+                    if false {
+                        let buf = (idt_ptr as *const [u8; 16]).read();
+                        eprint!("programmed idt entry ({:016x}) to handler at {:08x}, bytes: ", idt_ptr as u64, interrupt_handler_addr.0);
+                        for b in buf {
+                            eprint!("{:02x} ", b);
+                        }
+                        eprintln!("");
+                    }
+                }
+            };
+
+            // TODO
+            for i in 0..32 {
+                let interrupt_handler_addr = GuestAddress(self.interrupt_handlers_start().0 + i as u64);
+                write_idt_entry(self.idt_entry_mut(i), interrupt_handler_addr);
+            }
+
+            unsafe {
+                std::slice::from_raw_parts_mut(self.host_ptr(self.interrupt_handlers_start()), 256)
+                    .fill(0xf4);
+            }
         }
     }
 
@@ -448,11 +528,58 @@ mod kvm {
         }
     }
 
+    fn run(vm: &mut TestVm) {
+        let mut exits = 0;
+        let end_pc = loop {
+            eprintln!("about to run! here's some state:");
+            let regs = vm.vcpu.get_regs().unwrap();
+            eprintln!("regs: {:?}", regs);
+            let sregs = vm.vcpu.get_sregs().unwrap();
+            eprintln!("sregs: {:?}", sregs);
+            let exit = vm.run();
+            exits += 1;
+            match exit {
+                VcpuExit::MmioRead(addr, buf) => {
+                    eprintln!("mmio: [{:08x}:{}] <- ..", addr, buf.len());
+                    // TODO: better
+                    buf.fill(1);
+                }
+                VcpuExit::MmioWrite(addr, buf) => {
+                    eprintln!("mmio: .. -> [{:08x}:{}]", addr, buf.len());
+                }
+                VcpuExit::Debug(info) => {
+                    break info.pc;
+                }
+                VcpuExit::Hlt => {
+                    eprintln!("hit hlt");
+                    let regs = vm.vcpu.get_regs().unwrap();
+                    break regs.rip;
+                }
+                other => {
+                    eprintln!("unhandled exit: {:?} ... after {}", other, exits);
+                    let regs = vm.vcpu.get_regs().unwrap();
+                    eprintln!("regs: {:?}", regs);
+                    let sregs = vm.vcpu.get_sregs().unwrap();
+                    // eprintln!("sregs: {:?}", sregs);
+                    panic!("stop");
+                }
+            }
+        };
+
+        eprintln!("run exits at {:08x}", end_pc);
+        return;
+    }
+
     fn run_with_mem_checks(vm: &mut TestVm, expected_end: u64, expected_mem: &[ExpectedMemAccess]) {
         let mut expected_mem = expected_mem.to_vec();
         let mut unexpected_mem = Vec::new();
         let mut exits = 0;
         let end_pc = loop {
+            eprintln!("about to run! here's some state:");
+            let regs = vm.vcpu.get_regs().unwrap();
+            eprintln!("regs: {:?}", regs);
+            let sregs = vm.vcpu.get_sregs().unwrap();
+            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
             exits += 1;
             match exit {
@@ -490,7 +617,12 @@ mod kvm {
                     break regs.rip;
                 }
                 other => {
-                    panic!("unhandled exit: {:?} ... after {}", other, exits);
+                    eprintln!("unhandled exit: {:?} ... after {}", other, exits);
+                    let regs = vm.vcpu.get_regs().unwrap();
+                    eprintln!("regs: {:?}", regs);
+                    let sregs = vm.vcpu.get_sregs().unwrap();
+                    eprintln!("sregs: {:?}", sregs);
+                    panic!("stop");
                 }
             }
         };
@@ -839,6 +971,7 @@ mod kvm {
 
         permute_dontcares(dontcare_regs.as_slice(), &mut regs);
 
+        eprintln!("setting regs to: {:?}", regs);
         vm.vcpu.set_regs(&regs).unwrap();
 
         run_with_mem_checks(vm, regs.rip + insts.len() as u64, expected_mem.as_slice());
@@ -901,6 +1034,55 @@ mod kvm {
         // `push rax`
         let inst: &'static [u8] = &[0x50];
         check_behavior(&mut vm, inst);
+    }
+
+    #[test]
+    fn kvm_verify_ins() {
+        let mut vm = TestVm::create();
+
+        // `ins byte [rdi], dl`
+        let inst: &'static [u8] = &[0x6c];
+        check_behavior(&mut vm, inst);
+    }
+
+    #[test]
+    fn test_pf() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
+
+        let mut vm = TestVm::create();
+
+        let decoder = InstDecoder::default();
+        let mut buf = Instruction::default();
+
+//        let inst = &[0xcc, 0xc7, 0x01, 0x0a, 0x00, 0x00, 0x00];
+        let inst = &[
+            // jmp to jmpf below..
+            0xeb, 0x0e,
+            0xf4, // hlt in case we didn't jump (??)
+            // set up a far call destination in the next 10 bytes here..
+            0x20, 0x00,                                     // GDT entry 4 (4 * 8 == 0x20)
+            0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // address 0x3000
+            0x00, 0x00, 0x00,
+            0x48, 0xff, 0x28, // jmpf [rax]
+        ];
+        let mut reader = U8Reader::new(inst.as_slice());
+        let decoded = decoder.decode(&mut reader).expect("can decode");
+
+        let before_sregs = vm.vcpu.get_sregs().unwrap();
+        let mut regs = vm.vcpu.get_regs().unwrap();
+
+        vm.program(inst.as_slice(), &mut regs);
+
+        regs.rax = regs.rip + 3;
+        // regs.rip = 0x3001;
+        vm.vcpu.set_regs(&regs).unwrap();
+
+        // vm.set_single_step(true);
+
+        run(&mut vm);
+
+        panic!("hi");
     }
 
     #[test]
