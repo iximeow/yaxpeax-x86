@@ -1103,9 +1103,6 @@ const XSAVE: [Opcode; 10] = [
     Opcode::XSETBV,
 ];
 
-//struct OpcodeBuilder {
-//    variant_specifier: OpcodeVariantInfo
-
 /// an `x86_64` opcode. there sure are a lot of these.
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -2789,6 +2786,49 @@ impl LengthedInstruction for Instruction {
     }
 }
 
+#[cfg(feature="_debug_internal_disasm_stats")]
+mod disasm_stats {
+}
+#[cfg(not(feature="_debug_internal_disasm_stats"))]
+mod disasm_stats {
+    macro_rules! shim_impl {
+        ($name:ident) => {
+            #[inline(always)]
+            pub fn $name() { }
+        }
+    }
+
+    #[inline(always)]
+    pub fn record_opcode(_opc: super::Opcode) {
+    }
+
+    #[inline(always)]
+    pub(crate) fn record_operand_case(_oper: super::OperandCase) {
+    }
+
+    shim_impl!(record_opc_0f);
+    shim_impl!(record_opc_rep_0f);
+    shim_impl!(record_opc_repnz_0f);
+    shim_impl!(record_opc_op_size_0f);
+    shim_impl!(record_opc_0f38);
+    shim_impl!(record_opc_0f3a);
+
+    shim_impl!(check_lock);
+    shim_impl!(read_operands);
+    shim_impl!(is_only_modrm_operands);
+    shim_impl!(instr_done);
+
+    shim_impl!(prefix_rex);
+    shim_impl!(read_opc_hotpath_hit);
+    shim_impl!(read_opc_hotpath_miss);
+    shim_impl!(indirect_branch_prefixes_slow);
+}
+
+#[cfg(feature="_debug_internal_disasm_stats")]
+pub use disasm_stats::DisasmStats;
+#[cfg(feature="_debug_internal_disasm_stats")]
+pub use disasm_stats::DISASM_STATS;
+
 /// an `x86_64` instruction decoder.
 ///
 /// fundamentally this is one or two primitives with no additional state kept during decoding. it
@@ -3822,7 +3862,7 @@ pub struct OperandCodeWrapper { code: OperandCode }
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[repr(u8)]
-enum OperandCase {
+pub enum OperandCase {
     Internal = 0, // handled internally and completely by embedded rules.
     Gv_M = 1, // "internal", but must be distinguished from Gv_Ev
     Ibs = 2,
@@ -5261,6 +5301,7 @@ fn record_opcode_record_found<
     T: Reader<Address<Arch>, Word<Arch>>,
     S: DescriptionSink<FieldDescription>,
 >(words: &mut T, sink: &mut S, opc: Opcode, code: OperandCode, opc_length: u32) {
+    disasm_stats::record_opcode(opc);
     let offset = words.offset() as u32;
     let opcode_start_bit = (offset - opc_length) * 8;
     let opcode_end_bit = offset * 8 - 1;
@@ -5387,12 +5428,15 @@ fn read_with_annotations<
     instruction.regs[2] = RegSpec::rax();
 
     let record: OperandCode = if self.read_opc_hotpath(nextb, &mut nextb, &mut next_rec, words, instruction, sink)? {
+        disasm_stats::read_opc_hotpath_hit();
         next_rec.operand()
     } else {
+        disasm_stats::read_opc_hotpath_miss();
         let prefixes = &mut instruction.prefixes;
         let record = loop {
             let mut record = next_rec;
             if nextb >= 0x40 && nextb < 0x50 {
+                disasm_stats::prefix_rex();
                 let b = nextb;
                 sink.record((words.offset() - 1) as u32 * 8, (words.offset() - 1) as u32 * 8 + 7, FieldDescription {
                     desc: InnerDescription::RexPrefix(b),
@@ -5456,6 +5500,7 @@ fn read_with_annotations<
                     });
                     prefixes.set_rep();
                 } else {
+                    disasm_stats::indirect_branch_prefixes_slow();
                     match b {
                         0x26 |
                         0x2e |
@@ -5525,10 +5570,13 @@ fn read_with_annotations<
     self.read_operands(decoder, words, instruction, record, sink)?;
 
     if self.check_lock {
+        disasm_stats::check_lock();
         if !instruction.opcode.can_lock() || !instruction.operands[0].is_memory() {
             return Err(DecodeError::InvalidPrefixes);
         }
     }
+
+    disasm_stats::instr_done();
 
     Ok(())
 }
@@ -5599,11 +5647,13 @@ fn read_operands<
         InnerDescription::Boundary("opcode ends/operands begin (typically)")
             .with_id(words.offset() as u32 * 8 - 1)
     );
+    disasm_stats::read_operands();
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
     let modrm_start = words.offset() as u32 * 8;
     let opcode_start = modrm_start - 8;
 
     if operand_code.is_only_modrm_operands() {
+        disasm_stats::is_only_modrm_operands();
         let bank;
         let modrm = read_modrm(words)?;
         let rrr = (modrm >> 3) & 7;
@@ -5943,6 +5993,7 @@ fn read_operands<
     }
     instruction.operand_count = 2;
 
+    disasm_stats::record_operand_case(operand_code.operand_case_handler_index());
 //    match operand_code {
     match operand_code.operand_case_handler_index() {
         // these operand cases are all `only_*`, and are unreachable here..
@@ -9024,18 +9075,23 @@ fn read_0f_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> OpcodeRecor
     // invalid prefix is in fact an invalid instruction. so just duplicate for the four kinds of
     // opcode lists.
     if prefixes.repnz() {
+        disasm_stats::record_opc_repnz_0f();
         REPNZ_0F_CODES[opcode as usize]
     } else if prefixes.rep() {
+        disasm_stats::record_opc_rep_0f();
         REP_0F_CODES[opcode as usize]
     } else if prefixes.operand_size() {
+        disasm_stats::record_opc_op_size_0f();
         OPERAND_SIZE_0F_CODES[opcode as usize]
     } else {
+        disasm_stats::record_opc_0f();
         NORMAL_0F_CODES[opcode as usize]
     }
 }
 
 #[inline(always)]
 fn read_0f38_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> Result<OpcodeRecord, DecodeError> {
+    disasm_stats::record_opc_0f38();
     if prefixes.rep() {
         const TBL: [OpcodeRecord; 0x28] = [
             OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0xf30f38d8),
@@ -9156,6 +9212,7 @@ fn read_0f38_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> Result<Op
 
 #[inline(always)]
 fn read_0f3a_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> Result<OpcodeRecord, DecodeError> {
+    disasm_stats::record_opc_0f3a();
     if prefixes.rep() {
         if prefixes != &Prefixes::new(0x10) {
             return Err(DecodeError::InvalidOpcode);

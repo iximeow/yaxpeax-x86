@@ -65,3 +65,6 @@ capstone_bench = []
 # this disables a lot of inlining to make it easier for me to measure
 # likelihood of codepaths for typical instruction sequences
 profiling = []
+
+# do not use this. it is for development and library debugging only.
+_debug_internal_disasm_stats = []
