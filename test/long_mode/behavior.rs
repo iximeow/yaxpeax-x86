@@ -61,6 +61,34 @@ mod kvm {
         }
     }
 
+    fn encode_segment(seg: &kvm_segment) -> u64 {
+        let base = seg.base as u64;
+        let limit = seg.limit as u64;
+
+        let lim_low = limit & 0xffff;
+        let lim_high = (limit >> 16) & 0xf;
+        let addr_low = base & 0xffff;
+        let desc_low = lim_low | (addr_low << 16);
+
+        let base_mid = (base >> 16) & 0xff;
+        let base_high = (base >> 24) & 0xff;
+        let access_byte = (seg.type_ as u64)
+            | (seg.s as u64) << 4
+            | (seg.dpl as u64) << 5
+            | (seg.present as u64) << 7;
+        let flaglim_byte = lim_high
+            | (seg.avl as u64) << 4
+            | (seg.l as u64) << 5
+            | (seg.db as u64) << 6
+            | (seg.g as u64) << 7;
+        let desc_high = base_mid
+            | access_byte << 8
+            | flaglim_byte << 16
+            | base_high << 24;
+
+        desc_low | (desc_high << 32)
+    }
+
     impl TestVm {
         fn create() -> TestVm {
             let kvm = Kvm::new().unwrap();
@@ -170,17 +198,25 @@ mod kvm {
             assert!(self.mem_size as u64 >= end);
         }
 
-        pub fn program(&mut self, code: &[u8], regs: &mut kvm_regs) {
-            let addr = self.code_addr();
-            self.check_range(addr, code.len() as u64);
+        pub fn write_mem(&mut self, addr: GuestAddress, data: &[u8]) {
+            self.check_range(addr, data.len() as u64);
 
             // SAFETY: `check_range` above validates the range to copy, and... please do not
             // provide a slice of guest memory as what the guest should be programmed for...
             unsafe {
-                std::ptr::copy_nonoverlapping(code.as_ptr(), self.host_ptr(addr), code.len());
+                std::ptr::copy_nonoverlapping(
+                    data.as_ptr(),
+                    self.host_ptr(addr),
+                    data.len()
+                );
             }
+        }
 
-            regs.rip = self.code_addr().0;
+        pub fn program(&mut self, code: &[u8], regs: &mut kvm_regs) {
+            let addr = self.code_addr();
+            self.write_mem(addr, code);
+
+            regs.rip = addr.0;
         }
 
         fn gdt_entry_mut(&mut self, idx: u16) -> *mut u64 {
@@ -294,75 +330,48 @@ mod kvm {
 
             sregs.cs.base = 0;
             sregs.cs.limit = 0;
-            sregs.cs.selector = 4 * 8;
+            sregs.cs.selector = 6 * 8;
             sregs.cs.type_ = 0b1011; // see SDM table 3-1 Code- and Data-Segment Types
             sregs.cs.present = 1;
             sregs.cs.dpl = 0;
             sregs.cs.db = 0;
             sregs.cs.s = 1;
             sregs.cs.l = 1;
-            sregs.cs.g = 1;
+            sregs.cs.g = 0;
             sregs.cs.avl = 0;
 
             sregs.ds.base = 0;
-            sregs.ds.limit = 0;
-            sregs.ds.selector = 5 * 8;
+            sregs.ds.limit = 0xffffffff;
+            sregs.ds.selector = 7 * 8;
             sregs.ds.type_ = 0b0011; // see SDM table 3-1 Code- and Data-Segment Types
             sregs.ds.present = 1;
             sregs.ds.dpl = 0;
-            sregs.ds.db = 1;
+            sregs.ds.db = 0;
             sregs.ds.s = 1;
             sregs.ds.l = 0;
-            sregs.ds.g = 1;
+            sregs.ds.g = 0;
             sregs.ds.avl = 0;
 
             sregs.es = sregs.ds;
             sregs.fs = sregs.ds;
             sregs.gs = sregs.ds;
+            // linux populates the vmcb cpl field with whatever's in ss.dpl. what the hell???
             sregs.ss = sregs.ds;
 
-            fn encode_segment(seg: &kvm_segment) -> u64 {
-                let base = seg.base as u64;
-                let limit = seg.limit as u64;
-
-                let lim_low = limit & 0xffff;
-                let lim_high = (limit >> 16) & 0xf;
-                let addr_low = base & 0xffff;
-                let desc_low = lim_low | (addr_low << 16);
-
-                let base_mid = (base >> 16) & 0xff;
-                let base_high = (base >> 24) & 0xff;
-                let access_byte = (seg.type_ as u64)
-                    | (seg.s as u64) << 4
-                    | (seg.dpl as u64) << 5
-                    | (seg.present as u64) << 7;
-                let flaglim_byte = lim_high
-                    | (seg.avl as u64) << 4
-                    | (seg.l as u64) << 5
-                    | (seg.db as u64) << 6
-                    | (seg.g as u64) << 7;
-                let desc_high = base_mid
-                    | access_byte << 8
-                    | flaglim_byte << 16
-                    | base_high << 24;
-
-                desc_low | (desc_high << 32)
-            }
-
             sregs.gdt.base = self.gdt_addr().0;
-            sregs.gdt.limit = 0x256 * 8 - 1;
+            sregs.gdt.limit = 256 * 8 - 1;
 
             for i in 0..256 {
                 self.gdt_entry_mut(i).write(encode_segment(&sregs.cs));
             }
-            let buf = unsafe { (self.gdt_entry_mut(4) as *const [u8; 8]).read() };
+            let buf = unsafe { (self.gdt_entry_mut(6) as *const [u8; 8]).read() };
             eprint!("programmed gdt entry ({:016x}) to bytes: ", self.gdt_entry_mut(4) as u64);
             for b in buf {
                 eprint!("{:02x} ", b);
             }
             eprintln!("");
             self.gdt_entry_mut(5).write(encode_segment(&sregs.ds));
-            let buf = unsafe { (self.gdt_entry_mut(5) as *const [u8; 8]).read() };
+            let buf = unsafe { (self.gdt_entry_mut(7) as *const [u8; 8]).read() };
             eprint!("programmed gdt entry ({:016x}) to bytes: ", self.gdt_entry_mut(5) as u64);
             for b in buf {
                 eprint!("{:02x} ", b);
@@ -382,7 +391,7 @@ mod kvm {
                     0b1110 << 8 |
                     0 << 3 |
                     0;
-                let low_lo = ((4 * 8) << 16 | interrupt_handler_addr.0 & 0x0000_ffff) as u32;
+                let low_lo = ((6 * 8) << 16 | interrupt_handler_addr.0 & 0x0000_ffff) as u32;
                 unsafe {
                     idt_ptr.offset(0).write(low_lo);
                     idt_ptr.offset(1).write(low_hi);
@@ -390,7 +399,7 @@ mod kvm {
                     idt_ptr.offset(3).write(0); // reserved
                 }
                 unsafe {
-                    if false {
+                    if true {
                         let buf = (idt_ptr as *const [u8; 16]).read();
                         eprint!("programmed idt entry ({:016x}) to handler at {:08x}, bytes: ", idt_ptr as u64, interrupt_handler_addr.0);
                         for b in buf {
@@ -533,9 +542,9 @@ mod kvm {
         let end_pc = loop {
             eprintln!("about to run! here's some state:");
             let regs = vm.vcpu.get_regs().unwrap();
-            eprintln!("regs: {:?}", regs);
+            dump_regs(&regs);
             let sregs = vm.vcpu.get_sregs().unwrap();
-            eprintln!("sregs: {:?}", sregs);
+//            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
             exits += 1;
             match exit {
@@ -548,19 +557,31 @@ mod kvm {
                     eprintln!("mmio: .. -> [{:08x}:{}]", addr, buf.len());
                 }
                 VcpuExit::Debug(info) => {
-                    break info.pc;
+                    unsafe {
+                        let bytes = vm.host_ptr(GuestAddress(info.pc));
+                        let slc = std::slice::from_raw_parts(bytes, 15);
+                        let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
+                            .decode_slice(slc);
+                        if let Ok(decoded) = decoded {
+                            eprintln!("step. next: {:06x}: {}", info.pc, decoded);
+                        } else {
+                            eprintln!("garbage @ {:06x}", info.pc);
+                        }
+                    }
+                    // break info.pc;
                 }
                 VcpuExit::Hlt => {
                     eprintln!("hit hlt");
                     let regs = vm.vcpu.get_regs().unwrap();
+                    dump_regs(&regs);
                     break regs.rip;
                 }
                 other => {
                     eprintln!("unhandled exit: {:?} ... after {}", other, exits);
                     let regs = vm.vcpu.get_regs().unwrap();
-                    eprintln!("regs: {:?}", regs);
+                    dump_regs(&regs);
                     let sregs = vm.vcpu.get_sregs().unwrap();
-                    // eprintln!("sregs: {:?}", sregs);
+                    eprintln!("sregs: {:?}", sregs);
                     panic!("stop");
                 }
             }
@@ -568,6 +589,19 @@ mod kvm {
 
         eprintln!("run exits at {:08x}", end_pc);
         return;
+    }
+
+    fn dump_regs(regs: &kvm_regs) {
+        eprintln!("rip              flags            ");
+        eprintln!("{:016x} {:016x}", regs.rip, regs.rflags);
+        eprintln!("rax              rcx              rdx              rbx");
+        eprintln!("{:016x} {:016x} {:016x} {:016x}", regs.rax, regs.rcx, regs.rdx, regs.rbx);
+        eprintln!("rsp              rbp              rsi              rdi");
+        eprintln!("{:016x} {:016x} {:016x} {:016x}", regs.rsp, regs.rbp, regs.rsi, regs.rdi);
+        eprintln!("r8               r9               r10              r11");
+        eprintln!("{:016x} {:016x} {:016x} {:016x}", regs.r8, regs.r9, regs.r10, regs.r11);
+        eprintln!("r12              r13              r14              r15");
+        eprintln!("{:016x} {:016x} {:016x} {:016x}", regs.r12, regs.r13, regs.r14, regs.r15);
     }
 
     fn run_with_mem_checks(vm: &mut TestVm, expected_end: u64, expected_mem: &[ExpectedMemAccess]) {
@@ -579,7 +613,7 @@ mod kvm {
             let regs = vm.vcpu.get_regs().unwrap();
             eprintln!("regs: {:?}", regs);
             let sregs = vm.vcpu.get_sregs().unwrap();
-            eprintln!("sregs: {:?}", sregs);
+//            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
             exits += 1;
             match exit {
@@ -621,7 +655,7 @@ mod kvm {
                     let regs = vm.vcpu.get_regs().unwrap();
                     eprintln!("regs: {:?}", regs);
                     let sregs = vm.vcpu.get_sregs().unwrap();
-                    eprintln!("sregs: {:?}", sregs);
+//                    eprintln!("sregs: {:?}", sregs);
                     panic!("stop");
                 }
             }
@@ -1057,28 +1091,126 @@ mod kvm {
 
 //        let inst = &[0xcc, 0xc7, 0x01, 0x0a, 0x00, 0x00, 0x00];
         let inst = &[
-            // jmp to jmpf below..
-            0xeb, 0x0e,
+            /*
+            0x0f, 0x20, 0xc3,
+            0x0f, 0x01, 0x01,
+            0x66, 0x44, 0x8b, 0x01,
+            0x64, 0x4c, 0x8b, 0x49, 0x02,
+            0x4d, 0x8b, 0x51, 0x20,
+            0x4d, 0x8b, 0x59, 0x28,
+            0x8c, 0xce,
+            0x8c, 0xdf,
+            */
+//            0xf4,
+            0x90,
+            0xff, 0x28, // jmpf [rax]
             0xf4, // hlt in case we didn't jump (??)
             // set up a far call destination in the next 10 bytes here..
             0x20, 0x00,                                     // GDT entry 4 (4 * 8 == 0x20)
             0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // address 0x3000
             0x00, 0x00, 0x00,
-            0x48, 0xff, 0x28, // jmpf [rax]
         ];
-        let mut reader = U8Reader::new(inst.as_slice());
-        let decoded = decoder.decode(&mut reader).expect("can decode");
+
+        let inst = &[
+ //           0x0f, 0x01, 0x10,
+            0x0f, 0x00, 0xe2,
+            0x0f, 0x00, 0xea,
+//            0x48, 0x0f, 0xb2, 0x3f,
+            0xff, 0x29,
+            0xf4,
+        ];
+
+        let do_fault = &[
+            0x90, 0xcc,
+        ];
 
         let before_sregs = vm.vcpu.get_sregs().unwrap();
         let mut regs = vm.vcpu.get_regs().unwrap();
 
         vm.program(inst.as_slice(), &mut regs);
 
-        regs.rax = regs.rip + 3;
+        vm.write_mem(GuestAddress(0x83000), do_fault);
+
+        let mut int1_far_addr = &mut [0; 10];
+        int1_far_addr[..4].copy_from_slice(&0x83000u32.to_le_bytes());
+        int1_far_addr[4..][..2].copy_from_slice(&before_sregs.cs.selector.to_le_bytes());
+        vm.write_mem(GuestAddress(0x80000), int1_far_addr);
+
+        let mut int1_long_addr = &mut [0; 8];
+        int1_long_addr[0..].copy_from_slice(&0x3001u64.to_le_bytes());
+        vm.write_mem(GuestAddress(0x80020), int1_long_addr);
+
+        /*
+        let illumos_gdt = &mut [
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // 0x08
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x93, 0xcf, 0x00,
+            // 0x10
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x9b, 0xcf, 0x00,
+            // 0x18
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x9b, 0x0f, 0x00,
+            // 0x20
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x93, 0x4f, 0x00,
+            // 0x28
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x9b, 0xaf, 0x00,
+            // 0x30
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x9b, 0x20, 0x00, // it turns out G is never set? see arch/x86/svm/svm.c...
+            // 0x38
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x93, 0x8f, 0x00,
+            // 0x40
+            0xff, 0xff, 0x00, 0x00, 0x00, 0xfb, 0xcf, 0x00,
+            0xff, 0xff, 0x00, 0x00, 0x00, 0xf3, 0xcf, 0x00,
+            // 0x50
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x7b, 0xa0, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // 0x60
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // 0x70
+            0x67, 0x00, 0x00, 0xc0, 0x7e, 0x8b, 0x00, 0xfb,
+            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+            // 0x80
+            0x00, 0x00, 0x00, 0x00, 0x00, 0xf5, 0x40, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // 0x00
+        ];
+        assert_eq!(&illumos_gdt[0x30..][..8], &encode_segment(&before_sregs.cs).to_le_bytes());
+        assert_eq!(&illumos_gdt[0x38..][..8], &encode_segment(&before_sregs.ds).to_le_bytes());
+        let illumos_gdtp = &mut [
+            0x90, 0x00,
+            0x00, 0x10, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        vm.write_mem(GuestAddress(0x82000), illumos_gdtp);
+
+        vm.write_mem(GuestAddress(0x81000), illumos_gdt);
+        regs.rax = 0x82000;
+        */
+        regs.rdx = 0x38;
+        regs.rcx = 0x80000;
+        regs.rdi = 0x80000;
+
+        let mut reader = U8Reader::new(inst.as_slice());
+        eprintln!("going to run...");
+        let mut offset = regs.rip;
+        loop {
+//            let decoder = current_isa(&vm);
+            let decoded = decoder.decode(&mut reader).expect("can decode");
+            use yaxpeax_arch::LengthedInstruction;
+            eprintln!("{:04x}: {}", offset, decoded);
+            offset = offset.wrapping_offset(decoded.len());
+            if decoded.opcode() == yaxpeax_x86::long_mode::Opcode::HLT {
+                break;
+            }
+        }
+
+        /*
+        regs.rax = regs.rip + 4;
+        regs.rcx = regs.rip - 0x1000;
+        */
         // regs.rip = 0x3001;
         vm.vcpu.set_regs(&regs).unwrap();
 
-        // vm.set_single_step(true);
+        vm.set_single_step(true);
 
         run(&mut vm);
 
