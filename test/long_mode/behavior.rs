@@ -8,6 +8,8 @@ mod kvm {
         KVM_GUESTDBG_ENABLE, KVM_GUESTDBG_SINGLESTEP,
     };
 
+    use yaxpeax_x86::long_mode::behavior::Exception;
+
     use rand::prelude::*;
 
     /// a test VM for running arbitrary instructions.
@@ -586,7 +588,7 @@ mod kvm {
             eprintln!("about to run! here's some state:");
             let regs = vm.vcpu.get_regs().unwrap();
             dump_regs(&regs);
-            let sregs = vm.vcpu.get_sregs().unwrap();
+//            let sregs = vm.vcpu.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
             exits += 1;
@@ -655,7 +657,7 @@ mod kvm {
             eprintln!("about to run! here's some state:");
             let regs = vm.vcpu.get_regs().unwrap();
             eprintln!("regs: {:?}", regs);
-            let sregs = vm.vcpu.get_sregs().unwrap();
+//            let sregs = vm.vcpu.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
             exits += 1;
@@ -697,7 +699,7 @@ mod kvm {
                     eprintln!("unhandled exit: {:?} ... after {}", other, exits);
                     let regs = vm.vcpu.get_regs().unwrap();
                     eprintln!("regs: {:?}", regs);
-                    let sregs = vm.vcpu.get_sregs().unwrap();
+//                    let sregs = vm.vcpu.get_sregs().unwrap();
 //                    eprintln!("sregs: {:?}", sregs);
                     panic!("stop");
                 }
@@ -788,6 +790,13 @@ mod kvm {
         }
     }
 
+    fn verify_seg(
+        unexpected_regs: &mut Vec<UnexpectedRegChange>, expected_regs: &[ExpectedRegAccess],
+        changed_reg: RegSpec, before: u16, after: u16,
+    ) {
+        verify_reg(unexpected_regs, expected_regs, changed_reg, before as u64, after as u64)
+    }
+
     fn verify_reg(
         unexpected_regs: &mut Vec<UnexpectedRegChange>, expected_regs: &[ExpectedRegAccess],
         changed_reg: RegSpec, before: u64, after: u64,
@@ -875,6 +884,19 @@ mod kvm {
         verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::r14(), before_regs.r14, after_regs.r14);
         verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::r15(), before_regs.r15, after_regs.r15);
         verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::rflags(), before_regs.rflags, after_regs.rflags);
+
+        verify_seg(&mut unexpected_regs, &expected_regs, RegSpec::cs(), before_sregs.cs.selector, after_sregs.cs.selector);
+        verify_seg(&mut unexpected_regs, &expected_regs, RegSpec::ds(), before_sregs.ds.selector, after_sregs.ds.selector);
+        verify_seg(&mut unexpected_regs, &expected_regs, RegSpec::es(), before_sregs.es.selector, after_sregs.es.selector);
+        verify_seg(&mut unexpected_regs, &expected_regs, RegSpec::fs(), before_sregs.fs.selector, after_sregs.fs.selector);
+        verify_seg(&mut unexpected_regs, &expected_regs, RegSpec::gs(), before_sregs.gs.selector, after_sregs.gs.selector);
+        verify_seg(&mut unexpected_regs, &expected_regs, RegSpec::ss(), before_sregs.ss.selector, after_sregs.ss.selector);
+
+        verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::cr0(), before_sregs.cr0, after_sregs.cr0);
+        verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::cr2(), before_sregs.cr2, after_sregs.cr2);
+        verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::cr3(), before_sregs.cr3, after_sregs.cr3);
+        verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::cr4(), before_sregs.cr4, after_sregs.cr4);
+        verify_reg(&mut unexpected_regs, &expected_regs, RegSpec::cr8(), before_sregs.cr8, after_sregs.cr8);
 
         if !unexpected_regs.is_empty() {
             eprintln!("unexpected reg changes:");
@@ -1125,45 +1147,29 @@ mod kvm {
     #[test]
     fn test_pf() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
+        use yaxpeax_x86::long_mode::InstDecoder;
 
         let mut vm = TestVm::create();
 
         let decoder = InstDecoder::default();
-        let mut buf = Instruction::default();
-
-//        let inst = &[0xcc, 0xc7, 0x01, 0x0a, 0x00, 0x00, 0x00];
-        let inst = &[
-            /*
-            0x0f, 0x20, 0xc3,
-            0x0f, 0x01, 0x01,
-            0x66, 0x44, 0x8b, 0x01,
-            0x64, 0x4c, 0x8b, 0x49, 0x02,
-            0x4d, 0x8b, 0x51, 0x20,
-            0x4d, 0x8b, 0x59, 0x28,
-            0x8c, 0xce,
-            0x8c, 0xdf,
-            */
-//            0xf4,
-            0x90,
-            0xff, 0x28, // jmpf [rax]
-            0xf4, // hlt in case we didn't jump (??)
-            // set up a far call destination in the next 10 bytes here..
-            0x20, 0x00,                                     // GDT entry 4 (4 * 8 == 0x20)
-            0x00, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // address 0x3000
-            0x00, 0x00, 0x00,
-        ];
 
         let inst = &[
- //           0x0f, 0x01, 0x10,
+            // verr dx
             0x0f, 0x00, 0xe2,
+            // verw dx
             0x0f, 0x00, 0xea,
-//            0x48, 0x0f, 0xb2, 0x3f,
+            // jmpf mword [rcx]
+            //
+            // because there is no operand override prefix, this is am m16:32
+            // (!  not 64 !) operand.
             0xff, 0x29,
+            // hlt (unreached)
             0xf4,
         ];
 
         let do_fault = &[
+            // nop then int3 to have clear evidence that the vcpu took the jmpf
+            // and the GDT works, before using the IDT.
             0x90, 0xcc,
         ];
 
@@ -1174,70 +1180,18 @@ mod kvm {
 
         vm.write_mem(GuestAddress(0x83000), do_fault);
 
-        let mut int1_far_addr = &mut [0; 10];
+        let int1_far_addr = &mut [0; 6];
         int1_far_addr[..4].copy_from_slice(&0x83000u32.to_le_bytes());
-        int1_far_addr[4..][..2].copy_from_slice(&before_sregs.cs.selector.to_le_bytes());
+        int1_far_addr[4..].copy_from_slice(&before_sregs.cs.selector.to_le_bytes());
         vm.write_mem(GuestAddress(0x80000), int1_far_addr);
 
-        let mut int1_long_addr = &mut [0; 8];
-        int1_long_addr[0..].copy_from_slice(&0x3001u64.to_le_bytes());
-        vm.write_mem(GuestAddress(0x80020), int1_long_addr);
-
-        /*
-        let illumos_gdt = &mut [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            // 0x08
-            0xff, 0xff, 0x00, 0x00, 0x00, 0x93, 0xcf, 0x00,
-            // 0x10
-            0xff, 0xff, 0x00, 0x00, 0x00, 0x9b, 0xcf, 0x00,
-            // 0x18
-            0xff, 0xff, 0x00, 0x00, 0x00, 0x9b, 0x0f, 0x00,
-            // 0x20
-            0xff, 0xff, 0x00, 0x00, 0x00, 0x93, 0x4f, 0x00,
-            // 0x28
-            0xff, 0xff, 0x00, 0x00, 0x00, 0x9b, 0xaf, 0x00,
-            // 0x30
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x9b, 0x20, 0x00, // it turns out G is never set? see arch/x86/svm/svm.c...
-            // 0x38
-            0xff, 0xff, 0x00, 0x00, 0x00, 0x93, 0x8f, 0x00,
-            // 0x40
-            0xff, 0xff, 0x00, 0x00, 0x00, 0xfb, 0xcf, 0x00,
-            0xff, 0xff, 0x00, 0x00, 0x00, 0xf3, 0xcf, 0x00,
-            // 0x50
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x7b, 0xa0, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            // 0x60
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            // 0x70
-            0x67, 0x00, 0x00, 0xc0, 0x7e, 0x8b, 0x00, 0xfb,
-            0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
-            // 0x80
-            0x00, 0x00, 0x00, 0x00, 0x00, 0xf5, 0x40, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            // 0x00
-        ];
-        assert_eq!(&illumos_gdt[0x30..][..8], &encode_segment(&before_sregs.cs).to_le_bytes());
-        assert_eq!(&illumos_gdt[0x38..][..8], &encode_segment(&before_sregs.ds).to_le_bytes());
-        let illumos_gdtp = &mut [
-            0x90, 0x00,
-            0x00, 0x10, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        vm.write_mem(GuestAddress(0x82000), illumos_gdtp);
-
-        vm.write_mem(GuestAddress(0x81000), illumos_gdt);
-        regs.rax = 0x82000;
-        */
         regs.rdx = vm.selector_cs() as u64;
         regs.rcx = 0x80000;
-        regs.rdi = 0x80000;
-//        regs.rsp = 0x90000;
 
         let mut reader = U8Reader::new(inst.as_slice());
         eprintln!("going to run...");
         let mut offset = regs.rip;
         loop {
-//            let decoder = current_isa(&vm);
             let decoded = decoder.decode(&mut reader).expect("can decode");
             use yaxpeax_arch::LengthedInstruction;
             eprintln!("{:04x}: {}", offset, decoded);
@@ -1247,18 +1201,16 @@ mod kvm {
             }
         }
 
-        /*
-        regs.rax = regs.rip + 4;
-        regs.rcx = regs.rip - 0x1000;
-        */
-        // regs.rip = 0x3001;
         vm.vcpu.set_regs(&regs).unwrap();
 
         vm.set_single_step(true);
 
         run(&mut vm);
 
-        panic!("hi");
+        let after_regs = vm.vcpu.get_regs().unwrap();
+
+        let bp_exit_addr: u64 = vm.interrupt_handlers_start().0 + Exception::BP.to_u8() as u64 + 1;
+        assert_eq!(after_regs.rip, bp_exit_addr);
     }
 
     #[test]

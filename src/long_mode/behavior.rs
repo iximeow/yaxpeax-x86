@@ -103,6 +103,11 @@ impl Exception {
     const fn vector(vector: u8) -> Self {
         Self { vector }
     }
+
+    /// convert this `Exception` to an index into an x86 IDT.
+    pub const fn to_u8(&self) -> u8 {
+        self.vector
+    }
 }
 
 impl ExceptionInfo {
@@ -261,7 +266,8 @@ pub struct OperandIter<'inst> {
 /// this is (maybe surprisingly, compared to the rest of the isa) relatively tiny: the only
 /// implicit operands to date are register reads/writes, and simple dereference of a register (such
 /// as `[rsp - 8] = ...` in a push).
-struct ImplicitOperand {
+// TODO: this needs accessors for the elements or something.
+pub struct ImplicitOperand {
     spec: OperandSpec,
     reg: RegSpec,
     disp: i32,
@@ -442,7 +448,7 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::ImmInDispField => {
                         // no register/memory access to report.
                     }
-                    other => {
+                    _other => {
                         // compute effective address...
                         let addr = compute_addr(v, &self.inst, op_spec);
                         let size = self.inst.mem_size().expect("memory operand implies memory access size")
@@ -483,7 +489,7 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::ImmInDispField => {
                         // no register/memory access to report.
                     }
-                    other => {
+                    _other => {
                         // compute effective address...
                         let addr = compute_addr(v, &self.inst, op_spec);
                         let size = self.inst.mem_size().expect("memory operand implies memory access size")
@@ -555,6 +561,8 @@ pub struct BehaviorDigest {
     extra: u16,
 }
 
+// TODO: the various `set_pl*()` are not actually used yet..
+#[allow(dead_code)]
 impl BehaviorDigest {
     const fn empty() -> BehaviorDigest {
         BehaviorDigest {
