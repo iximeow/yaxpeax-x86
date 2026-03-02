@@ -1,6 +1,7 @@
 
 #[cfg(target_arch = "x86_64")]
 mod kvm {
+    use std::convert::TryInto;
     use kvm_ioctls::{Kvm, VcpuFd, VmFd, VcpuExit};
     use kvm_bindings::{
         kvm_guest_debug, kvm_userspace_memory_region, kvm_segment, kvm_regs, kvm_sregs,
@@ -130,16 +131,18 @@ mod kvm {
                 mem_size,
             };
 
+            let mut vcpu_regs = this.vcpu.get_regs().unwrap();
             let mut vcpu_sregs = this.vcpu.get_sregs().unwrap();
 
             unsafe {
                 this.configure_identity_paging(&mut vcpu_sregs);
                 this.configure_selectors(&mut vcpu_sregs);
-                this.configure_idt(&mut vcpu_sregs);
+                this.configure_idt(&mut vcpu_regs, &mut vcpu_sregs);
             }
 
             vcpu_sregs.efer = 0x0000_0500; // LME | LMA
 
+            this.vcpu.set_regs(&vcpu_regs).unwrap();
             this.vcpu.set_sregs(&vcpu_sregs).unwrap();
 
             this
@@ -188,6 +191,32 @@ mod kvm {
 
         fn guest_mem_size(&self) -> u64 {
             512 * (GB as u64)
+        }
+
+        /// configuring the IDT implies the IDT might be used which means we want a stack pointer
+        /// that can have at least 0x18 bytes pushed to it if an interrupt happens.
+        fn stack_addr(&self) -> GuestAddress {
+            // it would be nice to point the stack somewhere that we could get MMIO exits and see the
+            // processor push words for the interrupt in real time, but this doesn't seem to... work
+            // as one might hope. instead, you end up in a loop somewhere around svm_vcpu_run (which
+            // you can ^C out of, thankfully).
+            //
+            // so this picks some guest memory lower down.
+            //GuestAddress(0x1_0000_8000)
+
+            // stack grows *down* but if someone pops a lot of bytes from rsp we'd go up and
+            // clobber the page tables. so leave a bit of space.
+            GuestAddress(0xf800)
+        }
+
+        /// selector 0x10 is used for code everywhere in these tests.
+        fn selector_cs(&self) -> u16 {
+            0x10
+        }
+
+        /// selector 0x18 is used for data (all segments; ss, ds, es, etc) everywhere in these tests.
+        fn selector_ds(&self) -> u16 {
+            0x18
         }
 
         fn check_range(&self, base: GuestAddress, size: u64) {
@@ -240,9 +269,8 @@ mod kvm {
 
         // note this returns a u32, but an IDT is four u32. the u32 this points at is the first of
         // the four for the entry.
-        fn idt_entry_mut(&mut self, idx: u16) -> *mut u32 {
+        fn idt_entry_mut(&mut self, idx: u8) -> *mut u32 {
             let addr = GuestAddress(self.idt_addr().0 + (idx as u64 * 16));
-            assert!(idx < 256);
             self.check_range(addr, std::mem::size_of::<[u64; 2]>() as u64);
 
             unsafe {
@@ -330,7 +358,7 @@ mod kvm {
 
             sregs.cs.base = 0;
             sregs.cs.limit = 0;
-            sregs.cs.selector = 6 * 8;
+            sregs.cs.selector = self.selector_cs();
             sregs.cs.type_ = 0b1011; // see SDM table 3-1 Code- and Data-Segment Types
             sregs.cs.present = 1;
             sregs.cs.dpl = 0;
@@ -342,7 +370,7 @@ mod kvm {
 
             sregs.ds.base = 0;
             sregs.ds.limit = 0xffffffff;
-            sregs.ds.selector = 7 * 8;
+            sregs.ds.selector = self.selector_ds();
             sregs.ds.type_ = 0b0011; // see SDM table 3-1 Code- and Data-Segment Types
             sregs.ds.present = 1;
             sregs.ds.dpl = 0;
@@ -361,65 +389,80 @@ mod kvm {
             sregs.gdt.base = self.gdt_addr().0;
             sregs.gdt.limit = 256 * 8 - 1;
 
-            for i in 0..256 {
-                self.gdt_entry_mut(i).write(encode_segment(&sregs.cs));
-            }
-            let buf = unsafe { (self.gdt_entry_mut(6) as *const [u8; 8]).read() };
-            eprint!("programmed gdt entry ({:016x}) to bytes: ", self.gdt_entry_mut(4) as u64);
-            for b in buf {
-                eprint!("{:02x} ", b);
-            }
-            eprintln!("");
-            self.gdt_entry_mut(5).write(encode_segment(&sregs.ds));
-            let buf = unsafe { (self.gdt_entry_mut(7) as *const [u8; 8]).read() };
-            eprint!("programmed gdt entry ({:016x}) to bytes: ", self.gdt_entry_mut(5) as u64);
-            for b in buf {
-                eprint!("{:02x} ", b);
-            }
-            eprintln!("");
+            self.gdt_entry_mut(self.selector_cs() >> 3).write(encode_segment(&sregs.cs));
+            self.gdt_entry_mut(self.selector_ds() >> 3).write(encode_segment(&sregs.ds));
         }
 
-        fn configure_idt(&mut self, sregs: &mut kvm_sregs) {
-            sregs.idt.base = self.idt_addr().0;
-            sregs.idt.limit = 256 * 16 - 1; // IDT is 256 entries of 16 bytes each
+        fn write_idt_entry(
+            &mut self,
+            intr_nr: u8,
+            interrupt_handler_cs: u16,
+            interrupt_handler_addr: GuestAddress
+        ) {
+            let idt_ptr = self.idt_entry_mut(intr_nr);
 
-            let write_idt_entry = |idt_ptr: *mut u32, interrupt_handler_addr: GuestAddress| {
-                let low_hi = interrupt_handler_addr.0 as u32 & 0xffff_0000 |
-                    1 << 15 |
-                    0b00 << 13 |
-                    0 << 12 |
-                    0b1110 << 8 |
-                    0 << 3 |
-                    0;
-                let low_lo = ((6 * 8) << 16 | interrupt_handler_addr.0 & 0x0000_ffff) as u32;
-                unsafe {
-                    idt_ptr.offset(0).write(low_lo);
-                    idt_ptr.offset(1).write(low_hi);
-                    idt_ptr.offset(2).write((interrupt_handler_addr.0 >> 32) as u32);
-                    idt_ptr.offset(3).write(0); // reserved
-                }
-                unsafe {
-                    if true {
-                        let buf = (idt_ptr as *const [u8; 16]).read();
-                        eprint!("programmed idt entry ({:016x}) to handler at {:08x}, bytes: ", idt_ptr as u64, interrupt_handler_addr.0);
-                        for b in buf {
-                            eprint!("{:02x} ", b);
-                        }
-                        eprintln!("");
-                    }
-                }
-            };
-
-            // TODO
-            for i in 0..32 {
-                let interrupt_handler_addr = GuestAddress(self.interrupt_handlers_start().0 + i as u64);
-                write_idt_entry(self.idt_entry_mut(i), interrupt_handler_addr);
-            }
+            // entries in the IDT, interrupt and trap descriptors (in the AMD APM, "interrupt-gate"
+            // and "trap-gate" descriptors), are described (in the AMD APM) by
+            // "Figure 4-24. Interrupt-Gate and Trap-Gate Descriptors—Long Mode". reproduced here:
+            //
+            //  3   2                 1        |          1                   0
+            //  1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6|5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
+            // |---------------------------------------------------------------|
+            // |                            res,ign                            | +12
+            // |                      target offset[63:32]                     | +8
+            // |     target offset[31:16]      |P|DPL|0| type  | res,ign | IST | +4
+            // |     target selector           |    target offset[15:0]        | +0
+            // |---------------------------------------------------------------|
+            //
+            // descriptors are encoded with P set, DPL at 0, and type set to 0b1110. TODO: frankly
+            // i don't know the mechanical difference between type 0x0e and type 0x0f, but 0x0e
+            // works for now.
+            let idt_attr_bits = 0b1_00_0_1110_00000_000;
+            let low_hi = (interrupt_handler_addr.0 as u32 & 0xffff_0000) | idt_attr_bits;
+            let low_lo = (interrupt_handler_cs as u32) << 16 | (interrupt_handler_addr.0 as u32 & 0x0000_ffff);
 
             unsafe {
-                std::slice::from_raw_parts_mut(self.host_ptr(self.interrupt_handlers_start()), 256)
-                    .fill(0xf4);
+                idt_ptr.offset(0).write(low_lo);
+                idt_ptr.offset(1).write(low_hi);
+                idt_ptr.offset(2).write((interrupt_handler_addr.0 >> 32) as u32);
+                idt_ptr.offset(3).write(0); // reserved
             }
+        }
+
+        fn configure_idt(&mut self, regs: &mut kvm_regs, sregs: &mut kvm_sregs) {
+            const IDT_ENTRIES: u16 = 256;
+            sregs.idt.base = self.idt_addr().0;
+            sregs.idt.limit = IDT_ENTRIES * 16 - 1; // IDT is 256 entries of 16 bytes each
+
+            for i in 0..IDT_ENTRIES {
+                let interrupt_handler_addr = GuestAddress(self.interrupt_handlers_start().0 + i as u64);
+                self.write_idt_entry(
+                    i.try_into().expect("<u8::MAX interrupts"),
+                    self.selector_cs(),
+                    interrupt_handler_addr
+                );
+            }
+
+            // all interrupt handlers are just `hlt`. their position is used to detect which
+            // exception/interrupt occurred.
+            unsafe {
+                std::slice::from_raw_parts_mut(
+                    self.host_ptr(self.interrupt_handlers_start()),
+                    IDT_ENTRIES as usize
+                ).fill(0xf4);
+            }
+
+            // finally, set `rsp` to a valid region so that the CPU can push necessary state (see
+            // AMD APM section "8.9.3 Interrupt Stack Frame") to actually enter the interrupt
+            // handler. if we didn't do this, rsp will probably be zero or something, underflow,
+            // page fault on push to 0xffffffff_ffffffff, and just triple fault.
+            //
+            // TODO: this is our option in 16- and 32-bit modes, but in long mode all the interrupt
+            // descriptors could set something in IST to switch stacks outright for exception
+            // handling. this might be nice to test rsp permutations in 64-bit code? alternatively
+            // we might just have to limit possible rsp permutations so as to be able to test in
+            // 16- and 32-bit modes anyway.
+            regs.rsp = self.stack_addr().0;
         }
     }
 
@@ -1185,9 +1228,10 @@ mod kvm {
         vm.write_mem(GuestAddress(0x81000), illumos_gdt);
         regs.rax = 0x82000;
         */
-        regs.rdx = 0x38;
+        regs.rdx = vm.selector_cs() as u64;
         regs.rcx = 0x80000;
         regs.rdi = 0x80000;
+//        regs.rsp = 0x90000;
 
         let mut reader = U8Reader::new(inst.as_slice());
         eprintln!("going to run...");
