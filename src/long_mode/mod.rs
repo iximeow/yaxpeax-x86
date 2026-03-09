@@ -6627,8 +6627,15 @@ fn read_operands<
                 instruction.mem_size = 8;
             } else if instruction.opcode == Opcode::RETF {
                 instruction.mem_size = 10;
+            } else if instruction.opcode == Opcode::POPF {
+                instruction.mem_size = 8;
+            } else if instruction.opcode == Opcode::PUSHF {
+                instruction.mem_size = 8;
+            } else if instruction.opcode == Opcode::LEAVE {
+                instruction.mem_size = 8;
+            } else if instruction.opcode == Opcode::XLAT {
+                instruction.mem_size = 1;
             }
-            // TODO: leave?
             instruction.operands[0] = OperandSpec::Nothing;
             instruction.operand_count = 0;
             return Ok(());

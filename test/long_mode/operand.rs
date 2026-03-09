@@ -53,4 +53,12 @@ fn test_implied_memory_width() {
     // operand-size prefixed call and jump still reads 8 bytes (prefix ignored)
     assert_eq!(mem_size_of(&[0x66, 0xff, 0x10]), Some(8));
     assert_eq!(mem_size_of(&[0x66, 0xff, 0x20]), Some(8));
+    // pushf
+    assert_eq!(mem_size_of(&[0x9c]), Some(8));
+    // popf
+    assert_eq!(mem_size_of(&[0x9d]), Some(8));
+    // leave
+    assert_eq!(mem_size_of(&[0xc9]), Some(8));
+    // xlat
+    assert_eq!(mem_size_of(&[0xd7]), Some(1));
 }

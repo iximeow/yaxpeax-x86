@@ -7,8 +7,9 @@
     even when their corresponding extension is not selected.
 * added uarch-specific decoders for Zen 2, Zen 3, Zen 4, and Zen 5
 * removed 3DNow support from AMD uarch-specific decoders after K10
-* push-immediate now reports a correct memory access side, fixing the prior
-  behavior of reporting to memory access size at all
+* push-immediate, pushf, popf, leave, and xlat now all report a correct memory
+  access size, fixing the prior behavior of reporting to memory access size at
+  all
 
 ## 2.0.0
 
