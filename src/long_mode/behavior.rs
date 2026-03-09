@@ -46,6 +46,7 @@ pub struct ExceptionInfo {
 
 /// an individual exception vector. these are just a tiny wrapper around `u8` to have some
 /// associated constant definitions.
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Exception {
     vector: u8,
 }
@@ -100,13 +101,44 @@ impl Exception {
     /// Control Protection Exception
     pub const CP: Exception = Exception::vector(21);
 
-    const fn vector(vector: u8) -> Self {
+    pub const fn vector(vector: u8) -> Self {
         Self { vector }
     }
 
     /// convert this `Exception` to an index into an x86 IDT.
     pub const fn to_u8(&self) -> u8 {
         self.vector
+    }
+
+    #[cfg(feature = "fmt")]
+    pub fn name(&self) -> Option<&'static str> {
+        static NAMES: [Option<&'static str>; 22] = [
+            Some("DE"), Some("DB"), Some("NMI"), Some("BP"),
+            Some("OF"), Some("BR"), Some("UD"), Some("NM"),
+            Some("DF"), None, Some("TS"), Some("NP"),
+            Some("SS"), Some("GP"), Some("PF"), None,
+            Some("MF"), Some("AC"), Some("MC"), Some("XM"),
+            Some("VE"), Some("CP")
+        ];
+
+        if let Some(maybe_name) = NAMES.get(self.vector as usize) {
+            *maybe_name
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(feature = "fmt")]
+use core::fmt;
+#[cfg(feature = "fmt")]
+impl fmt::Debug for Exception {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(name) = self.name() {
+            write!(f, "#{}", name)
+        } else {
+            write!(f, "#Int{}", self.to_u8())
+        }
     }
 }
 
