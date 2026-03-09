@@ -214,7 +214,7 @@ pub struct InstOperands<'inst> {
 }
 
 impl<'inst> InstOperands<'inst> {
-    fn iter(self) -> AccessIter<'inst> {
+    pub fn iter(self) -> AccessIter<'inst> {
         AccessIter::new(self)
     }
 }
@@ -234,7 +234,7 @@ impl<'inst> AccessIter<'inst> {
         }
     }
 
-    fn operands(self) -> OperandIter<'inst> {
+    pub fn operands(self) -> OperandIter<'inst> {
         OperandIter { inner: self }
     }
 }
@@ -978,6 +978,12 @@ const GENERAL_RW_RW: BehaviorDigest = GENERAL_RW_R
 const GENERAL_RW_RW_FLAGWRITE: BehaviorDigest = GENERAL_RW_RW
     .set_flags_access(Access::Write);
 
+// TODO: seems incredibly funky that jcc's operand is an immediate, when written like this..
+const JCC: BehaviorDigest = BehaviorDigest::empty()
+    .set_implicit_ops(JCC_OPS_IDX)
+    .set_pl_any()
+    .set_operand(0, Access::Read);
+
 static PUSH_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::Disp,
@@ -1021,13 +1027,173 @@ static POP_OPS: &'static [ImplicitOperand] = &[
     }
 ];
 
+static JCC_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rflags(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static CBW_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::al(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static CWDE_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static CDQE_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rax(),
+        disp: 0,
+        write: true,
+    }
+];
+
+// note CQD, CDQ, CQO:
+//
+// these are writes to dx/edx/rdx but *not* `*ax`. this is because while these registers "write"
+// sign-extended *ax to *ax:*dx, "writes" to eax:edx do not modify the upper 32 bits of rax. that
+// is to say, that if `rax` is 0x8000_1234_c000_0000 and a `cdq` is executed, the result is:
+// ```
+// rax = 0x8000_1234_c000_0000
+// rdx = 0x0000_0000_ffff_ffff
+// ```
+//
+// cool, huh!!
+static CWD_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::dx(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static CDQ_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static CQO_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rdx(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static PUSHF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rflags(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Disp,
+        reg: RegSpec::rsp(),
+        disp: -8i32,
+        write: true,
+    },
+    // push.. pushes the value (above), then does a RMW on rsp.
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
+const JCC_OPS_IDX: u16 = 3;
+const CBW_IDX: u16 = 4;
+const CWDE_IDX: u16 = 5;
+const CDQE_IDX: u16 = 6;
+const CWD_IDX: u16 = 7;
+const CDQ_IDX: u16 = 8;
+const CQO_IDX: u16 = 9;
+const PUSHF_IDX: u16 = 10;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 3] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 11] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
+    JCC_OPS,
+    CBW_OPS,
+    CWDE_OPS,
+    CDQE_OPS,
+    CWD_OPS,
+    CDQ_OPS,
+    CQO_OPS,
+    PUSHF_OPS,
 ];
 
 fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
@@ -1147,36 +1313,50 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         LEAVE => { panic!("todo: leave"); },
         MOV => GENERAL_RW_R,
         RETURN => { panic!("todo: return"); },
-        PUSHF => { panic!("todo: pushf"); },
-        WAIT => { panic!("todo: wait"); },
-        CBW => { panic!("todo: cbw"); },
-        CWDE => { panic!("todo: cwde"); },
-        CDQE => { panic!("todo: cdqe"); },
-        CWD => { panic!("todo: cwd"); },
-        CDQ => { panic!("todo: cdq"); },
-        CQO => { panic!("todo: cqo"); },
+        PUSHF => BehaviorDigest::empty()
+            .set_implicit_ops(PUSHF_IDX)
+            .set_pl_any(),
+        WAIT => BehaviorDigest::empty().set_pl_any(),
+        CBW => BehaviorDigest::empty()
+            .set_implicit_ops(CBW_IDX)
+            .set_pl_any(),
+        CWDE => BehaviorDigest::empty()
+            .set_implicit_ops(CWDE_IDX)
+            .set_pl_any(),
+        CDQE => BehaviorDigest::empty()
+            .set_implicit_ops(CDQE_IDX)
+            .set_pl_any(),
+        CWD => BehaviorDigest::empty()
+            .set_implicit_ops(CWD_IDX)
+            .set_pl_any(),
+        CDQ => BehaviorDigest::empty()
+            .set_implicit_ops(CDQ_IDX)
+            .set_pl_any(),
+        CQO => BehaviorDigest::empty()
+            .set_implicit_ops(CQO_IDX)
+            .set_pl_any(),
         LAHF => { panic!("todo: lahf"); },
         SAHF => { panic!("todo: sahf"); },
-        TEST => { panic!("todo: test"); },
+        TEST => GENERAL_R_R_FLAGWRITE,
         IN => { panic!("todo: in"); },
         OUT => { panic!("todo: out"); },
         IMUL => { panic!("todo: imul"); },
-        JO => { panic!("todo: jo"); },
-        JNO => { panic!("todo: jno"); },
-        JB => { panic!("todo: jb"); },
-        JNB => { panic!("todo: jnb"); },
-        JZ => { panic!("todo: jz"); },
-        JNZ => { panic!("todo: jnz"); },
-        JA => { panic!("todo: ja"); },
-        JNA => { panic!("todo: jna"); },
-        JS => { panic!("todo: js"); },
-        JNS => { panic!("todo: jns"); },
-        JP => { panic!("todo: jp"); },
-        JNP => { panic!("todo: jnp"); },
-        JL => { panic!("todo: jl"); },
-        JGE => { panic!("todo: jge"); },
-        JLE => { panic!("todo: jle"); },
-        JG => { panic!("todo: jg"); },
+        JO => JCC,
+        JNO => JCC,
+        JB => JCC,
+        JNB => JCC,
+        JZ => JCC,
+        JNZ => JCC,
+        JA => JCC,
+        JNA => JCC,
+        JS => JCC,
+        JNS => JCC,
+        JP => JCC,
+        JNP => JCC,
+        JL => JCC,
+        JGE => JCC,
+        JLE => JCC,
+        JG => JCC,
         CMOVA => { panic!("todo: cmova"); },
         CMOVB => { panic!("todo: cmovb"); },
         CMOVG => { panic!("todo: cmovg"); },
