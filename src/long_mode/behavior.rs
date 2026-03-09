@@ -404,6 +404,18 @@ impl<'inst> InstBehavior<'inst> {
                 OperandSpec::Deref => {
                     v.get_register(inst.regs[1])
                 }
+                OperandSpec::Deref_rdi => {
+                    v.get_register(RegSpec::rdi())
+                }
+                OperandSpec::Deref_rsi => {
+                    v.get_register(RegSpec::rsi())
+                }
+                OperandSpec::Deref_edi => {
+                    v.get_register(RegSpec::edi())
+                }
+                OperandSpec::Deref_esi => {
+                    v.get_register(RegSpec::esi())
+                }
                 other => {
                     panic!("not-yet-handled memory operand: {:?}", other);
                 }
@@ -418,6 +430,23 @@ impl<'inst> InstBehavior<'inst> {
                     } else {
                         v.register_read(op.reg);
                     }
+                } else if op.spec == OperandSpec::Deref_rdi {
+                    // Deref_rdi is used for string instructions; operand-size overrides apply here
+                    // and so the register that is incremented (or decremented!) depends on the
+                    // operand-size prefix. the register is correct for the operands, so we'll
+                    let reg = match self.inst.operands[op.disp as usize] {
+                        OperandSpec::Deref_rdi => RegSpec::rdi(),
+                        OperandSpec::Deref_rsi => RegSpec::rsi(),
+                        OperandSpec::Deref_edi => RegSpec::edi(),
+                        OperandSpec::Deref_esi => RegSpec::esi(),
+                        OperandSpec::Deref => self.inst.regs[1],
+                        other => { panic!("TODO: unreachable {:?}", other); }
+                    };
+                    if op.write {
+                        v.register_write(reg);
+                    } else {
+                        v.register_read(reg);
+                    }
                 } else {
                     let addr = match op.spec {
                         OperandSpec::Deref => {
@@ -426,6 +455,16 @@ impl<'inst> InstBehavior<'inst> {
                         OperandSpec::Disp => {
                             if let Some(base) = v.get_register(op.reg) {
                                 Some(base.wrapping_add(op.disp as i64 as u64))
+                            } else {
+                                None
+                            }
+                        }
+                        OperandSpec::MemIndexScale => {
+                            // HACK HACK HACK
+                            let base = v.get_register(op.reg);
+                            let index = v.get_register(RegSpec::al());
+                            if let (Some(base), Some(index)) = (base, index) {
+                                Some(base.wrapping_add(index as u64))
                             } else {
                                 None
                             }
@@ -954,6 +993,11 @@ const GENERAL_RW_FLAGREAD: BehaviorDigest = BehaviorDigest::empty()
 const GENERAL_RW_R_FLAGREAD: BehaviorDigest = GENERAL_RW_FLAGREAD
     .set_operand(1, Access::Read);
 
+/// cmc, clc, sti, cli, etc that toggle individual bits in flags
+const GENERAL_FLAGRW: BehaviorDigest = BehaviorDigest::empty()
+    .set_pl_any()
+    .set_flags_access(Access::ReadWrite);
+
 /// `inc`, `dec`, and `neg` have one operand and modify flags.
 const GENERAL_RW_FLAGWRITE: BehaviorDigest = BehaviorDigest::empty()
     .set_pl_any()
@@ -977,6 +1021,12 @@ const GENERAL_RW_RW: BehaviorDigest = GENERAL_RW_R
 
 const GENERAL_RW_RW_FLAGWRITE: BehaviorDigest = GENERAL_RW_RW
     .set_flags_access(Access::Write);
+
+    /*
+const GENERAL_R: BehaviorDigest = BehaviorDigest::empty()
+    .set_pl_any()
+    .set_operand(0, Access::Read);
+    */
 
 // TODO: seems incredibly funky that jcc's operand is an immediate, when written like this..
 const JCC: BehaviorDigest = BehaviorDigest::empty()
@@ -1171,6 +1221,239 @@ static PUSHF_OPS: &'static [ImplicitOperand] = &[
     }
 ];
 
+static POPF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref,
+        reg: RegSpec::rsp(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rflags(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static SAHF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ah(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rflags(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static LAHF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rflags(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ah(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static MOVS_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 1,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 1,
+        write: true,
+    },
+];
+
+static LODS_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 1,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 1,
+        write: true,
+    },
+];
+
+static STOS_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: true,
+    },
+];
+
+static SCAS_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref_rdi,
+        reg: RegSpec::eax(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rflags(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static RETURN_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Deref,
+        reg: RegSpec::rsp(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static LEAVE_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rbp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref,
+        reg: RegSpec::rsp(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rbp(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static XLAT_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        // xlat is the only implicit operand to use a base/index addressing scheme, so note the
+        // base (rbx) and handle the implicit al index in code..?
+        spec: OperandSpec::MemIndexScale,
+        reg: RegSpec::rbx(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::al(),
+        disp: 0,
+        write: true,
+    },
+];
+
+static CLTS_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cr2(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cr2(),
+        disp: 0,
+        write: true,
+    },
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
 const JCC_OPS_IDX: u16 = 3;
@@ -1181,8 +1464,19 @@ const CWD_IDX: u16 = 7;
 const CDQ_IDX: u16 = 8;
 const CQO_IDX: u16 = 9;
 const PUSHF_IDX: u16 = 10;
+const POPF_IDX: u16 = 11;
+const SAHF_IDX: u16 = 12;
+const LAHF_IDX: u16 = 13;
+const MOVS_IDX: u16 = 14;
+const LODS_IDX: u16 = 15;
+const STOS_IDX: u16 = 16;
+const SCAS_IDX: u16 = 17;
+const RETURN_IDX: u16 = 18;
+const LEAVE_IDX: u16 = 19;
+const XLAT_IDX: u16 = 20;
+const CLTS_IDX: u16 = 21;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 11] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 22] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -1194,6 +1488,17 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 11] = [
     CDQ_OPS,
     CQO_OPS,
     PUSHF_OPS,
+    POPF_OPS,
+    SAHF_OPS,
+    LAHF_OPS,
+    MOVS_OPS,
+    LODS_OPS,
+    STOS_OPS,
+    SCAS_OPS,
+    RETURN_OPS,
+    LEAVE_OPS,
+    XLAT_OPS,
+    CLTS_OPS,
 ];
 
 fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
@@ -1228,11 +1533,16 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         XADD => GENERAL_RW_RW_FLAGRW,
         XCHG => GENERAL_RW_RW,
 
-        CMPS => GENERAL_RW_RW_FLAGWRITE,
-        SCAS => GENERAL_RW_R_FLAGREAD, // TODO: second operand is `aX`, right?
-        MOVS => GENERAL_RW_R_FLAGREAD, // TODO: operands are [rdi], [rsi], right?
-        LODS => GENERAL_RW_R_FLAGREAD, // TODO: operands are [rsi], aX?
-        STOS => GENERAL_RW_R_FLAGREAD, // TODO: operands are [rdi], aX?
+        CMPS => GENERAL_RW_RW_FLAGWRITE
+            .set_implicit_ops(MOVS_IDX),
+        SCAS => GENERAL_RW_R_FLAGREAD
+            .set_implicit_ops(SCAS_IDX), // TODO: second operand is `aX`, right?
+        MOVS => GENERAL_RW_R_FLAGREAD
+            .set_implicit_ops(MOVS_IDX),
+        LODS => GENERAL_RW_R_FLAGREAD
+            .set_implicit_ops(LODS_IDX),
+        STOS => GENERAL_RW_R_FLAGREAD
+            .set_implicit_ops(STOS_IDX),
         INS => GENERAL_W_R,
         OUTS => GENERAL_R_R,
 
@@ -1282,7 +1592,9 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         MOVSX => GENERAL_RW_R,
         MOVSXD => GENERAL_RW_R,
         SHRD => { panic!("todo: shrd"); },
-        HLT => { panic!("todo: hlt"); },
+        // TODO: should be complex?
+        HLT => BehaviorDigest::empty()
+            .set_pl0(),
         CALL => { panic!("todo: call"); },
         CALLF => { panic!("todo: callf"); },
         JMP => { panic!("todo: jmp"); },
@@ -1302,7 +1614,9 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         PREFETCH0 => { panic!("todo: prefetch0"); },
         PREFETCH1 => { panic!("todo: prefetch1"); },
         PREFETCH2 => { panic!("todo: prefetch2"); },
-        POPF => { panic!("todo: popf"); },
+        POPF => BehaviorDigest::empty()
+            .set_implicit_ops(POPF_IDX)
+            .set_pl_any(),
         INT => { panic!("todo: int"); },
         INTO => { panic!("todo: into"); },
         IRET => { panic!("todo: iret"); },
@@ -1310,9 +1624,13 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         IRETQ => { panic!("todo: iretq"); },
         RETF => { panic!("todo: retf"); },
         ENTER => { panic!("todo: enter"); },
-        LEAVE => { panic!("todo: leave"); },
+        LEAVE => BehaviorDigest::empty()
+            .set_implicit_ops(LEAVE_IDX)
+            .set_pl_any(),
         MOV => GENERAL_RW_R,
-        RETURN => { panic!("todo: return"); },
+        RETURN => BehaviorDigest::empty()
+            .set_implicit_ops(RETURN_IDX)
+            .set_pl_any(),
         PUSHF => BehaviorDigest::empty()
             .set_implicit_ops(PUSHF_IDX)
             .set_pl_any(),
@@ -1335,8 +1653,12 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         CQO => BehaviorDigest::empty()
             .set_implicit_ops(CQO_IDX)
             .set_pl_any(),
-        LAHF => { panic!("todo: lahf"); },
-        SAHF => { panic!("todo: sahf"); },
+        LAHF => BehaviorDigest::empty()
+            .set_implicit_ops(LAHF_IDX)
+            .set_pl_any(),
+        SAHF => BehaviorDigest::empty()
+            .set_implicit_ops(SAHF_IDX)
+            .set_pl_any(),
         TEST => GENERAL_R_R_FLAGWRITE,
         IN => { panic!("todo: in"); },
         OUT => { panic!("todo: out"); },
@@ -1399,7 +1721,9 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         WBINVD => { panic!("todo: wbinvd"); },
         INVD => { panic!("todo: invd"); },
         SYSRET => { panic!("todo: sysret"); },
-        CLTS => { panic!("todo: clts"); },
+        CLTS => BehaviorDigest::empty()
+            .set_implicit_ops(CLTS_IDX)
+            .set_pl0(),
         SYSCALL => { panic!("todo: syscall"); },
         LSL => { panic!("todo: lsl"); },
         LAR => { panic!("todo: lar"); },
@@ -1435,13 +1759,15 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         LTR => { panic!("todo: ltr"); },
         VERR => { panic!("todo: verr"); },
         VERW => { panic!("todo: verw"); },
-        CMC => { panic!("todo: cmc"); },
-        CLC => { panic!("todo: clc"); },
-        STC => { panic!("todo: stc"); },
-        CLI => { panic!("todo: cli"); },
-        STI => { panic!("todo: sti"); },
-        CLD => { panic!("todo: cld"); },
-        STD => { panic!("todo: std"); },
+        CMC => GENERAL_FLAGRW,
+        CLC => GENERAL_FLAGRW,
+        STC => GENERAL_FLAGRW,
+        CLI => GENERAL_FLAGRW
+            .set_pl_special(),
+        STI => GENERAL_FLAGRW
+            .set_pl_special(),
+        CLD => GENERAL_FLAGRW,
+        STD => GENERAL_FLAGRW,
         JMPE => { panic!("todo: jmpe"); },
         POPCNT => { panic!("todo: popcnt"); },
         MOVDQU => { panic!("todo: movdqu"); },
@@ -2125,12 +2451,15 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
 
         CRC32 => { panic!("todo: crc32"); },
         SALC => { panic!("todo: salc"); },
-        XLAT => { panic!("todo: xlat"); },
+        XLAT => BehaviorDigest::empty()
+            .set_implicit_ops(XLAT_IDX)
+            .set_pl_any(),
 
+        // TODO: none of x87 is verified well.. and what about the bits in the FPU status word..
         F2XM1 => { panic!("todo: f2xm1"); },
         FABS => { panic!("todo: fabs"); },
-        FADD => { panic!("todo: fadd"); },
-        FADDP => { panic!("todo: faddp"); },
+        FADD => GENERAL_RW_R,
+        FADDP => GENERAL_RW_R,
         FBLD => { panic!("todo: fbld"); },
         FBSTP => { panic!("todo: fbstp"); },
         FCHS => { panic!("todo: fchs"); },
@@ -2157,12 +2486,13 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         FENI8087_NOP => { panic!("todo: feni8087_nop"); },
         FFREE => { panic!("todo: ffree"); },
         FFREEP => { panic!("todo: ffreep"); },
-        FIADD => { panic!("todo: fiadd"); },
+        FIADD => GENERAL_RW_R,
         FICOM => { panic!("todo: ficom"); },
         FICOMP => { panic!("todo: ficomp"); },
         FIDIV => { panic!("todo: fidiv"); },
         FIDIVR => { panic!("todo: fidivr"); },
-        FILD => { panic!("todo: fild"); },
+        // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
+        FILD => GENERAL_W_R,
         FIMUL => { panic!("todo: fimul"); },
         FINCSTP => { panic!("todo: fincstp"); },
         FIST => { panic!("todo: fist"); },
@@ -2170,7 +2500,8 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         FISTTP => { panic!("todo: fisttp"); },
         FISUB => { panic!("todo: fisub"); },
         FISUBR => { panic!("todo: fisubr"); },
-        FLD => { panic!("todo: fld"); },
+        // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
+        FLD => GENERAL_W_R,
         FLD1 => { panic!("todo: fld1"); },
         FLDCW => { panic!("todo: fldcw"); },
         FLDENV => { panic!("todo: fldenv"); },

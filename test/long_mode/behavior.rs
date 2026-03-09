@@ -943,6 +943,10 @@ mod kvm {
                 (_, register_class::RFLAGS) => {
                     false
                 }
+                (register_class::RIP, _) |
+                (_, register_class::RIP) => {
+                    false
+                }
                 (l, s) => {
                     panic!("unhandled register-contains test: {:?}/{:?}", l, s);
                 }
@@ -1479,15 +1483,27 @@ mod kvm {
                 vm.read_mem(GuestAddress(vm_regs.rsp + 8), &mut prev_rip[..]);
                 let mut buf = [0u8; 8];
                 vm.read_mem(GuestAddress(vm_regs.rsp), &mut buf[..]);
-                eprintln!(
-                    "error code: {:#08x} accessing {:016x} @ rip={:#016x} (cr3={:016x})",
-                    u64::from_le_bytes(buf), vm_sregs.cr2,
-                    u64::from_le_bytes(prev_rip), vm_sregs.cr3
-                );
                 if other == Exception::PF {
+                    eprintln!(
+                        "error code: {:#08x} accessing {:016x} @ rip={:#016x} (cr3={:016x})",
+                        u64::from_le_bytes(buf), vm_sregs.cr2,
+                        u64::from_le_bytes(prev_rip), vm_sregs.cr3
+                    );
                     let mut pdpt = [0u8; 4096];
                     vm.read_mem(vm.page_tables().pdpt_addr(), &mut pdpt[..]);
                     eprintln!("pdpt: {:x?}", &pdpt[..8]);
+                } else if other == Exception::GP {
+                    if decoded.opcode() == long_mode::Opcode::MOV {
+                        // TODO: should be in the exception list
+                        if let long_mode::Operand::Register { reg } = decoded.operand(0) {
+                            if reg.class() == long_mode::register_class::S {
+                                // mov to segment selector can #GP if the selector is invalid:
+                                // > If the DS, ES, FS, or GS register is being loaded and the
+                                // > segment pointed to is not a data or readable code segment.
+                                return;
+                            }
+                        }
+                    }
                 }
                 panic!("TODO: handle exceptions ({:?})", other);
             }
@@ -1601,6 +1617,18 @@ mod kvm {
     }
 
     #[test]
+    fn kvm_verify_ret() {
+        let mut vm = TestVm::create();
+
+        // `ret`
+        let inst: &'static [u8] = &[0xc3];
+        // TODO: set up ret test to return to some other address. check_behavior() doesn't tolerate
+        // this (yet).
+        vm.write_mem(vm.stack_addr(), &0xff001u64.to_le_bytes());
+        check_behavior(&mut vm, inst);
+    }
+
+    #[test]
     fn kvm_verify_ins() {
         let mut vm = TestVm::create();
 
@@ -1682,6 +1710,7 @@ mod kvm {
         use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
 
         let mut vm = TestVm::create();
+        vm.set_single_step(true);
 
         let decoder = InstDecoder::default();
         let mut buf = Instruction::default();
@@ -1691,6 +1720,43 @@ mod kvm {
             let inst = word.to_le_bytes();
             let mut reader = U8Reader::new(&inst);
             if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                if buf.opcode() == Opcode::RETURN {
+                    // hard to handle generically here; see `verify_ret`.
+                    continue;
+                }
+                if buf.opcode() == Opcode::LEAVE {
+                    // TODO: trying to generically handle leave typically gets #SS from popping a
+                    // non-canonical address. needs more specific test.
+                    continue;
+                }
+                if buf.opcode() == Opcode::RETF {
+                    // TODO: trying to is harder. needs more specific test.
+                    continue;
+                }
+                if buf.opcode() == Opcode::INT {
+                    // TODO: int is complex, but check_behavior() does not tolerate those yet
+                    continue;
+                }
+                if buf.opcode() == Opcode::JMP || buf.opcode() == Opcode::CALL {
+                    // TODO: needs more specific testing
+                    continue;
+                }
+                if buf.opcode() == Opcode::JRCXZ || buf.opcode() == Opcode::LOOP || buf.opcode() == Opcode::LOOPZ || buf.opcode() == Opcode::LOOPNZ {
+                    // TODO: also complex
+                    continue;
+                }
+                if buf.opcode() == Opcode::IRET || buf.opcode() == Opcode::IRETD || buf.opcode() == Opcode::IRETQ {
+                    // TODO: oh dear
+                    continue;
+                }
+                if [Opcode::JO, Opcode::JNO, Opcode::JB, Opcode::JNB, Opcode::JZ, Opcode::JNZ, Opcode::JA, Opcode::JNA, Opcode::JS, Opcode::JNS, Opcode::JP, Opcode::JNP, Opcode::JL, Opcode::JGE, Opcode::JLE, Opcode::JG].contains(&buf.opcode()) {
+                    // TODO: jmp-related tests that tolerate rip changing.
+                    continue;
+                }
+                if [Opcode::SYSCALL, Opcode::SYSRET, Opcode::SYSENTER, Opcode::SYSEXIT].contains(&buf.opcode()) {
+                    // TODO: syscall tests
+                    continue;
+                }
                 // some instructions may just be one byte, so figure out the length and only check
                 // that many bytes of instructions for specific behavior..
                 use yaxpeax_arch::LengthedInstruction;
@@ -1703,7 +1769,7 @@ mod kvm {
                 use yaxpeax_x86::long_mode::Opcode;
                 // mov es, word [rax]
                 // does an inf loop too...?
-                if [Opcode::MOV, Opcode::INS, Opcode::OUTS, Opcode::IN, Opcode::OUT].contains(&buf.opcode()) {
+                if [Opcode::INS, Opcode::OUTS, Opcode::IN, Opcode::OUT].contains(&buf.opcode()) {
                     eprintln!("skipping {}", buf.opcode());
                     continue;
                 }
