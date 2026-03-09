@@ -970,7 +970,7 @@ const GENERAL_R_R: BehaviorDigest = GENERAL_RW_R
 
 /// `ins` writes to the memory operand, reads from `rdx` (second operand)
 const GENERAL_W_R: BehaviorDigest = GENERAL_RW_R
-    .set_operand(0, Access::Read);
+    .set_operand(0, Access::Write);
 
 const GENERAL_RW_RW: BehaviorDigest = GENERAL_RW_R
     .set_operand(1, Access::ReadWrite);
