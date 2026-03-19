@@ -29,9 +29,50 @@ pub struct InstBehavior<'inst> {
 
 impl Instruction {
     pub fn behavior<'inst>(&'inst self) -> InstBehavior<'inst> {
+        let behavior = if let Some(behavior) = opcode2behavior(&self.opcode) {
+            behavior
+        } else {
+            // mul and imul are incredibly frustrating, with multiple behaviors corresponding to
+            // different encodings with different opcode counts. fix up behaviors here..
+            if self.opcode == Opcode::MUL || (self.opcode == Opcode::IMUL && self.operand_count == 1) {
+                let op_width = if self.operands[0] == OperandSpec::RegMMM {
+                    self.regs[1].width()
+                } else {
+                    self.mem_size
+                };
+                let ops_idx = match op_width {
+                    1 => MUL_IDX_1OP_BYTE,
+                    2 => MUL_IDX_1OP_WORD,
+                    4 => MUL_IDX_1OP_DWORD,
+                    _ /* 8 */ => MUL_IDX_1OP_QWORD,
+                };
+                BehaviorDigest::empty()
+                    .set_pl_any()
+                    .set_flags_access(Access::Write)
+                    .set_operand(0, Access::Read)
+                    .set_implicit_ops(ops_idx)
+            } else if self.opcode == Opcode::IMUL {
+                let base_digest = BehaviorDigest::empty()
+                    .set_pl_any()
+                    .set_flags_access(Access::Write);
+                if self.operand_count == 2 {
+                    base_digest
+                        .set_operand(0, Access::ReadWrite)
+                        .set_operand(1, Access::Read)
+                } else {
+                    base_digest
+                        .set_operand(0, Access::Write)
+                        .set_operand(1, Access::Read)
+                        .set_operand(2, Access::Read)
+                }
+            } else {
+                // TODO: words
+                unreachable!();
+            }
+        };
         InstBehavior {
             inst: self,
-            behavior: opcode2behavior(&self.opcode)
+            behavior
         }
     }
 }
@@ -251,7 +292,7 @@ impl<'inst> Iterator for AccessIter<'inst> {
 
         // the implicit operand list might be empty, there may be no flags, etc. so we need to
         // consider the implicit operand iterator states up to two times before falling through to
-        // the first element of the explicit operand list (if there is one). using a loop here
+        // the first is this the first reported case of buttelement of the explicit operand list (if there is one). using a loop here
         // seems like the least-gross way to go...
         while !self.explicit {
             if self.next == 0 {
@@ -959,6 +1000,10 @@ mod test {
     }
 }
 
+/// no operations, but you can run it anywhere.
+const GENERAL: BehaviorDigest = BehaviorDigest::empty()
+    .set_pl_any();
+
 /// instructions that can execute at all privilege levels, have two operands, read/write the first,
 /// and read the second.
 const GENERAL_RW_R: BehaviorDigest = BehaviorDigest::empty()
@@ -1022,11 +1067,12 @@ const GENERAL_RW_RW: BehaviorDigest = GENERAL_RW_R
 const GENERAL_RW_RW_FLAGWRITE: BehaviorDigest = GENERAL_RW_RW
     .set_flags_access(Access::Write);
 
-    /*
 const GENERAL_R: BehaviorDigest = BehaviorDigest::empty()
     .set_pl_any()
     .set_operand(0, Access::Read);
-    */
+
+const GENERAL_R_FLAGREAD: BehaviorDigest = GENERAL_R
+    .set_flags_access(Access::Read);
 
 // TODO: seems incredibly funky that jcc's operand is an immediate, when written like this..
 const JCC: BehaviorDigest = BehaviorDigest::empty()
@@ -1454,6 +1500,82 @@ static CLTS_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
+// the actual implicit operands of `{i,}mul` are broken out by operand count and operation size..
+static MUL_OPS_1OP_BYTE: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::al(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: true,
+    }
+];
+static MUL_OPS_1OP_WORD: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::dx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+static MUL_OPS_1OP_DWORD: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+static MUL_OPS_1OP_QWORD: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rdx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
 const JCC_OPS_IDX: u16 = 3;
@@ -1475,8 +1597,12 @@ const RETURN_IDX: u16 = 18;
 const LEAVE_IDX: u16 = 19;
 const XLAT_IDX: u16 = 20;
 const CLTS_IDX: u16 = 21;
+const MUL_IDX_1OP_BYTE: u16 = 22;
+const MUL_IDX_1OP_WORD: u16 = 23;
+const MUL_IDX_1OP_DWORD: u16 = 24;
+const MUL_IDX_1OP_QWORD: u16 = 25;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 22] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 26] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -1499,11 +1625,18 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 22] = [
     LEAVE_OPS,
     XLAT_OPS,
     CLTS_OPS,
+    MUL_OPS_1OP_BYTE,
+    MUL_OPS_1OP_WORD,
+    MUL_OPS_1OP_DWORD,
+    MUL_OPS_1OP_QWORD,
 ];
 
-fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
+fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
     use Opcode::*;
-    match opc {
+    if opc == &MUL || opc == &IMUL {
+        return None;
+    }
+    let behavior = match opc {
         ADD => GENERAL_RW_R_FLAGWRITE,
         OR => GENERAL_RW_R_FLAGWRITE,
         ADC => GENERAL_RW_R_FLAGRW,
@@ -1608,8 +1741,7 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
             .set_pl_any()
             .set_operand(0, Access::Write),
         LEA => GENERAL_W_R,
-        NOP => BehaviorDigest::empty()
-            .set_pl_any(),
+        NOP => GENERAL,
         PREFETCHNTA => { panic!("todo: prefetchnta"); },
         PREFETCH0 => { panic!("todo: prefetch0"); },
         PREFETCH1 => { panic!("todo: prefetch1"); },
@@ -1617,8 +1749,8 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         POPF => BehaviorDigest::empty()
             .set_implicit_ops(POPF_IDX)
             .set_pl_any(),
-        INT => { panic!("todo: int"); },
-        INTO => { panic!("todo: into"); },
+        INT => GENERAL_R,
+        INTO => GENERAL_R_FLAGREAD,
         IRET => { panic!("todo: iret"); },
         IRETD => { panic!("todo: iretd"); },
         IRETQ => { panic!("todo: iretq"); },
@@ -1634,7 +1766,7 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         PUSHF => BehaviorDigest::empty()
             .set_implicit_ops(PUSHF_IDX)
             .set_pl_any(),
-        WAIT => BehaviorDigest::empty().set_pl_any(),
+        WAIT => GENERAL,
         CBW => BehaviorDigest::empty()
             .set_implicit_ops(CBW_IDX)
             .set_pl_any(),
@@ -1662,7 +1794,7 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         TEST => GENERAL_R_R_FLAGWRITE,
         IN => { panic!("todo: in"); },
         OUT => { panic!("todo: out"); },
-        IMUL => { panic!("todo: imul"); },
+        IMUL => BehaviorDigest::empty(), // unreachable due to branch above match
         JO => JCC,
         JNO => JCC,
         JB => JCC,
@@ -1697,7 +1829,7 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         CMOVZ => { panic!("todo: cmovz"); },
         DIV => { panic!("todo: div"); },
         IDIV => { panic!("todo: idiv"); },
-        MUL => { panic!("todo: mul"); },
+        MUL => BehaviorDigest::empty(), // unreachable due to branch above match
         SETO => { panic!("todo: seto"); },
         SETNO => { panic!("todo: setno"); },
         SETB => { panic!("todo: setb"); },
@@ -1715,11 +1847,13 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         SETLE => { panic!("todo: setle"); },
         SETG => { panic!("todo: setg"); },
         CPUID => { panic!("todo: cpuid"); },
-        UD0 => { panic!("todo: ud0"); },
-        UD1 => { panic!("todo: ud1"); },
-        UD2 => { panic!("todo: ud2"); },
-        WBINVD => { panic!("todo: wbinvd"); },
-        INVD => { panic!("todo: invd"); },
+        UD0 => GENERAL,
+        UD1 => GENERAL,
+        UD2 => GENERAL,
+        WBINVD => BehaviorDigest::empty()
+            .set_pl0(),
+        INVD =>  BehaviorDigest::empty()
+            .set_pl0(),
         SYSRET => { panic!("todo: sysret"); },
         CLTS => BehaviorDigest::empty()
             .set_implicit_ops(CLTS_IDX)
@@ -1846,7 +1980,7 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         CVTTPD2DQ => { panic!("todo: cvttpd2dq"); },
         DIVPS => { panic!("todo: divps"); },
         DIVPD => { panic!("todo: divpd"); },
-        EMMS => { panic!("todo: emms"); },
+        EMMS => GENERAL,
         GETSEC => { panic!("todo: getsec"); },
         LFS => { panic!("todo: lfs"); },
         LGS => { panic!("todo: lgs"); },
@@ -2456,11 +2590,12 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
             .set_pl_any(),
 
         // TODO: none of x87 is verified well.. and what about the bits in the FPU status word..
+        // and what about pushes/pops from the x87 operand stack..
         F2XM1 => { panic!("todo: f2xm1"); },
         FABS => { panic!("todo: fabs"); },
         FADD => GENERAL_RW_R,
         FADDP => GENERAL_RW_R,
-        FBLD => { panic!("todo: fbld"); },
+        FBLD => GENERAL_W_R,
         FBSTP => { panic!("todo: fbstp"); },
         FCHS => { panic!("todo: fchs"); },
         FCMOVB => { panic!("todo: fcmovb"); },
@@ -2471,15 +2606,15 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         FCMOVNE => { panic!("todo: fcmovne"); },
         FCMOVNU => { panic!("todo: fcmovnu"); },
         FCMOVU => { panic!("todo: fcmovu"); },
-        FCOM => { panic!("todo: fcom"); },
+        FCOM => GENERAL_R_R,
         FCOMI => { panic!("todo: fcomi"); },
         FCOMIP => { panic!("todo: fcomip"); },
-        FCOMP => { panic!("todo: fcomp"); },
-        FCOMPP => { panic!("todo: fcompp"); },
+        FCOMP => GENERAL_R_R,
+        FCOMPP => GENERAL_R_R,
         FCOS => { panic!("todo: fcos"); },
         FDECSTP => { panic!("todo: fdecstp"); },
         FDISI8087_NOP => { panic!("todo: fdisi8087_nop"); },
-        FDIV => { panic!("todo: fdiv"); },
+        FDIV => GENERAL_RW_R,
         FDIVP => { panic!("todo: fdivp"); },
         FDIVR => { panic!("todo: fdivr"); },
         FDIVRP => { panic!("todo: fdivrp"); },
@@ -2487,23 +2622,23 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         FFREE => { panic!("todo: ffree"); },
         FFREEP => { panic!("todo: ffreep"); },
         FIADD => GENERAL_RW_R,
-        FICOM => { panic!("todo: ficom"); },
-        FICOMP => { panic!("todo: ficomp"); },
+        FICOM => GENERAL_R_R,
+        FICOMP => GENERAL_R_R,
         FIDIV => { panic!("todo: fidiv"); },
         FIDIVR => { panic!("todo: fidivr"); },
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
         FILD => GENERAL_W_R,
-        FIMUL => { panic!("todo: fimul"); },
+        FIMUL => GENERAL_RW_R,
         FINCSTP => { panic!("todo: fincstp"); },
-        FIST => { panic!("todo: fist"); },
-        FISTP => { panic!("todo: fistp"); },
-        FISTTP => { panic!("todo: fisttp"); },
-        FISUB => { panic!("todo: fisub"); },
-        FISUBR => { panic!("todo: fisubr"); },
+        FIST => GENERAL_W_R,
+        FISTP => GENERAL_W_R,
+        FISTTP => GENERAL_W_R,
+        FISUB => GENERAL_RW_R,
+        FISUBR => GENERAL_RW_R,
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
         FLD => GENERAL_W_R,
         FLD1 => { panic!("todo: fld1"); },
-        FLDCW => { panic!("todo: fldcw"); },
+        FLDCW => GENERAL_R,
         FLDENV => { panic!("todo: fldenv"); },
         FLDL2E => { panic!("todo: fldl2e"); },
         FLDL2T => { panic!("todo: fldl2t"); },
@@ -2511,7 +2646,7 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         FLDLN2 => { panic!("todo: fldln2"); },
         FLDPI => { panic!("todo: fldpi"); },
         FLDZ => { panic!("todo: fldz"); },
-        FMUL => { panic!("todo: fmul"); },
+        FMUL => GENERAL_RW_R,
         FMULP => { panic!("todo: fmulp"); },
         FNCLEX => { panic!("todo: fnclex"); },
         FNINIT => { panic!("todo: fninit"); },
@@ -2532,19 +2667,19 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         FSIN => { panic!("todo: fsin"); },
         FSINCOS => { panic!("todo: fsincos"); },
         FSQRT => { panic!("todo: fsqrt"); },
-        FST => { panic!("todo: fst"); },
-        FSTP => { panic!("todo: fstp"); },
+        FST => GENERAL_W_R,
+        FSTP => GENERAL_W_R,
         FSTPNCE => { panic!("todo: fstpnce"); },
-        FSUB => { panic!("todo: fsub"); },
-        FSUBP => { panic!("todo: fsubp"); },
-        FSUBR => { panic!("todo: fsubr"); },
-        FSUBRP => { panic!("todo: fsubrp"); },
+        FSUB => GENERAL_RW_R,
+        FSUBP => GENERAL_RW_R,
+        FSUBR => GENERAL_RW_R,
+        FSUBRP => GENERAL_RW_R,
         FTST => { panic!("todo: ftst"); },
-        FUCOM => { panic!("todo: fucom"); },
-        FUCOMI => { panic!("todo: fucomi"); },
-        FUCOMIP => { panic!("todo: fucomip"); },
-        FUCOMP => { panic!("todo: fucomp"); },
-        FUCOMPP => { panic!("todo: fucompp"); },
+        FUCOM => GENERAL_R_R,
+        FUCOMI => GENERAL_R_R_FLAGWRITE,
+        FUCOMIP => GENERAL_R_R_FLAGWRITE,
+        FUCOMP => GENERAL_R_R,
+        FUCOMPP => GENERAL_R_R,
         FXAM => { panic!("todo: fxam"); },
         FXCH => { panic!("todo: fxch"); },
         FXTRACT => { panic!("todo: fxtract"); },
@@ -2576,8 +2711,8 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         // unsure
         HRESET => { panic!("todo: hreset"); },
 
-        // 3dnow
-        FEMMS => { panic!("todo: femms"); },
+        // 3dnow. note these are yet untested!
+        FEMMS => GENERAL,
         PI2FW => { panic!("todo: pi2fw"); },
         PI2FD => { panic!("todo: pi2fd"); },
         PF2IW => { panic!("todo: pf2iw"); },
@@ -3029,5 +3164,6 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         RMPADJUST => { panic!("todo: rmpadjust"); },
         RMPUPDATE => { panic!("todo: rmpupdate"); },
 
-    }
+    };
+    Some(behavior)
 }

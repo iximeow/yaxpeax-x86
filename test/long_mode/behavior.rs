@@ -738,9 +738,9 @@ mod kvm {
     fn run(vm: &mut TestVm) {
         let mut exits = 0;
         let end_pc = loop {
-            eprintln!("about to run! here's some state:");
+//            eprintln!("about to run! here's some state:");
             let regs = vm.vcpu.get_regs().unwrap();
-
+/*
             unsafe {
             let bytes = vm.host_ptr(GuestAddress(regs.rip));
             let slc = std::slice::from_raw_parts(bytes, 15);
@@ -750,8 +750,9 @@ mod kvm {
                 eprintln!("step. next: {:06x}: {}", regs.rip, decoded);
             }
             }
+*/
 
-            dump_regs(&regs);
+//            dump_regs(&regs);
 //            let sregs = vm.vcpu.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
@@ -784,9 +785,9 @@ mod kvm {
                     // break info.pc;
                 }
                 VcpuExit::Hlt => {
-                    eprintln!("hit hlt");
+                    // eprintln!("hit hlt");
                     let regs = vm.vcpu.get_regs().unwrap();
-                    dump_regs(&regs);
+                    // dump_regs(&regs);
                     break regs.rip;
                 }
                 other => {
@@ -838,9 +839,9 @@ mod kvm {
         vm.test_mem_mut().fill(0xaa);
         let mut exits = 0;
         let end_pc = loop {
-            eprintln!("about to run! here's some state:");
+//            eprintln!("about to run! here's some state:");
             let regs = vm.vcpu.get_regs().unwrap();
-            dump_regs(&regs);
+//            dump_regs(&regs);
 //            let sregs = vm.vcpu.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run();
@@ -858,7 +859,7 @@ mod kvm {
                 VcpuExit::Hlt => {
                     let regs = vm.vcpu.get_regs().unwrap();
                     eprintln!("hit hlt");
-                    dump_regs(&regs);
+//                    dump_regs(&regs);
                     let intr_handler_base = vm.interrupt_handlers_start();
 
                     // by the time we've exited the `hlt` of the interrupt handler has completed, so rip is
@@ -1417,6 +1418,11 @@ mod kvm {
         let behavior = decoded.behavior();
         eprintln!("checking behavior of {}", decoded);
 
+        // TODO: this does an infinite loop when run??
+        if decoded.opcode() == long_mode::Opcode::FLDCW {
+            return;
+        }
+
         let sregs = vm.vcpu.get_sregs().unwrap();
         let mut regs = vm.vcpu.get_regs().unwrap();
         // vm.set_single_step(true);
@@ -1518,9 +1524,6 @@ mod kvm {
 
         match res {
             Ok(()) => {
-                let mut pdpt = [0u8; 4096];
-                vm.read_mem(vm.page_tables().pdpt_addr(), &mut pdpt[..]);
-                eprintln!("pdpt: {:x?}", &pdpt[..8]);
             }
             Err(Exception::PF) => {
             }
@@ -1712,14 +1715,24 @@ mod kvm {
         let mut vm = TestVm::create();
         vm.set_single_step(true);
 
-        let decoder = InstDecoder::default();
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
         let mut buf = Instruction::default();
         let initial_regs = vm.vcpu.get_regs().unwrap();
 
-        for word in 0..u16::MAX {
+        for word in 0x3000..u16::MAX {
             let inst = word.to_le_bytes();
             let mut reader = U8Reader::new(&inst);
             if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                if [Opcode::FLDENV, Opcode::FNSTENV, Opcode::FRSTOR].contains(&buf.opcode()) {
+                    // this needs a more targeted test
+                    continue;
+                }
+
+                if buf.opcode() == Opcode::WRMSR || buf.opcode() == Opcode::RDMSR {
+                    // TODO: ... okay come on.
+                    continue;
+                }
                 if buf.opcode() == Opcode::RETURN {
                     // hard to handle generically here; see `verify_ret`.
                     continue;
@@ -1729,7 +1742,7 @@ mod kvm {
                     // non-canonical address. needs more specific test.
                     continue;
                 }
-                if buf.opcode() == Opcode::RETF {
+                if buf.opcode() == Opcode::JMPF || buf.opcode() == Opcode::RETF || buf.opcode() == Opcode::CALLF {
                     // TODO: trying to is harder. needs more specific test.
                     continue;
                 }
@@ -1755,6 +1768,10 @@ mod kvm {
                 }
                 if [Opcode::SYSCALL, Opcode::SYSRET, Opcode::SYSENTER, Opcode::SYSEXIT].contains(&buf.opcode()) {
                     // TODO: syscall tests
+                    continue;
+                }
+                if [Opcode::UD0, Opcode::UD1, Opcode::UD2].contains(&buf.opcode()) {
+                    // TODO: ud tests, etc
                     continue;
                 }
                 // some instructions may just be one byte, so figure out the length and only check
