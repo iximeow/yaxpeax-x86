@@ -1720,12 +1720,34 @@ mod kvm {
         let mut buf = Instruction::default();
         let initial_regs = vm.vcpu.get_regs().unwrap();
 
-        for word in 0x3000..u16::MAX {
+        for word in 0xa000..u16::MAX {
             let inst = word.to_le_bytes();
             let mut reader = U8Reader::new(&inst);
             if decoder.decode_into(&mut buf, &mut reader).is_ok() {
-                if [Opcode::FLDENV, Opcode::FNSTENV, Opcode::FRSTOR].contains(&buf.opcode()) {
+                if [Opcode::FLDENV, Opcode::FNSTENV, Opcode::FRSTOR, Opcode::FNSAVE, Opcode::FNSTCW, Opcode::FNSTSW].contains(&buf.opcode()) {
                     // this needs a more targeted test
+                    continue;
+                }
+
+                if buf.opcode() == Opcode::GETSEC {
+                    // oh dear
+                    continue;
+                }
+
+                if buf.opcode() == Opcode::RDTSC {
+                    // the TSC keeps ticking so eax will change across runs and trip the
+                    // "cared about dontcares" check.
+                    continue;
+                }
+
+                if buf.opcode() == Opcode::RDPMC {
+                    // reading a bogus PMC will just #GP so this needs a more specific test.
+                    continue;
+                }
+
+                if buf.opcode() == Opcode::DIV || buf.opcode() == Opcode::IDIV {
+                    // if the operand is in memory we're not currently permuting memory, so it
+                    // might be zero and just #DE.
                     continue;
                 }
 

@@ -65,6 +65,23 @@ impl Instruction {
                         .set_operand(1, Access::Read)
                         .set_operand(2, Access::Read)
                 }
+            } else if self.opcode == Opcode::DIV || self.opcode == Opcode::IDIV {
+                let op_width = if self.operands[0] == OperandSpec::RegMMM {
+                    self.regs[1].width()
+                } else {
+                    self.mem_size
+                };
+                let ops_idx = match op_width {
+                    1 => DIV_IDX_1OP_BYTE,
+                    2 => DIV_IDX_1OP_WORD,
+                    4 => DIV_IDX_1OP_DWORD,
+                    _ /* 8 */ => DIV_IDX_1OP_QWORD,
+                };
+                BehaviorDigest::empty()
+                    .set_pl_any()
+                    .set_flags_access(Access::Write)
+                    .set_operand(0, Access::Read)
+                    .set_implicit_ops(ops_idx)
             } else {
                 // TODO: words
                 unreachable!();
@@ -341,6 +358,7 @@ pub struct OperandIter<'inst> {
 /// as `[rsp - 8] = ...` in a push).
 // TODO: this needs accessors for the elements or something.
 pub struct ImplicitOperand {
+    // TODO: not suitable for public API!
     spec: OperandSpec,
     reg: RegSpec,
     disp: i32,
@@ -1576,6 +1594,136 @@ static MUL_OPS_1OP_QWORD: &'static [ImplicitOperand] = &[
     }
 ];
 
+// the actual implicit operands of `{i,}div` are broken out by operation size..
+static DIV_OPS_1OP_BYTE: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: true,
+    },
+];
+static DIV_OPS_1OP_WORD: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::dx(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::dx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+static DIV_OPS_1OP_DWORD: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+static DIV_OPS_1OP_QWORD: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rdx(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rdx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+
+static RDTSC_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+
+static RDPMC_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ecx(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: true,
+    }
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
 const JCC_OPS_IDX: u16 = 3;
@@ -1601,8 +1749,14 @@ const MUL_IDX_1OP_BYTE: u16 = 22;
 const MUL_IDX_1OP_WORD: u16 = 23;
 const MUL_IDX_1OP_DWORD: u16 = 24;
 const MUL_IDX_1OP_QWORD: u16 = 25;
+const DIV_IDX_1OP_BYTE: u16 = 26;
+const DIV_IDX_1OP_WORD: u16 = 27;
+const DIV_IDX_1OP_DWORD: u16 = 28;
+const DIV_IDX_1OP_QWORD: u16 = 29;
+const RDTSC_IDX: u16 = 30;
+const RDPMC_IDX: u16 = 31;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 26] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 32] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -1629,11 +1783,17 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 26] = [
     MUL_OPS_1OP_WORD,
     MUL_OPS_1OP_DWORD,
     MUL_OPS_1OP_QWORD,
+    DIV_OPS_1OP_BYTE,
+    DIV_OPS_1OP_WORD,
+    DIV_OPS_1OP_DWORD,
+    DIV_OPS_1OP_QWORD,
+    RDTSC_OPS,
+    RDPMC_OPS,
 ];
 
 fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
     use Opcode::*;
-    if opc == &MUL || opc == &IMUL {
+    if opc == &MUL || opc == &IMUL || opc == &DIV || opc == &IDIV {
         return None;
     }
     let behavior = match opc {
@@ -1827,9 +1987,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         CMOVP => { panic!("todo: cmovp"); },
         CMOVS => { panic!("todo: cmovs"); },
         CMOVZ => { panic!("todo: cmovz"); },
-        DIV => { panic!("todo: div"); },
-        IDIV => { panic!("todo: idiv"); },
-        MUL => BehaviorDigest::empty(), // unreachable due to branch above match
+        DIV => BehaviorDigest::empty(), // unreachable due to branch above match
+        IDIV => BehaviorDigest::empty(), // same as div
+        MUL => BehaviorDigest::empty(), // same as div
         SETO => { panic!("todo: seto"); },
         SETNO => { panic!("todo: setno"); },
         SETB => { panic!("todo: setb"); },
@@ -1884,9 +2044,13 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         CLFLUSHOPT => { panic!("todo: clflushopt"); },
         CLWB => { panic!("todo: clwb"); },
         WRMSR => { panic!("todo: wrmsr"); },
-        RDTSC => { panic!("todo: rdtsc"); },
+        RDTSC => BehaviorDigest::empty()
+            .set_implicit_ops(RDTSC_IDX)
+            .set_pl_special(),
         RDMSR => { panic!("todo: rdmsr"); },
-        RDPMC => { panic!("todo: rdpmc"); },
+        RDPMC => BehaviorDigest::empty()
+            .set_implicit_ops(RDPMC_IDX)
+            .set_pl_special(),
         SLDT => { panic!("todo: sldt"); },
         STR => { panic!("todo: str"); },
         LLDT => { panic!("todo: lldt"); },
@@ -2596,7 +2760,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         FADD => GENERAL_RW_R,
         FADDP => GENERAL_RW_R,
         FBLD => GENERAL_W_R,
-        FBSTP => { panic!("todo: fbstp"); },
+        FBSTP => GENERAL_W_R,
         FCHS => { panic!("todo: fchs"); },
         FCMOVB => { panic!("todo: fcmovb"); },
         FCMOVBE => { panic!("todo: fcmovbe"); },
@@ -2616,7 +2780,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         FDISI8087_NOP => { panic!("todo: fdisi8087_nop"); },
         FDIV => GENERAL_RW_R,
         FDIVP => { panic!("todo: fdivp"); },
-        FDIVR => { panic!("todo: fdivr"); },
+        FDIVR => GENERAL_RW_R,
         FDIVRP => { panic!("todo: fdivrp"); },
         FENI8087_NOP => { panic!("todo: feni8087_nop"); },
         FFREE => { panic!("todo: ffree"); },
@@ -2624,8 +2788,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         FIADD => GENERAL_RW_R,
         FICOM => GENERAL_R_R,
         FICOMP => GENERAL_R_R,
-        FIDIV => { panic!("todo: fidiv"); },
-        FIDIVR => { panic!("todo: fidivr"); },
+        FIDIV => GENERAL_RW_R,
+        FIDIVR => GENERAL_RW_R,
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
         FILD => GENERAL_W_R,
         FIMUL => GENERAL_RW_R,
