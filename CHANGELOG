@@ -10,6 +10,12 @@
 * push-immediate, pushf, popf, leave, and xlat now all report a correct memory
   access size, fixing the prior behavior of reporting to memory access size at
   all
+* 64-bit mode: mov seg-to-reg uses 32-bit GPRs for the destination rather than 16-bit.
+  * this is more accurate to the semantic of the instruction, which is why other disassemblers
+    report it this way; for register destinations specifically the segment selector is
+    zero-extended to 64 bits for storage. writing to "eax" in this way implies the 32->64 bit
+    zero-extend, whereas writing to "ax" does not imply any zero-extension. mov reg-to-seg
+    is unchanged and uses a 16-bit form for source GPR.
 
 ## 2.0.0
 

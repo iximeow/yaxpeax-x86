@@ -1254,12 +1254,22 @@ fn test_mov() {
     test_display(&[0x0f, 0x97, 0x08], "seta byte [rax]");
 //    test_display(&[0xd6], "salc");
     test_display(&[0x8e, 0x00], "mov es, word [rax]");
+    test_display(&[0x8e, 0xc0], "mov es, ax");
+    test_display(&[0x8c, 0xc0], "mov eax, es");
     // cs is not an allowed destination
     test_invalid(&[0x8e, 0x08]);
     test_display(&[0x8e, 0x10], "mov ss, word [rax]");
+    test_display(&[0x8e, 0xd0], "mov ss, ax");
+    test_display(&[0x8c, 0xd0], "mov eax, ss");
     test_display(&[0x8e, 0x18], "mov ds, word [rax]");
+    test_display(&[0x8e, 0xd8], "mov ds, ax");
+    test_display(&[0x8c, 0xd8], "mov eax, ds");
     test_display(&[0x8e, 0x20], "mov fs, word [rax]");
+    test_display(&[0x8e, 0xe0], "mov fs, ax");
+    test_display(&[0x8c, 0xe0], "mov eax, fs");
     test_display(&[0x8e, 0x28], "mov gs, word [rax]");
+    test_display(&[0x8e, 0xe8], "mov gs, ax");
+    test_display(&[0x8c, 0xe8], "mov eax, gs");
     test_invalid(&[0x8e, 0x30]);
     test_invalid(&[0x8e, 0x38]);
 }

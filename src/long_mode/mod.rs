@@ -8109,7 +8109,7 @@ fn read_operands<
             instruction.operand_count = 2;
 
             if mem_oper == OperandSpec::RegMMM {
-                instruction.regs[1].bank = RegisterBank::W;
+                instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 2;
             }
