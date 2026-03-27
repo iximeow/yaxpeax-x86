@@ -948,6 +948,10 @@ mod kvm {
                 (_, register_class::RIP) => {
                     false
                 }
+                (register_class::S, _) |
+                (_, register_class::S) => {
+                    false
+                }
                 (l, s) => {
                     panic!("unhandled register-contains test: {:?}/{:?}", l, s);
                 }
@@ -973,6 +977,7 @@ mod kvm {
             register_class::D => (diff & !0xffffffff_ffffffff) == 0,
             register_class::Q => (diff & !0xffffffff_ffffffff) == 0,
             register_class::RFLAGS => (diff & !0xffffffff_ffffffff) == 0,
+            register_class::S => (diff & !0xffff) == 0,
             other => {
                 panic!("unhandled register class: {:?}", other);
             }
@@ -1075,7 +1080,14 @@ mod kvm {
             }
 
             for acc in accesses.iter() {
-                if acc.write {
+                if acc.write && acc.reg.class().width() >= 4 {
+                    // TODO: if a write goes to a subset of a GPR, the dontcare part is *only* the
+                    // written part. currently dontcares are reported as the full width, so
+                    // subsequent steps permute the non-written part and trip over it in
+                    // verify_dontcares.
+                    //
+                    // for now, only dontcare if the written register would be a full write (4
+                    // bytes, zero-extended to 8, or actually a write to all 8 bytes).
                     continue;
                 }
 
