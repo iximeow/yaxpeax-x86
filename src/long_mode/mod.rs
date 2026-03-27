@@ -8918,11 +8918,26 @@ fn read_operands<
             instruction.regs[0] = RegSpec::fs();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
+
+            // good grief. from the SDM:
+            //
+            // > If the source operand is a segment register (16 bits) and the operand size is
+            // > 64-bits, a zeroextended value is pushed on the stack; if the operand size is
+            // > 32-bits, either a zero-extended value is pushed on the stack or the segment selector
+            // > s written on the stack using a 16-bit move
+            //
+            // the memory size here really depends on the `Default` bit in the CS descriptor. if
+            // the default operand size is 64 bits (basically every long-mode code), the acccess is
+            // 8 bytes (zero extended). if the default operand size is 32 bits, this is more complex.
+            instruction.mem_size = 8;
         }
         OperandCase::GS => {
             instruction.regs[0] = RegSpec::gs();
             instruction.operands[0] = OperandSpec::RegRRR;
             instruction.operand_count = 1;
+
+            // see the comment on mem size as written in OperandCase::FS
+            instruction.mem_size = 8;
         }
         OperandCase::AL_Ib => {
             instruction.regs[0] =
