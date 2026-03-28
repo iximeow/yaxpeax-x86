@@ -249,7 +249,6 @@ mod kvm {
             let upper = address.0 >> 32;
             let lower = address.0 & 0xffff_ffff;
 
-            eprintln!("upper: {}", upper);
             // see comment on map_test_mem for why this bounds check is not totally bonkers
             assert!(upper >= 1 && upper <= 9);
             // again, see map_test_mem
@@ -858,7 +857,7 @@ mod kvm {
                 }
                 VcpuExit::Hlt => {
                     let regs = vm.vcpu.get_regs().unwrap();
-                    eprintln!("hit hlt");
+//                    eprintln!("hit hlt");
 //                    dump_regs(&regs);
                     let intr_handler_base = vm.interrupt_handlers_start();
 
@@ -1487,7 +1486,7 @@ mod kvm {
 
         permute_dontcares(dontcare_regs.as_slice(), &mut regs);
 
-        eprintln!("setting regs to: {:?}", regs);
+//        eprintln!("setting regs to: {:?}", regs);
         vm.vcpu.set_regs(&regs).unwrap();
 
         let expected_end = regs.rip + insts.len() as u64;

@@ -1053,7 +1053,8 @@ const GENERAL_RW_FLAGREAD: BehaviorDigest = BehaviorDigest::empty()
     .set_flags_access(Access::Read);
 
 /// cmov reads from a second operand and (may) writes to the first.
-const GENERAL_RW_R_FLAGREAD: BehaviorDigest = GENERAL_RW_FLAGREAD
+const GENERAL_W_R_FLAGREAD: BehaviorDigest = GENERAL_RW_FLAGREAD
+    .set_operand(0, Access::Write)
     .set_operand(1, Access::Read);
 
 /// cmc, clc, sti, cli, etc that toggle individual bits in flags
@@ -1724,6 +1725,45 @@ static RDPMC_OPS: &'static [ImplicitOperand] = &[
     }
 ];
 
+static CPUID_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ecx(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ecx(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ebx(),
+        disp: 0i32,
+        write: true,
+    },
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
 const JCC_OPS_IDX: u16 = 3;
@@ -1755,8 +1795,9 @@ const DIV_IDX_1OP_DWORD: u16 = 28;
 const DIV_IDX_1OP_QWORD: u16 = 29;
 const RDTSC_IDX: u16 = 30;
 const RDPMC_IDX: u16 = 31;
+const CPUID_IDX: u16 = 32;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 32] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 33] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -1789,6 +1830,7 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 32] = [
     DIV_OPS_1OP_QWORD,
     RDTSC_OPS,
     RDPMC_OPS,
+    CPUID_OPS,
 ];
 
 fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
@@ -1828,13 +1870,13 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
 
         CMPS => GENERAL_RW_RW_FLAGWRITE
             .set_implicit_ops(MOVS_IDX),
-        SCAS => GENERAL_RW_R_FLAGREAD
+        SCAS => GENERAL_W_R_FLAGREAD
             .set_implicit_ops(SCAS_IDX), // TODO: second operand is `aX`, right?
-        MOVS => GENERAL_RW_R_FLAGREAD
+        MOVS => GENERAL_W_R_FLAGREAD
             .set_implicit_ops(MOVS_IDX),
-        LODS => GENERAL_RW_R_FLAGREAD
+        LODS => GENERAL_W_R_FLAGREAD
             .set_implicit_ops(LODS_IDX),
-        STOS => GENERAL_RW_R_FLAGREAD
+        STOS => GENERAL_W_R_FLAGREAD
             .set_implicit_ops(STOS_IDX),
         INS => GENERAL_W_R,
         OUTS => GENERAL_R_R,
@@ -2006,7 +2048,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         SETGE => { panic!("todo: setge"); },
         SETLE => { panic!("todo: setle"); },
         SETG => { panic!("todo: setg"); },
-        CPUID => { panic!("todo: cpuid"); },
+        CPUID => BehaviorDigest::empty()
+            .set_implicit_ops(CPUID_IDX)
+            .set_pl_any(),
         UD0 => GENERAL,
         UD1 => GENERAL,
         UD2 => GENERAL,
@@ -2128,7 +2172,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         ANDNPD => { panic!("todo: andnpd"); },
         ANDPS => { panic!("todo: andps"); },
         ANDPD => { panic!("todo: andpd"); },
-        BSWAP => { panic!("todo: bswap"); },
+        BSWAP => GENERAL_RW,
         CMPPD => { panic!("todo: cmppd"); },
         CMPPS => { panic!("todo: cmpps"); },
         COMISD => { panic!("todo: comisd"); },
@@ -2755,36 +2799,53 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
 
         // TODO: none of x87 is verified well.. and what about the bits in the FPU status word..
         // and what about pushes/pops from the x87 operand stack..
-        F2XM1 => { panic!("todo: f2xm1"); },
-        FABS => { panic!("todo: fabs"); },
+        // TODO: read st(0), write st(0)
+        F2XM1 => BehaviorDigest::empty()
+            .set_pl_any(),
+        FABS => GENERAL, // TODO: this is really an implicit write to st(0)
         FADD => GENERAL_RW_R,
         FADDP => GENERAL_RW_R,
         FBLD => GENERAL_W_R,
         FBSTP => GENERAL_W_R,
-        FCHS => { panic!("todo: fchs"); },
-        FCMOVB => { panic!("todo: fcmovb"); },
-        FCMOVBE => { panic!("todo: fcmovbe"); },
-        FCMOVE => { panic!("todo: fcmove"); },
-        FCMOVNB => { panic!("todo: fcmovnb"); },
-        FCMOVNBE => { panic!("todo: fcmovnbe"); },
-        FCMOVNE => { panic!("todo: fcmovne"); },
-        FCMOVNU => { panic!("todo: fcmovnu"); },
-        FCMOVU => { panic!("todo: fcmovu"); },
+        FCHS => GENERAL_W_R,
+        FCMOVB => GENERAL_W_R_FLAGREAD,
+        FCMOVBE => GENERAL_W_R_FLAGREAD,
+        FCMOVE => GENERAL_W_R_FLAGREAD,
+        FCMOVNB => GENERAL_W_R_FLAGREAD,
+        FCMOVNBE => GENERAL_W_R_FLAGREAD,
+        FCMOVNE => GENERAL_W_R_FLAGREAD,
+        FCMOVNU => GENERAL_W_R_FLAGREAD,
+        FCMOVU => GENERAL_W_R_FLAGREAD,
         FCOM => GENERAL_R_R,
-        FCOMI => { panic!("todo: fcomi"); },
-        FCOMIP => { panic!("todo: fcomip"); },
+        FCOMI => GENERAL_R_R_FLAGWRITE,
+        FCOMIP => GENERAL_R_R_FLAGWRITE,
         FCOMP => GENERAL_R_R,
         FCOMPP => GENERAL_R_R,
-        FCOS => { panic!("todo: fcos"); },
-        FDECSTP => { panic!("todo: fdecstp"); },
-        FDISI8087_NOP => { panic!("todo: fdisi8087_nop"); },
+        // TODO: st(0) -> st(0)
+        FCOS => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: x87 stack pointer dec
+        FDECSTP => BehaviorDigest::empty()
+            .set_pl_any(),
         FDIV => GENERAL_RW_R,
-        FDIVP => { panic!("todo: fdivp"); },
+        // TODO: x87 stack pop
+        FDIVP => GENERAL_RW_R,
         FDIVR => GENERAL_RW_R,
-        FDIVRP => { panic!("todo: fdivrp"); },
-        FENI8087_NOP => { panic!("todo: feni8087_nop"); },
-        FFREE => { panic!("todo: ffree"); },
-        FFREEP => { panic!("todo: ffreep"); },
+        // TODO: x87 stack pop
+        FDIVRP => GENERAL_RW_R,
+        FENI8087_NOP => BehaviorDigest::empty()
+            .set_pl_any(),
+        FDISI8087_NOP => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: the behavior here is ... inaccurate. st(i) is not read, but state associated with
+        // that register is modified. so it's kind of read?
+        FFREE => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_pl_any(),
+        // same as `ffree` above.
+        FFREEP => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_pl_any(),
         FIADD => GENERAL_RW_R,
         FICOM => GENERAL_R_R,
         FICOMP => GENERAL_R_R,
@@ -2793,7 +2854,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
         FILD => GENERAL_W_R,
         FIMUL => GENERAL_RW_R,
-        FINCSTP => { panic!("todo: fincstp"); },
+        // TODO: x87 stack pointer inc
+        FINCSTP => BehaviorDigest::empty()
+            .set_pl_any(),
         FIST => GENERAL_W_R,
         FISTP => GENERAL_W_R,
         FISTTP => GENERAL_W_R,
@@ -2801,54 +2864,104 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         FISUBR => GENERAL_RW_R,
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
         FLD => GENERAL_W_R,
-        FLD1 => { panic!("todo: fld1"); },
+        // TODO: fpu stack write
+        FLD1 => BehaviorDigest::empty()
+            .set_pl_any(),
         FLDCW => GENERAL_R,
-        FLDENV => { panic!("todo: fldenv"); },
-        FLDL2E => { panic!("todo: fldl2e"); },
-        FLDL2T => { panic!("todo: fldl2t"); },
-        FLDLG2 => { panic!("todo: fldlg2"); },
-        FLDLN2 => { panic!("todo: fldln2"); },
-        FLDPI => { panic!("todo: fldpi"); },
-        FLDZ => { panic!("todo: fldz"); },
+        FLDENV => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: fpu stack write
+        FLDL2E => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: fpu stack write
+        FLDL2T => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: fpu stack write
+        FLDLG2 => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: fpu stack write
+        FLDLN2 => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: fpu stack write
+        FLDPI =>  BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: fpu stack write
+        FLDZ =>  BehaviorDigest::empty()
+            .set_pl_any(),
         FMUL => GENERAL_RW_R,
-        FMULP => { panic!("todo: fmulp"); },
-        FNCLEX => { panic!("todo: fnclex"); },
-        FNINIT => { panic!("todo: fninit"); },
-        FNOP => { panic!("todo: fnop"); },
+        FMULP => GENERAL_RW_R,
+        // TODO: report change to x87 flags?
+        FNCLEX => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: report change to x87 flags?
+        FNINIT => BehaviorDigest::empty()
+            .set_pl_any(),
+        FNOP => BehaviorDigest::empty()
+            .set_pl_any(),
         FNSAVE => { panic!("todo: fnsave"); },
         FNSTCW => { panic!("todo: fnstcw"); },
         FNSTENV => { panic!("todo: fnstenv"); },
         FNSTOR => { panic!("todo: fnstor"); },
         FNSTSW => { panic!("todo: fnstsw"); },
-        FPATAN => { panic!("todo: fpatan"); },
-        FPREM => { panic!("todo: fprem"); },
-        FPREM1 => { panic!("todo: fprem1"); },
-        FPTAN => { panic!("todo: fptan"); },
-        FRNDINT => { panic!("todo: frndint"); },
+        // TODO: read st(1) with atan(st(1)/st(0)) and pop
+        FPATAN => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: read st(0), st(1), write st(0)
+        FPREM => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: read st(0), st(1), write st(0)
+        FPREM1 => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: read st(0), write, push?
+        FPTAN => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: read st(0), write, push?
+        FRNDINT => BehaviorDigest::empty()
+            .set_pl_any(),
         FRSTOR => { panic!("todo: frstor"); },
-        FSCALE => { panic!("todo: fscale"); },
-        FSETPM287_NOP => { panic!("todo: fsetpm287_nop"); },
-        FSIN => { panic!("todo: fsin"); },
-        FSINCOS => { panic!("todo: fsincos"); },
-        FSQRT => { panic!("todo: fsqrt"); },
+        // TODO: read st(0), st(1)
+        FSCALE => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: report this as a complex instruction?
+        FSETPM287_NOP => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: st(0) -> st(0)
+        FSIN => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: st(0) -> st(0)
+        FSINCOS => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: st(0) -> st(0)
+        FSQRT => BehaviorDigest::empty()
+            .set_pl_any(),
         FST => GENERAL_W_R,
         FSTP => GENERAL_W_R,
-        FSTPNCE => { panic!("todo: fstpnce"); },
+        FSTPNCE => GENERAL_W_R,
         FSUB => GENERAL_RW_R,
         FSUBP => GENERAL_RW_R,
         FSUBR => GENERAL_RW_R,
         FSUBRP => GENERAL_RW_R,
-        FTST => { panic!("todo: ftst"); },
+        // TODO: report change to x87 flags, read of st(0)?
+        FTST => BehaviorDigest::empty()
+            .set_pl_any(),
         FUCOM => GENERAL_R_R,
         FUCOMI => GENERAL_R_R_FLAGWRITE,
         FUCOMIP => GENERAL_R_R_FLAGWRITE,
         FUCOMP => GENERAL_R_R,
         FUCOMPP => GENERAL_R_R,
-        FXAM => { panic!("todo: fxam"); },
-        FXCH => { panic!("todo: fxch"); },
-        FXTRACT => { panic!("todo: fxtract"); },
-        FYL2X => { panic!("todo: fyl2x"); },
-        FYL2XP1 => { panic!("todo: fyl2xp1"); },
+        // TODO: report change to x87 flags?
+        FXAM => BehaviorDigest::empty()
+            .set_pl_any(),
+        FXCH => GENERAL_RW_RW,
+        // TODO: read st(0), write st(0), x87 push
+        FXTRACT => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: read st(0), write st(0)
+        FYL2X => BehaviorDigest::empty()
+            .set_pl_any(),
+        // TODO: read st(0), write st(0)
+        FYL2XP1 => BehaviorDigest::empty()
+            .set_pl_any(),
 
         LOOPNZ => { panic!("todo: loopnz"); },
         LOOPZ => { panic!("todo: loopz"); },
