@@ -957,7 +957,7 @@ mod kvm {
             }
         }
     }
-    fn write_matches_reg(reg: RegSpec, diff: u64) -> bool {
+    fn reg_mask(reg: RegSpec) -> u64 {
         match reg.class() {
             register_class::B => {
                 // non-rex byte regs are al, cl, dl, bl, ah, ch, dh, bh
@@ -966,17 +966,17 @@ mod kvm {
                 } else {
                     0xff00
                 };
-                (diff & !mask) == 0
+                mask
             },
             // but rex byte regs are all low-byte
-            register_class::RB => (diff & !0xff) == 0,
-            register_class::W => (diff & !0xffff) == 0,
+            register_class::RB => 0xff,
+            register_class::W => 0xffff,
             // x86_64 zero-extends 32-bit writes to 64-bit, so writes to "32-bit" registers still
             // are fully-clobbers.
-            register_class::D => (diff & !0xffffffff_ffffffff) == 0,
-            register_class::Q => (diff & !0xffffffff_ffffffff) == 0,
-            register_class::RFLAGS => (diff & !0xffffffff_ffffffff) == 0,
-            register_class::S => (diff & !0xffff) == 0,
+            register_class::D => 0xffffffff_ffffffff,
+            register_class::Q => 0xffffffff_ffffffff,
+            register_class::RFLAGS => 0xffffffff_ffffffff,
+            register_class::S => 0xffff,
             other => {
                 panic!("unhandled register class: {:?}", other);
             }
@@ -994,24 +994,24 @@ mod kvm {
         unexpected_regs: &mut Vec<UnexpectedRegChange>, expected_regs: &[ExpectedRegAccess],
         changed_reg: RegSpec, before: u64, after: u64,
     ) {
-        let diff = before ^ after;
+        // the same GPR may appear by different names in `expected_regs`, like as in `xchg ah, al`.
+        // so, compute a diff here and poke out bits as the diff can be accounted for.
+        let mut diff = before ^ after;
         if diff != 0 {
             // could be a write. full write? maybe!
-            let position = expected_regs.iter().position(|e| {
+            for e in expected_regs.iter() {
                 if !e.write {
-                    return false;
+                    continue;
                 }
 
                 if !check_contains(changed_reg, e.reg) {
-                    return false;
+                    continue;
                 }
 
-                write_matches_reg(e.reg, diff)
-            });
+                diff &= !reg_mask(e.reg);
+            }
 
-            if let Some(_position) = position {
-                // nothing to do with it right now
-            } else {
+            if diff != 0 {
                 unexpected_regs.push(UnexpectedRegChange {
                     reg: changed_reg,
                     before,
@@ -1066,7 +1066,7 @@ mod kvm {
                         Some(reg.num())
                     }
                     register_class::B => {
-                        Some(reg.num() & 0b111)
+                        Some(reg.num() & 0b11)
                     }
                     _ => {
                         None
@@ -1119,7 +1119,7 @@ mod kvm {
                         Some(reg.num())
                     }
                     register_class::B => {
-                        Some(reg.num() & 0b111)
+                        Some(reg.num() & 0b11)
                     }
                     _ => {
                         None
