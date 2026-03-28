@@ -1740,6 +1740,19 @@ mod kvm {
                     continue;
                 }
 
+                if [Opcode::INS, Opcode::MOVS, Opcode::OUTS, Opcode::LODS, Opcode::STOS, Opcode::CMPS, Opcode::SCAS].contains(&buf.opcode()) {
+                    if buf.prefixes.rep_any() {
+                        // `repnz cmps` will carry on for however long memory allows,
+                        // `rep movs` runs `rcx`-many times, etc
+                        continue;
+                    }
+                }
+
+                if buf.opcode() == Opcode::RSM {
+                    // SMM is kinda not our problem for now..
+                    continue;
+                }
+
                 if buf.opcode() == Opcode::GETSEC {
                     // oh dear
                     continue;
