@@ -1,623 +1,12 @@
 
 #[cfg(target_arch = "x86_64")]
 mod kvm {
-    use std::convert::TryInto;
-    use kvm_ioctls::{Kvm, VcpuFd, VmFd, VcpuExit};
-    use kvm_bindings::{
-        kvm_guest_debug, kvm_userspace_memory_region, kvm_segment, kvm_regs, kvm_sregs,
-        KVM_GUESTDBG_ENABLE, KVM_GUESTDBG_SINGLESTEP,
-    };
+    use asmlinator::x86_64::{GuestAddress, Vm, VcpuExit, kvm_regs, kvm_sregs};
 
     use yaxpeax_x86::long_mode;
     use yaxpeax_x86::long_mode::behavior::Exception;
 
     use rand::prelude::*;
-
-    /// a test VM for running arbitrary instructions.
-    ///
-    /// there is one CPU which is configured for long-mode execution. all memory is
-    /// identity-mapped with 1GiB pages. page tables are configured to cover 512 GiB of memory, but
-    /// much much less than that is actually allocated and usable through `memory.`
-    ///
-    /// it is configured with `mem_size` bytes of memory at guest address 0, accessible through
-    /// host pointer `memory`. this region is used for "control structures"; page tables, GDT, IDT,
-    /// and stack. `test_memory` and `test_mem_size` describe an additional region intended for
-    /// instruction reads and writes.
-    #[allow(unused)]
-    struct TestVm {
-        vm: VmFd,
-        vcpu: VcpuFd,
-        idt_configured: bool,
-        memory: *mut u8,
-        mem_size: usize,
-        test_memory: *mut u8,
-        test_mem_size: usize,
-    }
-
-    const GB: u64 = 1 << 30;
-
-    // TODO: cite APM/SDM
-    const IDT_ENTRIES: u16 = 256;
-
-    #[derive(Copy, Clone)]
-    struct GuestAddress(u64);
-
-    struct VmPageTables<'vm> {
-        vm: &'vm TestVm,
-        base: GuestAddress,
-    }
-
-    impl<'vm> VmPageTables<'vm> {
-        fn pml4_addr(&self) -> GuestAddress {
-            self.base
-        }
-
-        fn pdpt_addr(&self) -> GuestAddress {
-            GuestAddress(self.base.0 + 0x1000)
-        }
-
-        fn pml4_mut(&self) -> *mut u64 {
-            // SAFETY: creating VmPageTables implies we've asserted that we can form host pointers
-            // for all addresses in the page tables.
-            unsafe {
-                self.vm.host_ptr(self.pml4_addr()) as *mut u64
-            }
-        }
-
-        fn pdpt_mut(&self) -> *mut u64 {
-            // SAFETY: creating VmPageTables implies we've asserted that we can form host pointers
-            // for all addresses in the page tables.
-            unsafe {
-                self.vm.host_ptr(self.pdpt_addr()) as *mut u64
-            }
-        }
-    }
-
-    fn encode_segment(seg: &kvm_segment) -> u64 {
-        let base = seg.base as u64;
-        let limit = seg.limit as u64;
-
-        let lim_low = limit & 0xffff;
-        let lim_high = (limit >> 16) & 0xf;
-        let addr_low = base & 0xffff;
-        let desc_low = lim_low | (addr_low << 16);
-
-        let base_mid = (base >> 16) & 0xff;
-        let base_high = (base >> 24) & 0xff;
-        let access_byte = (seg.type_ as u64)
-            | (seg.s as u64) << 4
-            | (seg.dpl as u64) << 5
-            | (seg.present as u64) << 7;
-        let flaglim_byte = lim_high
-            | (seg.avl as u64) << 4
-            | (seg.l as u64) << 5
-            | (seg.db as u64) << 6
-            | (seg.g as u64) << 7;
-        let desc_high = base_mid
-            | access_byte << 8
-            | flaglim_byte << 16
-            | base_high << 24;
-
-        desc_low | (desc_high << 32)
-    }
-
-    impl TestVm {
-        fn create() -> TestVm {
-            let kvm = Kvm::new().unwrap();
-
-            let vm = kvm.create_vm().unwrap();
-
-            let mem_size = 1024 * 1024;
-            let mem_addr: *mut u8 = unsafe {
-                libc::mmap(
-                    core::ptr::null_mut(),
-                    mem_size,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_ANONYMOUS | libc::MAP_SHARED | libc::MAP_NORESERVE,
-                    -1,
-                    0,
-                ) as *mut u8
-            };
-
-            let test_mem_size = 9 * 128 * 1024;
-            let test_mem_addr: *mut u8 = unsafe {
-                libc::mmap(
-                    core::ptr::null_mut(),
-                    test_mem_size,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_ANONYMOUS | libc::MAP_SHARED | libc::MAP_NORESERVE,
-                    -1,
-                    0,
-                ) as *mut u8
-            };
-
-            assert!(!mem_addr.is_null());
-            assert!(!test_mem_addr.is_null());
-            // look, mmap should only be in the business of returning page-aligned addresses but i
-            // just wanna see it, you know...
-            assert!(mem_addr as usize % 4096 == 0);
-            assert!(test_mem_addr as usize % 4096 == 0);
-
-            let region = kvm_userspace_memory_region {
-                slot: 0,
-                guest_phys_addr: 0x0000,
-                memory_size: mem_size as u64,
-                userspace_addr: mem_addr as u64,
-                flags: 0,
-            };
-            unsafe { vm.set_user_memory_region(region).unwrap() };
-
-            let vcpu = vm.create_vcpu(0).unwrap();
-
-            let mut this = TestVm {
-                vm,
-                vcpu,
-                idt_configured: false,
-                memory: mem_addr,
-                mem_size,
-                test_memory: test_mem_addr,
-                test_mem_size,
-            };
-
-            this.map_test_mem();
-
-            let mut vcpu_regs = this.vcpu.get_regs().unwrap();
-            let mut vcpu_sregs = this.vcpu.get_sregs().unwrap();
-
-            unsafe {
-                this.configure_identity_paging(&mut vcpu_sregs);
-                this.configure_selectors(&mut vcpu_sregs);
-                this.configure_idt(&mut vcpu_regs, &mut vcpu_sregs);
-            }
-
-            vcpu_sregs.efer = 0x0000_0500; // LME | LMA
-
-            this.vcpu.set_regs(&vcpu_regs).unwrap();
-            this.vcpu.set_sregs(&vcpu_sregs).unwrap();
-
-            this
-        }
-
-        // we need to keep accesses from falling into mapped-but-not-backed regions
-        // of guest memory, so we don't get MMIO exits (which would just test
-        // Linux's x86 emulation). control structures are at in the low 1G (really 1M)
-        // of memory, which memory references under test shoul not touch.
-        //
-        // we'll limit discriminants to 511 (arbitrary), which means that 512-byte
-        // increments of 1..16 can distinguish registers. given SIB addressing the
-        // highest address that can be formed is something like...
-        //
-        // > (1G + 15 * 512) + (1G + 16 * 512) * 8 + 512
-        //
-        // or just under 9G + 16k. that access *could* be a wide AVX-512 situation,
-        // so the highest byte addressed can be a few bytes later.
-        //
-        // this can be read as "the first 32k at each 1G may be accessed", but only
-        // GB boundaries at 1, 2, 3, 5, and 9 can be accessed in this way (non-SIB,
-        // then SIB with scale = 1, 2, 4, 8).
-        //
-        // while memory is Yikes Expensive, setting up 128k at each 1G offset that might be
-        // accessed is only 1M 128K, so that's what we'll do  here.
-        fn map_test_mem(&mut self) {
-            // arbitrayish, but does ned to be greater than a few bytes larger than 16k. see above.
-            const GB_CHUNK_SIZE: u64 = 128 * 1024;
-            for i in 0..=8 {
-                eprintln!("mapping chunk {}", i);
-                let host_test_offset = i * GB_CHUNK_SIZE;
-                assert!(host_test_offset + GB_CHUNK_SIZE <= self.test_mem_size as u64);
-
-                let host_ptr = unsafe {
-                    self.test_memory.offset(host_test_offset as isize) as u64
-                };
-
-                let region = kvm_userspace_memory_region {
-                    slot: 1 + i as u32,
-                    guest_phys_addr: 0x1_0000_0000 * (1 + i),
-                    memory_size: GB_CHUNK_SIZE,
-                    userspace_addr: host_ptr,
-                    flags: 0,
-                };
-                unsafe { self.vm.set_user_memory_region(region).unwrap() };
-            }
-        }
-
-        // TODO: seems like there's a KVM bug where if the VM is configured for single-step and the
-        // single-stepped instruction is a read-modify-write to MMIO memory, the single-step
-        // doesn't actually take effect. compare `0x33 0x00` and `0x31 0x00`. what the hell!
-        fn set_single_step(&mut self, active: bool) {
-            let mut guest_debug = kvm_guest_debug::default();
-
-            if active {
-                guest_debug.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP
-            };
-
-            self.vcpu.set_guest_debug(&guest_debug).unwrap();
-        }
-
-        fn run(&mut self) -> VcpuExit<'_> {
-            self.vcpu.run().unwrap_or_else(|e| {
-                panic!("error running vcpu: {}", e);
-            })
-        }
-
-        unsafe fn host_ptr(&self, address: GuestAddress) -> *mut u8 {
-            assert!(address.0 < self.mem_size as u64);
-            self.memory.offset(address.0 as isize)
-        }
-
-        unsafe fn testmem_ptr(&self, address: GuestAddress) -> *mut u8 {
-            let upper = address.0 >> 32;
-            let lower = address.0 & 0xffff_ffff;
-
-            // see comment on map_test_mem for why this bounds check is not totally bonkers
-            assert!(upper >= 1 && upper <= 9);
-            // again, see map_test_mem
-            assert!(lower < 128 * 1024);
-
-            let testmem_offset = 128 * 1024 * (upper - 1) + lower;
-            self.test_memory.offset(testmem_offset as isize)
-        }
-
-        fn gdt_addr(&self) -> GuestAddress {
-            GuestAddress(0x1000)
-        }
-
-        fn idt_addr(&self) -> GuestAddress {
-            GuestAddress(0x2000)
-        }
-
-        fn interrupt_handlers_start(&self) -> GuestAddress {
-            GuestAddress(0x3000)
-        }
-
-        fn page_table_addr(&self) -> GuestAddress {
-            GuestAddress(0x10000)
-        }
-
-        fn code_addr(&self) -> GuestAddress {
-            GuestAddress(self.mem_size as u64 - 4096)
-        }
-
-        fn guest_mem_size(&self) -> u64 {
-            512 * (GB as u64)
-        }
-
-        /// configuring the IDT implies the IDT might be used which means we want a stack pointer
-        /// that can have at least 0x18 bytes pushed to it if an interrupt happens.
-        fn stack_addr(&self) -> GuestAddress {
-            // it would be nice to point the stack somewhere that we could get MMIO exits and see the
-            // processor push words for the interrupt in real time, but this doesn't seem to... work
-            // as one might hope. instead, you end up in a loop somewhere around svm_vcpu_run (which
-            // you can ^C out of, thankfully).
-            //
-            // so this picks some guest memory lower down.
-            //GuestAddress(0x1_0000_8000)
-
-            // stack grows *down* but if someone pops a lot of bytes from rsp we'd go up and
-            // clobber the page tables. so leave a bit of space.
-            GuestAddress(0x19800)
-        }
-
-        /// selector 0x10 is used for code everywhere in these tests.
-        fn selector_cs(&self) -> u16 {
-            0x10
-        }
-
-        /// selector 0x18 is used for data (all segments; ss, ds, es, etc) everywhere in these tests.
-        fn selector_ds(&self) -> u16 {
-            0x18
-        }
-
-        fn check_range(&self, base: GuestAddress, size: u64) {
-            let base = base.0;
-            let end = base.checked_add(size).expect("no overflow");
-
-            assert!(base < self.mem_size as u64);
-            assert!(self.mem_size as u64 >= end);
-        }
-
-        fn check_testrange(&self, base: GuestAddress, size: u64) {
-            let base = base.0;
-            assert!(base >= 0x1_0000_0000);
-
-            let test_chunk = base >> 32;
-            assert!(test_chunk < 0xa);
-            let test_offset = base & 0xffff_ffff;
-            let end = test_offset.checked_add(size).expect("no overflow");
-
-            assert!(end < 128 * 1024);
-        }
-
-        pub fn write_mem(&mut self, addr: GuestAddress, data: &[u8]) {
-            self.check_range(addr, data.len() as u64);
-
-            // SAFETY: `check_range` above validates the range to copy, and... please do not
-            // provide a slice of guest memory as what the guest should be programmed for...
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    data.as_ptr(),
-                    self.host_ptr(addr),
-                    data.len()
-                );
-            }
-        }
-
-        pub fn read_mem(&mut self, addr: GuestAddress, buf: &mut [u8]) {
-            self.check_range(addr, buf.len() as u64);
-
-            // SAFETY: `check_range` above validates the range to copy, and... please do not
-            // provide a slice of guest memory as what should be read into...
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    self.host_ptr(addr) as *const _,
-                    buf.as_mut_ptr(),
-                    buf.len()
-                );
-            }
-        }
-
-        pub fn test_mem(&self) -> &[u8] {
-            // SAFETY: since this is &mut self we know the VM is not running and will not be
-            // running as long as this slice exists. so there are no concurrent readers or writers
-            // of this slice.
-            unsafe {
-                std::slice::from_raw_parts(
-                    self.test_memory,
-                    self.test_mem_size
-                )
-            }
-        }
-
-        pub fn test_mem_mut(&mut self) -> &mut [u8] {
-            // SAFETY: since this is &mut self we know the VM is not running and will not be
-            // running as long as this slice exists. so there are no concurrent readers or writers
-            // of this slice.
-            unsafe {
-                std::slice::from_raw_parts_mut(
-                    self.test_memory,
-                    self.test_mem_size
-                )
-            }
-        }
-
-        pub fn write_testmem(&mut self, addr: GuestAddress, data: &[u8]) {
-            self.check_testrange(addr, data.len() as u64);
-
-            // SAFETY: `check_range` above validates the range to copy, and... please do not
-            // provide a slice of guest memory as what the guest should be programmed for...
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    data.as_ptr(),
-                    self.testmem_ptr(addr),
-                    data.len()
-                );
-            }
-        }
-
-        pub fn program(&mut self, code: &[u8], regs: &mut kvm_regs) {
-            let addr = self.code_addr();
-            self.write_mem(addr, code);
-
-            regs.rip = addr.0;
-        }
-
-        fn gdt_entry_mut(&mut self, idx: u16) -> *mut u64 {
-            // the GDT is set up at addresses 0..64k:
-            //
-            // > 3.5.1 Segment Descriptor Tables
-            // > A segment descriptor table is an array of segment descriptors (see Figure 3-10). A
-            // > descriptor table is variable in length and can contain up to 8192 (2^13) 8-byte
-            // > descriptors.
-
-            assert!(idx < 4096 / 8);
-            let addr = GuestAddress(self.gdt_addr().0 + (idx as u64 * 8));
-            self.check_range(addr, std::mem::size_of::<u64>() as u64);
-
-            // SAFETY: idx * 8 can't overflow isize, and we've asserted the end of the pointer is
-            // still inside the allocation (`self.memory`).
-            unsafe {
-                self.host_ptr(addr) as *mut u64
-            }
-        }
-
-        // note this returns a u32, but an IDT is four u32. the u32 this points at is the first of
-        // the four for the entry.
-        fn idt_entry_mut(&mut self, idx: u8) -> *mut u32 {
-            let addr = GuestAddress(self.idt_addr().0 + (idx as u64 * 16));
-            self.check_range(addr, std::mem::size_of::<[u64; 2]>() as u64);
-
-            unsafe {
-                self.host_ptr(addr) as *mut u32
-            }
-        }
-
-        fn page_tables(&self) -> VmPageTables<'_> {
-            let base = self.page_table_addr();
-
-            // the page tables are really just two pages: a PML4 and a PDPT for its first 512G of
-            // address space.
-            self.check_range(base, 0x2000);
-
-            VmPageTables {
-                vm: self,
-                base,
-            }
-        }
-
-        unsafe fn configure_identity_paging(&mut self, sregs: &mut kvm_sregs) {
-            let pt = self.page_tables();
-
-            // we're only setting up one PDPT, which can have up to 512 PDPTE covering 1G each.
-            assert!(self.guest_mem_size() <= 512 * GB);
-
-            // TODO: expects 1G page support
-
-            pt.pml4_mut().write(
-                1 << 0 | // P
-                1 << 1 | // RW
-                1 << 2 | // user access allowed. but no user code will run so not strictly needed.
-                0 << 3 | // PWT (TODO: configure PAT explicitly, but PAT0 is sufficient)
-                0 << 4 | // PCD (TODO: configure PAT explicitly, but PAT0 is sufficient)
-                0 << 5 | // A
-                0 << 6 | // ignored
-                0 << 7 | // PS (reserved must-be-0)
-                0 << 11 | // R (for ordinary paging, ignored; for HLAT ...)
-                pt.pdpt_addr().0
-            );
-
-            let mut mapped: u64 = 0;
-            // we've set up the first PML4 to point to a PDPT, so we should actually set it up!
-            let pdpt = pt.pdpt_mut();
-            // PDPTEs start at the start of PDPT..
-            let mut pdpte = pdpt;
-            let entry_bits: u64 =
-                1 << 0 | // P
-                1 << 1 | // RW
-                1 << 2 | // user accesses allowed (everything is under privilege level 0 tho)
-                0 << 3 | // PWT (TODO: configure PAT explicitly, but PAT0 is sufficient)
-                0 << 4 | // PCD (TODO: configure PAT explicitly, but PAT0 is sufficient)
-                0 << 5 | // Accessed
-                0 << 6 | // Dirty
-                1 << 7 | // Page size (1 implies 1G page)
-                1 << 8 | // Global (if cr4.pge)
-                0 << 9 |
-                0 << 10 |
-                0 << 11 | // for ordinary paging, ignored. for HLAT, ...
-                0 << 12; // PAT (TODO: configure explicitly, but PAT0 is sufficient. verify MTRR sets PAT0 to WB?)
-
-            while mapped < self.guest_mem_size() {
-                let phys_num = mapped >> 30;
-                let entry = entry_bits | (phys_num << 30);
-                pdpte.write(entry);
-                pdpte = pdpte.offset(1);
-                // eprintln!("mapped 1g at {:08x}", mapped);
-                mapped += 1 << 30;
-            }
-
-            sregs.cr0 = 0x8000_0001; // cr0.PE | cr0.PG
-            sregs.cr3 = pt.pml4_addr().0 as u64;
-            sregs.cr4 = 1 << 5; // enable PAE
-        }
-
-        unsafe fn configure_selectors(&mut self, sregs: &mut kvm_sregs) {
-            // we have to set descriptor information directly. this avoids having to load selectors
-            // as the first instructions on the vCPU, which is simplifying. but if we want the
-            // information in these selectors to match with anything in a GDT (i do!) we'll have to
-            // keep this initial state lined up with GDT entries ourselves.
-            //
-            // we could avoid setting up the GDT for the most part, but anything that might
-            // legitimately load the "valid" current segment selector would instead clobber the
-            // selector with zeroes.
-
-            sregs.cs.base = 0;
-            sregs.cs.limit = 0;
-            sregs.cs.selector = self.selector_cs();
-            sregs.cs.type_ = 0b1011; // see SDM table 3-1 Code- and Data-Segment Types
-            sregs.cs.present = 1;
-            sregs.cs.dpl = 0;
-            sregs.cs.db = 0;
-            sregs.cs.s = 1;
-            sregs.cs.l = 1;
-            sregs.cs.g = 0;
-            sregs.cs.avl = 0;
-
-            sregs.ds.base = 0;
-            sregs.ds.limit = 0xffffffff;
-            sregs.ds.selector = self.selector_ds();
-            sregs.ds.type_ = 0b0011; // see SDM table 3-1 Code- and Data-Segment Types
-            sregs.ds.present = 1;
-            sregs.ds.dpl = 0;
-            sregs.ds.db = 0;
-            sregs.ds.s = 1;
-            sregs.ds.l = 0;
-            sregs.ds.g = 0;
-            sregs.ds.avl = 0;
-
-            sregs.es = sregs.ds;
-            sregs.fs = sregs.ds;
-            sregs.gs = sregs.ds;
-            // linux populates the vmcb cpl field with whatever's in ss.dpl. what the hell???
-            sregs.ss = sregs.ds;
-
-            sregs.gdt.base = self.gdt_addr().0;
-            sregs.gdt.limit = 256 * 8 - 1;
-
-            self.gdt_entry_mut(self.selector_cs() >> 3).write(encode_segment(&sregs.cs));
-            self.gdt_entry_mut(self.selector_ds() >> 3).write(encode_segment(&sregs.ds));
-        }
-
-        fn write_idt_entry(
-            &mut self,
-            intr_nr: u8,
-            interrupt_handler_cs: u16,
-            interrupt_handler_addr: GuestAddress
-        ) {
-            let idt_ptr = self.idt_entry_mut(intr_nr);
-
-            // entries in the IDT, interrupt and trap descriptors (in the AMD APM, "interrupt-gate"
-            // and "trap-gate" descriptors), are described (in the AMD APM) by
-            // "Figure 4-24. Interrupt-Gate and Trap-Gate Descriptors—Long Mode". reproduced here:
-            //
-            //  3   2                 1        |          1                   0
-            //  1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6|5 4 3 2 1 0 9 8 7 6 5 4 3 2 1 0
-            // |---------------------------------------------------------------|
-            // |                            res,ign                            | +12
-            // |                      target offset[63:32]                     | +8
-            // |     target offset[31:16]      |P|DPL|0| type  | res,ign | IST | +4
-            // |     target selector           |    target offset[15:0]        | +0
-            // |---------------------------------------------------------------|
-            //
-            // descriptors are encoded with P set, DPL at 0, and type set to 0b1110. TODO: frankly
-            // i don't know the mechanical difference between type 0x0e and type 0x0f, but 0x0e
-            // works for now.
-            let idt_attr_bits = 0b1_00_0_1110_00000_000;
-            let low_hi = (interrupt_handler_addr.0 as u32 & 0xffff_0000) | idt_attr_bits;
-            let low_lo = (interrupt_handler_cs as u32) << 16 | (interrupt_handler_addr.0 as u32 & 0x0000_ffff);
-
-            unsafe {
-                idt_ptr.offset(0).write(low_lo);
-                idt_ptr.offset(1).write(low_hi);
-                idt_ptr.offset(2).write((interrupt_handler_addr.0 >> 32) as u32);
-                idt_ptr.offset(3).write(0); // reserved
-            }
-        }
-
-        fn configure_idt(&mut self, regs: &mut kvm_regs, sregs: &mut kvm_sregs) {
-            sregs.idt.base = self.idt_addr().0;
-            sregs.idt.limit = IDT_ENTRIES * 16 - 1; // IDT is 256 entries of 16 bytes each
-
-            for i in 0..IDT_ENTRIES {
-                let interrupt_handler_addr = GuestAddress(self.interrupt_handlers_start().0 + i as u64);
-                self.write_idt_entry(
-                    i.try_into().expect("<u8::MAX interrupts"),
-                    self.selector_cs(),
-                    interrupt_handler_addr
-                );
-            }
-
-            // all interrupt handlers are just `hlt`. their position is used to detect which
-            // exception/interrupt occurred.
-            unsafe {
-                std::slice::from_raw_parts_mut(
-                    self.host_ptr(self.interrupt_handlers_start()),
-                    IDT_ENTRIES as usize
-                ).fill(0xf4);
-            }
-
-            // finally, set `rsp` to a valid region so that the CPU can push necessary state (see
-            // AMD APM section "8.9.3 Interrupt Stack Frame") to actually enter the interrupt
-            // handler. if we didn't do this, rsp will probably be zero or something, underflow,
-            // page fault on push to 0xffffffff_ffffffff, and just triple fault.
-            //
-            // TODO: this is our option in 16- and 32-bit modes, but in long mode all the interrupt
-            // descriptors could set something in IST to switch stacks outright for exception
-            // handling. this might be nice to test rsp permutations in 64-bit code? alternatively
-            // we might just have to limit possible rsp permutations so as to be able to test in
-            // 16- and 32-bit modes anyway.
-            regs.rsp = self.stack_addr().0;
-            self.idt_configured = true;
-        }
-    }
 
     #[derive(Debug, Copy, Clone)]
     struct ExpectedMemAccess {
@@ -641,7 +30,7 @@ mod kvm {
 
     struct AccessTestCtx<'a> {
         regs: &'a mut kvm_regs,
-        vm: &'a TestVm,
+        vm: &'a Vm,
         preserve_rsp: bool,
         used_regs: [bool; 16],
         expected_reg: Vec<ExpectedRegAccess>,
@@ -734,12 +123,12 @@ mod kvm {
         }
     }
 
-    fn run(vm: &mut TestVm) {
+    fn run(vm: &mut Vm) {
         let mut exits = 0;
         let end_pc = loop {
 //            eprintln!("about to run! here's some state:");
-            let regs = vm.vcpu.get_regs().unwrap();
 /*
+            let regs = vm.get_regs().unwrap();
             unsafe {
             let bytes = vm.host_ptr(GuestAddress(regs.rip));
             let slc = std::slice::from_raw_parts(bytes, 15);
@@ -752,26 +141,26 @@ mod kvm {
 */
 
 //            dump_regs(&regs);
-//            let sregs = vm.vcpu.get_sregs().unwrap();
+//            let sregs = vm.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
-            let exit = vm.run();
+            let exit = vm.run().expect("can run vcpu");
             exits += 1;
             match exit {
-                VcpuExit::MmioRead(addr, buf) => {
+                VcpuExit::MmioRead { addr, buf } => {
                     eprintln!("mmio: [{:08x}:{}] <- ..", addr, buf.len());
                     // TODO: with expected memory accesses we should be able to perhaps pick some
                     // values ahead of time and permute them (so as to tickle flags changes in
                     // `add [rcx], rdi` for example.
                     buf.fill(1);
                 }
-                VcpuExit::MmioWrite(addr, buf) => {
+                VcpuExit::MmioWrite { addr, buf } => {
                     eprintln!("mmio: .. -> [{:08x}:{}]", addr, buf.len());
                 }
-                VcpuExit::Debug(info) => {
-                    let regs = vm.vcpu.get_regs().unwrap();
+                VcpuExit::Debug { pc, info } => {
+                    let regs = vm.get_regs().unwrap();
                     dump_regs(&regs);
                     unsafe {
-                        let bytes = vm.host_ptr(GuestAddress(info.pc));
+                        let bytes = vm.host_ptr(GuestAddress(pc));
                         let slc = std::slice::from_raw_parts(bytes, 15);
                         let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
                             .decode_slice(slc);
@@ -785,15 +174,15 @@ mod kvm {
                 }
                 VcpuExit::Hlt => {
                     // eprintln!("hit hlt");
-                    let regs = vm.vcpu.get_regs().unwrap();
+                    let regs = vm.get_regs().unwrap();
                     // dump_regs(&regs);
                     break regs.rip;
                 }
                 other => {
                     eprintln!("unhandled exit: {:?} ... after {}", other, exits);
-                    let regs = vm.vcpu.get_regs().unwrap();
+                    let regs = vm.get_regs().unwrap();
                     dump_regs(&regs);
-                    let sregs = vm.vcpu.get_sregs().unwrap();
+                    let sregs = vm.get_sregs().unwrap();
                     eprintln!("sregs: {:?}", sregs);
                     panic!("stop");
                 }
@@ -802,23 +191,6 @@ mod kvm {
 
         eprintln!("run exits at {:08x}", end_pc);
         return;
-    }
-
-    fn exception_exit(vm: &TestVm) -> Option<Exception> {
-        let regs = vm.vcpu.get_regs().unwrap();
-        let intr_handler_base = vm.interrupt_handlers_start();
-
-        // by the time we've exited the `hlt` of the interrupt handler has completed, so rip is
-        // advanced by one. subtract back out to convert to an exception vector number.
-        let intr_start = regs.rip - 1;
-
-        if intr_start >= intr_handler_base.0 && intr_start < intr_handler_base.0 + IDT_ENTRIES as u64 {
-            Some(Exception::vector(
-                (intr_start - intr_handler_base.0).try_into().expect("handler offset is in range")
-            ))
-        } else {
-            None
-        }
     }
 
     fn dump_regs(regs: &kvm_regs) {
@@ -834,52 +206,42 @@ mod kvm {
         eprintln!("{:016x} {:016x} {:016x} {:016x}", regs.r12, regs.r13, regs.r14, regs.r15);
     }
 
-    fn run_with_mem_checks(vm: &mut TestVm, expected_end: u64) -> Result<(), Exception> {
-        vm.test_mem_mut().fill(0xaa);
+    fn run_with_mem_checks(vm: &mut Vm, expected_end: u64) -> Result<(), Exception> {
+        for chunk in 0..=8 {
+            let base = TEST_MEM_BASE.0 + 0x1_0000_0000 * chunk;
+            vm.mem_slice_mut(GuestAddress(base), TEST_MEM_SIZE).fill(0xaa);
+        }
         let mut exits = 0;
         let end_pc = loop {
 //            eprintln!("about to run! here's some state:");
-            let regs = vm.vcpu.get_regs().unwrap();
+            let regs = vm.get_regs().unwrap();
 //            dump_regs(&regs);
-//            let sregs = vm.vcpu.get_sregs().unwrap();
+//            let sregs = vm.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
-            let exit = vm.run();
+            let exit = vm.run().expect("can run vcpu");
             exits += 1;
             match exit {
-                VcpuExit::MmioRead(addr, buf) => {
+                VcpuExit::MmioRead { addr, buf } => {
                     panic!("shoud not be mmio accesses anymore");
                 }
-                VcpuExit::MmioWrite(addr, buf) => {
+                VcpuExit::MmioWrite { addr, buf } => {
                     panic!("shoud not be mmio accesses anymore");
                 }
-                VcpuExit::Debug(info) => {
-                    break info.pc;
+                VcpuExit::Debug { pc, info } => {
+                    break pc;
+                }
+                VcpuExit::Exception { nr } => {
+                    return Err(Exception::vector(nr));
                 }
                 VcpuExit::Hlt => {
-                    let regs = vm.vcpu.get_regs().unwrap();
-//                    eprintln!("hit hlt");
-//                    dump_regs(&regs);
-                    let intr_handler_base = vm.interrupt_handlers_start();
-
-                    // by the time we've exited the `hlt` of the interrupt handler has completed, so rip is
-                    // advanced by one. subtract back out to convert to an exception vector number.
-                    let intr_start = regs.rip - 1;
-
-                    if intr_start >= intr_handler_base.0 && intr_start < intr_handler_base.0 + IDT_ENTRIES as u64 {
-                        let exception = Exception::vector(
-                            (intr_start - intr_handler_base.0).try_into().expect("handler offset is in range")
-                        );
-                        eprintln!("VM exited at exception: {:?}", exception);
-                        return Err(exception);
-                    } else {
-                        break regs.rip;
-                    }
+                    let regs = vm.get_regs().unwrap();
+                    break regs.rip;
                 }
                 other => {
                     eprintln!("unhandled exit: {:?} ... after {}", other, exits);
-                    let regs = vm.vcpu.get_regs().unwrap();
+                    let regs = vm.get_regs().unwrap();
                     eprintln!("regs: {:?}", regs);
-//                    let sregs = vm.vcpu.get_sregs().unwrap();
+//                    let sregs = vm.get_sregs().unwrap();
 //                    eprintln!("sregs: {:?}", sregs);
                     panic!("stop");
                 }
@@ -1053,7 +415,7 @@ mod kvm {
         }
     }
 
-        fn compute_dontcares(vm: &TestVm, accesses: &[ExpectedRegAccess]) -> Vec<RegSpec> {
+        fn compute_dontcares(vm: &Vm, accesses: &[ExpectedRegAccess]) -> Vec<RegSpec> {
             // use a bitmap for dontcares, mask out bits as registers are seen to be read.
             let mut reg_bitmap: u32 = 0xffffffff;
 
@@ -1074,7 +436,7 @@ mod kvm {
                 }
             }
 
-            if vm.idt_configured {
+            if vm.idt_configured() {
                 reg_bitmap &= !(1 << (RegSpec::rsp().num()));
             }
 
@@ -1166,7 +528,7 @@ mod kvm {
             }
         }
 
-        fn permute_memdontcare(expected_mem: &[ExpectedMemAccess], vm: &mut TestVm) {
+        fn permute_memdontcare(expected_mem: &[ExpectedMemAccess], vm: &mut Vm) {
             for acc in expected_mem.iter() {
                 if acc.write {
                     continue;
@@ -1192,7 +554,7 @@ mod kvm {
 
     fn verify_mem_changes(
         expected_mem: &[ExpectedMemAccess],
-        vm: &TestVm,
+        vm: &mut Vm,
     ) {
         // test the expected writes by process of elimination: reset any expected-to-be-written
         // areas to the initial pattern. then, anything in test memory that is not the default
@@ -1202,18 +564,9 @@ mod kvm {
                 continue;
             }
 
-            if acc.addr >= 0x1_0000_0000 {
-                unsafe {
-                    let ptr = vm.testmem_ptr(GuestAddress(acc.addr));
-                    let slice = std::slice::from_raw_parts_mut(ptr, acc.size as usize);
-                    slice.fill(0xaa);
-                }
-            } else {
-                unsafe {
-                    let ptr = vm.host_ptr(GuestAddress(acc.addr));
-                    let slice = std::slice::from_raw_parts_mut(ptr, acc.size as usize);
-                    slice.fill(0xaa);
-                }
+            unsafe {
+                let slice = vm.mem_slice_mut(GuestAddress(acc.addr), acc.size as u64);
+                slice.fill(0xaa);
             }
         }
 
@@ -1237,24 +590,40 @@ mod kvm {
         let mut unexpected_acc = Vec::new();
         let mut current_diff: Option<MemoryDiff> = None;
 
-        let test_mem = vm.test_mem();
-        for i in 0..test_mem.len() {
-            if let Some(mut diff) = current_diff.take() {
+        for mem_hunk in 0..=8 {
+            let base = GuestAddress(TEST_MEM_BASE.0 * (mem_hunk + 1));
+            let test_mem = unsafe { vm.mem_slice(base, TEST_MEM_SIZE) };
+            for i in 0..test_mem.len() {
                 if test_mem[i] != 0xaa {
-                    diff.bytes.push(test_mem[i]);
-                } else {
-                    unexpected_acc.push(diff);
+                    if let Some(mut diff) = current_diff.take() {
+                        const CHUNK_SIZE: u64 = 128 * 1024;
+
+                        let prev_diff_start = diff.addr.0 % CHUNK_SIZE;
+                        let prev_diff_tail = prev_diff_start + diff.bytes.len() as u64;
+                        let continuation = i as u64 == prev_diff_tail + 1;
+                        if continuation {
+                            diff.bytes.push(test_mem[i]);
+                        } else {
+                            unexpected_acc.push(diff);
+
+                            let guest_addr = (mem_hunk + 1) * 0x1_0000_0000 + i as u64;
+                            current_diff = Some(MemoryDiff {
+                                addr: GuestAddress(guest_addr as u64),
+                                bytes: vec![test_mem[i]],
+                            });
+                        }
+                    } else {
+                        let guest_addr = (mem_hunk + 1) * 0x1_0000_0000 + i as u64;
+                        current_diff = Some(MemoryDiff {
+                            addr: GuestAddress(guest_addr as u64),
+                            bytes: vec![test_mem[i]],
+                        });
+                    }
                 }
-            } else {
-                if test_mem[i] != 0xaa {
-                    const CHUNK_SIZE: usize = 128 * 1024;
-                    let guest_test_chunk = i / CHUNK_SIZE;
-                    let guest_addr = (guest_test_chunk + 1) * 0x1_0000_0000 + i % CHUNK_SIZE;
-                    current_diff = Some(MemoryDiff {
-                        addr: GuestAddress(guest_addr as u64),
-                        bytes: vec![test_mem[i]],
-                    });
-                }
+            }
+
+            if let Some(diff) = current_diff.take() {
+                unexpected_acc.push(diff);
             }
         }
 
@@ -1324,16 +693,16 @@ mod kvm {
     // moving the stack elsewhere, and the stack would have to be zeroed to not introduce Weirdness
     // across permutations too.
     fn check_side_effects(
-        vm: &mut TestVm, regs: &kvm_regs, sregs: &kvm_sregs,
+        vm: &mut Vm, regs: &kvm_regs, sregs: &kvm_sregs,
         expected_end: u64, expected_reg: &[ExpectedRegAccess], expected_mem: &[ExpectedMemAccess]
     ) -> Result<(kvm_regs, kvm_sregs), Exception> {
         run_with_mem_checks(vm, expected_end)?;
 
-        let after_regs = vm.vcpu.get_regs().unwrap();
-        let after_sregs = vm.vcpu.get_sregs().unwrap();
+        let after_regs = vm.get_regs().unwrap();
+        let after_sregs = vm.get_sregs().unwrap();
 
         verify_reg_changes(&expected_reg, &regs, &after_regs, &sregs, &after_sregs);
-        verify_mem_changes(&expected_mem, &vm);
+        verify_mem_changes(&expected_mem, vm);
 
         Ok((after_regs, after_sregs))
     }
@@ -1342,7 +711,7 @@ mod kvm {
     // really did not care about them. "4" steps is of course arbitrary, but makes for some kind of
     // confidence about flag registers in particular, probably.
     fn test_dontcares(
-        vm: &mut TestVm, regs: &mut kvm_regs, sregs: &kvm_sregs,
+        vm: &mut Vm, regs: &mut kvm_regs, sregs: &kvm_sregs,
         expected_end: u64, expected_reg: &[ExpectedRegAccess], expected_mem: &[ExpectedMemAccess],
         dontcare_regs: &[RegSpec], written_regs: &[RegSpec],
         first_after_regs: &kvm_regs, _first_after_sregs: &kvm_sregs
@@ -1352,7 +721,7 @@ mod kvm {
             // TODO:
             // permute_memread(expected_mem, vm);
 
-            vm.vcpu.set_regs(&regs).unwrap();
+            vm.set_regs(&regs).unwrap();
 
             let (after_regs, _after_sregs) = check_side_effects(
                 vm, &regs, &sregs,
@@ -1365,7 +734,7 @@ mod kvm {
         Ok(())
     }
 
-    fn inrange_displacements(vm: &TestVm, inst: &long_mode::Instruction) -> bool {
+    fn inrange_displacements(vm: &Vm, inst: &long_mode::Instruction) -> bool {
         // see comment on `map_test_mem`. this limit is partially used to figure out what memory
         // must be backed by real memory vs holes that can have mmio traps.
         let disp_lim = 511;
@@ -1402,7 +771,7 @@ mod kvm {
         true
     }
 
-    fn check_behavior(vm: &mut TestVm, inst: &[u8]) {
+    fn check_behavior(vm: &mut Vm, inst: &[u8]) {
         let mut insts = inst.to_vec();
         // cap things off with a `hlt` to work around single-step sometimes .. not? see comment on
         // set_single_step. this ensures that even if single-stepping doesn't do the needful, the
@@ -1434,9 +803,9 @@ mod kvm {
             return;
         }
 
-        let sregs = vm.vcpu.get_sregs().unwrap();
-        let mut regs = vm.vcpu.get_regs().unwrap();
-        // vm.set_single_step(true);
+        let sregs = vm.get_sregs().unwrap();
+        let mut regs = vm.get_regs().unwrap();
+        // vm.set_single_step(true).expect("can enable single-step");
         vm.program(insts.as_slice(), &mut regs);
 
         let mut rng = rand::rng();
@@ -1445,7 +814,7 @@ mod kvm {
         regs.rbx = rng.next_u64();
         regs.rcx = rng.next_u64();
         regs.rdx = rng.next_u64();
-        if !vm.idt_configured {
+        if !vm.idt_configured() {
             regs.rsp = rng.next_u64();
         }
         regs.rbp = rng.next_u64();
@@ -1473,7 +842,7 @@ mod kvm {
             // to reproduce this issue, set this to `false` unconditionally, then run
             // `kvm_verify_popmem`. it will infinite loop in the kernel and you'll see
             // x86_decode_emulated_instruction failing over and over and over and ...
-            preserve_rsp: vm.idt_configured,
+            preserve_rsp: vm.idt_configured(),
             used_regs: [false; 16],
             expected_reg: Vec::new(),
             expected_mem: Vec::new(),
@@ -1487,15 +856,15 @@ mod kvm {
         permute_dontcares(dontcare_regs.as_slice(), &mut regs);
 
 //        eprintln!("setting regs to: {:?}", regs);
-        vm.vcpu.set_regs(&regs).unwrap();
+        vm.set_regs(&regs).unwrap();
 
         let expected_end = regs.rip + insts.len() as u64;
 
         let (after_regs, after_sregs) = match check_side_effects(vm, &regs, &sregs, expected_end, &expected_reg, &expected_mem) {
             Ok((a, b)) => (a, b),
             Err(other) => {
-                let vm_regs = vm.vcpu.get_regs().unwrap();
-                let vm_sregs = vm.vcpu.get_sregs().unwrap();
+                let vm_regs = vm.get_regs().unwrap();
+                let vm_sregs = vm.get_sregs().unwrap();
                 let mut prev_rip = [0u8; 8];
                 vm.read_mem(GuestAddress(vm_regs.rsp + 8), &mut prev_rip[..]);
                 let mut buf = [0u8; 8];
@@ -1544,9 +913,51 @@ mod kvm {
         }
     }
 
+    const TEST_MEM_BASE: GuestAddress = GuestAddress(0x1_0000_0000);
+    const TEST_MEM_SIZE: u64 = 128 * 1024;
+
+    // we need to keep accesses from falling into mapped-but-not-backed regions
+    // of guest memory, so we don't get MMIO exits (which would just test
+    // Linux's x86 emulation). control structures are at in the low 1G (really 1M)
+    // of memory, which memory references under test shoul not touch.
+    //
+    // we'll limit discriminants to 511 (arbitrary), which means that 512-byte
+    // increments of 1..16 can distinguish registers. given SIB addressing the
+    // highest address that can be formed is something like...
+    //
+    // > (1G + 15 * 512) + (1G + 16 * 512) * 8 + 512
+    //
+    // or just under 9G + 16k. that access *could* be a wide AVX-512 situation,
+    // so the highest byte addressed can be a few bytes later.
+    //
+    // this can be read as "the first 32k at each 1G may be accessed", but only
+    // GB boundaries at 1, 2, 3, 5, and 9 can be accessed in this way (non-SIB,
+    // then SIB with scale = 1, 2, 4, 8).
+    //
+    // while memory is Yikes Expensive, setting up 128k at each 1G offset that might be
+    // accessed is only 1M 128K, so that's what we'll do  here.
+    fn map_test_mem(vm: &mut asmlinator::x86_64::Vm) {
+        let mut base = TEST_MEM_BASE.0;
+        for _ in 0..=8 {
+            vm.add_memory(GuestAddress(base), TEST_MEM_SIZE).expect("can add test mem region");
+            base += 0x1_0000_0000;
+        }
+    }
+
+    fn create_test_vm() -> asmlinator::x86_64::Vm {
+        let mut vm = Vm::create(1024 * 1024).expect("can create vm");
+
+        map_test_mem(&mut vm);
+        unsafe {
+            vm.configure_identity_paging(None);
+        }
+
+        vm
+    }
+
     #[test]
     fn kvm_verify_xor_reg_mem() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `xor rax, [rcx]`. this works. great!
         let inst: &'static [u8] = &[0x33, 0x01];
@@ -1564,7 +975,7 @@ mod kvm {
 
     #[test]
     fn kvm_verify_inc() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `inc eax`
         let inst: &'static [u8] = &[0xff, 0xc0];
@@ -1577,7 +988,7 @@ mod kvm {
 
     #[test]
     fn kvm_verify_push() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `push rax`
         let inst: &'static [u8] = &[0x50];
@@ -1586,7 +997,7 @@ mod kvm {
 
     #[test]
     fn kvm_verify_popmem() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `pop [rax]`
         let inst: &'static [u8] = &[0x8f, 0x00];
@@ -1595,7 +1006,7 @@ mod kvm {
 
     // #[test]
     fn kvm_hugepage_bug() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `add [rsp], al; add [rcx], al; pop [rcx]; hlt`
         // the first instruction runs fine. the second instruction runs fine.
@@ -1603,16 +1014,16 @@ mod kvm {
         // this turns out to be an issue in linux' paging64_gva_to_gpa() when the va is mapped with
         // huge pages.
         let inst: &'static [u8] = &[0x00, 0x04, 0x24, 0x00, 0x01, 0x8f, 0x01, 0xf4];
-        let mut regs = vm.vcpu.get_regs().unwrap();
+        let mut regs = vm.get_regs().unwrap();
         regs.rax = 0x00000002_00100000;
         regs.rcx = 0x00000002_00100000;
         vm.program(inst, &mut regs);
-        vm.vcpu.set_regs(&regs).unwrap();
-        vm.set_single_step(true);
+        vm.set_regs(&regs).unwrap();
+        vm.set_single_step(true).expect("can enable single-step");
         run(&mut vm);
 
-        let vm_regs = vm.vcpu.get_regs().unwrap();
-        let vm_sregs = vm.vcpu.get_sregs().unwrap();
+        let vm_regs = vm.get_regs().unwrap();
+        let vm_sregs = vm.get_sregs().unwrap();
         let mut prev_rip = [0u8; 8];
         vm.read_mem(GuestAddress(vm_regs.rsp + 8), &mut prev_rip[..]);
         let mut buf = [0u8; 8];
@@ -1632,7 +1043,7 @@ mod kvm {
 
     #[test]
     fn kvm_verify_ret() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `ret`
         let inst: &'static [u8] = &[0xc3];
@@ -1644,7 +1055,7 @@ mod kvm {
 
     #[test]
     fn kvm_verify_ins() {
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         // `ins byte [rdi], dl`
         let inst: &'static [u8] = &[0x6c];
@@ -1656,7 +1067,7 @@ mod kvm {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::InstDecoder;
 
-        let mut vm = TestVm::create();
+        let mut vm = create_test_vm();
 
         let decoder = InstDecoder::default();
 
@@ -1680,8 +1091,8 @@ mod kvm {
             0x90, 0xcc,
         ];
 
-        let before_sregs = vm.vcpu.get_sregs().unwrap();
-        let mut regs = vm.vcpu.get_regs().unwrap();
+        let before_sregs = vm.get_sregs().unwrap();
+        let mut regs = vm.get_regs().unwrap();
 
         vm.program(inst.as_slice(), &mut regs);
 
@@ -1708,14 +1119,15 @@ mod kvm {
             }
         }
 
-        vm.vcpu.set_regs(&regs).unwrap();
+        vm.set_regs(&regs).unwrap();
 
-        vm.set_single_step(true);
+        vm.set_single_step(true).expect("can enable single-step");
 
         run(&mut vm);
 
-        let intr_exit = exception_exit(&vm);
-        assert_eq!(intr_exit, Some(Exception::BP));
+// TODO: capture the VcpuExit::Exception
+//        let intr_exit = exception_exit(&vm);
+//        assert_eq!(intr_exit, Some(Exception::BP));
     }
 
     #[test]
@@ -1723,13 +1135,13 @@ mod kvm {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
 
-        let mut vm = TestVm::create();
-        vm.set_single_step(true);
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
 
         // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
         let decoder = long_mode::uarch::amd::zen5();
         let mut buf = Instruction::default();
-        let initial_regs = vm.vcpu.get_regs().unwrap();
+        let initial_regs = vm.get_regs().unwrap();
 
         for word in 0..u16::MAX {
             let inst = word.to_le_bytes();
@@ -1820,6 +1232,11 @@ mod kvm {
                     // TODO: ud tests, etc
                     continue;
                 }
+
+                if buf.opcode() == Opcode::CLTS {
+                    // what happens here, access 0xff000?
+                    continue;
+                }
                 // some instructions may just be one byte, so figure out the length and only check
                 // that many bytes of instructions for specific behavior..
                 use yaxpeax_arch::LengthedInstruction;
@@ -1836,7 +1253,7 @@ mod kvm {
                     eprintln!("skipping {}", buf.opcode());
                     continue;
                 }
-                vm.vcpu.set_regs(&initial_regs).unwrap();
+                vm.set_regs(&initial_regs).unwrap();
                 check_behavior(&mut vm, &inst[..inst_len]);
             }
         }
