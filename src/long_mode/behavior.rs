@@ -1207,7 +1207,7 @@ const CMOVCC: BehaviorDigest = BehaviorDigest::empty()
     .set_pl_any()
     .set_flags_access(Access::Read)
     .set_operand(0, Access::Write)
-    .set_operand(0, Access::Read);
+    .set_operand(1, Access::Read);
 
 const SETCC: BehaviorDigest = BehaviorDigest::empty()
     .set_pl_any()
