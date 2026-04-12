@@ -10,6 +10,8 @@
 * push-immediate, pushf, popf, leave, and xlat now all report a correct memory
   access size, fixing the prior behavior of reporting to memory access size at
   all
+* table load/store instructions (lgdt, lidt, lldt, sgdt, sidt, sldt) have correct (mode-dependent)
+  memory access sizes, rather than incorrectly varying on operand-size overrides.
 * 64-bit mode: mov seg-to-reg uses 32-bit GPRs for the destination rather than 16-bit.
   * this is more accurate to the semantic of the instruction, which is why other disassemblers
     report it this way; for register destinations specifically the segment selector is
