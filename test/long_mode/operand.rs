@@ -69,4 +69,12 @@ fn test_implied_memory_width() {
     assert_eq!(mem_size_of(&[0x0f, 0xa8]), Some(8));
     // pop gs
     assert_eq!(mem_size_of(&[0x0f, 0xa9]), Some(8));
+    // lidt
+    assert_eq!(mem_size_of(&[0x0f, 0x01, 0x18]), Some(10));
+    // sidt
+    assert_eq!(mem_size_of(&[0x0f, 0x01, 0x08]), Some(10));
+    // lgdt
+    assert_eq!(mem_size_of(&[0x0f, 0x01, 0x10]), Some(10));
+    // sgdt
+    assert_eq!(mem_size_of(&[0x0f, 0x01, 0x00]), Some(10));
 }
