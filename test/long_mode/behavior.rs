@@ -6,7 +6,12 @@ mod kvm {
     use yaxpeax_x86::long_mode;
     use yaxpeax_x86::long_mode::behavior::Exception;
 
+    use yaxpeax_arch::LengthedInstruction;
+    use yaxpeax_x86::long_mode::Instruction;
+
     use rand::prelude::*;
+
+    use std::fmt::Write;
 
     #[derive(Debug, Copy, Clone)]
     struct ExpectedMemAccess {
@@ -919,9 +924,9 @@ mod kvm {
     // we need to keep accesses from falling into mapped-but-not-backed regions
     // of guest memory, so we don't get MMIO exits (which would just test
     // Linux's x86 emulation). control structures are at in the low 1G (really 1M)
-    // of memory, which memory references under test shoul not touch.
+    // of memory, which memory references under test should not touch.
     //
-    // we'll limit discriminants to 511 (arbitrary), which means that 512-byte
+    // we'll limit displacements to 511 (arbitrary), which means that 512-byte
     // increments of 1..16 can distinguish registers. given SIB addressing the
     // highest address that can be formed is something like...
     //
@@ -1255,6 +1260,49 @@ mod kvm {
                 }
                 vm.set_regs(&initial_regs).unwrap();
                 check_behavior(&mut vm, &inst[..inst_len]);
+            }
+        }
+    }
+
+    #[test]
+    fn behavior_verify_kvm_0f_() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::Instruction;
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        for word in 0..u16::MAX {
+            let inst = word.to_le_bytes();
+            let bytes = [0x0f, inst[0], inst[1]];
+            let mut reader = U8Reader::new(&bytes);
+            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                // bytes (or longer..?)
+                use yaxpeax_arch::LengthedInstruction;
+                let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                if inst_len == 2 {
+                    continue;
+                }
+
+                eprintln!("checking behavior of {:02x} {:02x}: {}", inst[0], inst[1], buf);
+
+                /*
+                use yaxpeax_x86::long_mode::Opcode;
+                // mov es, word [rax]
+                // does an inf loop too...?
+                if [Opcode::INS, Opcode::OUTS, Opcode::IN, Opcode::OUT].contains(&buf.opcode()) {
+                    eprintln!("skipping {}", buf.opcode());
+                    continue;
+                }
+                */
+                vm.set_regs(&initial_regs).unwrap();
+                check_behavior(&mut vm, &bytes[..inst_len]);
             }
         }
     }

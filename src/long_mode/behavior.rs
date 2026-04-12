@@ -1033,6 +1033,11 @@ const GENERAL_RW_R: BehaviorDigest = BehaviorDigest::empty()
 const GENERAL_RW_R_FLAGWRITE: BehaviorDigest = GENERAL_RW_R
     .set_flags_access(Access::Write);
 
+/// popcnt and maybe others?
+const GENERAL_W_R_FLAGWRITE: BehaviorDigest = GENERAL_RW_R
+    .set_operand(0, Access::Write)
+    .set_flags_access(Access::Write);
+
 /// test, cmp, with no write but to flags.
 const GENERAL_R_R_FLAGWRITE: BehaviorDigest = GENERAL_RW_R
     .set_operand(0, Access::Read)
@@ -1090,6 +1095,10 @@ const GENERAL_R: BehaviorDigest = BehaviorDigest::empty()
     .set_pl_any()
     .set_operand(0, Access::Read);
 
+const GENERAL_W: BehaviorDigest = BehaviorDigest::empty()
+    .set_pl_any()
+    .set_operand(0, Access::Write);
+
 const GENERAL_R_FLAGREAD: BehaviorDigest = GENERAL_R
     .set_flags_access(Access::Read);
 
@@ -1098,6 +1107,17 @@ const JCC: BehaviorDigest = BehaviorDigest::empty()
     .set_implicit_ops(JCC_OPS_IDX)
     .set_pl_any()
     .set_operand(0, Access::Read);
+
+const CMOVCC: BehaviorDigest = BehaviorDigest::empty()
+    .set_pl_any()
+    .set_flags_access(Access::Read)
+    .set_operand(0, Access::Write)
+    .set_operand(0, Access::Read);
+
+const SETCC: BehaviorDigest = BehaviorDigest::empty()
+    .set_pl_any()
+    .set_flags_access(Access::Read)
+    .set_operand(0, Access::Write);
 
 static PUSH_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
@@ -1764,6 +1784,110 @@ static CPUID_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
+static CALL_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Disp,
+        reg: RegSpec::rsp(),
+        disp: -8i32,
+        write: true,
+    },
+    // push.. pushes the value (above), then does a RMW on rsp.
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static JMP_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    },
+];
+
+static JMPF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cs(),
+        disp: 0,
+        write: true,
+    },
+];
+
+static CALLF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cs(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cs(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Disp,
+        reg: RegSpec::rsp(),
+        disp: -8i32,
+        write: true,
+    },
+    // push.. pushes the value (above), then does a RMW on rsp.
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
 const JCC_OPS_IDX: u16 = 3;
@@ -1796,8 +1920,12 @@ const DIV_IDX_1OP_QWORD: u16 = 29;
 const RDTSC_IDX: u16 = 30;
 const RDPMC_IDX: u16 = 31;
 const CPUID_IDX: u16 = 32;
+const CALL_OPS_IDX: u16 = 33;
+const JMP_OPS_IDX: u16 = 34;
+const CALLF_OPS_IDX: u16 = 35;
+const JMPF_OPS_IDX: u16 = 36;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 33] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 37] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -1831,6 +1959,10 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 33] = [
     RDTSC_OPS,
     RDPMC_OPS,
     CPUID_OPS,
+    CALL_OPS,
+    JMP_OPS,
+    CALLF_OPS,
+    JMPF_OPS,
 ];
 
 fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
@@ -1930,10 +2062,22 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         // TODO: should be complex?
         HLT => BehaviorDigest::empty()
             .set_pl0(),
-        CALL => { panic!("todo: call"); },
-        CALLF => { panic!("todo: callf"); },
-        JMP => { panic!("todo: jmp"); },
-        JMPF => { panic!("todo: jmpf"); },
+        CALL => BehaviorDigest::empty()
+            .set_implicit_ops(CALL_OPS_IDX)
+            .set_pl_any()
+            .set_operand(0, Access::Read),
+        CALLF => BehaviorDigest::empty()
+            .set_implicit_ops(CALLF_OPS_IDX)
+            .set_pl_any()
+            .set_operand(0, Access::Read),
+        JMP => BehaviorDigest::empty()
+            .set_implicit_ops(JMP_OPS_IDX)
+            .set_pl_any()
+            .set_operand(0, Access::Read),
+        JMPF => BehaviorDigest::empty()
+            .set_implicit_ops(JMPF_OPS_IDX)
+            .set_pl_any()
+            .set_operand(0, Access::Read),
         PUSH => BehaviorDigest::empty()
             .set_implicit_ops(PUSH_OPS_IDX)
             .set_pl_any()
@@ -2013,41 +2157,41 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         JGE => JCC,
         JLE => JCC,
         JG => JCC,
-        CMOVA => { panic!("todo: cmova"); },
-        CMOVB => { panic!("todo: cmovb"); },
-        CMOVG => { panic!("todo: cmovg"); },
-        CMOVGE => { panic!("todo: cmovge"); },
-        CMOVL => { panic!("todo: cmovl"); },
-        CMOVLE => { panic!("todo: cmovle"); },
-        CMOVNA => { panic!("todo: cmovna"); },
-        CMOVNB => { panic!("todo: cmovnb"); },
-        CMOVNO => { panic!("todo: cmovno"); },
-        CMOVNP => { panic!("todo: cmovnp"); },
-        CMOVNS => { panic!("todo: cmovns"); },
-        CMOVNZ => { panic!("todo: cmovnz"); },
-        CMOVO => { panic!("todo: cmovo"); },
-        CMOVP => { panic!("todo: cmovp"); },
-        CMOVS => { panic!("todo: cmovs"); },
-        CMOVZ => { panic!("todo: cmovz"); },
+        CMOVA => CMOVCC,
+        CMOVB => CMOVCC,
+        CMOVG => CMOVCC,
+        CMOVGE => CMOVCC,
+        CMOVL => CMOVCC,
+        CMOVLE => CMOVCC,
+        CMOVNA => CMOVCC,
+        CMOVNB => CMOVCC,
+        CMOVNO => CMOVCC,
+        CMOVNP => CMOVCC,
+        CMOVNS => CMOVCC,
+        CMOVNZ => CMOVCC,
+        CMOVO => CMOVCC,
+        CMOVP => CMOVCC,
+        CMOVS => CMOVCC,
+        CMOVZ => CMOVCC,
         DIV => BehaviorDigest::empty(), // unreachable due to branch above match
         IDIV => BehaviorDigest::empty(), // same as div
         MUL => BehaviorDigest::empty(), // same as div
-        SETO => { panic!("todo: seto"); },
-        SETNO => { panic!("todo: setno"); },
-        SETB => { panic!("todo: setb"); },
-        SETAE => { panic!("todo: setae"); },
-        SETZ => { panic!("todo: setz"); },
-        SETNZ => { panic!("todo: setnz"); },
-        SETBE => { panic!("todo: setbe"); },
-        SETA => { panic!("todo: seta"); },
-        SETS => { panic!("todo: sets"); },
-        SETNS => { panic!("todo: setns"); },
-        SETP => { panic!("todo: setp"); },
-        SETNP => { panic!("todo: setnp"); },
-        SETL => { panic!("todo: setl"); },
-        SETGE => { panic!("todo: setge"); },
-        SETLE => { panic!("todo: setle"); },
-        SETG => { panic!("todo: setg"); },
+        SETO => SETCC,
+        SETNO => SETCC,
+        SETB => SETCC,
+        SETAE => SETCC,
+        SETZ => SETCC,
+        SETNZ => SETCC,
+        SETBE => SETCC,
+        SETA => SETCC,
+        SETS => SETCC,
+        SETNS => SETCC,
+        SETP => SETCC,
+        SETNP => SETCC,
+        SETL => SETCC,
+        SETGE => SETCC,
+        SETLE => SETCC,
+        SETG => SETCC,
         CPUID => BehaviorDigest::empty()
             .set_implicit_ops(CPUID_IDX)
             .set_pl_any(),
@@ -2081,12 +2225,20 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         XSAVE => { panic!("todo: xsave"); },
         XRSTOR => { panic!("todo: xrstor"); },
         XSAVEOPT => { panic!("todo: xsaveopt"); },
-        LFENCE => { panic!("todo: lfence"); },
-        MFENCE => { panic!("todo: mfence"); },
-        SFENCE => { panic!("todo: sfence"); },
-        CLFLUSH => { panic!("todo: clflush"); },
-        CLFLUSHOPT => { panic!("todo: clflushopt"); },
-        CLWB => { panic!("todo: clwb"); },
+        LFENCE => GENERAL,
+        MFENCE => GENERAL,
+        SFENCE => GENERAL,
+        // in almost all cases `clflush` does not "write" anything, but it is more of a write than
+        // a read; from any other processor's perspective, the cache coherency protocol would
+        // ensure that other processors' caches "are" memory and this would be a no-op for
+        // architectural state. but for some kinds of memory (WC, for example), cache coherency is
+        // more lax and the executing processor's cache is in fact writing up to 64 bytes of novel
+        // data to main memory.
+        CLFLUSH => GENERAL_W,
+        // same argument as `clflush`.
+        CLFLUSHOPT => GENERAL_W,
+        // same argument as `clflush`.
+        CLWB => GENERAL_W,
         WRMSR => { panic!("todo: wrmsr"); },
         RDTSC => BehaviorDigest::empty()
             .set_implicit_ops(RDTSC_IDX)
@@ -2111,7 +2263,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         CLD => GENERAL_FLAGRW,
         STD => GENERAL_FLAGRW,
         JMPE => { panic!("todo: jmpe"); },
-        POPCNT => { panic!("todo: popcnt"); },
+        POPCNT => GENERAL_W_R_FLAGWRITE,
         MOVDQU => { panic!("todo: movdqu"); },
         MOVDQA => { panic!("todo: movdqa"); },
         MOVQ => { panic!("todo: movq"); },
