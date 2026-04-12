@@ -8246,7 +8246,7 @@ fn read_operands<
                 } else {
                     instruction.opcode = Opcode::SGDT;
                     instruction.operand_count = 1;
-                    instruction.mem_size = 63;
+                    instruction.mem_size = 10;
                     instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 1 {
@@ -8301,7 +8301,7 @@ fn read_operands<
                 } else {
                     instruction.opcode = Opcode::SIDT;
                     instruction.operand_count = 1;
-                    instruction.mem_size = 63;
+                    instruction.mem_size = 10;
                     instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 2 {
@@ -8340,7 +8340,10 @@ fn read_operands<
                 } else {
                     instruction.opcode = Opcode::LGDT;
                     instruction.operand_count = 1;
-                    instruction.mem_size = 63;
+                    // quoth SDM:
+                    // > In 64-bit mode, the operand size is fixed at 8+2 bytes. The instruction
+                    // > stores an 8-byte base and a 2-byte limit.
+                    instruction.mem_size = 10;
                     instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 3 {
@@ -8404,7 +8407,7 @@ fn read_operands<
                 } else {
                     instruction.opcode = Opcode::LIDT;
                     instruction.operand_count = 1;
-                    instruction.mem_size = 63;
+                    instruction.mem_size = 10;
                     instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 4 {

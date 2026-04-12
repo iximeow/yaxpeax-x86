@@ -2209,10 +2209,18 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         SYSCALL => { panic!("todo: syscall"); },
         LSL => { panic!("todo: lsl"); },
         LAR => { panic!("todo: lar"); },
-        SGDT => { panic!("todo: sgdt"); },
-        SIDT => { panic!("todo: sidt"); },
-        LGDT => { panic!("todo: lgdt"); },
-        LIDT => { panic!("todo: lidt"); },
+        SGDT => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_operand(0, Access::Write),
+        SIDT => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_operand(0, Access::Write),
+        LGDT => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Read),
+        LIDT => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Read),
         SMSW => { panic!("todo: smsw"); },
         LMSW => { panic!("todo: lmsw"); },
         SWAPGS => { panic!("todo: swapgs"); },
@@ -2247,9 +2255,13 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         RDPMC => BehaviorDigest::empty()
             .set_implicit_ops(RDPMC_IDX)
             .set_pl_special(),
-        SLDT => { panic!("todo: sldt"); },
+        SLDT => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_operand(0, Access::Write),
         STR => { panic!("todo: str"); },
-        LLDT => { panic!("todo: lldt"); },
+        LLDT => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Read),
         LTR => { panic!("todo: ltr"); },
         VERR => { panic!("todo: verr"); },
         VERW => { panic!("todo: verw"); },

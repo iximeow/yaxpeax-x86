@@ -33,6 +33,12 @@ mod kvm {
         after: u64,
     }
 
+    #[derive(Debug, Clone)]
+    struct MemPatch {
+        addr: u64,
+        bytes: Vec<u8>,
+    }
+
     struct AccessTestCtx<'a> {
         regs: &'a mut kvm_regs,
         vm: &'a Vm,
@@ -211,10 +217,16 @@ mod kvm {
         eprintln!("{:016x} {:016x} {:016x} {:016x}", regs.r12, regs.r13, regs.r14, regs.r15);
     }
 
-    fn run_with_mem_checks(vm: &mut Vm, expected_end: u64) -> Result<(), Exception> {
+    fn run_with_mem_checks(vm: &mut Vm, expected_end: u64, mem_patches: &[MemPatch]) -> Result<(), Exception> {
         for chunk in 0..=8 {
             let base = TEST_MEM_BASE.0 + 0x1_0000_0000 * chunk;
             vm.mem_slice_mut(GuestAddress(base), TEST_MEM_SIZE).fill(0xaa);
+        }
+        // test environments may require constants in memory at known locations (say, in support of
+        // an LGDT test). apply those patches now that we've initialized all extra memory.
+        for patch in mem_patches {
+            let slice = vm.mem_slice_mut(GuestAddress(patch.addr), patch.bytes.len() as u64);
+            slice.copy_from_slice(patch.bytes.as_slice());
         }
         let mut exits = 0;
         let end_pc = loop {
@@ -699,9 +711,10 @@ mod kvm {
     // across permutations too.
     fn check_side_effects(
         vm: &mut Vm, regs: &kvm_regs, sregs: &kvm_sregs,
+        mem_patches: &[MemPatch],
         expected_end: u64, expected_reg: &[ExpectedRegAccess], expected_mem: &[ExpectedMemAccess]
     ) -> Result<(kvm_regs, kvm_sregs), Exception> {
-        run_with_mem_checks(vm, expected_end)?;
+        run_with_mem_checks(vm, expected_end, mem_patches)?;
 
         let after_regs = vm.get_regs().unwrap();
         let after_sregs = vm.get_sregs().unwrap();
@@ -717,6 +730,7 @@ mod kvm {
     // confidence about flag registers in particular, probably.
     fn test_dontcares(
         vm: &mut Vm, regs: &mut kvm_regs, sregs: &kvm_sregs,
+        mem_patches: &[MemPatch],
         expected_end: u64, expected_reg: &[ExpectedRegAccess], expected_mem: &[ExpectedMemAccess],
         dontcare_regs: &[RegSpec], written_regs: &[RegSpec],
         first_after_regs: &kvm_regs, _first_after_sregs: &kvm_sregs
@@ -730,6 +744,7 @@ mod kvm {
 
             let (after_regs, _after_sregs) = check_side_effects(
                 vm, &regs, &sregs,
+                mem_patches,
                 expected_end, expected_reg, expected_mem
             )?;
 
@@ -777,6 +792,12 @@ mod kvm {
     }
 
     fn check_behavior(vm: &mut Vm, inst: &[u8]) {
+        check_behavior_with_regs(vm, inst, [false; 16], &[])
+    }
+
+    // `reg_preserves` declares a set of registers, numbered by their *Linux KVM API number*, as in
+    // the position in `kvm_regs`, that must be preserved by the test.
+    fn check_behavior_with_regs(vm: &mut Vm, inst: &[u8], reg_preserves: [bool; 16], mem_patches: &[MemPatch]) {
         let mut insts = inst.to_vec();
         // cap things off with a `hlt` to work around single-step sometimes .. not? see comment on
         // set_single_step. this ensures that even if single-stepping doesn't do the needful, the
@@ -815,16 +836,52 @@ mod kvm {
 
         let mut rng = rand::rng();
 
-        regs.rax = rng.next_u64();
-        regs.rbx = rng.next_u64();
-        regs.rcx = rng.next_u64();
-        regs.rdx = rng.next_u64();
-        if !vm.idt_configured() {
-            regs.rsp = rng.next_u64();
+        // a set of registers whose values we are directed to care about. these are subtracted from
+        // dontcares, later.
+        let mut cares = Vec::new();
+
+        if !reg_preserves[0] {
+            regs.rax = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rax());
         }
-        regs.rbp = rng.next_u64();
-        regs.rsi = rng.next_u64();
-        regs.rdi = rng.next_u64();
+        if !reg_preserves[1] {
+            regs.rbx = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rbx());
+        }
+        if !reg_preserves[2] {
+            regs.rcx = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rcx());
+        }
+        if !reg_preserves[3] {
+            regs.rdx = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rdx());
+        }
+        if !reg_preserves[4] {
+            regs.rsi = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rsi());
+        }
+        if !reg_preserves[5] {
+            regs.rdi = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rdi());
+        }
+        if !vm.idt_configured() {
+            if !reg_preserves[6] {
+                regs.rsp = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rsp());
+            }
+        }
+        if !reg_preserves[7] {
+            regs.rbp = rng.next_u64();
+        } else {
+            cares.push(RegSpec::rbp());
+        }
 
         regs.r8 = rng.next_u64();
         regs.r9 = rng.next_u64();
@@ -848,14 +905,24 @@ mod kvm {
             // `kvm_verify_popmem`. it will infinite loop in the kernel and you'll see
             // x86_decode_emulated_instruction failing over and over and over and ...
             preserve_rsp: vm.idt_configured(),
-            used_regs: [false; 16],
+            used_regs: reg_preserves,
             expected_reg: Vec::new(),
             expected_mem: Vec::new(),
         };
         behavior.visit_accesses(&mut ctx).expect("can visit accesses");
-        let (expected_reg, expected_mem) = ctx.into_expectations();
+        let (expected_reg, mut expected_mem) = ctx.into_expectations();
+        for patch in mem_patches.iter() {
+            expected_mem.push(ExpectedMemAccess {
+                addr: patch.addr,
+                size: patch.bytes.len() as u32,
+                write: true,
+            });
+        }
 
-        let dontcare_regs = compute_dontcares(&vm, &expected_reg);
+        let mut dontcare_regs = compute_dontcares(&vm, &expected_reg);
+        dontcare_regs.retain(|reg| {
+            !cares.iter().any(|care| check_contains(*care, *reg))
+        });
         let written_regs = compute_writes(&expected_reg);
 
         permute_dontcares(dontcare_regs.as_slice(), &mut regs);
@@ -865,7 +932,11 @@ mod kvm {
 
         let expected_end = regs.rip + insts.len() as u64;
 
-        let (after_regs, after_sregs) = match check_side_effects(vm, &regs, &sregs, expected_end, &expected_reg, &expected_mem) {
+        let (after_regs, after_sregs) = match check_side_effects(
+            vm, &regs, &sregs,
+            mem_patches,
+            expected_end, &expected_reg, &expected_mem
+        ) {
             Ok((a, b)) => (a, b),
             Err(other) => {
                 let vm_regs = vm.get_regs().unwrap();
@@ -896,12 +967,14 @@ mod kvm {
                         }
                     }
                 }
+                dump_regs(&vm_regs);
                 panic!("TODO: handle exceptions ({:?})", other);
             }
         };
 
         let res = test_dontcares(
             vm, &mut regs, &sregs,
+            mem_patches,
             expected_end, expected_reg.as_slice(), expected_mem.as_slice(),
             dontcare_regs.as_slice(), written_regs.as_slice(),
             &after_regs, &after_sregs
@@ -1138,7 +1211,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
+        use yaxpeax_x86::long_mode::Instruction;
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1264,6 +1337,20 @@ mod kvm {
         }
     }
 
+    fn test_prelude(bytes: &[u8], instr: &Instruction) {
+        let inst_len = 0.wrapping_offset(instr.len()) as usize;
+        assert_eq!(inst_len, bytes.len());
+
+        let mut bytes_text = String::new();
+        for b in bytes.iter() {
+            if !bytes_text.is_empty() {
+                bytes_text.push_str(" ");
+            }
+            write!(bytes_text, "{:02x}", b).expect("can format");
+        }
+        eprintln!("checking behavior of {bytes_text}: {instr}");
+    }
+
     #[test]
     fn behavior_verify_kvm_0f_() {
         use yaxpeax_arch::{Decoder, U8Reader};
@@ -1303,6 +1390,182 @@ mod kvm {
                 */
                 vm.set_regs(&initial_regs).unwrap();
                 check_behavior(&mut vm, &bytes[..inst_len]);
+            }
+        }
+    }
+
+    // check the collection of {l,s}{g,i,l}dt. these instructions are at the combination of
+    // "interesting memory size" and "interesting [non]interaction with prefixes"
+    //
+    // because these modify VM control structures, the VM is not retained across checks in a test.
+    mod table_instrs {
+        use super::create_test_vm;
+        use super::test_prelude;
+        use super::MemPatch;
+        use super::check_behavior;
+        use super::check_behavior_with_regs;
+
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::Instruction;
+        use yaxpeax_x86::long_mode;
+
+        #[test]
+        fn verify_lgdt() {
+            // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+            let decoder = long_mode::uarch::amd::zen5();
+            let mut buf = Instruction::default();
+
+            static INSTS: &'static [&'static [u8]] = &[
+                // lgdt
+                &[0x0f, 0x01, 0x10],
+                &[0x66, 0x0f, 0x01, 0x10],
+                &[0x67, 0x0f, 0x01, 0x10],
+            ];
+
+            for inst in INSTS {
+                let mut vm = create_test_vm();
+                vm.set_single_step(true).expect("can enable single-step");
+
+                // set up lgdt to re-load the same gdt.
+                let mut patch_bytes = Vec::new();
+                patch_bytes.extend_from_slice(&4095u16.to_le_bytes());
+                patch_bytes.extend_from_slice(&vm.gdt_addr().0.to_le_bytes());
+                let patch = MemPatch {
+                    addr: 0x1_0000_0000,
+                    bytes: patch_bytes,
+                };
+                let mut regs = vm.get_regs().expect("can get regs");
+                regs.rax = patch.addr;
+                vm.set_regs(&regs).expect("can set regs");
+                // keep rax as-is
+                let mut preserves = [false; 16];
+                preserves[0] = true;
+
+                let mut reader = U8Reader::new(&inst);
+                assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
+
+                test_prelude(inst, &buf);
+
+                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]);
+            }
+        }
+
+        #[test]
+        fn verify_lidt() {
+            // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+            let decoder = long_mode::uarch::amd::zen5();
+            let mut buf = Instruction::default();
+
+            static INSTS: &'static [&'static [u8]] = &[
+                // lidt
+                &[0x0f, 0x01, 0x18],
+                &[0x66, 0x0f, 0x01, 0x18],
+                &[0x67, 0x0f, 0x01, 0x18],
+            ];
+
+            for inst in INSTS {
+                let mut vm = create_test_vm();
+                vm.set_single_step(true).expect("can enable single-step");
+
+                // set up lidt to re-load the same idt.
+                let mut patch_bytes = Vec::new();
+                patch_bytes.extend_from_slice(&4095u16.to_le_bytes());
+                patch_bytes.extend_from_slice(&vm.idt_addr().0.to_le_bytes());
+                let patch = MemPatch {
+                    addr: 0x1_0000_0000,
+                    bytes: patch_bytes,
+                };
+                let mut regs = vm.get_regs().expect("can get regs");
+                regs.rax = patch.addr;
+                vm.set_regs(&regs).expect("can set regs");
+                // keep rax as-is
+                let mut preserves = [false; 16];
+                preserves[0] = true;
+
+                let mut reader = U8Reader::new(&inst);
+                assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
+
+                test_prelude(inst, &buf);
+
+                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]);
+            }
+        }
+
+        #[test]
+        fn verify_lldt() {
+            // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+            let decoder = long_mode::uarch::amd::zen5();
+            let mut buf = Instruction::default();
+
+            static INSTS: &'static [&'static [u8]] = &[
+                // lldt
+                &[0x0f, 0x00, 0x10],
+                &[0x66, 0x0f, 0x00, 0x10],
+                &[0x67, 0x0f, 0x00, 0x10],
+            ];
+
+            for inst in INSTS {
+                let mut vm = create_test_vm();
+                vm.set_single_step(true).expect("can enable single-step");
+
+                // quoth SDM:
+                // > If bits 2-15 of the source operand are 0, LDTR is marked invalid and the LLDT
+                // > instruction completes silently. However, all subsequent references to
+                // > descriptors in the LDT (except by the LAR, VERR, VERW or LSL instructions) cause
+                // > a general protection exception (#GP).
+                let mut patch_bytes = Vec::new();
+                patch_bytes.extend_from_slice(&0u16.to_le_bytes());
+                let patch = MemPatch {
+                    addr: 0x1_0000_0000,
+                    bytes: patch_bytes,
+                };
+                let mut regs = vm.get_regs().expect("can get regs");
+                regs.rax = patch.addr;
+                vm.set_regs(&regs).expect("can set regs");
+                // keep rax as-is
+                let mut preserves = [false; 16];
+                preserves[0] = true;
+
+                let mut reader = U8Reader::new(&inst);
+                assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
+
+                test_prelude(inst, &buf);
+
+                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]);
+            }
+        }
+
+        #[test]
+        fn verify_table_stores() {
+            // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+            let decoder = long_mode::uarch::amd::zen5();
+            let mut buf = Instruction::default();
+
+            static INSTS: &'static [&'static [u8]] = &[
+                // sgdt
+                &[0x0f, 0x01, 0x00],
+                &[0x66, 0x0f, 0x01, 0x00],
+                &[0x67, 0x0f, 0x01, 0x00],
+                // sidt
+                &[0x0f, 0x01, 0x08],
+                &[0x66, 0x0f, 0x01, 0x08],
+                &[0x67, 0x0f, 0x01, 0x08],
+                // sldt
+                &[0x0f, 0x00, 0x00],
+                &[0x66, 0x0f, 0x00, 0x00],
+                &[0x67, 0x0f, 0x00, 0x00],
+            ];
+
+            for inst in INSTS {
+                let mut vm = create_test_vm();
+                vm.set_single_step(true).expect("can enable single-step");
+
+                let mut reader = U8Reader::new(&inst);
+                assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
+
+                test_prelude(inst, &buf);
+
+                check_behavior(&mut vm, &inst);
             }
         }
     }
