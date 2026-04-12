@@ -1215,8 +1215,11 @@ pub enum Opcode {
     LEA,
     NOP,
     PREFETCHNTA,
+    /// this variant was named incorrectly and will change to `PREFETCHT0` in the future.
     PREFETCH0,
+    /// this variant was named incorrectly and will change to `PREFETCHT1` in the future.
     PREFETCH1,
+    /// this variant was named incorrectly and will change to `PREFETCHT2` in the future.
     PREFETCH2,
 //    XCHG,
     POPF,

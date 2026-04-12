@@ -39,6 +39,12 @@ mod kvm {
         bytes: Vec<u8>,
     }
 
+    #[derive(Debug)]
+    #[allow(dead_code)]
+    enum CheckErr {
+        ComplexOp(long_mode::behavior::ComplexOp),
+    }
+
     struct AccessTestCtx<'a> {
         regs: &'a mut kvm_regs,
         vm: &'a Vm,
@@ -648,6 +654,8 @@ mod kvm {
             for diff in unexpected_acc {
                 eprintln!("{}", diff);
             }
+            let regs = vm.get_regs().unwrap();
+            dump_regs(&regs);
             panic!("unexpected memory accesses!");
         }
     }
@@ -791,13 +799,13 @@ mod kvm {
         true
     }
 
-    fn check_behavior(vm: &mut Vm, inst: &[u8]) {
+    fn check_behavior(vm: &mut Vm, inst: &[u8]) -> Result<(), CheckErr> {
         check_behavior_with_regs(vm, inst, [false; 16], &[])
     }
 
     // `reg_preserves` declares a set of registers, numbered by their *Linux KVM API number*, as in
     // the position in `kvm_regs`, that must be preserved by the test.
-    fn check_behavior_with_regs(vm: &mut Vm, inst: &[u8], reg_preserves: [bool; 16], mem_patches: &[MemPatch]) {
+    fn check_behavior_with_regs(vm: &mut Vm, inst: &[u8], reg_preserves: [bool; 16], mem_patches: &[MemPatch]) -> Result<(), CheckErr> {
         let mut insts = inst.to_vec();
         // cap things off with a `hlt` to work around single-step sometimes .. not? see comment on
         // set_single_step. this ensures that even if single-stepping doesn't do the needful, the
@@ -826,7 +834,7 @@ mod kvm {
 
         // TODO: this does an infinite loop when run??
         if decoded.opcode() == long_mode::Opcode::FLDCW {
-            return;
+            return Ok(());
         }
 
         let sregs = vm.get_sregs().unwrap();
@@ -909,7 +917,7 @@ mod kvm {
             expected_reg: Vec::new(),
             expected_mem: Vec::new(),
         };
-        behavior.visit_accesses(&mut ctx).expect("can visit accesses");
+        behavior.visit_accesses(&mut ctx).map_err(|e| CheckErr::ComplexOp(e))?;
         let (expected_reg, mut expected_mem) = ctx.into_expectations();
         for patch in mem_patches.iter() {
             expected_mem.push(ExpectedMemAccess {
@@ -962,7 +970,7 @@ mod kvm {
                                 // mov to segment selector can #GP if the selector is invalid:
                                 // > If the DS, ES, FS, or GS register is being loaded and the
                                 // > segment pointed to is not a data or readable code segment.
-                                return;
+                                return Ok(());
                             }
                         }
                     }
@@ -982,8 +990,11 @@ mod kvm {
 
         match res {
             Ok(()) => {
+                return Ok(());
             }
             Err(Exception::PF) => {
+                // TODO: probably should handle `#PF` more precisely?
+                return Ok(());
             }
             Err(other) => {
                 panic!("TODO: handle exceptions ({:?})", other);
@@ -1039,16 +1050,16 @@ mod kvm {
 
         // `xor rax, [rcx]`. this works. great!
         let inst: &'static [u8] = &[0x33, 0x01];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
 
         // `xor al, [rcx]`. also works. cool!
         let inst: &'static [u8] = &[0x32, 0x01];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
 
         // `xor [rcx], al`. this runs until the VM starts executing in MMIO space and
         // VcpuExit::Shutdown. what.
         let inst: &'static [u8] = &[0x30, 0x01];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
 
     #[test]
@@ -1057,11 +1068,11 @@ mod kvm {
 
         // `inc eax`
         let inst: &'static [u8] = &[0xff, 0xc0];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
 
         // `inc dword [rax]`
         let inst: &'static [u8] = &[0xff, 0x00];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
 
     #[test]
@@ -1070,7 +1081,7 @@ mod kvm {
 
         // `push rax`
         let inst: &'static [u8] = &[0x50];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
 
     #[test]
@@ -1079,7 +1090,7 @@ mod kvm {
 
         // `pop [rax]`
         let inst: &'static [u8] = &[0x8f, 0x00];
-        check_behavior(&mut vm, &inst[0..2]);
+        check_behavior(&mut vm, &inst[0..2]).expect("behavior check is ok");
     }
 
     // #[test]
@@ -1128,7 +1139,7 @@ mod kvm {
         // TODO: set up ret test to return to some other address. check_behavior() doesn't tolerate
         // this (yet).
         vm.write_mem(vm.stack_addr(), &0xff001u64.to_le_bytes());
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
 
     #[test]
@@ -1137,7 +1148,7 @@ mod kvm {
 
         // `ins byte [rdi], dl`
         let inst: &'static [u8] = &[0x6c];
-        check_behavior(&mut vm, inst);
+        check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
 
     #[test]
@@ -1332,7 +1343,7 @@ mod kvm {
                     continue;
                 }
                 vm.set_regs(&initial_regs).unwrap();
-                check_behavior(&mut vm, &inst[..inst_len]);
+                check_behavior(&mut vm, &inst[..inst_len]).expect("behavior check is ok");
             }
         }
     }
@@ -1354,7 +1365,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm_0f_() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::Instruction;
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1377,7 +1388,33 @@ mod kvm {
                     continue;
                 }
 
-                eprintln!("checking behavior of {:02x} {:02x}: {}", inst[0], inst[1], buf);
+                if table_instrs::OPCODES.contains(&buf.opcode()) {
+                    // tested under `mod table_instrs`.
+                    continue;
+                }
+
+                if vm_instrs::OPCODES.contains(&buf.opcode()) {
+                    // this generic testing facility is not appropriate for VM instructions.
+                    continue;
+                }
+
+                static COMPLEX: &'static [Opcode] = &[
+                    Opcode::PREFETCHNTA,
+                    Opcode::PREFETCH2,
+                    Opcode::PREFETCH1,
+                    Opcode::PREFETCH0,
+                ];
+
+                if COMPLEX.contains(&buf.opcode()) {
+                    continue;
+                }
+
+                if bytes[1] == 0x22 {
+                    // skip `mov crN, reg`
+                    continue;
+                }
+
+                eprintln!("checking behavior of 0f {:02x} {:02x}: {}", inst[0], inst[1], buf);
 
                 /*
                 use yaxpeax_x86::long_mode::Opcode;
@@ -1389,9 +1426,26 @@ mod kvm {
                 }
                 */
                 vm.set_regs(&initial_regs).unwrap();
-                check_behavior(&mut vm, &bytes[..inst_len]);
+                check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
             }
         }
+    }
+
+    // instructions related to operating VT-x/SVM virtual machines.
+    // TODO: these are not (yet) tested.
+    mod vm_instrs {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::VMREAD,
+            Opcode::VMWRITE,
+            Opcode::VMCLEAR,
+            Opcode::VMLAUNCH,
+            Opcode::VMRESUME,
+            Opcode::VMXON,
+            Opcode::VMXOFF,
+            Opcode::VMFUNC,
+        ];
     }
 
     // check the collection of {l,s}{g,i,l}dt. these instructions are at the combination of
@@ -1406,8 +1460,17 @@ mod kvm {
         use super::check_behavior_with_regs;
 
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::Instruction;
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
         use yaxpeax_x86::long_mode;
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::LGDT,
+            Opcode::SGDT,
+            Opcode::LIDT,
+            Opcode::SIDT,
+            Opcode::LLDT,
+            Opcode::SLDT,
+        ];
 
         #[test]
         fn verify_lgdt() {
@@ -1446,7 +1509,7 @@ mod kvm {
 
                 test_prelude(inst, &buf);
 
-                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]);
+                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]).expect("behavior check is ok");
             }
         }
 
@@ -1487,7 +1550,7 @@ mod kvm {
 
                 test_prelude(inst, &buf);
 
-                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]);
+                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]).expect("behavior check is ok");
             }
         }
 
@@ -1531,7 +1594,7 @@ mod kvm {
 
                 test_prelude(inst, &buf);
 
-                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]);
+                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]).expect("behavior check is ok");
             }
         }
 
@@ -1565,7 +1628,7 @@ mod kvm {
 
                 test_prelude(inst, &buf);
 
-                check_behavior(&mut vm, &inst);
+                check_behavior(&mut vm, &inst).expect("behavior check is ok");
             }
         }
     }
