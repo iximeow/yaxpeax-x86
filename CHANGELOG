@@ -19,6 +19,7 @@
     zero-extend, whereas writing to "ax" does not imply any zero-extension. mov reg-to-seg
     is unchanged and uses a 16-bit form for source GPR.
 * reject 0f0d prefetch/nop with a register operand, which was incorrectly decoded before.
+* maskmovq and maskmovdqu now have their implicit memory access size reported correctly.
 
 ## 2.0.0
 

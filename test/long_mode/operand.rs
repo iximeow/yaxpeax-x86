@@ -29,6 +29,14 @@ fn memory_widths() {
     assert_eq!(mem_size_of(&[0x48, 0x33, 0x00]).size_name(), "qword");
     assert_eq!(mem_size_of(&[0x6a, 0x00]).size_name(), "qword");
     assert_eq!(mem_size_of(&[0x68, 0x00, 0x00, 0x00, 0x00]).size_name(), "qword");
+
+    // "maskmovq mm0, mm1"
+    assert_eq!(mem_size_of(&[0x4f, 0x0f, 0xf7, 0xc1]).size_name(), "qword");
+    assert_eq!(mem_size_of(&[0x67, 0x0f, 0xf7, 0xc1]).size_name(), "dword");
+
+    // "maskmovdqu xmm0, xmm1"
+    assert_eq!(mem_size_of(&[0x66, 0x4f, 0x0f, 0xf7, 0xc1]).size_name(), "qword");
+    assert_eq!(mem_size_of(&[0x67, 0x66, 0x0f, 0xf7, 0xc1]).size_name(), "dword");
 }
 
 #[test]

@@ -4036,6 +4036,7 @@ pub enum OperandCase {
     G_Ev_xmm_Ib,
     G_E_mm_Ib,
     MOVDIR64B,
+    MASKMOVDQU,
     ModRM_0x0f00,
     ModRM_0x0f01,
     ModRM_0x0f0d,
@@ -4392,6 +4393,7 @@ enum OperandCode {
     PMOVX_E_G_xmm = OperandCodeBuilder::new().read_E().operand_case(OperandCase::PMOVX_E_G_xmm).bits(),
     G_Ev_xmm_Ib = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_Ev_xmm_Ib).bits(),
     G_E_mm_Ib = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_E_mm_Ib).bits(),
+    MASKMOVDQU = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::MASKMOVDQU).bits(),
 }
 
 fn base_opcode_map(v: u8) -> Opcode {
@@ -6932,6 +6934,14 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::X;
             instruction.regs[1].bank = RegisterBank::X;
         },
+        OperandCase::MASKMOVDQU => {
+            if mem_oper != OperandSpec::RegMMM {
+                return Err(DecodeError::InvalidOperand);
+            }
+            instruction.regs[0].bank = RegisterBank::X;
+            instruction.regs[1].bank = RegisterBank::X;
+            instruction.mem_size = if instruction.prefixes.address_size() { 4 } else { 8 };
+        },
         OperandCase::Gv_Ev_Ib => {
             instruction.imm =
                 read_imm_signed(words, 1)? as u64;
@@ -7151,6 +7161,7 @@ fn read_operands<
             instruction.regs[1].bank = RegisterBank::MM;
             instruction.regs[1].num &= 0b111;
             instruction.regs[0].num &= 0b111;
+            instruction.mem_size = if !instruction.prefixes.address_size() { 8 } else { 4 };
             instruction.operand_count = 2;
         },
         OperandCase::E_G_q => {
@@ -10728,7 +10739,7 @@ const OPERAND_SIZE_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PMULUDQ), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PMADDWD), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PSADBW), OperandCode::G_E_xmm),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::MASKMOVDQU), OperandCode::G_U_xmm),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::MASKMOVDQU), OperandCode::MASKMOVDQU),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PSUBB), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PSUBW), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PSUBD), OperandCode::G_E_xmm),
