@@ -18,6 +18,7 @@
     zero-extended to 64 bits for storage. writing to "eax" in this way implies the 32->64 bit
     zero-extend, whereas writing to "ax" does not imply any zero-extension. mov reg-to-seg
     is unchanged and uses a 16-bit form for source GPR.
+* reject 0f0d prefetch/nop with a register operand, which was incorrectly decoded before.
 
 ## 2.0.0
 

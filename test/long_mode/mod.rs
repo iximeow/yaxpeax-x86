@@ -2854,6 +2854,8 @@ fn test_adx() {
 #[test]
 fn test_prefetchw() {
     test_display(&[0x0f, 0x0d, 0x08], "prefetchw zmmword [rax]");
+    test_display(&[0x0f, 0x0d, 0x00], "nop zmmword [rax]");
+    test_invalid(&[0x0f, 0x0d, 0xc0]);
 }
 
 #[test]
