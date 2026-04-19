@@ -8296,6 +8296,11 @@ fn read_operands<
                         match m {
                             0b000 => {
                                 instruction.opcode = Opcode::MONITOR;
+                                instruction.mem_size = if instruction.prefixes.address_size() {
+                                    4
+                                } else {
+                                    8
+                                };
                             }
                             0b001 => {
                                 instruction.opcode = Opcode::MWAIT;
