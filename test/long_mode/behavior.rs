@@ -1317,7 +1317,8 @@ mod kvm {
                     // TODO: syscall tests
                     continue;
                 }
-                if [Opcode::UD0, Opcode::UD1, Opcode::UD2].contains(&buf.opcode()) {
+
+                if undef::OPCODES.contains(&buf.opcode()) {
                     // TODO: ud tests, etc
                     continue;
                 }
@@ -1375,7 +1376,7 @@ mod kvm {
         let mut buf = Instruction::default();
         let initial_regs = vm.get_regs().unwrap();
 
-        for word in 0..u16::MAX {
+        for word in 0x0000..u16::MAX {
             let inst = word.to_le_bytes();
             let bytes = [0x0f, inst[0], inst[1]];
             let mut reader = U8Reader::new(&bytes);
@@ -1388,47 +1389,350 @@ mod kvm {
                     continue;
                 }
 
-                if table_instrs::OPCODES.contains(&buf.opcode()) {
-                    // tested under `mod table_instrs`.
-                    continue;
-                }
-
-                if vm_instrs::OPCODES.contains(&buf.opcode()) {
-                    // this generic testing facility is not appropriate for VM instructions.
-                    continue;
-                }
-
-                static COMPLEX: &'static [Opcode] = &[
-                    Opcode::PREFETCHNTA,
-                    Opcode::PREFETCH2,
-                    Opcode::PREFETCH1,
-                    Opcode::PREFETCH0,
-                ];
-
-                if COMPLEX.contains(&buf.opcode()) {
-                    continue;
-                }
-
-                if bytes[1] == 0x22 {
-                    // skip `mov crN, reg`
+                if not_generic(&buf) {
                     continue;
                 }
 
                 eprintln!("checking behavior of 0f {:02x} {:02x}: {}", inst[0], inst[1], buf);
 
-                /*
-                use yaxpeax_x86::long_mode::Opcode;
-                // mov es, word [rax]
-                // does an inf loop too...?
-                if [Opcode::INS, Opcode::OUTS, Opcode::IN, Opcode::OUT].contains(&buf.opcode()) {
-                    eprintln!("skipping {}", buf.opcode());
-                    continue;
-                }
-                */
                 vm.set_regs(&initial_regs).unwrap();
                 check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
             }
         }
+    }
+
+    #[test]
+    fn behavior_verify_kvm_66_0f_() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        for word in 0xf001..u16::MAX {
+            let inst = word.to_le_bytes();
+            let bytes = [0x66, 0x0f, inst[0], inst[1]];
+            let mut reader = U8Reader::new(&bytes);
+            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                // bytes (or longer..?)
+                use yaxpeax_arch::LengthedInstruction;
+                let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                if inst_len != 4 {
+                    continue;
+                }
+
+                if not_generic(&buf) {
+                    continue;
+                }
+
+                eprintln!("checking behavior of 66 0f {:02x} {:02x}: {}", inst[0], inst[1], buf);
+
+                vm.set_regs(&initial_regs).unwrap();
+                check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
+            }
+        }
+    }
+
+    #[test]
+    fn behavior_verify_kvm_0f_38_() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        for word in 0xf001..u16::MAX {
+            let inst = word.to_le_bytes();
+            let bytes = [0x0f, 0x38, inst[0], inst[1]];
+            let mut reader = U8Reader::new(&bytes);
+            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                // bytes (or longer..?)
+                use yaxpeax_arch::LengthedInstruction;
+                let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                if inst_len != 4 {
+                    continue;
+                }
+
+                if not_generic(&buf) {
+                    continue;
+                }
+
+                eprintln!("checking behavior of 66 0f {:02x} {:02x}: {}", inst[0], inst[1], buf);
+
+                vm.set_regs(&initial_regs).unwrap();
+                check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
+            }
+        }
+    }
+
+    use yaxpeax_x86::long_mode::Opcode;
+    use yaxpeax_x86::long_mode::Operand;
+    fn not_generic(instr: &Instruction) -> bool {
+        if table_instrs::OPCODES.contains(&instr.opcode()) {
+            // tested under `mod table_instrs`.
+            return true;
+        }
+
+        if vm_instrs::OPCODES.contains(&instr.opcode()) {
+            // this generic testing facility is not appropriate for VM instructions.
+            return true;
+        }
+
+        if ctrl_instrs::OPCODES.contains(&instr.opcode()) {
+            // control registers complicate testing against permutations, since those reuse
+            // the VM.
+            return true;
+        }
+
+        static COMPLEX: &'static [Opcode] = &[
+            Opcode::SYSCALL,
+            Opcode::SYSRET,
+            Opcode::PREFETCHW,
+            Opcode::PREFETCHNTA,
+            Opcode::PREFETCH2,
+            Opcode::PREFETCH1,
+            Opcode::PREFETCH0,
+        ];
+
+        if COMPLEX.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if instr.opcode() == Opcode::RDTSCP {
+            // raises #UD without CPUID leaf 80000001 edx.rdtscp (bit 27)
+            return true;
+        }
+
+        if instr.opcode() == Opcode::INVLPGB {
+            // guest is not configured to permit invlpgb
+            return true;
+        }
+
+        if instr.opcode() == Opcode::TLBSYNC {
+            // guest is not configured to permit tlbsync
+            return true;
+        }
+
+        if rands::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if xsave::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if pconfig::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if mpk::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if selector_load::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if undef::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if cmov::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if tdx::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if waitpkg::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if Opcode::MONITOR == instr.opcode() {
+            return true;
+        }
+
+        if Opcode::MWAIT == instr.opcode() {
+            return true;
+        }
+
+        if instr.opcode() == Opcode::LAR || instr.opcode() == Opcode::LSL {
+            // TODO: needs explicit test (conditional write of dest..)
+            return true;
+        }
+
+        if instr.operand_present(0) {
+            if let Operand::Register { reg } = instr.operand(0) {
+                if reg.class() == register_class::CR {
+                    return true;
+                }
+
+                if reg.class() == register_class::DR {
+                    return true;
+                }
+            }
+        }
+
+        if instr.mem_size().is_some() {
+            if instr.opcode() == Opcode::BT ||
+                instr.opcode() == Opcode::BTS ||
+                instr.opcode() == Opcode::BTR ||
+                instr.opcode() == Opcode::BTC {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // TODO: these don't fit in the generic harness because the destination register is scrombled
+    // and checking permutations will assume the instruction depends on some missed read (which
+    // *is* kinda true...)
+    mod rands {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::RDRAND,
+            Opcode::RDSEED,
+        ];
+    }
+
+    mod cmov {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::CMOVA,
+            Opcode::CMOVNA,
+            Opcode::CMOVB,
+            Opcode::CMOVNB,
+            Opcode::CMOVG,
+            Opcode::CMOVLE,
+            Opcode::CMOVL,
+            Opcode::CMOVGE,
+            Opcode::CMOVO,
+            Opcode::CMOVNO,
+            Opcode::CMOVP,
+            Opcode::CMOVNP,
+            Opcode::CMOVS,
+            Opcode::CMOVNS,
+            Opcode::CMOVZ,
+            Opcode::CMOVNZ,
+        ];
+
+    }
+
+    mod tdx {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::TDCALL,
+            Opcode::SEAMRET,
+            Opcode::SEAMOPS,
+            Opcode::SEAMCALL,
+        ];
+
+    }
+
+    mod waitpkg {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::TPAUSE,
+            Opcode::UMONITOR,
+            Opcode::UMWAIT,
+        ];
+
+    }
+
+    mod undef {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::UD0,
+            Opcode::UD1,
+            Opcode::UD2,
+        ];
+
+    }
+
+    // these need standalone testing because loading a bogus selector produces #GP
+    mod selector_load {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::LFS,
+            Opcode::LGS,
+            Opcode::LSS,
+            Opcode::SWAPGS,
+        ];
+
+    }
+
+    mod xsave {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::FXSAVE,
+            Opcode::FXRSTOR,
+            Opcode::XSAVE,
+            Opcode::XSAVEOPT,
+            Opcode::XSAVEC,
+            Opcode::XSAVEC64,
+            Opcode::XSAVES,
+            Opcode::XSAVES64,
+            Opcode::XRSTOR,
+            Opcode::XRSTORS,
+            Opcode::XRSTORS64,
+        ];
+
+    }
+
+    mod pconfig {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::PCONFIG,
+            Opcode::SKINIT,
+        ];
+
+    }
+
+    mod mpk {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::RDPKRU,
+            Opcode::WRPKRU,
+        ];
+
+    }
+
+    mod ctrl_instrs {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::CLTS,
+            Opcode::XGETBV,
+            Opcode::XSETBV,
+            Opcode::LDMXCSR,
+            Opcode::STMXCSR,
+            Opcode::LMSW,
+            Opcode::SMSW,
+        ];
+
     }
 
     // instructions related to operating VT-x/SVM virtual machines.
@@ -1437,6 +1741,8 @@ mod kvm {
         use yaxpeax_x86::long_mode::{Instruction, Opcode};
 
         pub static OPCODES: &'static [Opcode] = &[
+            Opcode::STGI,
+            Opcode::CLGI,
             Opcode::VMREAD,
             Opcode::VMWRITE,
             Opcode::VMCLEAR,
@@ -1445,6 +1751,13 @@ mod kvm {
             Opcode::VMXON,
             Opcode::VMXOFF,
             Opcode::VMFUNC,
+            Opcode::VMPTRLD,
+            Opcode::VMPTRST,
+            Opcode::VMMCALL,
+            Opcode::VMLOAD,
+            Opcode::VMSAVE,
+            Opcode::VMRUN,
+            Opcode::VMCALL,
         ];
     }
 
@@ -1470,6 +1783,8 @@ mod kvm {
             Opcode::SIDT,
             Opcode::LLDT,
             Opcode::SLDT,
+            Opcode::LTR,
+            Opcode::STR,
         ];
 
         #[test]
