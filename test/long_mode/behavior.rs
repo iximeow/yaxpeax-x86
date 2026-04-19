@@ -1259,6 +1259,11 @@ mod kvm {
                     continue;
                 }
 
+                if buf.opcode() == Opcode::RDPID {
+                    // rdpid is a specialized rdmsr
+                    continue;
+                }
+
                 if buf.opcode() == Opcode::RDTSC {
                     // the TSC keeps ticking so eax will change across runs and trip the
                     // "cared about dontcares" check.
@@ -1364,7 +1369,7 @@ mod kvm {
     }
 
     #[test]
-    fn behavior_verify_kvm_0f_() {
+    fn behavior_verify_kvm_0f__() {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::{Instruction, Opcode};
 
@@ -1402,7 +1407,7 @@ mod kvm {
     }
 
     #[test]
-    fn behavior_verify_kvm_66_0f_() {
+    fn behavior_verify_kvm_66_0f__() {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::{Instruction, Opcode};
 
@@ -1414,7 +1419,7 @@ mod kvm {
         let mut buf = Instruction::default();
         let initial_regs = vm.get_regs().unwrap();
 
-        for word in 0xf001..u16::MAX {
+        for word in 0x0000..u16::MAX {
             let inst = word.to_le_bytes();
             let bytes = [0x66, 0x0f, inst[0], inst[1]];
             let mut reader = U8Reader::new(&bytes);
@@ -1440,6 +1445,44 @@ mod kvm {
     }
 
     #[test]
+    fn behavior_verify_kvm_f3_0f__() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        for word in 0xec00..u16::MAX {
+            let inst = word.to_le_bytes();
+            let bytes = [0xf3, 0x0f, inst[0], inst[1]];
+            let mut reader = U8Reader::new(&bytes);
+            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                // bytes (or longer..?)
+                use yaxpeax_arch::LengthedInstruction;
+                let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                if inst_len != 4 {
+                    continue;
+                }
+
+                if not_generic(&buf) {
+                    continue;
+                }
+
+                eprintln!("checking behavior of f3 0f {:02x} {:02x}: {}", inst[0], inst[1], buf);
+
+                vm.set_regs(&initial_regs).unwrap();
+                check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
+            }
+        }
+    }
+
+    #[test]
     fn behavior_verify_kvm_0f_38_() {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::{Instruction, Opcode};
@@ -1452,7 +1495,7 @@ mod kvm {
         let mut buf = Instruction::default();
         let initial_regs = vm.get_regs().unwrap();
 
-        for word in 0xf001..u16::MAX {
+        for word in 0x0000..u16::MAX {
             let inst = word.to_le_bytes();
             let bytes = [0x0f, 0x38, inst[0], inst[1]];
             let mut reader = U8Reader::new(&bytes);
@@ -1469,7 +1512,7 @@ mod kvm {
                     continue;
                 }
 
-                eprintln!("checking behavior of 66 0f {:02x} {:02x}: {}", inst[0], inst[1], buf);
+                eprintln!("checking behavior of 0f 38 {:02x} {:02x}: {}", inst[0], inst[1], buf);
 
                 vm.set_regs(&initial_regs).unwrap();
                 check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
@@ -1482,6 +1525,10 @@ mod kvm {
     fn not_generic(instr: &Instruction) -> bool {
         if table_instrs::OPCODES.contains(&instr.opcode()) {
             // tested under `mod table_instrs`.
+            return true;
+        }
+
+        if ptwrite::OPCODES.contains(&instr.opcode()) {
             return true;
         }
 
@@ -1510,6 +1557,11 @@ mod kvm {
             return true;
         }
 
+        if instr.opcode() == Opcode::RDPID {
+            // rdpid is a specialized rdmsr
+            return true;
+        }
+
         if instr.opcode() == Opcode::RDTSCP {
             // raises #UD without CPUID leaf 80000001 edx.rdtscp (bit 27)
             return true;
@@ -1522,6 +1574,10 @@ mod kvm {
 
         if instr.opcode() == Opcode::TLBSYNC {
             // guest is not configured to permit tlbsync
+            return true;
+        }
+
+        if cet::OPCODES.contains(&instr.opcode()) {
             return true;
         }
 
@@ -1561,6 +1617,10 @@ mod kvm {
             return true;
         }
 
+        if uintr::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
         if Opcode::MONITOR == instr.opcode() {
             return true;
         }
@@ -1596,6 +1656,22 @@ mod kvm {
         }
 
         return false;
+    }
+
+    mod cet {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::WRUSS,
+            Opcode::WRSS,
+            Opcode::INCSSP,
+            Opcode::SAVEPREVSSP,
+            Opcode::SETSSBSY,
+            Opcode::CLRSSBSY,
+            Opcode::RSTORSSP,
+            Opcode::ENDBR64,
+            Opcode::ENDBR32,
+        ];
     }
 
     // TODO: these don't fit in the generic harness because the destination register is scrombled
@@ -1657,6 +1733,19 @@ mod kvm {
 
     }
 
+    mod uintr {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::UIRET,
+            Opcode::SENDUIPI,
+            Opcode::TESTUI,
+            Opcode::CLUI,
+            Opcode::STUI,
+        ];
+
+    }
+
     mod undef {
         use yaxpeax_x86::long_mode::{Instruction, Opcode};
 
@@ -1710,6 +1799,15 @@ mod kvm {
 
     }
 
+    mod ptwrite {
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::PTWRITE,
+        ];
+
+    }
+
     mod mpk {
         use yaxpeax_x86::long_mode::{Instruction, Opcode};
 
@@ -1731,6 +1829,11 @@ mod kvm {
             Opcode::STMXCSR,
             Opcode::LMSW,
             Opcode::SMSW,
+            Opcode::SWAPGS,
+            Opcode::RDFSBASE,
+            Opcode::WRFSBASE,
+            Opcode::RDGSBASE,
+            Opcode::WRGSBASE,
         ];
 
     }

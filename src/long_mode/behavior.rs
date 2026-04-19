@@ -976,6 +976,10 @@ pub enum ComplexOp {
 
     /// TODO: document
     SWAPGS,
+    RDFSBASE,
+    WRFSBASE,
+    RDGSBASE,
+    WRGSBASE,
 }
 
 /// a visitor for collecting architectural accesses for an `Instruction`. used with
@@ -2234,6 +2238,15 @@ static MONITOR_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
+static SHA256RNDS2_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm0(),
+        disp: 0i32,
+        write: false,
+    },
+];
+
 const PUSH_OPS_IDX: u16 = 1;
 const POP_OPS_IDX: u16 = 2;
 const JCC_OPS_IDX: u16 = 3;
@@ -2282,8 +2295,9 @@ const CMPXCHG16B_IDX: u16 = 45;
 const RDTSCP_IDX: u16 = 46;
 const MASKMOVQ_IDX: u16 = 47;
 const MONITOR_IDX: u16 = 48;
+const SHA256RNDS2_IDX: u16 = 49;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 49] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 50] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -2333,6 +2347,7 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 49] = [
     RDTSCP_OPS,
     MASKMOVQ_OPS,
     MONITOR_OPS,
+    SHA256RNDS2_OPS,
 ];
 
 #[inline(never)]
@@ -2408,9 +2423,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         DIVSD => GENERAL_RW_R,
         MINSD => GENERAL_RW_R,
         MAXSD => GENERAL_RW_R,
-        MOVSLDUP => { panic!("todo: movsldup"); },
-        MOVSHDUP => { panic!("todo: movshdup"); },
-        MOVDDUP => { panic!("todo: movddup"); },
+        MOVSLDUP => GENERAL_W_R,
+        MOVSHDUP => GENERAL_W_R,
+        MOVDDUP => GENERAL_W_R,
         HADDPS => GENERAL_RW_R,
         HSUBPS => GENERAL_RW_R,
         ADDSUBPD => GENERAL_RW_R,
@@ -2671,19 +2686,21 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         MOVDQU => GENERAL_W_R,
         MOVDQA => GENERAL_W_R,
         MOVQ => GENERAL_W_R,
-        CMPSS => { panic!("todo: cmpss"); },
-        CMPSD => { panic!("todo: cmpsd"); },
+        CMPSS => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        CMPSD => GENERAL_RW_R
+            .set_operand(2, Access::Read),
         UNPCKLPS => GENERAL_RW_R,
         UNPCKLPD => GENERAL_RW_R,
         UNPCKHPS => GENERAL_RW_R,
         UNPCKHPD => GENERAL_RW_R,
-        PSHUFHW => { panic!("todo: pshufhw"); },
-        PSHUFLW => { panic!("todo: pshuflw"); },
+        PSHUFHW => GENERAL_W_R,
+        PSHUFLW => GENERAL_W_R,
         MOVUPS => GENERAL_W_R,
-        MOVQ2DQ => { panic!("todo: movq2dq"); },
-        MOVDQ2Q => { panic!("todo: movdq2q"); },
+        MOVQ2DQ => GENERAL_W_R,
+        MOVDQ2Q => GENERAL_W_R,
         RSQRTSS => GENERAL_RW_R,
-        RCPSS => { panic!("todo: rcpss"); },
+        RCPSS => GENERAL_RW_R,
 
         ANDN => { panic!("todo: andn"); },
         BEXTR => { panic!("todo: bextr"); },
@@ -2917,8 +2934,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VBROADCASTSD => { panic!("todo: vbroadcastsd"); },
         VBROADCASTSS => { panic!("todo: vbroadcastss"); },
         VCMPSD => { panic!("todo: vcmpsd"); },
-        VCMPSS => { panic!("todo: vcmpss"); },
-        VCMPPD => { panic!("todo: vcmppd"); },
+        VCMPSS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VCMPPD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VCMPPS => { panic!("todo: vcmpps"); },
         VCVTDQ2PD => { panic!("todo: vcvtdq2pd"); },
         VCVTDQ2PS => GENERAL_W_R,
@@ -3046,8 +3065,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VMOVQ => GENERAL_W_R,
         VMOVSS => { panic!("todo: vmovss"); },
         VMOVSD => { panic!("todo: vmovsd"); },
-        VMOVSHDUP => { panic!("todo: vmovshdup"); },
-        VMOVSLDUP => { panic!("todo: vmovsldup"); },
+        VMOVSHDUP => GENERAL_W_R,
+        VMOVSLDUP => GENERAL_W_R,
         VMOVUPD => { panic!("todo: vmovupd"); },
         VMOVUPS => { panic!("todo: vmovups"); },
         VMPSADBW => { panic!("todo: vmpsadbw"); },
@@ -3120,7 +3139,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VPHADDD => { panic!("todo: vphaddd"); },
         VPHADDSW => { panic!("todo: vphaddsw"); },
         VPHADDW => { panic!("todo: vphaddw"); },
-        VPMADDUBSW => { panic!("todo: vpmaddubsw"); },
+        VPMADDUBSW => GENERAL_W_R_R,
         VPHMINPOSUW => { panic!("todo: vphminposuw"); },
         VPHSUBD => { panic!("todo: vphsubd"); },
         VPHSUBSW => { panic!("todo: vphsubsw"); },
@@ -3158,7 +3177,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VPMOVZXWD => { panic!("todo: vpmovzxwd"); },
         VPMOVZXWQ => { panic!("todo: vpmovzxwq"); },
         VPMULDQ => { panic!("todo: vpmuldq"); },
-        VPMULHRSW => { panic!("todo: vpmulhrsw"); },
+        VPMULHRSW => GENERAL_W_R_R,
         VPMULHUW => GENERAL_W_R_R,
         VPMULHW => { panic!("todo: vpmulhw"); },
         VPMULLQ => GENERAL_W_R_R,
@@ -3167,11 +3186,11 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VPMULUDQ => { panic!("todo: vpmuludq"); },
         VPOR => { panic!("todo: vpor"); },
         VPSADBW => { panic!("todo: vpsadbw"); },
-        VPSHUFB => { panic!("todo: vpshufb"); },
-        VPSHUFD => { panic!("todo: vpshufd"); },
-        VPSIGNB => { panic!("todo: vpsignb"); },
-        VPSIGND => { panic!("todo: vpsignd"); },
-        VPSIGNW => { panic!("todo: vpsignw"); },
+        VPSHUFB => GENERAL_W_R_R,
+        VPSHUFD => GENERAL_W_R_R,
+        VPSIGNB => GENERAL_W_R_R,
+        VPSIGND => GENERAL_W_R_R,
+        VPSIGNW => GENERAL_W_R_R,
         VPSLLD => { panic!("todo: vpslld"); },
         VPSLLDQ => { panic!("todo: vpslldq"); },
         VPSLLQ => { panic!("todo: vpsllq"); },
@@ -3280,12 +3299,12 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         ROUNDSD => { panic!("todo: roundsd"); },
         ROUNDPS => { panic!("todo: roundps"); },
         ROUNDPD => { panic!("todo: roundpd"); },
-        PMAXSB => { panic!("todo: pmaxsb"); },
-        PMAXSD => { panic!("todo: pmaxsd"); },
+        PMAXSB => GENERAL_RW_R,
+        PMAXSD => GENERAL_RW_R,
         PMAXUW => GENERAL_RW_R,
         PMAXUD => GENERAL_RW_R,
-        PMINSD => { panic!("todo: pminsd"); },
-        PMINSB => { panic!("todo: pminsb"); },
+        PMINSD => GENERAL_RW_R,
+        PMINSB => GENERAL_RW_R,
         PMINUD => GENERAL_RW_R,
         PMINUW => GENERAL_RW_R,
         BLENDW => { panic!("todo: blendw"); },
@@ -3299,31 +3318,32 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         MOVNTDQA => { panic!("todo: movntdqa"); },
         PMULLD => GENERAL_RW_R,
         PALIGNR => { panic!("todo: palignr"); },
-        PSIGNW => { panic!("todo: psignw"); },
-        PSIGND => { panic!("todo: psignd"); },
-        PSIGNB => { panic!("todo: psignb"); },
-        PSHUFB => { panic!("todo: pshufb"); },
-        PMULHRSW => { panic!("todo: pmulhrsw"); },
-        PMADDUBSW => { panic!("todo: pmaddubsw"); },
-        PABSD => { panic!("todo: pabsd"); },
-        PABSW => { panic!("todo: pabsw"); },
-        PABSB => { panic!("todo: pabsb"); },
-        PHSUBSW => { panic!("todo: phsubsw"); },
-        PHSUBW => { panic!("todo: phsubw"); },
-        PHSUBD => { panic!("todo: phsubd"); },
-        PHADDD => { panic!("todo: phaddd"); },
-        PHADDSW => { panic!("todo: phaddsw"); },
-        PHADDW => { panic!("todo: phaddw"); },
+        PSIGNW => GENERAL_RW_R,
+        PSIGND => GENERAL_RW_R,
+        PSIGNB => GENERAL_RW_R,
+        PSHUFB => GENERAL_RW_R,
+        PMULHRSW => GENERAL_RW_R,
+        PMADDUBSW => GENERAL_RW_R,
+        PABSD => GENERAL_W_R,
+        PABSW => GENERAL_W_R,
+        PABSB => GENERAL_W_R,
+        PHSUBSW => GENERAL_RW_R,
+        PHSUBW => GENERAL_RW_R,
+        PHSUBD => GENERAL_RW_R,
+        PHADDD => GENERAL_RW_R,
+        PHADDSW => GENERAL_RW_R,
+        PHADDW => GENERAL_RW_R,
         HSUBPD => GENERAL_RW_R,
         HADDPD => GENERAL_RW_R,
 
-        SHA1RNDS4 => { panic!("todo: sha1rnds4"); },
-        SHA1NEXTE => { panic!("todo: sha1nexte"); },
-        SHA1MSG1 => { panic!("todo: sha1msg1"); },
-        SHA1MSG2 => { panic!("todo: sha1msg2"); },
-        SHA256RNDS2 => { panic!("todo: sha256rnds2"); },
-        SHA256MSG1 => { panic!("todo: sha256msg1"); },
-        SHA256MSG2 => { panic!("todo: sha256msg2"); },
+        SHA1RNDS4 => GENERAL_RW_R_R,
+        SHA1NEXTE => GENERAL_RW_R,
+        SHA1MSG1 => GENERAL_RW_R,
+        SHA1MSG2 => GENERAL_RW_R,
+        SHA256RNDS2 => GENERAL_RW_R
+            .set_implicit_ops(SHA256RNDS2_IDX),
+        SHA256MSG1 => GENERAL_RW_R,
+        SHA256MSG2 => GENERAL_RW_R,
 
         LZCNT => { panic!("todo: lzcnt"); },
         CLGI => { panic!("todo: clgi"); },
@@ -3344,7 +3364,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_operand(2, Access::Read),
         TLBSYNC => { panic!("todo: tlbsync"); },
 
-        MOVBE => { panic!("todo: movbe"); },
+        MOVBE => GENERAL_W_R,
 
         ADCX => { panic!("todo: adcx"); },
         ADOX => { panic!("todo: adox"); },
@@ -3553,8 +3573,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         JRCXZ => { panic!("todo: jrcxz"); },
 
         // started shipping in Tremont, 2020 sept 23
-        MOVDIR64B => { panic!("todo: movdir64b"); },
-        MOVDIRI => { panic!("todo: movdiri"); },
+        MOVDIR64B => GENERAL_W_R,
+        MOVDIRI => GENERAL_W_R,
 
         // started shipping in Tiger Lake, 2020 sept 2
         AESDEC128KL => { panic!("todo: aesdec128kl"); },
