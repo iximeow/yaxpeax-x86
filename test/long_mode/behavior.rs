@@ -1371,7 +1371,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm_0f__() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Instruction;
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1409,7 +1409,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm_66_0f__() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Instruction;
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1447,7 +1447,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm_f3_0f__() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Instruction;
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1485,7 +1485,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm_0f_38_() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Instruction;
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1525,7 +1525,7 @@ mod kvm {
     #[test]
     fn behavior_verify_kvm_misc() {
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Instruction;
 
         let mut vm = create_test_vm();
         vm.set_single_step(true).expect("can enable single-step");
@@ -1550,6 +1550,8 @@ mod kvm {
             &[0x66, 0x0f, 0x38, 0xf6, 0x01],
             // adox eax, dword [rcx]
             &[0xf3, 0x0f, 0x38, 0xf6, 0x01],
+            // crc32 eax, byte [rcx]
+            &[0xf2, 0x0f, 0x38, 0xf0, 0xc1],
         ];
         for bytes in MISC_INSTS.iter() {
             let mut reader = U8Reader::new(&bytes);
@@ -1705,7 +1707,7 @@ mod kvm {
     }
 
     mod cet {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::WRUSS,
@@ -1724,7 +1726,7 @@ mod kvm {
     // and checking permutations will assume the instruction depends on some missed read (which
     // *is* kinda true...)
     mod rands {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::RDRAND,
@@ -1733,7 +1735,7 @@ mod kvm {
     }
 
     mod cmov {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::CMOVA,
@@ -1757,7 +1759,7 @@ mod kvm {
     }
 
     mod tdx {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::TDCALL,
@@ -1769,7 +1771,7 @@ mod kvm {
     }
 
     mod waitpkg {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::TPAUSE,
@@ -1780,7 +1782,7 @@ mod kvm {
     }
 
     mod uintr {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::UIRET,
@@ -1793,7 +1795,7 @@ mod kvm {
     }
 
     mod undef {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::UD0,
@@ -1805,7 +1807,7 @@ mod kvm {
 
     // these need standalone testing because loading a bogus selector produces #GP
     mod selector_load {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::LFS,
@@ -1817,7 +1819,7 @@ mod kvm {
     }
 
     mod xsave {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::FXSAVE,
@@ -1836,7 +1838,7 @@ mod kvm {
     }
 
     mod pconfig {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::PCONFIG,
@@ -1846,7 +1848,7 @@ mod kvm {
     }
 
     mod ptwrite {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::PTWRITE,
@@ -1855,7 +1857,7 @@ mod kvm {
     }
 
     mod mpk {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::RDPKRU,
@@ -1865,7 +1867,7 @@ mod kvm {
     }
 
     mod ctrl_instrs {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::CLTS,
@@ -1887,7 +1889,7 @@ mod kvm {
     // instructions related to operating VT-x/SVM virtual machines.
     // TODO: these are not (yet) tested.
     mod vm_instrs {
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::STGI,
