@@ -2758,8 +2758,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         ANDPS => GENERAL_RW_R,
         ANDPD => GENERAL_RW_R,
         BSWAP => GENERAL_RW,
-        CMPPD => { panic!("todo: cmppd"); },
-        CMPPS => { panic!("todo: cmpps"); },
+        CMPPD => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        CMPPS =>  GENERAL_RW_R
+            .set_operand(2, Access::Read),
         COMISD => GENERAL_R_R_FLAGWRITE,
         COMISS => GENERAL_R_R_FLAGWRITE,
         CVTDQ2PS => GENERAL_W_R,
@@ -2885,8 +2887,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         RSQRTPS => GENERAL_W_R,
         SHLD => GENERAL_RW_R_R
             .set_flags_access(Access::Write),
-        SHUFPD => { panic!("todo: shufpd"); },
-        SHUFPS => { panic!("todo: shufps"); },
+        SHUFPD => GENERAL_RW_R_R,
+        SHUFPS => GENERAL_RW_R_R,
         SLHD => { panic!("todo: slhd"); },
         SQRTPS => GENERAL_W_R,
         SQRTPD => GENERAL_W_R,
@@ -2938,7 +2940,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_operand(3, Access::Read),
         VCMPPD => GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VCMPPS => { panic!("todo: vcmpps"); },
+        VCMPPS =>  GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VCVTDQ2PD => { panic!("todo: vcvtdq2pd"); },
         VCVTDQ2PS => GENERAL_W_R,
         VCVTPD2PS => { panic!("todo: vcvtpd2ps"); },
@@ -3232,8 +3235,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VRSQRTPS => GENERAL_W_R,
         VRSQRTSS => GENERAL_RW_R,
         VRCPSS => { panic!("todo: vrcpss"); },
-        VSHUFPD => { panic!("todo: vshufpd"); },
-        VSHUFPS => { panic!("todo: vshufps"); },
+        VSHUFPD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VSHUFPS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VSQRTPD => GENERAL_W_R,
         VSQRTPS => GENERAL_W_R,
         VSQRTSS => GENERAL_RW_R,
@@ -3345,7 +3350,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         SHA256MSG1 => GENERAL_RW_R,
         SHA256MSG2 => GENERAL_RW_R,
 
-        LZCNT => { panic!("todo: lzcnt"); },
+        LZCNT => GENERAL_W_R
+            .set_flags_access(Access::Write),
         CLGI => { panic!("todo: clgi"); },
         STGI => { panic!("todo: stgi"); },
         SKINIT => { panic!("todo: skinit"); },
@@ -3366,8 +3372,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
 
         MOVBE => GENERAL_W_R,
 
-        ADCX => { panic!("todo: adcx"); },
-        ADOX => { panic!("todo: adox"); },
+        ADCX => GENERAL_RW_R
+            .set_flags_access(Access::ReadWrite),
+        ADOX => GENERAL_RW_R
+            .set_flags_access(Access::ReadWrite),
 
         PREFETCHW => { panic!("todo: prefetchw"); },
 
@@ -3395,7 +3403,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         WRFSBASE => { panic!("todo: wrfsbase"); },
         WRGSBASE => { panic!("todo: wrgsbase"); },
 
-        CRC32 => { panic!("todo: crc32"); },
+        CRC32 => GENERAL_RW_R,
         SALC => { panic!("todo: salc"); },
         XLAT => BehaviorDigest::empty()
             .set_implicit_ops(XLAT_IDX)

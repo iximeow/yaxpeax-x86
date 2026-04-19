@@ -1520,6 +1520,52 @@ mod kvm {
         }
     }
 
+    // use the generic test harness for a handful of instructions that don't get covered in the
+    // general enumeration above
+    #[test]
+    fn behavior_verify_kvm_misc() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        static MISC_INSTS: &'static [&'static [u8]] = &[
+            // cmppd xmm0, xmmword [rcx], 0x75
+            &[0x66, 0x0f, 0xc2, 0x01, 0x75],
+            // cmpps xmm0, xmmword [rcx], 0x75
+            &[0x0f, 0xc2, 0x01, 0x75],
+            // shufpd xmm0, xmmword [rcx], 0x75
+            &[0x66, 0x0f, 0xc6, 0x01, 0x75],
+            // shufps xmm0, xmmword [rcx], 0x75
+            &[0x0f, 0xc6, 0x01, 0x75],
+            // lzcnt eax, dword [rcx]
+            &[0xf3, 0x0f, 0xbd, 0x01],
+            // adcx eax, dword [rcx]
+            &[0x66, 0x0f, 0x38, 0xf6, 0x01],
+            // adox eax, dword [rcx]
+            &[0xf3, 0x0f, 0x38, 0xf6, 0x01],
+        ];
+        for bytes in MISC_INSTS.iter() {
+            let mut reader = U8Reader::new(&bytes);
+            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                eprint!("checking behavior of {:02x}", bytes[0]);
+                for b in &bytes[1..] {
+                    eprint!(" {:02x}", b);
+                }
+                eprint!("\n");
+
+                vm.set_regs(&initial_regs).unwrap();
+                check_behavior(&mut vm, bytes).expect("behavior check is ok");
+            }
+        }
+    }
+
     use yaxpeax_x86::long_mode::Opcode;
     use yaxpeax_x86::long_mode::Operand;
     fn not_generic(instr: &Instruction) -> bool {
