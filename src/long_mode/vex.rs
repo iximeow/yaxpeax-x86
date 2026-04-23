@@ -1755,7 +1755,7 @@ fn read_vex_instruction<
 //                        0x0a => (Opcode::VROUNDSS, VEXOperandCode::G_V_E_xmm_imm8),
 //                        0x0b => (Opcode::VROUNDSD, VEXOperandCode::G_V_E_xmm_imm8),
                         0x10 => (Opcode::VMOVUPD, VEXOperandCode::G_E_xyLmm),
-                        0x11 => (Opcode::VMOVUPD, VEXOperandCode::G_E_xyLmm),
+                        0x11 => (Opcode::VMOVUPD, VEXOperandCode::E_G_xyLmm),
                         0x12 => (Opcode::VMOVLPD, if L {
                             return Err(DecodeError::InvalidOpcode);
                         } else {
@@ -2073,10 +2073,26 @@ fn read_vex_instruction<
                     0x09 => (Opcode::VPSIGNW, VEXOperandCode::G_V_E_xyLmm),
                     0x0A => (Opcode::VPSIGND, VEXOperandCode::G_V_E_xyLmm),
                     0x0B => (Opcode::VPMULHRSW, VEXOperandCode::G_V_E_xyLmm),
-                    0x0C => (Opcode::VPERMILPS, VEXOperandCode::G_V_E_xyLmm),
-                    0x0D => (Opcode::VPERMILPD, VEXOperandCode::G_V_E_xyLmm),
-                    0x0E => (Opcode::VTESTPS, VEXOperandCode::G_E_xyLmm),
-                    0x0F => (Opcode::VTESTPD, VEXOperandCode::G_E_xyLmm),
+                    0x0C => (Opcode::VPERMILPS, if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
+                    } else {
+                        VEXOperandCode::G_V_E_xyLmm
+                    }),
+                    0x0D => (Opcode::VPERMILPD, if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
+                    } else {
+                        VEXOperandCode::G_V_E_xyLmm
+                    }),
+                    0x0E => (Opcode::VTESTPS, if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
+                    } else {
+                        VEXOperandCode::G_E_xyLmm
+                    }),
+                    0x0F => (Opcode::VTESTPD, if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
+                    } else {
+                        VEXOperandCode::G_E_xyLmm
+                    }),
                     0x13 => (Opcode::VCVTPH2PS, VEXOperandCode::G_E_xyLmm),
                     0x16 => (Opcode::VPERMPS, if L {
                         if instruction.prefixes.vex_unchecked().w() {
@@ -2614,8 +2630,16 @@ fn read_vex_instruction<
                     } else {
                         VEXOperandCode::G_V_E_xyLmm_imm8
                     }),
-                    0x04 => (Opcode::VPERMILPS, VEXOperandCode::G_E_xyLmm_imm8),
-                    0x05 => (Opcode::VPERMILPD, VEXOperandCode::G_E_xyLmm_imm8),
+                    0x04 => (Opcode::VPERMILPS, if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
+                    } else {
+                        VEXOperandCode::G_E_xyLmm_imm8
+                    }),
+                    0x05 => (Opcode::VPERMILPD, if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
+                    } else {
+                        VEXOperandCode::G_E_xyLmm_imm8
+                    }),
                     0x06 => (Opcode::VPERM2F128, if L {
                         if instruction.prefixes.vex_unchecked().w() {
                             return Err(DecodeError::InvalidOpcode);

@@ -1753,10 +1753,14 @@ fn test_vex() {
     test_instr(&[0xc4, 0b000_00010, 0b0_0111_101, 0x0c, 0b11_001_010], "vpermilps ymm9, ymm8, ymm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_0111_001, 0x0d, 0b11_001_010], "vpermilpd xmm9, xmm8, xmm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_0111_101, 0x0d, 0b11_001_010], "vpermilpd ymm9, ymm8, ymm10");
+    test_invalid(&[0xc4, 0b000_00010, 0b1_0111_001, 0x0d, 0b11_001_010]);
+    test_invalid(&[0xc4, 0b000_00010, 0b1_0111_101, 0x0d, 0b11_001_010]);
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_001, 0x0e, 0b11_001_010], "vtestps xmm9, xmm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x0e, 0b11_001_010], "vtestps ymm9, ymm10");
+    test_invalid(&[0xc4, 0b000_00010, 0b1_1111_101, 0x0e, 0b11_001_010]);
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_001, 0x0f, 0b11_001_010], "vtestpd xmm9, xmm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x0f, 0b11_001_010], "vtestpd ymm9, ymm10");
+    test_invalid(&[0xc4, 0b000_00010, 0b1_1111_101, 0x0f, 0b11_001_010]);
 
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x16, 0b11_001_010], "vpermps ymm9, ymm0, ymm10");
     test_instr(&[0xc4, 0b000_00010, 0b0_1111_101, 0x16, 0b00_001_010], "vpermps ymm9, ymm0, ymmword [r10]");
@@ -1970,18 +1974,24 @@ fn test_vex() {
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_111, 0x10, 0b00_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_001, 0x10, 0b00_001_010], "vmovupd xmm9, xmmword [r10]");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_101, 0x10, 0b00_001_010], "vmovupd ymm9, ymmword [r10]");
+    test_instr(&[0xc4, 0b000_00001, 0b1_1111_001, 0x11, 0b00_001_010], "vmovupd xmmword [r10], xmm9");
+    test_instr(&[0xc4, 0b000_00001, 0b1_1111_101, 0x11, 0b00_001_010], "vmovupd ymmword [r10], ymm9");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_011, 0x11, 0b00_001_010], "vmovsd qword [r10], xmm9");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_111, 0x11, 0b00_001_010], "vmovsd qword [r10], xmm9");
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_011, 0x11, 0b00_001_010]);
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_111, 0x11, 0b00_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_001, 0x10, 0b00_001_010], "vmovupd xmm9, xmmword [r10]");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_101, 0x10, 0b00_001_010], "vmovupd ymm9, ymmword [r10]");
+    test_instr(&[0xc4, 0b000_00001, 0b1_1111_001, 0x11, 0b00_001_010], "vmovupd xmmword [r10], xmm9");
+    test_instr(&[0xc4, 0b000_00001, 0b1_1111_101, 0x11, 0b00_001_010], "vmovupd ymmword [r10], ymm9");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_010, 0x10, 0b00_001_010], "vmovss xmm9, dword [r10]");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_110, 0x10, 0b00_001_010], "vmovss xmm9, dword [r10]");
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_010, 0x10, 0b00_001_010]);
     test_invalid(&[0xc4, 0b000_00001, 0b1_0111_110, 0x10, 0b00_001_010]);
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_000, 0x10, 0b00_001_010], "vmovups xmm9, xmmword [r10]");
     test_instr(&[0xc4, 0b000_00001, 0b1_1111_100, 0x10, 0b00_001_010], "vmovups ymm9, ymmword [r10]");
+    test_instr(&[0xc4, 0b000_00001, 0b1_1111_000, 0x11, 0b00_001_010], "vmovups xmmword [r10], xmm9");
+    test_instr(&[0xc4, 0b000_00001, 0b1_1111_100, 0x11, 0b00_001_010], "vmovups ymmword [r10], ymm9");
 
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_011, 0x11, 0b11_001_010], "vmovsd xmm10, xmm8, xmm9");
     test_instr(&[0xc4, 0b000_00001, 0b1_0111_111, 0x11, 0b11_001_010], "vmovsd xmm10, xmm8, xmm9");
