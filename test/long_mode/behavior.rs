@@ -1520,6 +1520,66 @@ mod kvm {
         }
     }
 
+    #[test]
+    fn behavior_verify_kvm_vex() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::Instruction;
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        #[allow(non_snake_case)]
+        for opcode in 0x00..=u8::MAX {
+            for prefix_bits in 0x00..0x400u16 {
+                let mmmmm = prefix_bits & 0b11111;
+                let prefix_1 = (0xe0 | mmmmm) as u8;
+
+                let pp = (prefix_bits >> 5) & 0b11;
+                let W = (prefix_bits >> 7) & 1;
+                let L = (prefix_bits >> 8) & 1;
+                let prefix_2 = (0x78 | (W << 7) | (L << 2) | pp) as u8;
+
+                let operands = (prefix_bits >> 9) & 0b1;
+                static OPC_BYTE_TABLE: [u8; 2] = [0xc1, 0x01];
+
+                let bytes: [u8; 5] = [0xc4, prefix_1, prefix_2, opcode, OPC_BYTE_TABLE[operands as usize]];
+                let mut reader = U8Reader::new(&bytes);
+                if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                    // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                    // bytes (or longer..?)
+                    use yaxpeax_arch::LengthedInstruction;
+                    let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                    if inst_len != bytes.len() {
+                        continue;
+                    }
+
+                    if not_generic(&buf) {
+                        continue;
+                    }
+
+                    let mut printed = false;
+                    eprint!("checking behavior of ");
+                    for b in bytes.iter() {
+                        if printed {
+                            eprint!(" ");
+                        }
+                        eprint!("{:02x}", b);
+                        printed = true;
+                    }
+                    eprintln!(": {}", buf);
+
+                    vm.set_regs(&initial_regs).unwrap();
+                    check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
+                }
+            }
+        }
+    }
+
     // use the generic test harness for a handful of instructions that don't get covered in the
     // general enumeration above
     #[test]
