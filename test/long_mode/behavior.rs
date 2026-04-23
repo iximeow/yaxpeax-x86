@@ -47,7 +47,7 @@ mod kvm {
 
     struct AccessTestCtx<'a> {
         regs: &'a mut kvm_regs,
-        vm: &'a Vm,
+        _vm: &'a Vm,
         preserve_rsp: bool,
         used_regs: [bool; 16],
         expected_reg: Vec<ExpectedRegAccess>,
@@ -237,20 +237,18 @@ mod kvm {
         let mut exits = 0;
         let end_pc = loop {
 //            eprintln!("about to run! here's some state:");
-            let regs = vm.get_regs().unwrap();
+//            let regs = vm.get_regs().unwrap();
 //            dump_regs(&regs);
 //            let sregs = vm.get_sregs().unwrap();
 //            eprintln!("sregs: {:?}", sregs);
             let exit = vm.run().expect("can run vcpu");
             exits += 1;
             match exit {
-                VcpuExit::MmioRead { addr, buf } => {
+                VcpuExit::MmioRead { .. } |
+                VcpuExit::MmioWrite { .. } => {
                     panic!("shoud not be mmio accesses anymore");
                 }
-                VcpuExit::MmioWrite { addr, buf } => {
-                    panic!("shoud not be mmio accesses anymore");
-                }
-                VcpuExit::Debug { pc, info } => {
+                VcpuExit::Debug { pc, info: _ } => {
                     break pc;
                 }
                 VcpuExit::Exception { nr } => {
@@ -434,6 +432,12 @@ mod kvm {
         }
 
         if bad {
+//            eprintln!("before:");
+//            dump_regs(&before_regs);
+            eprintln!("after:");
+            dump_regs(&now_after_regs);
+            eprintln!("initial_after:");
+            dump_regs(&initial_after_regs);
             panic!("cared about dontcares");
         }
     }
@@ -551,27 +555,26 @@ mod kvm {
             }
         }
 
-        fn permute_memdontcare(expected_mem: &[ExpectedMemAccess], vm: &mut Vm) {
+        // TODO: this needs some rethinking. see commented-out caller.
+        #[allow(dead_code)]
+        fn permute_memread(expected_mem: &[ExpectedMemAccess], vm: &mut Vm) {
             for acc in expected_mem.iter() {
                 if acc.write {
                     continue;
                 }
 
-                /*
-                 * WRONG
                 let mut buf = vec![0; acc.size as usize];
                 let mut rng = rand::rng();
                 rng.fill(&mut buf);
 
                 if acc.addr >= 0x1_0000_0000 {
-                    vm.write_testmem(GuestAddress(acc.addr), buf.as_slice());
+                    vm.write_mem(GuestAddress(acc.addr), buf.as_slice());
                 } else {
                     // check we're not going to "permute" page tables or something.
                     // instruction text might get clobbered, which would be Weird, but..
                     assert!(acc.addr > vm.page_table_addr().0 + 2 * 0x1000);
                     vm.write_mem(GuestAddress(acc.addr), buf.as_slice());
                 }
-                */
             }
         }
 
@@ -587,10 +590,8 @@ mod kvm {
                 continue;
             }
 
-            unsafe {
-                let slice = vm.mem_slice_mut(GuestAddress(acc.addr), acc.size as u64);
-                slice.fill(0xaa);
-            }
+            let slice = vm.mem_slice_mut(GuestAddress(acc.addr), acc.size as u64);
+            slice.fill(0xaa);
         }
 
         struct MemoryDiff {
@@ -615,7 +616,7 @@ mod kvm {
 
         for mem_hunk in 0..=8 {
             let base = GuestAddress(TEST_MEM_BASE.0 * (mem_hunk + 1));
-            let test_mem = unsafe { vm.mem_slice(base, TEST_MEM_SIZE) };
+            let test_mem = vm.mem_slice(base, TEST_MEM_SIZE);
             for i in 0..test_mem.len() {
                 if test_mem[i] != 0xaa {
                     if let Some(mut diff) = current_diff.take() {
@@ -745,7 +746,9 @@ mod kvm {
     ) -> Result<(), Exception> {
         for _ in 0..4 {
             permute_dontcares(dontcare_regs, regs);
-            // TODO:
+            // TODO: really need to permute memory dont-care here, rather than reads. it'd probably
+            // be sufficient to pick any other default pattern than 0xaa and pass that selected
+            // pattern to verify..?
             // permute_memread(expected_mem, vm);
 
             vm.set_regs(&regs).unwrap();
@@ -762,14 +765,14 @@ mod kvm {
         Ok(())
     }
 
-    fn inrange_displacements(vm: &Vm, inst: &long_mode::Instruction) -> bool {
+    fn inrange_displacements(_vm: &Vm, inst: &long_mode::Instruction) -> bool {
         // see comment on `map_test_mem`. this limit is partially used to figure out what memory
         // must be backed by real memory vs holes that can have mmio traps.
         let disp_lim = 511;
 
         let ops = match inst.behavior().all_operands() {
             Ok(ops) => ops,
-            Err(e) => {
+            Err(_e) => {
                 // TODO: is it true that all ComplexOp do not have displacements?
                 return true;
             }
@@ -902,7 +905,7 @@ mod kvm {
 
         let mut ctx = AccessTestCtx {
             regs: &mut regs,
-            vm,
+            _vm: vm,
             // if an interrupt handler is initialized with rsp pointing to addresses that cause
             // MMIO exits the vcpu ends up in a loop doing nothing particularly interesting
             // (seemingly in a loop trying to raise #UD after resetting?). this is a Linux issue
@@ -1091,43 +1094,6 @@ mod kvm {
         // `pop [rax]`
         let inst: &'static [u8] = &[0x8f, 0x00];
         check_behavior(&mut vm, &inst[0..2]).expect("behavior check is ok");
-    }
-
-    // #[test]
-    fn kvm_hugepage_bug() {
-        let mut vm = create_test_vm();
-
-        // `add [rsp], al; add [rcx], al; pop [rcx]; hlt`
-        // the first instruction runs fine. the second instruction runs fine.
-        // the third instruction gets a page fault at 0xf800? which worked fine for the add.
-        // this turns out to be an issue in linux' paging64_gva_to_gpa() when the va is mapped with
-        // huge pages.
-        let inst: &'static [u8] = &[0x00, 0x04, 0x24, 0x00, 0x01, 0x8f, 0x01, 0xf4];
-        let mut regs = vm.get_regs().unwrap();
-        regs.rax = 0x00000002_00100000;
-        regs.rcx = 0x00000002_00100000;
-        vm.program(inst, &mut regs);
-        vm.set_regs(&regs).unwrap();
-        vm.set_single_step(true).expect("can enable single-step");
-        run(&mut vm);
-
-        let vm_regs = vm.get_regs().unwrap();
-        let vm_sregs = vm.get_sregs().unwrap();
-        let mut prev_rip = [0u8; 8];
-        vm.read_mem(GuestAddress(vm_regs.rsp + 8), &mut prev_rip[..]);
-        let mut buf = [0u8; 8];
-        vm.read_mem(GuestAddress(vm_regs.rsp), &mut buf[..]);
-        eprintln!(
-            "error code: {:#08x} accessing {:016x} @ rip={:#016x} (cr3={:016x})",
-            u64::from_le_bytes(buf), vm_sregs.cr2,
-            u64::from_le_bytes(prev_rip), vm_sregs.cr3
-        );
-        if vm_regs.rip == 0x300f {
-            let mut pdpt = [0u8; 4096];
-            vm.read_mem(vm.page_tables().pdpt_addr(), &mut pdpt[..]);
-            eprintln!("pdpt: {:x?}", &pdpt[..8]);
-        }
-        panic!("no");
     }
 
     #[test]
