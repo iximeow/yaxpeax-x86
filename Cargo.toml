@@ -19,7 +19,7 @@ yaxpeax-arch = { version = "0.3.1", default-features = false, features = [] }
 
 [dev-dependencies]
 rand = { version = "0.10.0", features = ["thread_rng"] }
-asmlinator = "1.0.0"
+asmlinator = { version = "2.0.0" }
 
 [[test]]
 name = "test"
