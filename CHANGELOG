@@ -26,6 +26,8 @@
   vcvtph2ps, vbroadcastf128, vmaskmovps, vmaskmovpd, vpermd, vpbroadcast{b,w,d,q}, among others
 * vpbroadcastb and vpbroadcastw should respect the L bit to select xmm/ymm vector width, but
   always decoded as ymm.
+* vmaskmovqdu now reports a memory access size for the implied write to ds:[rdi/edi/di].
+* correct swapped operand order of 0xD6-opcode movq.
 
 ## 2.0.0
 
