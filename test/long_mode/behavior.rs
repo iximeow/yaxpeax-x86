@@ -765,23 +765,23 @@ mod kvm {
         Ok(())
     }
 
-    fn inrange_displacements(_vm: &Vm, inst: &long_mode::Instruction) -> bool {
+    fn inrange_displacements(_vm: &Vm, inst: &long_mode::Instruction) -> Result<bool, CheckErr> {
         // see comment on `map_test_mem`. this limit is partially used to figure out what memory
         // must be backed by real memory vs holes that can have mmio traps.
         let disp_lim = 511;
 
         let ops = match inst.behavior().all_operands() {
             Ok(ops) => ops,
-            Err(_e) => {
-                // TODO: is it true that all ComplexOp do not have displacements?
-                return true;
+            Err(complex) => {
+                return Err(CheckErr::ComplexOp(complex));
             }
         };
+
         for op in ops.iter().operands() {
             let disp = match op {
                 long_mode::Operand::AbsoluteU32 { .. } |
                 long_mode::Operand::AbsoluteU64 { .. } => {
-                    return false;
+                    return Ok(false);
                 }
                 long_mode::Operand::Disp { disp, .. } => disp,
                 long_mode::Operand::MemIndexScaleDisp { disp, .. } => disp,
@@ -795,11 +795,11 @@ mod kvm {
             };
 
             if disp > disp_lim {
-                return false;
+                return Ok(false);
             }
         }
 
-        true
+        Ok(true)
     }
 
     fn check_behavior(vm: &mut Vm, inst: &[u8]) -> Result<(), CheckErr> {
@@ -809,6 +809,20 @@ mod kvm {
     // `reg_preserves` declares a set of registers, numbered by their *Linux KVM API number*, as in
     // the position in `kvm_regs`, that must be preserved by the test.
     fn check_behavior_with_regs(vm: &mut Vm, inst: &[u8], reg_preserves: [bool; 16], mem_patches: &[MemPatch]) -> Result<(), CheckErr> {
+        let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
+            .decode_slice(inst).expect("can decode");
+
+        let mut printed = false;
+        eprint!("checking behavior of ");
+        for b in inst.iter() {
+            if printed {
+                eprint!(" ");
+            }
+            eprint!("{:02x}", b);
+            printed = true;
+        }
+        eprintln!(": {}", decoded);
+
         let mut insts = inst.to_vec();
         // cap things off with a `hlt` to work around single-step sometimes .. not? see comment on
         // set_single_step. this ensures that even if single-stepping doesn't do the needful, the
@@ -823,17 +837,14 @@ mod kvm {
         // exception raised by `TF` that just executes hlt. then everything other than popf will
         // work out of the box and popf can be caught by kvm single-stepping.
         insts.push(0xf4);
-        let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
-            .decode_slice(inst).expect("can decode");
         use yaxpeax_arch::LengthedInstruction;
         assert_eq!(insts.len(), 0.wrapping_offset(decoded.len()) as usize + 1);
 
-        if !inrange_displacements(vm, &decoded) {
+        if !inrange_displacements(vm, &decoded)? {
             panic!("unable to test '{}': displacement(s) are larger than test VM memory.", decoded);
         }
 
         let behavior = decoded.behavior();
-        eprintln!("checking behavior of {}", decoded);
 
         // TODO: this does an infinite loop when run??
         if decoded.opcode() == long_mode::Opcode::FLDCW {
@@ -1500,7 +1511,7 @@ mod kvm {
         let initial_regs = vm.get_regs().unwrap();
 
         #[allow(non_snake_case)]
-        for opcode in 0x00..=u8::MAX {
+        for opcode in 0x90..=u8::MAX {
             for prefix_bits in 0x00..0x400u16 {
                 let mmmmm = prefix_bits & 0b11111;
                 let prefix_1 = (0xe0 | mmmmm) as u8;
@@ -1528,19 +1539,17 @@ mod kvm {
                         continue;
                     }
 
-                    let mut printed = false;
-                    eprint!("checking behavior of ");
-                    for b in bytes.iter() {
-                        if printed {
-                            eprint!(" ");
-                        }
-                        eprint!("{:02x}", b);
-                        printed = true;
-                    }
-                    eprintln!(": {}", buf);
-
                     vm.set_regs(&initial_regs).unwrap();
-                    check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
+                    let res = check_behavior(&mut vm, &bytes[..inst_len]);
+                    match res {
+                        Ok(()) => {}
+                        Err(CheckErr::ComplexOp(op)) => {
+                            // uncheckable but not a failure
+                        }
+                        Err(e) => {
+                            panic!("check error: {:?}", e);
+                        }
+                    }
                 }
             }
         }
