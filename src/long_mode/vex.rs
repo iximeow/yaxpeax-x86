@@ -2787,16 +2787,24 @@ fn read_vex_instruction<
                             VEXOperandCode::G_V_xmm_Ev_imm8
                         })
                     },
-                    0x38 => (Opcode::VINSERTI128, if L {
-                        VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8
-                    } else {
+                    0x38 => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
-                    }),
-                    0x39 => (Opcode::VEXTRACTI128, if L {
-                        VEXOperandCode::E_xmm_G_ymm_imm8
                     } else {
+                        (Opcode::VINSERTI128, if L {
+                            VEXOperandCode::G_ymm_V_ymm_E_xmm_imm8
+                        } else {
+                            return Err(DecodeError::InvalidOpcode);
+                        })
+                    },
+                    0x39 => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
-                    }),
+                    } else {
+                        (Opcode::VEXTRACTI128, if L {
+                            VEXOperandCode::E_xmm_G_ymm_imm8
+                        } else {
+                            return Err(DecodeError::InvalidOpcode);
+                        })
+                    },
                     0x40 => (Opcode::VDPPS, VEXOperandCode::G_V_E_xyLmm_imm8),
                     0x41 => (Opcode::VDPPD, if L {
                         return Err(DecodeError::InvalidOpcode);

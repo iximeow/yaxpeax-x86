@@ -23,7 +23,8 @@
 * monitor now reports the memory access size of the monitored dword/qword.
 * fix incorrect operand order for VEX-encoded vmovupd opcode 0x11.
 * reject a few VEX-encoded instructions that are specific about allowed W-bits.
-  vcvtph2ps, vbroadcastf128, vmaskmovps, vmaskmovpd, vpermd, vpbroadcast{b,w,d,q}, among others
+  vcvtph2ps, vbroadcastf128, vmaskmovps, vmaskmovpd, vpermd,
+  vpbroadcast{b,w,d,q}, vinserti128, vextracti128, among others
 * vpbroadcastb and vpbroadcastw should respect the L bit to select xmm/ymm vector width, but
   always decoded as ymm.
 * vmaskmovqdu now reports a memory access size for the implied write to ds:[rdi/edi/di].
