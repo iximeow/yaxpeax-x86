@@ -2988,6 +2988,12 @@ fn test_sha() {
 
 #[test]
 fn test_vmx() {
+    fn test_display_vmx(bytes: &[u8], text: &'static str) {
+        test_display_under(&InstDecoder::minimal().with_vmx(), bytes, text);
+        test_display_under(&InstDecoder::default(), bytes, text);
+        test_invalid_under(&InstDecoder::minimal(), bytes);
+    }
+
     test_display(&[0x0f, 0xc7, 0x3f], "vmptrst qword [rdi]");
     test_display(&[0x0f, 0xc7, 0x37], "vmptrld qword [rdi]");
     test_display(&[0xf3, 0x0f, 0xc7, 0x37], "vmxon qword [rdi]");
@@ -3000,6 +3006,10 @@ fn test_vmx() {
     test_display(&[0x66, 0x0f, 0xc7, 0x33], "vmclear qword [rbx]");
     test_display(&[0xf3, 0x4f, 0x0f, 0xc7, 0x33], "vmxon qword [r11]");
     test_display(&[0xf3, 0x0f, 0xc7, 0x33], "vmxon qword [rbx]");
+
+    // these need vmx and invept features
+    test_display_vmx(&[0x66, 0x0f, 0x38, 0x80, 0x01], "invept rax, xmmword [rcx]");
+    test_display_vmx(&[0x66, 0x0f, 0x38, 0x81, 0x01], "invvpid rax, xmmword [rcx]");
 }
 
 #[test]

@@ -29,6 +29,8 @@
   always decoded as ymm.
 * vmaskmovqdu now reports a memory access size for the implied write to ds:[rdi/edi/di].
 * correct swapped operand order of 0xD6-opcode movq.
+* some instructions (such as invept, invvpid) were accepted by uarch-specific
+  deocders when they should not have been.
 
 ## 2.0.0
 

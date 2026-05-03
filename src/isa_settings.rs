@@ -764,6 +764,13 @@ macro_rules! gen_isa_settings {
                         return Err(<$decode_err>::InvalidOpcode);
                     }
                 }
+                <$opcode>::INVEPT |
+                <$opcode>::INVVPID => {
+                    if !settings.vmx() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
+
                 other => {
                     if !settings.bmi1() {
                         if BMI1.contains(&other) {
