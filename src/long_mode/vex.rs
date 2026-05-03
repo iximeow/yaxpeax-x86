@@ -2825,16 +2825,24 @@ fn read_vex_instruction<
                     } else {
                         return Err(DecodeError::InvalidOpcode);
                     }),
-                    0x4A => (Opcode::VBLENDVPS, if L {
-                        VEXOperandCode::G_V_E_ymm_ymm4
+                    0x4A => if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
                     } else {
-                        VEXOperandCode::G_V_E_xmm_xmm4
-                    }),
-                    0x4B => (Opcode::VBLENDVPD, if L {
-                        VEXOperandCode::G_V_E_ymm_ymm4
+                        (Opcode::VBLENDVPS, if L {
+                            VEXOperandCode::G_V_E_ymm_ymm4
+                        } else {
+                            VEXOperandCode::G_V_E_xmm_xmm4
+                        })
+                    },
+                    0x4B => if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
                     } else {
-                        VEXOperandCode::G_V_E_xmm_xmm4
-                    }),
+                        (Opcode::VBLENDVPD, if L {
+                            VEXOperandCode::G_V_E_ymm_ymm4
+                        } else {
+                            VEXOperandCode::G_V_E_xmm_xmm4
+                        })
+                    },
                     0x4C => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
                     } else {
