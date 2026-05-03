@@ -1536,6 +1536,7 @@ fn test_misc() {
     test_invalid(&[0x43, 0x0f, 0x38, 0x82, 0x2f]);
     test_display(&[0x66, 0x0f, 0xae, 0xf1], "tpause ecx");
     test_display(&[0x66, 0x4f, 0x0f, 0xae, 0xf1], "tpause r9");
+    test_display(&[0xc4, 0b000_00011, 0b0_1111_101, 0x1d, 0b11_001_010, 0x77], "vcvtps2ph xmm10, ymm9, 0x77");
 }
 
 #[test]
@@ -1591,6 +1592,8 @@ fn test_vex() {
     fn test_instr_vex_f16c(bytes: &[u8], text: &'static str) {
         test_display_under(&InstDecoder::minimal().with_avx().with_f16c(), bytes, text);
         test_display_under(&InstDecoder::default(), bytes, text);
+        test_invalid_under(&InstDecoder::minimal().with_avx(), bytes);
+        test_invalid_under(&InstDecoder::minimal().with_f16c(), bytes);
         test_invalid_under(&InstDecoder::minimal(), bytes);
     }
 
@@ -1666,7 +1669,7 @@ fn test_vex() {
 
     test_invalid(&[0xc4, 0b000_00011, 0b1_0111_001, 0x18, 0b11_001_010, 0x77]);
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_101, 0x18, 0b11_001_010, 0x77], "vinsertf128 ymm9, ymm8, xmm10, 0x77");
-    test_invalid(&[0xc4, 0b000_00011, 0b1_0111_101, 0x18, 0b11_001_010, 0x77]);
+    test_invalid(&[0xc4, 0b000_00011, 0b1_0111_101, 0x19, 0b11_001_010, 0x77]);
     test_instr(&[0xc4, 0b000_00011, 0b0_1111_101, 0x19, 0b11_001_010, 0x77], "vextractf128 xmm10, ymm9, 0x77");
     test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x19, 0b11_001_010, 0x77]);
     test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x19, 0b11_001_010, 0x77]);
@@ -1677,6 +1680,10 @@ fn test_vex() {
     test_avx2(&[0xc4, 0b000_00011, 0b0_1111_101, 0x39, 0b11_001_010, 0x77], "vextracti128 xmm10, ymm9, 0x77");
     test_invalid(&[0xc4, 0b000_00011, 0b0_1111_001, 0x19, 0b11_001_010, 0x77]);
     test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x19, 0b11_001_010, 0x77]);
+
+    test_instr_vex_f16c(&[0xc4, 0b000_00011, 0b0_1111_101, 0x1d, 0b11_001_010, 0x77], "vcvtps2ph xmm10, ymm9, 0x77");
+    test_instr_vex_f16c(&[0xc4, 0b000_00011, 0b0_1111_101, 0x1d, 0b11_001_010, 0x77], "vcvtps2ph xmm10, ymm9, 0x77");
+    test_invalid(&[0xc4, 0b000_00011, 0b1_1111_101, 0x1d, 0b11_001_010, 0x77]);
 
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x20, 0b11_001_010, 0x77], "vpinsrb xmm9, xmm8, r10d, 0x77");
     test_instr(&[0xc4, 0b000_00011, 0b0_0111_001, 0x20, 0b00_001_010, 0x77], "vpinsrb xmm9, xmm8, byte [r10], 0x77");

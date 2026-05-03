@@ -2755,11 +2755,15 @@ fn read_vex_instruction<
                             return Err(DecodeError::InvalidOpcode);
                         })
                     },
-                    0x1D => (Opcode::VCVTPS2PH, if L {
-                        VEXOperandCode::E_xmm_G_ymm_imm8
+                    0x1D => if instruction.prefixes.vex_unchecked().w() {
+                        return Err(DecodeError::InvalidOpcode);
                     } else {
-                        VEXOperandCode::E_G_xmm_imm8
-                    }),
+                        (Opcode::VCVTPS2PH, if L {
+                            VEXOperandCode::E_xmm_G_ymm_imm8
+                        } else {
+                            VEXOperandCode::E_G_xmm_imm8
+                        })
+                    },
                     0x20 => (Opcode::VPINSRB, if L {
                         return Err(DecodeError::InvalidOpcode);
                     } else {

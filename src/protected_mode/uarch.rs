@@ -145,6 +145,7 @@ pub mod amd {
             .with_rdrand()
             .with_rdseed()
             .with_fma3()
+            .with_f16c()
 
             .with_xsavec()
             .with_xsaves()
@@ -271,6 +272,7 @@ pub mod intel {
             .with_abm()
             .with_fma3()
             .with_avx2()
+            .with_f16c()
     }
 
     /// `Haswell-EX` was a variant of `Haswell` launched in 2015 with functional TSX. these cores
