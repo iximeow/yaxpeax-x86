@@ -758,6 +758,21 @@ macro_rules! gen_isa_settings {
                         return Err(<$decode_err>::InvalidOpcode);
                     }
                 }
+                <$opcode>::AESDEC128KL |
+                <$opcode>::AESDEC256KL |
+                <$opcode>::AESDECWIDE128KL |
+                <$opcode>::AESDECWIDE256KL |
+                <$opcode>::AESENC128KL |
+                <$opcode>::AESENC256KL |
+                <$opcode>::AESENCWIDE128KL |
+                <$opcode>::AESENCWIDE256KL |
+                <$opcode>::ENCODEKEY128 |
+                <$opcode>::ENCODEKEY256 |
+                <$opcode>::LOADIWKEY => {
+                    if !settings.keylocker() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
                 <$opcode>::MONITORX | <$opcode>::MWAITX | // these are gated on the `monitorx` and `mwaitx` cpuid bits, but are AMD-only.
                 <$opcode>::CLZERO | <$opcode>::RDPRU => { // again, gated on specific cpuid bits, but AMD-only.
                     if !settings.amd_quirks() {
@@ -940,6 +955,8 @@ macro_rules! gen_arch_isa_settings {
             avx512_bf16, with_avx512_bf16 = 108;
             avx512_vnni, with_avx512_vnni = 109;
             avx512_ifma, with_avx512_ifma = 110;
+
+            keylocker, with_keylocker = 111;
 
             {
                 sse4 = {
