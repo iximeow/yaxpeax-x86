@@ -77,12 +77,50 @@ macro_rules! gen_isa_settings {
             )*
         }
 
+        // only present in Knights Mill
+        static AVX512_4FMAPS: &[Opcode] = &[
+            Opcode::V4FMADDPS,
+            Opcode::V4FNMADDPS,
+            Opcode::V4FMADDSS,
+            Opcode::V4FNMADDSS,
+        ];
+
+        // only present in Knights Mill
+        static AVX512_4VNNIW: &[Opcode] = &[
+            Opcode::VP4DPWSSDS,
+            Opcode::VP4DPWSSD,
+        ];
+
         /// optionally reject or reinterpret instruction according to settings for this decode
         /// operation.
         pub(crate) fn revise_instruction(settings: &$featureful_decoder, inst: &mut $inst_ty) -> Result<(), $decode_err> {
             if inst.prefixes.evex().is_some() {
+                // TODO: this happens to be the set of features on a Zen 5 processor..
+                let avx512_baseline = settings.avx512_f()
+                    && settings.avx512_dq()
+                    && settings.avx512_fma()
+                    && settings.avx512_cd()
+                    && settings.avx512_bw()
+                    && settings.avx512_vl()
+                    && settings.avx512_vbmi()
+                    && settings.avx512_vbmi2()
+                    && settings.avx512_vnni()
+                    && settings.avx512_bitalg()
+                    && settings.avx512_vpopcntdq();
+
                 if !settings.avx512() {
-                    return Err(<$decode_err>::InvalidOpcode);
+                    if !settings.avx512_4vnniw() && AVX512_4VNNIW.contains(&inst.opcode) {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    } else if !settings.avx512_4fmaps() && AVX512_4FMAPS.contains(&inst.opcode) {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    } else if avx512_baseline {
+                        // TODO: hack around missing avx feature set specificity.
+                        return Ok(());
+                    } else {
+                        // TODO: if settings.with_avx512(false) == *settings {
+                        // truly no AVX512 at all..
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
                 } else {
                     return Ok(());
                 }
@@ -830,6 +868,8 @@ macro_rules! gen_arch_isa_settings {
             avx512_vbmi2, with_avx512_vbmi2 = 21;
             avx512_vl, with_avx512_vl = 22;
             avx512_vpopcntdq, with_avx512_vpopcntdq = 23;
+            // TODO: VP2INTERSECTD
+            // avx512_vp2intersectd, with_avx512_vp2intersectq = ;
             avx_vnni, with_avx_vnni = 24;
             bmi1, with_bmi1 = 25;
             #[doc="`bmi2` indicates support for the `BZHI`, `MULX`, `PDEP`, `PEXT`, `RORX`, `SARX`, `SHRX`, "]
