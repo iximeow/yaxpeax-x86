@@ -1460,7 +1460,7 @@ mod kvm {
     }
 
     #[test]
-    fn behavior_verify_kvm_0f_38_() {
+    fn behavior_verify_kvm_avx() {
         use yaxpeax_arch::{Decoder, U8Reader};
         use yaxpeax_x86::long_mode::Instruction;
 
@@ -1472,27 +1472,122 @@ mod kvm {
         let mut buf = Instruction::default();
         let initial_regs = vm.get_regs().unwrap();
 
-        for word in 0x0000..u16::MAX {
-            let inst = word.to_le_bytes();
-            let bytes = [0x0f, 0x38, inst[0], inst[1]];
-            let mut reader = U8Reader::new(&bytes);
-            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
-                // two byte instructions were covered by `verify_kvm`, novel instructions are three
-                // bytes (or longer..?)
-                use yaxpeax_arch::LengthedInstruction;
-                let inst_len = 0.wrapping_offset(buf.len()) as usize;
-                if inst_len != 4 {
-                    continue;
+        for opc in 0xf0..=255 {
+            for prefix in [0x00, 0x66, 0xf2, 0xf3] {
+                for map in 0..3 {
+                    for operands in [0x01, 0xc1] {
+                        let mut len = 0;
+                        let mut bytes = [0; 8];
+
+                        if prefix != 0x00 {
+                            bytes[len] = prefix;
+                            len += 1;
+                        }
+
+                        bytes[len] = 0x0f;
+                        len += 1;
+
+                        if map == 1 {
+                            bytes[len] = 0x38;
+                            len += 1;
+                        } else if map == 2 {
+                            bytes[len] = 0x3a;
+                            len += 1;
+                        }
+
+                        bytes[len] = opc;
+                        len += 1;
+
+                        bytes[len] = operands;
+                        len += 1;
+
+                        let bytes = &bytes[..len];
+                        let mut reader = U8Reader::new(&bytes);
+                        if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                            use yaxpeax_arch::LengthedInstruction;
+                            let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                            if inst_len != bytes.len() {
+                                continue;
+                            }
+
+                            if not_generic(&buf) {
+                                continue;
+                            }
+
+                            vm.set_regs(&initial_regs).unwrap();
+                            check_behavior(&mut vm, &bytes).expect("behavior check is ok");
+                        }
+                    }
                 }
+            }
+        }
+    }
 
-                if not_generic(&buf) {
-                    continue;
+    #[test]
+    fn behavior_verify_kvm_avx_imm8() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::Instruction;
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        for opc in 0x10..=255 {
+            for prefix in [0x00, 0x66, 0xf2, 0xf3] {
+                for map in 0..3 {
+                    for imm in [0u8, 1u8, 2u8, 4u8, 8u8, 16u8, 32u8, 64u8, 128u8, 255u8] {
+                        for operands in [0x01, 0xc1] {
+                            let mut len = 0;
+                            let mut bytes = [0; 8];
+
+                            if prefix != 0x00 {
+                                bytes[len] = prefix;
+                                len += 1;
+                            }
+
+                            bytes[len] = 0x0f;
+                            len += 1;
+
+                            if map == 1 {
+                                bytes[len] = 0x38;
+                                len += 1;
+                            } else if map == 2 {
+                                bytes[len] = 0x3a;
+                                len += 1;
+                            }
+
+                            bytes[len] = opc;
+                            len += 1;
+
+                            bytes[len] = operands;
+                            len += 1;
+
+                            bytes[len] = imm;
+                            len += 1;
+
+                            let bytes = &bytes[..len];
+                            let mut reader = U8Reader::new(&bytes);
+                            if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                                use yaxpeax_arch::LengthedInstruction;
+                                let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                                if inst_len != bytes.len() {
+                                    continue;
+                                }
+
+                                if not_generic(&buf) {
+                                    continue;
+                                }
+
+                                vm.set_regs(&initial_regs).unwrap();
+                                check_behavior(&mut vm, &bytes).expect("behavior check is ok");
+                            }
+                        }
+                    }
                 }
-
-                eprintln!("checking behavior of 0f 38 {:02x} {:02x}: {}", inst[0], inst[1], buf);
-
-                vm.set_regs(&initial_regs).unwrap();
-                check_behavior(&mut vm, &bytes[..inst_len]).expect("behavior check is ok");
             }
         }
     }
@@ -1525,6 +1620,147 @@ mod kvm {
                 static OPC_BYTE_TABLE: [u8; 2] = [0xc1, 0x01];
 
                 let bytes: [u8; 5] = [0xc4, prefix_1, prefix_2, opcode, OPC_BYTE_TABLE[operands as usize]];
+                let mut reader = U8Reader::new(&bytes);
+                if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                    // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                    // bytes (or longer..?)
+                    use yaxpeax_arch::LengthedInstruction;
+                    let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                    if inst_len != bytes.len() {
+                        continue;
+                    }
+
+                    if not_generic(&buf) {
+                        continue;
+                    }
+
+                    vm.set_regs(&initial_regs).unwrap();
+                    let res = check_behavior(&mut vm, &bytes[..inst_len]);
+                    match res {
+                        Ok(()) => {}
+                        Err(CheckErr::ComplexOp(op)) => {
+                            // uncheckable but not a failure
+                        }
+                        Err(e) => {
+                            panic!("check error: {:?}", e);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn behavior_verify_kvm_vex_imm8() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::Instruction;
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5();
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        #[allow(non_snake_case)]
+        for opcode in 0xc2..=u8::MAX {
+            for prefix_bits in 0x00..0x400u16 {
+                for imm in [0u8, 1u8, 2u8, 4u8, 8u8, 16u8, 32u8, 64u8, 128u8, 255u8] {
+                    let mmmmm = prefix_bits & 0b11111;
+                    let prefix_1 = (0xe0 | mmmmm) as u8;
+
+                    let pp = (prefix_bits >> 5) & 0b11;
+                    let W = (prefix_bits >> 7) & 1;
+                    let L = (prefix_bits >> 8) & 1;
+                    let prefix_2 = (0x78 | (W << 7) | (L << 2) | pp) as u8;
+
+                    let operands = (prefix_bits >> 9) & 0b1;
+                    static OPC_BYTE_TABLE: [u8; 2] = [0xc1, 0x01];
+
+                    let bytes: [u8; 6] = [0xc4, prefix_1, prefix_2, opcode, OPC_BYTE_TABLE[operands as usize], imm];
+                    let mut reader = U8Reader::new(&bytes);
+                    if decoder.decode_into(&mut buf, &mut reader).is_ok() {
+                        // two byte instructions were covered by `verify_kvm`, novel instructions are three
+                        // bytes (or longer..?)
+                        use yaxpeax_arch::LengthedInstruction;
+                        let inst_len = 0.wrapping_offset(buf.len()) as usize;
+                        if inst_len != bytes.len() {
+                            continue;
+                        }
+
+                        if not_generic(&buf) {
+                            continue;
+                        }
+
+                        vm.set_regs(&initial_regs).unwrap();
+                        let res = check_behavior(&mut vm, &bytes[..inst_len]);
+                        match res {
+                            Ok(()) => {}
+                            Err(CheckErr::ComplexOp(op)) => {
+                                // uncheckable but not a failure
+                            }
+                            Err(e) => {
+                                panic!("check error: {:?}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn behavior_verify_kvm_evex() {
+        use yaxpeax_arch::{Decoder, U8Reader};
+        use yaxpeax_x86::long_mode::Instruction;
+
+        let mut vm = create_test_vm();
+        vm.set_single_step(true).expect("can enable single-step");
+
+        // TODO: happen to be testing on a zen 5 system, so i picked a zen 5 decoder.
+        let decoder = long_mode::uarch::amd::zen5()
+//            .with_avx512(); // TODO: need to refine isa_settings.rs/revise_instruction().
+            .with_avx512_f()
+            .with_avx512_dq()
+            .with_avx512_fma()
+            .with_avx512_cd()
+            .with_avx512_bw()
+            .with_avx512_vl()
+            .with_avx512_vbmi()
+            .with_avx512_vbmi2()
+            .with_avx512_vnni()
+            .with_avx512_bitalg()
+            .with_avx512_vpopcntdq();
+        /*
+            .with_avx512_vpopcntdq() // TODO: VP2INTERSECT
+            .with_avx512_bf16() // TODO: BF16
+            */
+        let mut buf = Instruction::default();
+        let initial_regs = vm.get_regs().unwrap();
+
+        #[allow(non_snake_case)]
+        for opcode in 0x7d..=u8::MAX {
+            for prefix_bits in 0x00..0x800u16 {
+                let mmm = prefix_bits & 0b111;
+                let prefix_1 = (0xf0 | mmm) as u8;
+
+                let pp = (prefix_bits >> 3) & 0b11;
+                let z = (prefix_bits >> 5) & 1;
+                let b = (prefix_bits >> 6) & 1;
+                let W = (prefix_bits >> 7) & 1;
+                let LL = (prefix_bits >> 8) & 0b11;
+                let k = (prefix_bits >> 10) & 1 != 0;
+
+                let prefix_2 = (0x7c | (W << 7) | pp) as u8;
+
+                let aaa = if k { 0b001 } else { 0b111 };
+                let prefix_3 = (0x08 | aaa | b << 4 | LL << 5 | z << 7) as u8;
+
+                let operands = (prefix_bits >> 9) & 0b1;
+                static OPC_BYTE_TABLE: [u8; 2] = [0xc1, 0x01];
+
+                let bytes: [u8; 6] = [0x62, prefix_1, prefix_2, prefix_3, opcode, OPC_BYTE_TABLE[operands as usize]];
                 let mut reader = U8Reader::new(&bytes);
                 if decoder.decode_into(&mut buf, &mut reader).is_ok() {
                     // two byte instructions were covered by `verify_kvm`, novel instructions are three
@@ -1626,6 +1862,10 @@ mod kvm {
             return true;
         }
 
+        if enqcmd::OPCODES.contains(&instr.opcode()) {
+            return true;
+        }
+
         static COMPLEX: &'static [Opcode] = &[
             Opcode::SYSCALL,
             Opcode::SYSRET,
@@ -1634,9 +1874,15 @@ mod kvm {
             Opcode::PREFETCH2,
             Opcode::PREFETCH1,
             Opcode::PREFETCH0,
+            Opcode::MOVDIR64B,
         ];
 
         if COMPLEX.contains(&instr.opcode()) {
+            return true;
+        }
+
+        if instr.opcode() == Opcode::INVPCID {
+            // this #UDs in the VM? is it because i'm not setting invpcid in cpuid..
             return true;
         }
 
@@ -1917,6 +2163,16 @@ mod kvm {
             Opcode::WRFSBASE,
             Opcode::RDGSBASE,
             Opcode::WRGSBASE,
+        ];
+
+    }
+
+    mod enqcmd {
+        use yaxpeax_x86::long_mode::Opcode;
+
+        pub static OPCODES: &'static [Opcode] = &[
+            Opcode::ENQCMD,
+            Opcode::ENQCMDS,
         ];
 
     }
