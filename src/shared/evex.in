@@ -572,7 +572,10 @@ pub(crate) fn read_evex_operands<
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
         }
       } else {
-        if instruction.prefixes.evex_unchecked().broadcast() {
+        deny_broadcast(instruction)?;
+
+        if instruction.prefixes.evex_unchecked().lp() &&
+          instruction.prefixes.evex_unchecked().vex().l() {
           return Err(DecodeError::InvalidOpcode);
         }
 
@@ -781,6 +784,8 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::G_V_Ed_xmm_imm8_W0 => {
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -827,6 +832,9 @@ pub(crate) fn read_evex_operands<
           return Err(DecodeError::InvalidOperand);
         }
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       instruction.operands[1] = OperandSpec::RegVex;
@@ -835,6 +843,8 @@ pub(crate) fn read_evex_operands<
     }
     generated::EVEXOperandCode::G_V_xmm_Edq_imm8 => {
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let (sz, bank) = if instruction.prefixes.evex_unchecked().vex().w() {
         if isa_has_qwords() {
@@ -865,6 +875,8 @@ pub(crate) fn read_evex_operands<
     }
     generated::EVEXOperandCode::G_V_xmm_Ebd_imm8 => {
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -925,28 +937,12 @@ pub(crate) fn read_evex_operands<
 
       set_reg_sizes_from_ll(instruction)?;
     }
-    generated::EVEXOperandCode::M_G_LL_W0 => {
-      deny_vex_reg(instruction)?;
-      deny_mask_reg(instruction)?;
-
-      instruction.mem_size = regs_size(instruction);
-
-      let modrm = read_modrm(words)?;
-      set_rrr(instruction, modrm);
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
-      if mem_oper == OperandSpec::RegMMM {
-        return Err(DecodeError::InvalidOperand);
-      }
-      instruction.operands[0] = mem_oper;
-      instruction.operands[1] = OperandSpec::RegRRR;
-      instruction.operand_count = 2;
-
-      set_reg_sizes_from_ll(instruction)?;
-    }
     generated::EVEXOperandCode::M_G_LL_W1 => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       instruction.mem_size = regs_size(instruction);
 
@@ -983,6 +979,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::G_Ed_xmm_sae_W0 => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
       // vucomiss and vcomiss both are W=0
       ensure_W(instruction, 0)?;
 
@@ -991,12 +988,18 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper.is_memory() {
+        deny_broadcast(instruction)?;
+      }
       instruction.regs[0].bank = RegisterBank::X;
 
       // in specific support of vcomisd/vucomisd
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       instruction.operands[1] = mem_oper;
@@ -1005,6 +1008,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Gm_Eq_xmm_sae_W1 => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
       // vucomisd and vcomisd both are W=1
       ensure_W(instruction, 1)?;
 
@@ -1013,12 +1017,18 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper.is_memory() {
+        deny_broadcast(instruction)?;
+      }
       instruction.regs[0].bank = RegisterBank::X;
 
       // in specific support of vcomisd/vucomisd
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       instruction.operands[1] = mem_oper;
@@ -1097,6 +1107,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Maskm_V_E_LL_imm8_sae_bcast_W1 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 1)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -1389,9 +1400,8 @@ pub(crate) fn read_evex_operands<
     }
     generated::EVEXOperandCode::G_V_E_LL => {
       deny_mask_reg(instruction)?;
-      if [Opcode::VAESDECLAST, Opcode::VAESDEC, Opcode::VAESENC, Opcode::VAESENCLAST].contains(&instruction.opcode) {
-        deny_z(instruction)?;
-      }
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -1490,6 +1500,9 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -1510,6 +1523,9 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -1734,6 +1750,7 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      check_allowed_zero_merge(&instruction.prefixes, mem_oper)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           // sae sets this to `vcvtps2ph ymm, zmm, imm8`
@@ -1767,6 +1784,7 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      check_allowed_zero_merge(&instruction.prefixes, mem_oper)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           // sae sets this to `vcvtps2ph ymm, zmm, imm8`
@@ -1801,6 +1819,7 @@ pub(crate) fn read_evex_operands<
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
+      check_allowed_zero_merge(&instruction.prefixes, mem_oper)?;
       if mem_oper == OperandSpec::RegMMM {
         if instruction.prefixes.evex_unchecked().broadcast() {
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge_sae_noround;
@@ -1808,6 +1827,9 @@ pub(crate) fn read_evex_operands<
           instruction.operands[0] = OperandSpec::RegMMM_maskmerge;
         }
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOperand);
         } else {
@@ -1916,6 +1938,7 @@ pub(crate) fn read_evex_operands<
       set_rrr(instruction, modrm);
       instruction.regs[0].bank = RegisterBank::Z;
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::Y, sink)?;
+      check_allowed_zero_merge(&instruction.prefixes, mem_oper)?;
       instruction.mem_size = 32;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -2488,6 +2511,7 @@ pub(crate) fn read_evex_operands<
         instruction.regs[0].bank = RegisterBank::Y;
       }
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      check_allowed_zero_merge(&instruction.prefixes, mem_oper)?;
       instruction.mem_size = 16;
       instruction.operands[0] = mem_oper.masked();
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -2614,32 +2638,12 @@ pub(crate) fn read_evex_operands<
       instruction.operands[3] = OperandSpec::ImmU8;
       instruction.operand_count = 4;
     }
-    generated::EVEXOperandCode::VMOVQ_G_Ed_xmm => {
-      deny_mask_reg(instruction)?;
-      deny_vex_reg(instruction)?;
-      ensure_W(instruction, 1)?;
-      deny_broadcast(instruction)?;
-
-      let modrm = read_modrm(words)?;
-      set_rrr(instruction, modrm);
-      instruction.regs[0].bank = RegisterBank::X;
-      let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
-
-      if mem_oper == OperandSpec::RegMMM {
-        instruction.mem_size = 0;
-      } else {
-        instruction.mem_size = 8;
-      }
-
-      instruction.operands[0] = OperandSpec::RegRRR;
-      instruction.operands[1] = mem_oper;
-      instruction.operand_count = 2;
-    }
     generated::EVEXOperandCode::VMOVQ_Ed_G_xmm => {
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2661,6 +2665,7 @@ pub(crate) fn read_evex_operands<
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2679,6 +2684,7 @@ pub(crate) fn read_evex_operands<
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2710,6 +2716,7 @@ pub(crate) fn read_evex_operands<
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -2878,6 +2885,7 @@ pub(crate) fn read_evex_operands<
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2913,6 +2921,7 @@ pub(crate) fn read_evex_operands<
       deny_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2948,6 +2957,7 @@ pub(crate) fn read_evex_operands<
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 1)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2975,6 +2985,7 @@ pub(crate) fn read_evex_operands<
       deny_vex_reg(instruction)?;
       ensure_W(instruction, 0)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -2997,10 +3008,11 @@ pub(crate) fn read_evex_operands<
         return Err(DecodeError::InvalidOperand);
       }
     }
-    generated::EVEXOperandCode::G_E_LL_W0 => {
+    generated::EVEXOperandCode::G_M_LL_W0 => {
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3010,7 +3022,7 @@ pub(crate) fn read_evex_operands<
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
-        instruction.mem_size = 0;
+        return Err(DecodeError::InvalidOperand);
       }
       instruction.operands[0] = OperandSpec::RegRRR;
       instruction.operands[1] = mem_oper;
@@ -3018,20 +3030,20 @@ pub(crate) fn read_evex_operands<
 
       set_reg_sizes_from_ll(instruction)?;
     }
-    generated::EVEXOperandCode::E_G_LL_W0 => {
+    generated::EVEXOperandCode::M_G_LL_W0 => {
+      deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
-      let sz = regs_size(instruction);
-
-      instruction.mem_size = sz;
+      instruction.mem_size = regs_size(instruction);
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if mem_oper == OperandSpec::RegMMM {
-        instruction.mem_size = 0;
+        return Err(DecodeError::InvalidOperand);
       }
       instruction.operands[0] = mem_oper;
       instruction.operands[1] = OperandSpec::RegRRR;
@@ -3688,6 +3700,10 @@ pub(crate) fn read_evex_operands<
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
+        if instruction.prefixes.evex_unchecked().lp()
+          && instruction.prefixes.evex_unchecked().vex().l() {
+            return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       }
       instruction.operands[1] = OperandSpec::RegVex;
@@ -3720,6 +3736,10 @@ pub(crate) fn read_evex_operands<
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
+        if instruction.prefixes.evex_unchecked().lp()
+          && instruction.prefixes.evex_unchecked().vex().l() {
+            return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       }
       instruction.operands[1] = OperandSpec::RegVex;
@@ -3738,6 +3758,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Mask_V_E_LL_imm8 => {
       check_mask_reg(instruction)?;
       deny_broadcast(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
       instruction.mem_size = sz;
@@ -3812,6 +3833,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Mask_E_LL_imm8_bcast => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3857,6 +3879,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Mask_V_E_LL_imm8_sae_bcast_W0 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3903,6 +3926,7 @@ pub(crate) fn read_evex_operands<
     }
     generated::EVEXOperandCode::Mask_V_E_LL_imm8_bcast => {
       check_mask_reg(instruction)?;
+      deny_z(instruction)?;
 
       let sz = regs_size(instruction);
 
@@ -3984,6 +4008,9 @@ pub(crate) fn read_evex_operands<
       apply_broadcast(instruction, item_size, sz);
 
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      }
       instruction.operands[0] = OperandSpec::RegVex_maskmerge;
       instruction.operands[1] = mem_oper;
       instruction.imm = read_imm_unsigned(words, 1)?;
@@ -4072,17 +4099,14 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Gm_V_E_LL_imm8_W0 => {
       check_mask_reg(instruction)?;
       ensure_W(instruction, 0)?;
+      deny_broadcast(instruction)?;
 
       let sz = regs_size(instruction);
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
-      if mem_oper == OperandSpec::RegMMM {
-        deny_broadcast(instruction)?;
-      } else {
-        instruction.mem_size = sz;
-      }
+      instruction.mem_size = sz;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4107,6 +4131,9 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4117,7 +4144,9 @@ pub(crate) fn read_evex_operands<
       set_reg_sizes_from_ll(instruction)?;
     }
     generated::EVEXOperandCode::G_V_E_LL_imm8 => {
-      check_mask_reg(instruction)?;
+      deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       instruction.mem_size = regs_size(instruction);
 
@@ -4135,6 +4164,7 @@ pub(crate) fn read_evex_operands<
     }
     generated::EVEXOperandCode::Gm_V_E_LL_imm8 => {
       check_mask_reg(instruction)?;
+      deny_broadcast(instruction)?;
 
       instruction.mem_size = regs_size(instruction);
 
@@ -4161,6 +4191,9 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper == OperandSpec::RegMMM {
+        deny_broadcast(instruction)?;
+      }
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
       instruction.operands[1] = OperandSpec::RegVex;
       instruction.operands[2] = mem_oper;
@@ -4537,6 +4570,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::VCVTTPD2DQ => {
       check_mask_reg(instruction)?;
       deny_vex_reg(instruction)?;
+      ensure_W(instruction, 1)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -4780,6 +4814,8 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Edd_G_xmm_imm8 => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -4841,6 +4877,9 @@ pub(crate) fn read_evex_operands<
           }
         }
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         if instruction.prefixes.evex_unchecked().broadcast() {
           return Err(DecodeError::InvalidOpcode);
         }
@@ -4855,6 +4894,8 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::VEXTRACTPS => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -4875,6 +4916,8 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Ewd_G_xmm_imm8 => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -4895,6 +4938,8 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Ebd_G_xmm_imm8 => {
       deny_vex_reg(instruction)?;
       deny_mask_reg(instruction)?;
+      deny_z(instruction)?;
+      deny_broadcast(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
@@ -4947,6 +4992,10 @@ pub(crate) fn read_evex_operands<
       if let OperandSpec::RegMMM = mem_oper {
         instruction.mem_size = 0;
       } else{
+        deny_broadcast(instruction)?;
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.mem_size = item_size;
       }
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -4964,13 +5013,18 @@ pub(crate) fn read_evex_operands<
     }
     generated::EVEXOperandCode::Gm_V_E_xmm_imm8_sae_W1 => {
       ensure_W(instruction, 1)?;
+      check_mask_reg(instruction)?;
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       if let OperandSpec::RegMMM = mem_oper {
         /* no mem size */
-      } else{
+      } else {
+        deny_broadcast(instruction)?;
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.mem_size = 8;
       }
       if instruction.prefixes.evex_unchecked().broadcast() {
@@ -5126,6 +5180,9 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper.is_memory() {
+        deny_broadcast(instruction)?;
+      }
       if instruction.prefixes.evex_unchecked().broadcast() && mem_oper == OperandSpec::RegMMM {
         if (!instruction.prefixes.evex_unchecked().vex().w() || !isa_has_qwords()) && instruction.opcode == Opcode::VCVTSI2SD {
           instruction.operands[0] = OperandSpec::RegRRR;
@@ -5133,6 +5190,9 @@ pub(crate) fn read_evex_operands<
           instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
         }
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       instruction.operands[1] = OperandSpec::RegVex;
@@ -5171,9 +5231,15 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper.is_memory() {
+        deny_broadcast(instruction)?;
+      }
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae_noround;
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       if instruction.prefixes.evex_unchecked().vex().w() {
@@ -5198,9 +5264,15 @@ pub(crate) fn read_evex_operands<
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
+      if mem_oper.is_memory() {
+        deny_broadcast(instruction)?;
+      }
       if instruction.prefixes.evex_unchecked().broadcast() {
         instruction.operands[0] = OperandSpec::RegRRR_maskmerge_sae;
       } else {
+        if instruction.prefixes.evex_unchecked().lp() && instruction.prefixes.evex_unchecked().vex().l() {
+          return Err(DecodeError::InvalidOpcode);
+        }
         instruction.operands[0] = OperandSpec::RegRRR;
       }
       if instruction.prefixes.evex_unchecked().vex().w() {
@@ -5221,6 +5293,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Operands_12_W0 => {
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
+      deny_broadcast(instruction)?;
       ensure_W(instruction, 0)?;
 
       let modrm = read_modrm(words)?;
@@ -5246,6 +5319,7 @@ pub(crate) fn read_evex_operands<
     generated::EVEXOperandCode::Operands_16_W0 => {
       deny_mask_reg(instruction)?;
       deny_z(instruction)?;
+      deny_broadcast(instruction)?;
       ensure_W(instruction, 0)?;
 
       let modrm = read_modrm(words)?;

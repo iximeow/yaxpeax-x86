@@ -506,7 +506,6 @@ pub(crate) enum EVEXOperandCode {
   Gm_U_zmm_imm8_sae_W0,
   Gm_V_E_LL_sae_W1,
   Gm_U_zmm_sae_W0,
-  E_G_LL_W0,
   Ebd_G_xmm_imm8,
   Edd_G_xmm_imm8,
   Edm_xmm_G_xmm_W0,
@@ -527,7 +526,7 @@ pub(crate) enum EVEXOperandCode {
   Eqm_xmm_G_zmm_W0,
   Ewd_G_xmm_imm8,
   Ewm_xmm_G_xmm_W0,
-  G_E_LL_W0,
+  G_M_LL_W0,
   G_Ed_xmm_sae_W0,
   G_LL_Mask,
   G_LL_Mask_W0,
@@ -667,7 +666,6 @@ pub(crate) enum EVEXOperandCode {
   VMOVD_7e,
   VMOVQ_7e,
   VMOVQ_Ed_G_xmm,
-  VMOVQ_G_Ed_xmm,
   VMOVSD_10,
   VMOVSD_11,
   VMOVSS_10,
@@ -676,15 +674,23 @@ pub(crate) enum EVEXOperandCode {
   VPINSRW,
 }
 
+// the APM and SDM describe the prefix bits as selecting no prefix, "66, f2, or f3" opcode extension.
+// however, this is *not the order those bits are interpreted in*. compare APM and SDM encodings and
+// you will see:
+// > 0b00 -> none,
+// > 0b01 -> 0x66,
+// > 0b10 -> 0xf3, // !!
+// > 0b11 -> 0xf2, // !!
+// hence the ordering of table names below.
 pub(crate) const TABLES: [&'static [(u8, [(super::Opcode, EVEXOperandCode); 4])]; 12] = [
   &EVEX_None_0f,
   &EVEX_66_0f,
-  &EVEX_f2_0f,
   &EVEX_f3_0f,
+  &EVEX_f2_0f,
   &DUMMY,
   &EVEX_66_0f38,
-  &EVEX_f2_0f38,
   &EVEX_f3_0f38,
+  &EVEX_f2_0f38,
   &DUMMY,
   &EVEX_66_0f3a,
   &DUMMY,
@@ -807,7 +813,7 @@ const EVEX_66_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 100] = [
   (0xe4, [(super::Opcode::VPMULHUW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPMULHUW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPMULHUW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0xe5, [(super::Opcode::VPMULHW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPMULHW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPMULHW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0xe6, [(super::Opcode::VCVTTPD2DQ, EVEXOperandCode::VCVTTPD2DQ), (super::Opcode::VCVTTPD2DQ, EVEXOperandCode::VCVTTPD2DQ), (super::Opcode::VCVTTPD2DQ, EVEXOperandCode::VCVTTPD2DQ), (super::Opcode::VCVTTPD2DQ, EVEXOperandCode::VCVTTPD2DQ)]),
-  (0xe7, [(super::Opcode::VMOVNTDQ, EVEXOperandCode::E_G_LL_W0), (super::Opcode::VMOVNTDQ, EVEXOperandCode::E_G_LL_W0), (super::Opcode::VMOVNTDQ, EVEXOperandCode::E_G_LL_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
+  (0xe7, [(super::Opcode::VMOVNTDQ, EVEXOperandCode::M_G_LL_W0), (super::Opcode::VMOVNTDQ, EVEXOperandCode::M_G_LL_W0), (super::Opcode::VMOVNTDQ, EVEXOperandCode::M_G_LL_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0xe8, [(super::Opcode::VPSUBSB, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPSUBSB, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPSUBSB, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0xe9, [(super::Opcode::VPSUBSW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPSUBSW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPSUBSW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0xea, [(super::Opcode::VPMINSW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPMINSW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::VPMINSW, EVEXOperandCode::Gm_V_E_LL), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
@@ -862,7 +868,7 @@ const EVEX_66_0f38: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 143] = [
   (0x27, [(super::Opcode::VPTESTMD, EVEXOperandCode::Mask_V_E_LL_bcast), (super::Opcode::VPTESTMD, EVEXOperandCode::Mask_V_E_LL_bcast), (super::Opcode::VPTESTMD, EVEXOperandCode::Mask_V_E_LL_bcast), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x28, [(super::Opcode::VPMULDQ, EVEXOperandCode::Gm_V_E_LL_bcast_W1), (super::Opcode::VPMULDQ, EVEXOperandCode::Gm_V_E_LL_bcast_W1), (super::Opcode::VPMULDQ, EVEXOperandCode::Gm_V_E_LL_bcast_W1), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x29, [(super::Opcode::VPCMPEQQ, EVEXOperandCode::Mask_V_E_LL_bcast_W1), (super::Opcode::VPCMPEQQ, EVEXOperandCode::Mask_V_E_LL_bcast_W1), (super::Opcode::VPCMPEQQ, EVEXOperandCode::Mask_V_E_LL_bcast_W1), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
-  (0x2a, [(super::Opcode::VMOVNTDQA, EVEXOperandCode::G_E_LL_W0), (super::Opcode::VMOVNTDQA, EVEXOperandCode::G_E_LL_W0), (super::Opcode::VMOVNTDQA, EVEXOperandCode::G_E_LL_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
+  (0x2a, [(super::Opcode::VMOVNTDQA, EVEXOperandCode::G_M_LL_W0), (super::Opcode::VMOVNTDQA, EVEXOperandCode::G_M_LL_W0), (super::Opcode::VMOVNTDQA, EVEXOperandCode::G_M_LL_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x2b, [(super::Opcode::VPACKUSDW, EVEXOperandCode::Gm_V_E_LL_bcast_W0), (super::Opcode::VPACKUSDW, EVEXOperandCode::Gm_V_E_LL_bcast_W0), (super::Opcode::VPACKUSDW, EVEXOperandCode::Gm_V_E_LL_bcast_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x2c, [(super::Opcode::VSCALEFPS, EVEXOperandCode::Gm_V_E_LL_sae_bcast), (super::Opcode::VSCALEFPS, EVEXOperandCode::Gm_V_E_LL_sae_bcast), (super::Opcode::VSCALEFPS, EVEXOperandCode::Gm_V_E_LL_sae_bcast), (super::Opcode::VSCALEFPS, EVEXOperandCode::Gm_V_E_LL_sae_bcast)]),
   (0x2d, [(super::Opcode::VSCALEFSS, EVEXOperandCode::Gm_V_Ed_xmm_sae), (super::Opcode::VSCALEFSS, EVEXOperandCode::Gm_V_Ed_xmm_sae), (super::Opcode::VSCALEFSS, EVEXOperandCode::Gm_V_Ed_xmm_sae), (super::Opcode::VSCALEFSS, EVEXOperandCode::Gm_V_Ed_xmm_sae)]),
@@ -1022,7 +1028,7 @@ const EVEX_66_0f3a: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 51] = [
   (0x56, [(super::Opcode::VREDUCEPS, EVEXOperandCode::Gm_E_LL_imm8_sae), (super::Opcode::VREDUCEPS, EVEXOperandCode::Gm_E_LL_imm8_sae), (super::Opcode::VREDUCEPS, EVEXOperandCode::Gm_E_LL_imm8_sae), (super::Opcode::VREDUCEPS, EVEXOperandCode::Gm_E_LL_imm8_sae)]),
   (0x57, [(super::Opcode::VREDUCESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae), (super::Opcode::VREDUCESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae), (super::Opcode::VREDUCESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae), (super::Opcode::VREDUCESS, EVEXOperandCode::Gm_V_Ed_xmm_imm8_sae)]),
   (0x66, [(super::Opcode::VFPCLASSPS, EVEXOperandCode::Mask_E_LL_imm8_bcast), (super::Opcode::VFPCLASSPS, EVEXOperandCode::Mask_E_LL_imm8_bcast), (super::Opcode::VFPCLASSPS, EVEXOperandCode::Mask_E_LL_imm8_bcast), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
-  (0x67, [(super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8), (super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8), (super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8), (super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8)]),
+  (0x67, [(super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8), (super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8), (super::Opcode::VFPCLASSSS, EVEXOperandCode::Mask_Ed_xmm_imm8), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x70, [(super::Opcode::VPSHLDW, EVEXOperandCode::Gm_V_E_LL_imm8_W1), (super::Opcode::VPSHLDW, EVEXOperandCode::Gm_V_E_LL_imm8_W1), (super::Opcode::VPSHLDW, EVEXOperandCode::Gm_V_E_LL_imm8_W1), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x71, [(super::Opcode::VPSHLDD, EVEXOperandCode::Gm_V_E_LL_imm8_bcast), (super::Opcode::VPSHLDD, EVEXOperandCode::Gm_V_E_LL_imm8_bcast), (super::Opcode::VPSHLDD, EVEXOperandCode::Gm_V_E_LL_imm8_bcast), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x72, [(super::Opcode::VPSHRDW, EVEXOperandCode::Gm_V_E_LL_imm8_W1), (super::Opcode::VPSHRDW, EVEXOperandCode::Gm_V_E_LL_imm8_W1), (super::Opcode::VPSHRDW, EVEXOperandCode::Gm_V_E_LL_imm8_W1), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
@@ -1031,7 +1037,7 @@ const EVEX_66_0f3a: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 51] = [
   (0xcf, [(super::Opcode::VGF2P8AFFINEINVQB, EVEXOperandCode::Gm_V_E_LL_imm8_bcast_W1), (super::Opcode::VGF2P8AFFINEINVQB, EVEXOperandCode::Gm_V_E_LL_imm8_bcast_W1), (super::Opcode::VGF2P8AFFINEINVQB, EVEXOperandCode::Gm_V_E_LL_imm8_bcast_W1), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
 ];
 
-const EVEX_f2_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 26] = [
+const EVEX_f3_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 26] = [
   (0x10, [(super::Opcode::VMOVSS, EVEXOperandCode::VMOVSS_10), (super::Opcode::VMOVSS, EVEXOperandCode::VMOVSS_10), (super::Opcode::VMOVSS, EVEXOperandCode::VMOVSS_10), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),// W0
   (0x11, [(super::Opcode::VMOVSS, EVEXOperandCode::VMOVSS_11), (super::Opcode::VMOVSS, EVEXOperandCode::VMOVSS_11), (super::Opcode::VMOVSS, EVEXOperandCode::VMOVSS_11), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),// W0
   (0x12, [(super::Opcode::VMOVSLDUP, EVEXOperandCode::Gm_E_LL_W0), (super::Opcode::VMOVSLDUP, EVEXOperandCode::Gm_E_LL_W0), (super::Opcode::VMOVSLDUP, EVEXOperandCode::Gm_E_LL_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
@@ -1060,7 +1066,7 @@ const EVEX_f2_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 26] = [
   (0xe6, [(super::Opcode::VCVTDQ2PD, EVEXOperandCode::VCVTUDQ2PD), (super::Opcode::VCVTDQ2PD, EVEXOperandCode::VCVTUDQ2PD), (super::Opcode::VCVTDQ2PD, EVEXOperandCode::VCVTUDQ2PD), (super::Opcode::VCVTDQ2PD, EVEXOperandCode::VCVTUDQ2PD)]),
 ];
 
-const EVEX_f2_0f38: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 28] = [
+const EVEX_f3_0f38: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 28] = [
   (0x10, [(super::Opcode::VPMOVUSWB, EVEXOperandCode::Eqm_xmm_G_xmm_W0), (super::Opcode::VPMOVUSWB, EVEXOperandCode::Em_xmm_G_ymm_W0), (super::Opcode::VPMOVUSWB, EVEXOperandCode::Em_ymm_G_zmm_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x11, [(super::Opcode::VPMOVUSDB, EVEXOperandCode::Edm_xmm_G_xmm_W0), (super::Opcode::VPMOVUSDB, EVEXOperandCode::Eqm_xmm_G_ymm_W0), (super::Opcode::VPMOVUSDB, EVEXOperandCode::Em_xmm_G_zmm_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x12, [(super::Opcode::VPMOVUSQB, EVEXOperandCode::Ewm_xmm_G_xmm_W0), (super::Opcode::VPMOVUSQB, EVEXOperandCode::Edm_xmm_G_ymm_W0), (super::Opcode::VPMOVUSQB, EVEXOperandCode::Eqm_xmm_G_zmm_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
@@ -1091,7 +1097,7 @@ const EVEX_f2_0f38: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 28] = [
   (0x72, [(super::Opcode::VCVTNEPS2BF16, EVEXOperandCode::Operands_72_W0), (super::Opcode::VCVTNEPS2BF16, EVEXOperandCode::Operands_72_W0), (super::Opcode::VCVTNEPS2BF16, EVEXOperandCode::Operands_72_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
 ];
 
-const EVEX_f3_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 24] = [
+const EVEX_f2_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 23] = [
   (0x10, [(super::Opcode::VMOVSD, EVEXOperandCode::VMOVSD_10), (super::Opcode::VMOVSD, EVEXOperandCode::VMOVSD_10), (super::Opcode::VMOVSD, EVEXOperandCode::VMOVSD_10), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),// W1
   (0x11, [(super::Opcode::VMOVSD, EVEXOperandCode::VMOVSD_11), (super::Opcode::VMOVSD, EVEXOperandCode::VMOVSD_11), (super::Opcode::VMOVSD, EVEXOperandCode::VMOVSD_11), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),// W1
   (0x12, [(super::Opcode::VMOVDDUP, EVEXOperandCode::Gm_E_LL_W1), (super::Opcode::VMOVDDUP, EVEXOperandCode::Gm_E_LL_W1), (super::Opcode::VMOVDDUP, EVEXOperandCode::Gm_E_LL_W1), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
@@ -1112,13 +1118,12 @@ const EVEX_f3_0f: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 24] = [
   (0x79, [(super::Opcode::VCVTSD2USI, EVEXOperandCode::Gd_Ed_xmm_sae), (super::Opcode::VCVTSD2USI, EVEXOperandCode::Gd_Ed_xmm_sae), (super::Opcode::VCVTSD2USI, EVEXOperandCode::Gd_Ed_xmm_sae), (super::Opcode::VCVTSD2USI, EVEXOperandCode::Gd_Ed_xmm_sae)]),
   (0x7a, [(super::Opcode::VCVTUDQ2PS, EVEXOperandCode::VCVTDQ2PS), (super::Opcode::VCVTUDQ2PS, EVEXOperandCode::VCVTDQ2PS), (super::Opcode::VCVTUDQ2PS, EVEXOperandCode::VCVTDQ2PS), (super::Opcode::VCVTUDQ2PS, EVEXOperandCode::VCVTDQ2PS)]),
   (0x7b, [(super::Opcode::VCVTUSI2SD, EVEXOperandCode::VCVTUSI2SD), (super::Opcode::VCVTUSI2SD, EVEXOperandCode::VCVTUSI2SD), (super::Opcode::VCVTUSI2SD, EVEXOperandCode::VCVTUSI2SD), (super::Opcode::VCVTUSI2SD, EVEXOperandCode::VCVTUSI2SD)]),
-  (0x7e, [(super::Opcode::VMOVQ, EVEXOperandCode::VMOVQ_G_Ed_xmm), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x7f, [(super::Opcode::VMOVDQU8, EVEXOperandCode::Em_G_LL), (super::Opcode::VMOVDQU8, EVEXOperandCode::Em_G_LL), (super::Opcode::VMOVDQU8, EVEXOperandCode::Em_G_LL), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0xc2, [(super::Opcode::VCMPSD, EVEXOperandCode::Maskm_V_Eq_xmm_imm8_sae_W1), (super::Opcode::VCMPSD, EVEXOperandCode::Maskm_V_Eq_xmm_imm8_sae_W1), (super::Opcode::VCMPSD, EVEXOperandCode::Maskm_V_Eq_xmm_imm8_sae_W1), (super::Opcode::VCMPSD, EVEXOperandCode::Maskm_V_Eq_xmm_imm8_sae_W1)]),
   (0xe6, [(super::Opcode::VCVTPD2DQ, EVEXOperandCode::VCVTTPD2DQ), (super::Opcode::VCVTPD2DQ, EVEXOperandCode::VCVTTPD2DQ), (super::Opcode::VCVTPD2DQ, EVEXOperandCode::VCVTTPD2DQ), (super::Opcode::VCVTPD2DQ, EVEXOperandCode::VCVTTPD2DQ)]),
 ];
 
-const EVEX_f3_0f38: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 8] = [
+const EVEX_f2_0f38: [(u8, [(super::Opcode, EVEXOperandCode); 4]); 8] = [
   (0x52, [(super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::VP4DPWSSD, EVEXOperandCode::Gm_V_zmm_M_xmm_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x53, [(super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::Invalid, EVEXOperandCode::Nothing), (super::Opcode::VP4DPWSSDS, EVEXOperandCode::Gm_V_zmm_M_xmm_W0), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),
   (0x68, [(super::Opcode::VP2INTERSECTD, EVEXOperandCode::Mask_V_E_LL_bcast), (super::Opcode::VP2INTERSECTD, EVEXOperandCode::Mask_V_E_LL_bcast), (super::Opcode::VP2INTERSECTD, EVEXOperandCode::Mask_V_E_LL_bcast), (super::Opcode::Invalid, EVEXOperandCode::Nothing)]),

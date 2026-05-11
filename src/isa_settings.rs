@@ -91,6 +91,20 @@ macro_rules! gen_isa_settings {
             Opcode::VP4DPWSSD,
         ];
 
+        // only present in Knights *?
+        static AVX512_ER: &[Opcode] = &[
+            Opcode::VEXP2PD,
+            Opcode::VEXP2PS,
+            Opcode::VRCP28PD,
+            Opcode::VRCP28PS,
+            Opcode::VRCP28SD,
+            Opcode::VRCP28SS,
+            Opcode::VRSQRT28PD,
+            Opcode::VRSQRT28PS,
+            Opcode::VRSQRT28SD,
+            Opcode::VRSQRT28SS,
+        ];
+
         /// optionally reject or reinterpret instruction according to settings for this decode
         /// operation.
         pub(crate) fn revise_instruction(settings: &$featureful_decoder, inst: &mut $inst_ty) -> Result<(), $decode_err> {
@@ -112,6 +126,8 @@ macro_rules! gen_isa_settings {
                     if !settings.avx512_4vnniw() && AVX512_4VNNIW.contains(&inst.opcode) {
                         return Err(<$decode_err>::InvalidOpcode);
                     } else if !settings.avx512_4fmaps() && AVX512_4FMAPS.contains(&inst.opcode) {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    } else if !settings.avx512_er() && AVX512_ER.contains(&inst.opcode) {
                         return Err(<$decode_err>::InvalidOpcode);
                     } else if avx512_baseline {
                         // TODO: hack around missing avx feature set specificity.
@@ -823,6 +839,11 @@ macro_rules! gen_isa_settings {
                         return Err(<$decode_err>::InvalidOpcode);
                     }
                 }
+                <$opcode>::HRESET => {
+                    if !settings.hreset() {
+                        return Err(<$decode_err>::InvalidOpcode);
+                    }
+                }
 
                 other => {
                     if !settings.bmi1() {
@@ -997,6 +1018,7 @@ macro_rules! gen_arch_isa_settings {
             avx512_ifma, with_avx512_ifma = 110;
 
             keylocker, with_keylocker = 111;
+            hreset, with_hreset = 112;
 
             {
                 sse4 = {
