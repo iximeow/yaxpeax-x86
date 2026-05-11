@@ -149,22 +149,36 @@ impl Instruction {
                     behavior = behavior
                         .set_implicit_ops(RDI_MEMWRITE_IDX);
                 }
-            } else if self.opcode() == Opcode::VPCMPESTRI {
+            } else if self.opcode() == Opcode::PCMPESTRI || self.opcode() == Opcode::VPCMPESTRI {
                 if self.prefixes.vex_unchecked().w() {
                     behavior = behavior
-                        .set_implicit_ops(VPCMPESTRI_64B_IDX);
+                        .set_implicit_ops(PCMPESTRI_64B_IDX);
                 } else {
                     behavior = behavior
-                        .set_implicit_ops(VPCMPESTRI_32B_IDX);
+                        .set_implicit_ops(PCMPESTRI_32B_IDX);
                 }
-            } else if self.opcode() == Opcode::VPCMPESTRM {
+            } else if self.opcode() == Opcode::PCMPESTRM || self.opcode() == Opcode::VPCMPESTRM {
                 if self.prefixes.vex_unchecked().w() {
                     behavior = behavior
-                        .set_implicit_ops(VPCMPESTRM_64B_IDX);
+                        .set_implicit_ops(PCMPESTRM_64B_IDX);
                 } else {
                     behavior = behavior
-                        .set_implicit_ops(VPCMPESTRM_32B_IDX);
+                        .set_implicit_ops(PCMPESTRM_32B_IDX);
                 }
+            } else if self.opcode() == Opcode::LOOPNZ
+                || self.opcode() == Opcode::LOOPZ
+                || self.opcode() == Opcode::LOOP
+                || self.opcode() == Opcode::JRCXZ {
+               if self.prefixes.rex_unchecked().w() {
+                   behavior = behavior
+                       .set_implicit_ops(RW_RCX_IDX);
+               } else if self.prefixes.operand_size() {
+                   behavior = behavior
+                       .set_implicit_ops(RW_CX_IDX);
+               } else {
+                   behavior = behavior
+                       .set_implicit_ops(RW_ECX_IDX);
+               }
             } else {
                 // TODO: words
                 unreachable!();
@@ -1214,6 +1228,12 @@ pub enum ComplexOp {
     /// TODO: document
     ENQCMD,
     ENQCMDS,
+
+    /// TODO: document
+    V4FNMADDSS,
+    V4FNMADDPS,
+    V4FMADDSS,
+    V4FMADDPS,
 }
 
 /// a visitor for collecting architectural accesses for an `Instruction`. used with
@@ -1881,6 +1901,39 @@ static LEAVE_OPS: &'static [ImplicitOperand] = &[
     }
 ];
 
+static ENTER_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rbp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rbp(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::Deref,
+        reg: RegSpec::rsp(),
+        disp: -8i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
 static XLAT_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         // xlat is the only implicit operand to use a base/index addressing scheme, so note the
@@ -2257,18 +2310,46 @@ static CALLF_OPS: &'static [ImplicitOperand] = &[
         write: true,
     },
     ImplicitOperand {
+        spec: OperandSpec::Disp,
+        reg: RegSpec::rsp(),
+        disp: -10i32,
+        write: true,
+    },
+    // push.. pushes the value (above), then does a RMW on rsp.
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rsp(),
+        disp: 0,
+        write: true,
+    }
+];
+
+static RETF_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::Disp,
+        reg: RegSpec::rsp(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rip(),
+        disp: 0,
+        write: true,
+    },
+    ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::cs(),
         disp: 0,
         write: true,
     },
-    ImplicitOperand {
-        spec: OperandSpec::Disp,
-        reg: RegSpec::rsp(),
-        disp: -8i32,
-        write: true,
-    },
-    // push.. pushes the value (above), then does a RMW on rsp.
+    // pop.. pops the value (above), then does a RMW on rsp.
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::rsp(),
@@ -2524,7 +2605,7 @@ static RDI_MEMWRITE_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
-static VPCMPESTRI_64B_OPS: &'static [ImplicitOperand] = &[
+static PCMPESTRI_64B_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::rax(),
@@ -2545,7 +2626,7 @@ static VPCMPESTRI_64B_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
-static VPCMPESTRI_32B_OPS: &'static [ImplicitOperand] = &[
+static PCMPESTRI_32B_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::eax(),
@@ -2566,7 +2647,7 @@ static VPCMPESTRI_32B_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
-static VPCMPESTRM_64B_OPS: &'static [ImplicitOperand] = &[
+static PCMPESTRM_64B_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::rax(),
@@ -2587,7 +2668,7 @@ static VPCMPESTRM_64B_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
-static VPCMPESTRM_32B_OPS: &'static [ImplicitOperand] = &[
+static PCMPESTRM_32B_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::eax(),
@@ -2608,7 +2689,7 @@ static VPCMPESTRM_32B_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
-static VPCMPISTRI_OPS: &'static [ImplicitOperand] = &[
+static PCMPISTRI_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::ecx(),
@@ -2617,11 +2698,272 @@ static VPCMPISTRI_OPS: &'static [ImplicitOperand] = &[
     },
 ];
 
-static VPCMPISTRM_OPS: &'static [ImplicitOperand] = &[
+static PCMPISTRM_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
         spec: OperandSpec::RegRRR,
         reg: RegSpec::xmm0(),
         disp: 0i32,
+        write: true,
+    },
+];
+
+static READ_EDX_EAX_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::edx(),
+        disp: 0i32,
+        write: false,
+    },
+];
+
+static LMSW_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cr0(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cr0(),
+        disp: 0i32,
+        write: true,
+    },
+];
+
+static SMSW_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cr0(),
+        disp: 0i32,
+        write: false,
+    },
+];
+
+static READ_EAX_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+];
+
+static WRITE_AL_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::al(),
+        disp: 0i32,
+        write: true,
+    },
+];
+
+static RW_XMM0TO7_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(0),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(1),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(2),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(3),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(4),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(5),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(6),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(7),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(0),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(1),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(2),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(3),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(4),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(5),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(6),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(7),
+        disp: 0i32,
+        write: true,
+    },
+];
+
+static ENCODEKEY_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(0),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(0),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(1),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(2),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(4),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(5),
+        disp: 0i32,
+        write: true,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(6),
+        disp: 0i32,
+        write: true,
+    },
+];
+
+static LOADIWKEY_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::eax(),
+        disp: 0i32,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::xmm(0),
+        disp: 0i32,
+        write: false,
+    },
+];
+
+static RW_RCX_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rcx(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::rcx(),
+        disp: 0,
+        write: true,
+    },
+];
+
+static RW_ECX_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ecx(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::ecx(),
+        disp: 0,
+        write: true,
+    },
+];
+
+static RW_CX_OPS: &'static [ImplicitOperand] = &[
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cx(),
+        disp: 0,
+        write: false,
+    },
+    ImplicitOperand {
+        spec: OperandSpec::RegRRR,
+        reg: RegSpec::cx(),
+        disp: 0,
         write: true,
     },
 ];
@@ -2679,14 +3021,27 @@ const MULX_64B_IDX: u16 = 50;
 const MULX_32B_IDX: u16 = 51;
 const EDI_MEMWRITE_IDX: u16 = 52;
 const RDI_MEMWRITE_IDX: u16 = 53;
-const VPCMPESTRI_64B_IDX: u16 = 54;
-const VPCMPESTRI_32B_IDX: u16 = 55;
-const VPCMPESTRM_64B_IDX: u16 = 56;
-const VPCMPESTRM_32B_IDX: u16 = 57;
-const VPCMPISTRI_IDX: u16 = 58;
-const VPCMPISTRM_IDX: u16 = 59;
+const PCMPESTRI_64B_IDX: u16 = 54;
+const PCMPESTRI_32B_IDX: u16 = 55;
+const PCMPESTRM_64B_IDX: u16 = 56;
+const PCMPESTRM_32B_IDX: u16 = 57;
+const PCMPISTRI_IDX: u16 = 58;
+const PCMPISTRM_IDX: u16 = 59;
+const READ_EDX_EAX_IDX: u16 = 60;
+const RETF_IDX: u16 = 61;
+const LMSW_IDX: u16 = 62;
+const SMSW_IDX: u16 = 63;
+const READ_EAX_IDX: u16 = 64;
+const WRITE_AL_IDX: u16 = 65;
+const RW_XMM0TO7_IDX: u16 = 66;
+const ENCODEKEY_IDX: u16 = 67;
+const LOADIWKEY_IDX: u16 = 68;
+const RW_RCX_IDX: u16 = 69;
+const RW_ECX_IDX: u16 = 70;
+const RW_CX_IDX: u16 = 71;
+const ENTER_IDX: u16 = 72;
 
-static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 60] = [
+static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 73] = [
     &[], // implicit ops list 0 is not used
     PUSH_OPS,
     POP_OPS,
@@ -2741,12 +3096,25 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 60] = [
     MULX_32B_OPS,
     EDI_MEMWRITE_OPS,
     RDI_MEMWRITE_OPS,
-    VPCMPESTRI_64B_OPS,
-    VPCMPESTRI_32B_OPS,
-    VPCMPESTRM_64B_OPS,
-    VPCMPESTRM_32B_OPS,
-    VPCMPISTRI_OPS,
-    VPCMPISTRM_OPS,
+    PCMPESTRI_64B_OPS,
+    PCMPESTRI_32B_OPS,
+    PCMPESTRM_64B_OPS,
+    PCMPESTRM_32B_OPS,
+    PCMPISTRI_OPS,
+    PCMPISTRM_OPS,
+    READ_EDX_EAX_OPS,
+    RETF_OPS,
+    LMSW_OPS,
+    SMSW_OPS,
+    READ_EAX_OPS,
+    WRITE_AL_OPS,
+    RW_XMM0TO7_OPS,
+    ENCODEKEY_OPS,
+    LOADIWKEY_OPS,
+    RW_RCX_OPS,
+    RW_ECX_OPS,
+    RW_CX_OPS,
+    ENTER_OPS,
 ];
 
 #[inline(never)]
@@ -2808,7 +3176,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         INS => GENERAL_W_R,
         OUTS => GENERAL_R_R,
 
-        Invalid => { panic!("todo: invalid"); },
+        // "Invalid" should never be a publicly-visible Opcode variant..
+        Invalid => BehaviorDigest::empty()
+            .set_complex(true),
         BT => GENERAL_R_R_FLAGWRITE
             .set_complex(true),
         BSF => GENERAL_RW_R_FLAGWRITE,
@@ -2894,17 +3264,33 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_pl_any(),
         INT => GENERAL_R,
         INTO => GENERAL_R_FLAGREAD,
-        IRET => { panic!("todo: iret"); },
-        IRETD => { panic!("todo: iretd"); },
-        IRETQ => { panic!("todo: iretq"); },
-        RETF => { panic!("todo: retf"); },
-        ENTER => { panic!("todo: enter"); },
+        // TODO: should there be implicit operands for the iret instructions? they're complex
+        // anyway..
+        IRET => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
+        IRETD => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
+        IRETQ => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
+        RETF => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true)
+            .set_implicit_ops(RETF_IDX),
+        ENTER => BehaviorDigest::empty()
+            .set_implicit_ops(ENTER_IDX)
+            .set_operand(0, Access::Read)
+            .set_operand(1, Access::Read)
+            .set_pl_any(),
         LEAVE => BehaviorDigest::empty()
             .set_implicit_ops(LEAVE_IDX)
             .set_pl_any(),
         MOV => GENERAL_RW_R,
         RETURN => BehaviorDigest::empty()
             .set_implicit_ops(RETURN_IDX)
+            .set_complex(true)
             .set_pl_any(),
         PUSHF => BehaviorDigest::empty()
             .set_implicit_ops(PUSHF_IDX)
@@ -2935,8 +3321,16 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_implicit_ops(SAHF_IDX)
             .set_pl_any(),
         TEST => GENERAL_R_R_FLAGWRITE,
-        IN => { panic!("todo: in"); },
-        OUT => { panic!("todo: out"); },
+        IN => BehaviorDigest::empty()
+            .set_complex(true)
+            .set_pl_special()
+            .set_operand(0, Access::Write)
+            .set_operand(1, Access::Read),
+        OUT => BehaviorDigest::empty()
+            .set_complex(true)
+            .set_pl_special()
+            .set_operand(0, Access::Read)
+            .set_operand(1, Access::Read),
         IMUL => BehaviorDigest::empty(), // unreachable due to branch above match
         JO => JCC,
         JNO => JCC,
@@ -3006,7 +3400,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         CLTS => BehaviorDigest::empty()
             .set_implicit_ops(CLTS_IDX)
             .set_pl0(),
-        SYSCALL => { panic!("todo: syscall"); },
+        SYSCALL => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
         LSL =>  BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
@@ -3029,8 +3425,14 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         LIDT => BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read),
-        SMSW => { panic!("todo: smsw"); },
-        LMSW => { panic!("todo: lmsw"); },
+        SMSW => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Write)
+            .set_implicit_ops(SMSW_IDX),
+        LMSW => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Read)
+            .set_implicit_ops(LMSW_IDX),
         SWAPGS => BehaviorDigest::empty()
             .set_pl0(),
         RDTSCP => BehaviorDigest::empty()
@@ -3041,13 +3443,38 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         INVLPG => BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read),
-        FXSAVE => { panic!("todo: fxsave"); },
-        FXRSTOR => { panic!("todo: fxrstor"); },
-        LDMXCSR => { panic!("todo: ldmxcsr"); },
-        STMXCSR => { panic!("todo: stmxcsr"); },
-        XSAVE => { panic!("todo: xsave"); },
-        XRSTOR => { panic!("todo: xrstor"); },
-        XSAVEOPT => { panic!("todo: xsaveopt"); },
+        // TODO: this is only complex because while the memory access is 512 bytes,
+        // `MemoryAccessSize::bytes_size()` does not report it as such.
+        FXSAVE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
+        // TODO: this is only complex because while the memory access is 512 bytes,
+        // `MemoryAccessSize::bytes_size()` does not report it as such.
+        FXRSTOR => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        LDMXCSR => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true)
+            .set_pl_any(),
+        STMXCSR => BehaviorDigest::empty()
+            .set_operand(0, Access::Write)
+            .set_complex(true)
+            .set_pl_any(),
+        XSAVE => BehaviorDigest::empty()
+            .set_operand(0, Access::Write)
+            .set_pl_any()
+            .set_complex(true),
+        XRSTOR => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_pl_any()
+            .set_complex(true),
+        XSAVEOPT => BehaviorDigest::empty()
+            .set_operand(0, Access::Write)
+            .set_pl_any()
+            .set_complex(true),
         LFENCE => GENERAL,
         MFENCE => GENERAL,
         SFENCE => GENERAL,
@@ -3062,22 +3489,34 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         CLFLUSHOPT => GENERAL_W,
         // same argument as `clflush`.
         CLWB => GENERAL_W,
-        WRMSR => { panic!("todo: wrmsr"); },
+        WRMSR => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
         RDTSC => BehaviorDigest::empty()
             .set_implicit_ops(RDTSC_IDX)
             .set_pl_special(),
-        RDMSR => { panic!("todo: rdmsr"); },
+        RDMSR => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
         RDPMC => BehaviorDigest::empty()
             .set_implicit_ops(RDPMC_IDX)
             .set_pl_special(),
         SLDT => BehaviorDigest::empty()
             .set_pl_special()
-            .set_operand(0, Access::Write),
-        STR => { panic!("todo: str"); },
+            .set_operand(0, Access::Write)
+            .set_complex(true),
+        STR => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
         LLDT => BehaviorDigest::empty()
             .set_pl0()
-            .set_operand(0, Access::Read),
-        LTR => { panic!("todo: ltr"); },
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        LTR => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
         VERR => GENERAL_R_FLAGWRITE,
         VERW =>  GENERAL_R_FLAGWRITE,
         CMC => GENERAL_FLAGRW,
@@ -3089,7 +3528,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_pl_special(),
         CLD => GENERAL_FLAGRW,
         STD => GENERAL_FLAGRW,
-        JMPE => { panic!("todo: jmpe"); },
+        JMPE => BehaviorDigest::empty()
+            .set_pl_any() // TODO: don't have a processor with jmpe to validate
+            .set_operand(0, Access::Read)
+            .set_implicit_ops(JMP_OPS_IDX),
         POPCNT => GENERAL_W_R_FLAGWRITE,
         MOVDQU => GENERAL_W_R,
         MOVDQA => GENERAL_W_R,
@@ -3102,8 +3544,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         UNPCKLPD => GENERAL_RW_R,
         UNPCKHPS => GENERAL_RW_R,
         UNPCKHPD => GENERAL_RW_R,
-        PSHUFHW => GENERAL_W_R,
-        PSHUFLW => GENERAL_W_R,
+        PSHUFHW => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        PSHUFLW => GENERAL_W_R
+            .set_operand(2, Access::Read),
         MOVUPS => GENERAL_W_R,
         MOVQ2DQ => GENERAL_W_R,
         MOVDQ2Q => GENERAL_W_R,
@@ -3117,40 +3561,87 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         BLSI => GENERAL_W_R_FLAGWRITE,
         BLSMSK => GENERAL_W_R_FLAGWRITE,
         BLSR => GENERAL_W_R_FLAGWRITE,
-        VMCLEAR => { panic!("todo: vmclear"); },
-        VMXON => { panic!("todo: vmxon"); },
-        VMCALL => { panic!("todo: vmcall"); },
-        VMLAUNCH => { panic!("todo: vmlaunch"); },
-        VMRESUME => { panic!("todo: vmresume"); },
-        VMXOFF => { panic!("todo: vmxoff"); },
-        PCONFIG => { panic!("todo: pconfig"); },
-        MONITOR => BehaviorDigest::empty()
+        VMCLEAR => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VMXON => BehaviorDigest::empty()
             .set_pl0()
-            .set_implicit_ops(MONITOR_IDX),
-        MWAIT => { panic!("todo: mwait"); },
-        MONITORX => { panic!("todo: monitorx"); },
-        MWAITX => { panic!("todo: mwaitx"); },
+            .set_complex(true),
+        VMCALL => BehaviorDigest::empty()
+            .set_complex(true),
+        VMLAUNCH => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        VMRESUME => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        VMXOFF => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        PCONFIG => BehaviorDigest::empty()
+            .set_complex(true),
+        MONITOR => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_implicit_ops(MONITOR_IDX)
+            .set_complex(true),
+        MWAIT => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
+        MONITORX => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_implicit_ops(MONITOR_IDX)
+            .set_complex(true),
+        MWAITX => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
         CLAC => BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write),
         STAC => BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write),
-        ENCLS => { panic!("todo: encls"); },
-        ENCLV => { panic!("todo: enclv"); },
-        XGETBV => { panic!("todo: xgetbv"); },
-        XSETBV => { panic!("todo: xsetbv"); },
-        VMFUNC => { panic!("todo: vmfunc"); },
-        XABORT => { panic!("todo: xabort"); },
-        XBEGIN => { panic!("todo: xbegin"); },
-        XEND => { panic!("todo: xend"); },
-        XTEST => { panic!("todo: xtest"); },
-        ENCLU => { panic!("todo: enclu"); },
-        RDPKRU => { panic!("todo: rdpkru"); },
-        WRPKRU => { panic!("todo: wrpkru"); },
+        ENCLS => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        ENCLV => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        XGETBV => BehaviorDigest::empty()
+            .set_complex(true),
+        XSETBV =>  BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        VMFUNC => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        XABORT => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        XBEGIN => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        XEND => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        XTEST => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        ENCLU => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
+        RDPKRU => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        WRPKRU => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
 
-        RDPRU => { panic!("todo: rdpru"); },
-        CLZERO => { panic!("todo: clzero"); },
+        RDPRU => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        CLZERO => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
 
         RDSEED => BehaviorDigest::empty()
             .set_operand(0, Access::Write)
@@ -3189,7 +3680,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         DIVPS => GENERAL_RW_R,
         DIVPD => GENERAL_RW_R,
         EMMS => GENERAL,
-        GETSEC => { panic!("todo: getsec"); },
+        // TODO: untested, don't have relevant hardware..
+        GETSEC => BehaviorDigest::empty()
+            .set_pl_any(),
         LFS => GENERAL_W_R
             .set_implicit_ops(LFS_IDX),
         LGS => GENERAL_W_R
@@ -3250,7 +3743,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         PCMPGTB => GENERAL_RW_R,
         PCMPGTD => GENERAL_RW_R,
         PCMPGTW => GENERAL_RW_R,
-        PINSRW => GENERAL_RW_R,
+        PINSRW => GENERAL_RW_R
+            .set_operand(2, Access::Read),
         PMADDWD => GENERAL_RW_R,
         PMAXSW => GENERAL_RW_R,
         PMAXUB => GENERAL_RW_R,
@@ -3263,8 +3757,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         PMULUDQ => GENERAL_RW_R,
         POR => GENERAL_RW_R,
         PSADBW => GENERAL_RW_R,
-        PSHUFW => GENERAL_RW_R,
-        PSHUFD => GENERAL_RW_R,
+        PSHUFW => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        PSHUFD => GENERAL_RW_R
+            .set_operand(2, Access::Read),
         PSLLD => GENERAL_RW_R,
         PSLLDQ => GENERAL_RW_R,
         PSLLQ => GENERAL_RW_R,
@@ -3293,23 +3789,38 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         PUNPCKHQDQ => GENERAL_RW_R,
         PXOR => GENERAL_RW_R,
         RCPPS => GENERAL_W_R,
-        RSM => { panic!("todo: rsm"); },
+        RSM => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
         RSQRTPS => GENERAL_W_R,
         SHLD => GENERAL_RW_R_R
             .set_flags_access(Access::Write),
         SHUFPD => GENERAL_RW_R_R,
         SHUFPS => GENERAL_RW_R_R,
-        SLHD => { panic!("todo: slhd"); },
+        // TODO: slhd is not real, typo of shld
+        SLHD => BehaviorDigest::empty(),
         SQRTPS => GENERAL_W_R,
         SQRTPD => GENERAL_W_R,
         SUBPS => GENERAL_RW_R,
         SUBPD => GENERAL_RW_R,
-        SYSENTER => { panic!("todo: sysenter"); },
-        SYSEXIT => { panic!("todo: sysexit"); },
+        SYSENTER => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        SYSEXIT => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
         UCOMISD => GENERAL_R_R_FLAGWRITE,
         UCOMISS => GENERAL_R_R_FLAGWRITE,
-        VMREAD => { panic!("todo: vmread"); },
-        VMWRITE => { panic!("todo: vmwrite"); },
+        VMREAD => BehaviorDigest::empty()
+            .set_operand(0, Access::Write)
+            .set_operand(1, Access::Read)
+            .set_pl0()
+            .set_complex(true),
+        VMWRITE => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_operand(1, Access::Read)
+            .set_pl0()
+            .set_complex(true),
         XORPS => GENERAL_RW_R,
         XORPD => GENERAL_RW_R,
 
@@ -3563,11 +4074,11 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VPCMPISTRI => GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
-            .set_implicit_ops(VPCMPISTRI_IDX),
+            .set_implicit_ops(PCMPISTRI_IDX),
         VPCMPISTRM => GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
-            .set_implicit_ops(VPCMPISTRM_IDX),
+            .set_implicit_ops(PCMPISTRM_IDX),
         VPERM2F128 => GENERAL_W_R_R
             .set_operand(3, Access::Read),
         VPERM2I128 => GENERAL_W_R_R
@@ -3719,31 +4230,56 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VUNPCKLPS => GENERAL_W_R_R,
         VXORPD => GENERAL_W_R_R,
         VXORPS => GENERAL_W_R_R,
-        VZEROUPPER => { panic!("todo: vzeroupper"); },
-        VZEROALL => { panic!("todo: vzeroall"); },
-        VLDMXCSR => { panic!("todo: vldmxcsr"); },
-        VSTMXCSR => { panic!("todo: vstmxcsr"); },
+        VZEROUPPER => BehaviorDigest::empty()
+            .set_complex(true),
+        VZEROALL => BehaviorDigest::empty()
+            .set_complex(true),
+        VLDMXCSR => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true)
+            .set_pl_any(),
+        VSTMXCSR => BehaviorDigest::empty()
+            .set_operand(0, Access::Write)
+            .set_complex(true)
+            .set_pl_any(),
 
-        PCLMULQDQ => { panic!("todo: pclmulqdq"); },
-        AESKEYGENASSIST => { panic!("todo: aeskeygenassist"); },
+        PCLMULQDQ => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        AESKEYGENASSIST => GENERAL_W_R
+            .set_operand(2, Access::Read),
         AESIMC => GENERAL_W_R,
         AESENC => GENERAL_RW_R,
         AESENCLAST => GENERAL_RW_R,
         AESDEC => GENERAL_RW_R,
         AESDECLAST => GENERAL_RW_R,
         PCMPGTQ => GENERAL_RW_R,
-        PCMPISTRM => { panic!("todo: pcmpistrm"); },
-        PCMPISTRI => { panic!("todo: pcmpistri"); },
-        PCMPESTRI => { panic!("todo: pcmpestri"); },
+        PCMPISTRM => GENERAL_R_R
+            .set_operand(2, Access::Read)
+            .set_flags_access(Access::Write)
+            .set_implicit_ops(PCMPISTRM_IDX),
+        PCMPISTRI => GENERAL_R_R
+            .set_operand(2, Access::Read)
+            .set_flags_access(Access::Write)
+            .set_implicit_ops(PCMPISTRI_IDX),
+        PCMPESTRI => GENERAL_R_R
+            .set_operand(2, Access::Read)
+            .set_flags_access(Access::Write)
+            .set_nontrivial(true),
         PACKUSDW => GENERAL_RW_R,
-        PCMPESTRM => { panic!("todo: pcmpestrm"); },
+        PCMPESTRM => GENERAL_R_R
+            .set_operand(2, Access::Read)
+            .set_flags_access(Access::Write)
+            .set_nontrivial(true),
         PCMPEQQ => GENERAL_RW_R,
         PTEST => GENERAL_R_R
             .set_flags_access(Access::Write),
         PHMINPOSUW => GENERAL_W_R,
-        DPPS => { panic!("todo: dpps"); },
-        DPPD => { panic!("todo: dppd"); },
-        MPSADBW => { panic!("todo: mpsadbw"); },
+        DPPS => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        DPPD => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        MPSADBW => GENERAL_RW_R
+            .set_operand(2, Access::Read),
         PMOVZXDQ => GENERAL_RW_R,
         PMOVSXDQ => GENERAL_RW_R,
         PMOVZXBD => GENERAL_RW_R,
@@ -3764,11 +4300,16 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_operand(2, Access::Read),
         PMOVSXBW => GENERAL_RW_R,
         PMOVZXBW => GENERAL_RW_R,
-        PINSRQ => { panic!("todo: pinsrq"); },
-        PINSRD => { panic!("todo: pinsrd"); },
-        PINSRB => { panic!("todo: pinsrb"); },
-        EXTRACTPS => { panic!("todo: extractps"); },
-        INSERTPS => { panic!("todo: insertps"); },
+        PINSRQ => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        PINSRD => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        PINSRB => GENERAL_RW_R
+            .set_operand(2, Access::Read),
+        EXTRACTPS => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        INSERTPS => GENERAL_W_R
+            .set_operand(2, Access::Read),
         ROUNDSS => GENERAL_RW_R
             .set_operand(2, Access::Read),
         ROUNDSD => GENERAL_RW_R
@@ -3785,7 +4326,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         PMINSB => GENERAL_RW_R,
         PMINUD => GENERAL_RW_R,
         PMINUW => GENERAL_RW_R,
-        BLENDW => { panic!("todo: blendw"); },
+        // TODO: need to remove; doesn't exist
+        BLENDW => BehaviorDigest::empty(),
         PBLENDVB => GENERAL_RW_R
             .set_implicit_ops(XMM0_READ_IDX),
         PBLENDW => GENERAL_RW_R
@@ -3832,13 +4374,31 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
 
         LZCNT => GENERAL_W_R
             .set_flags_access(Access::Write),
-        CLGI => { panic!("todo: clgi"); },
-        STGI => { panic!("todo: stgi"); },
-        SKINIT => { panic!("todo: skinit"); },
-        VMLOAD => { panic!("todo: vmload"); },
-        VMMCALL => { panic!("todo: vmmcall"); },
-        VMSAVE => { panic!("todo: vmsave"); },
-        VMRUN => { panic!("todo: vmrun"); },
+        CLGI => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        STGI => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        SKINIT => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Read),
+        VMLOAD => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Read),
+        VMMCALL => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        VMSAVE => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Read),
+        VMRUN => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Read),
         INVLPGA => BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
@@ -3848,7 +4408,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read)
             .set_operand(2, Access::Read),
-        TLBSYNC => { panic!("todo: tlbsync"); },
+        TLBSYNC => BehaviorDigest::empty()
+            .set_pl0(),
 
         MOVBE => GENERAL_W_R,
 
@@ -3857,11 +4418,21 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         ADOX => GENERAL_RW_R
             .set_flags_access(Access::ReadWrite),
 
-        PREFETCHW => { panic!("todo: prefetchw"); },
+        PREFETCHW => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read),
 
-        RDPID => { panic!("todo: rdpid"); },
-        VMPTRLD => { panic!("todo: vmptrld"); },
-        VMPTRST => { panic!("todo: vmptrst"); },
+        RDPID => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write),
+        VMPTRLD => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VMPTRST => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
 
         BZHI => GENERAL_W_R_R
             .set_flags_access(Access::Write),
@@ -3876,20 +4447,55 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         PDEP => GENERAL_W_R_R,
         PEXT => GENERAL_W_R_R,
         RORX => GENERAL_W_R_R,
-        XRSTORS => { panic!("todo: xrstors"); },
-        XRSTORS64 => { panic!("todo: xrstors64"); },
-        XSAVEC => { panic!("todo: xsavec"); },
-        XSAVEC64 => { panic!("todo: xsavec64"); },
-        XSAVES => { panic!("todo: xsaves"); },
-        XSAVES64 => { panic!("todo: xsaves64"); },
+        XRSTORS => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Read)
+            .set_implicit_ops(READ_EDX_EAX_IDX),
+        XRSTORS64 => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Read)
+            .set_implicit_ops(READ_EDX_EAX_IDX),
+        XSAVEC => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true)
+            .set_operand(0, Access::Write)
+            .set_implicit_ops(READ_EDX_EAX_IDX),
+        XSAVEC64 => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true)
+            .set_operand(0, Access::Write)
+            .set_implicit_ops(READ_EDX_EAX_IDX),
+        XSAVES => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Write)
+            .set_implicit_ops(READ_EDX_EAX_IDX),
+        XSAVES64 => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true)
+            .set_operand(0, Access::Write)
+            .set_implicit_ops(READ_EDX_EAX_IDX),
 
-        RDFSBASE => { panic!("todo: rdfsbase"); },
-        RDGSBASE => { panic!("todo: rdgsbase"); },
-        WRFSBASE => { panic!("todo: wrfsbase"); },
-        WRGSBASE => { panic!("todo: wrgsbase"); },
+        RDFSBASE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write),
+        RDGSBASE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write),
+        WRFSBASE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read),
+        WRGSBASE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read),
 
         CRC32 => GENERAL_RW_R,
-        SALC => { panic!("todo: salc"); },
+        SALC => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_flags_access(Access::Read)
+            .set_implicit_ops(WRITE_AL_IDX),
         XLAT => BehaviorDigest::empty()
             .set_implicit_ops(XLAT_IDX)
             .set_pl_any(),
@@ -3995,11 +4601,24 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_pl_any(),
         FNOP => BehaviorDigest::empty()
             .set_pl_any(),
-        FNSAVE => { panic!("todo: fnsave"); },
-        FNSTCW => { panic!("todo: fnstcw"); },
-        FNSTENV => { panic!("todo: fnstenv"); },
-        FNSTOR => { panic!("todo: fnstor"); },
-        FNSTSW => { panic!("todo: fnstsw"); },
+        FNSAVE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
+        FNSTCW => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
+        FNSTENV => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
+        // TODO: never produced..
+        FNSTOR => BehaviorDigest::empty(),
+        FNSTSW => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
         // TODO: read st(1) with atan(st(1)/st(0)) and pop
         FPATAN => BehaviorDigest::empty()
             .set_pl_any(),
@@ -4015,7 +4634,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         // TODO: read st(0), write, push?
         FRNDINT => BehaviorDigest::empty()
             .set_pl_any(),
-        FRSTOR => { panic!("todo: frstor"); },
+        FRSTOR => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Write)
+            .set_complex(true),
         // TODO: read st(0), st(1)
         FSCALE => BehaviorDigest::empty()
             .set_pl_any(),
@@ -4060,10 +4682,25 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         FYL2XP1 => BehaviorDigest::empty()
             .set_pl_any(),
 
-        LOOPNZ => { panic!("todo: loopnz"); },
-        LOOPZ => { panic!("todo: loopz"); },
-        LOOP => { panic!("todo: loop"); },
-        JRCXZ => { panic!("todo: jrcxz"); },
+        LOOPNZ => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read)
+            .set_flags_access(Access::ReadWrite)
+            .set_nontrivial(true),
+        LOOPZ => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read)
+            .set_flags_access(Access::ReadWrite)
+            .set_nontrivial(true),
+        LOOP => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read)
+            .set_flags_access(Access::ReadWrite)
+            .set_nontrivial(true),
+        JRCXZ => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(0, Access::Read)
+            .set_nontrivial(true),
 
         // started shipping in Tremont, 2020 sept 23
         // while this instruction is marked "write, read", the written first operand is a register
@@ -4073,48 +4710,71 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         MOVDIRI => GENERAL_W_R,
 
         // started shipping in Tiger Lake, 2020 sept 2
-        AESDEC128KL => { panic!("todo: aesdec128kl"); },
-        AESDEC256KL => { panic!("todo: aesdec256kl"); },
-        AESDECWIDE128KL => { panic!("todo: aesdecwide128kl"); },
-        AESDECWIDE256KL => { panic!("todo: aesdecwide256kl"); },
-        AESENC128KL => { panic!("todo: aesenc128kl"); },
-        AESENC256KL => { panic!("todo: aesenc256kl"); },
-        AESENCWIDE128KL => { panic!("todo: aesencwide128kl"); },
-        AESENCWIDE256KL => { panic!("todo: aesencwide256kl"); },
-        ENCODEKEY128 => { panic!("todo: encodekey128"); },
-        ENCODEKEY256 => { panic!("todo: encodekey256"); },
-        LOADIWKEY => { panic!("todo: loadiwkey"); },
+        AESDEC128KL => GENERAL_RW_R
+            .set_flags_access(Access::Write),
+        AESDEC256KL => GENERAL_RW_R
+            .set_flags_access(Access::Write),
+        AESDECWIDE128KL => GENERAL_R
+            .set_implicit_ops(RW_XMM0TO7_IDX)
+            .set_flags_access(Access::Write),
+        AESDECWIDE256KL => GENERAL_R
+            .set_implicit_ops(RW_XMM0TO7_IDX)
+            .set_flags_access(Access::Write),
+        AESENC128KL => GENERAL_RW_R
+            .set_flags_access(Access::Write),
+        AESENC256KL => GENERAL_RW_R
+            .set_flags_access(Access::Write),
+        AESENCWIDE128KL => GENERAL_R
+            .set_implicit_ops(RW_XMM0TO7_IDX)
+            .set_flags_access(Access::Write),
+        AESENCWIDE256KL => GENERAL_R
+            .set_implicit_ops(RW_XMM0TO7_IDX)
+            .set_flags_access(Access::Write),
+        ENCODEKEY128 => GENERAL_W_R
+            .set_implicit_ops(ENCODEKEY_IDX)
+            .set_flags_access(Access::Write),
+        ENCODEKEY256 => GENERAL_W_R
+            .set_implicit_ops(ENCODEKEY_IDX)
+            .set_flags_access(Access::Write),
+        LOADIWKEY => GENERAL_R_R
+            .set_implicit_ops(LOADIWKEY_IDX)
+            .set_flags_access(Access::Write),
 
         // unsure
-        HRESET => { panic!("todo: hreset"); },
+        HRESET => BehaviorDigest::empty()
+            .set_operand(0, Access::Read) // but really, "explicit imm8 operand is ignored"
+            .set_implicit_ops(READ_EAX_IDX)
+            .set_complex(true),
 
         // 3dnow. note these are yet untested!
+        // the 3dnow DSP instructions (pi2fw, pf2iw, pfnacc, pfpnacc, pswapd)
+        // are even more untested.
         FEMMS => GENERAL,
-        PI2FW => { panic!("todo: pi2fw"); },
-        PI2FD => { panic!("todo: pi2fd"); },
-        PF2IW => { panic!("todo: pf2iw"); },
-        PF2ID => { panic!("todo: pf2id"); },
-        PMULHRW => { panic!("todo: pmulhrw"); },
-        PFCMPGE => { panic!("todo: pfcmpge"); },
-        PFMIN => { panic!("todo: pfmin"); },
-        PFRCP => { panic!("todo: pfrcp"); },
-        PFRSQRT => { panic!("todo: pfrsqrt"); },
-        PFSUB => { panic!("todo: pfsub"); },
-        PFADD => { panic!("todo: pfadd"); },
-        PFCMPGT => { panic!("todo: pfcmpgt"); },
-        PFMAX => { panic!("todo: pfmax"); },
-        PFRCPIT1 => { panic!("todo: pfrcpit1"); },
-        PFRSQIT1 => { panic!("todo: pfrsqit1"); },
-        PFSUBR => { panic!("todo: pfsubr"); },
-        PFACC => { panic!("todo: pfacc"); },
-        PFCMPEQ => { panic!("todo: pfcmpeq"); },
-        PFMUL => { panic!("todo: pfmul"); },
-        PFMULHRW => { panic!("todo: pfmulhrw"); },
-        PFRCPIT2 => { panic!("todo: pfrcpit2"); },
-        PFNACC => { panic!("todo: pfnacc"); },
-        PFPNACC => { panic!("todo: pfpnacc"); },
-        PSWAPD => { panic!("todo: pswapd"); },
-        PAVGUSB => { panic!("todo: pavgusb"); },
+        PI2FW => GENERAL_RW_R,
+        PI2FD => GENERAL_W_R,
+        PF2IW => GENERAL_RW_R,
+        PF2ID => GENERAL_W_R,
+        PMULHRW => GENERAL_RW_R,
+        PFCMPGE => GENERAL_RW_R,
+        PFMIN => GENERAL_RW_R,
+        PFRCP => GENERAL_W_R,
+        PFRSQRT => GENERAL_W_R,
+        PFSUB => GENERAL_RW_R,
+        PFADD => GENERAL_RW_R,
+        PFCMPGT => GENERAL_RW_R,
+        PFMAX => GENERAL_RW_R,
+        PFRCPIT1 => GENERAL_RW_R,
+        PFRSQIT1 => GENERAL_RW_R,
+        PFSUBR => GENERAL_RW_R,
+        PFACC => GENERAL_RW_R,
+        PFCMPEQ => GENERAL_RW_R,
+        PFMUL => GENERAL_RW_R,
+        PFMULHRW => GENERAL_RW_R,
+        PFRCPIT2 => GENERAL_RW_R,
+        PFNACC => GENERAL_RW_R,
+        PFPNACC => GENERAL_RW_R,
+        PSWAPD => GENERAL_RW_RW,
+        PAVGUSB => GENERAL_RW_R,
 
         // ENQCMD
         // similar to movdir64b, but more complex; the first operand is also an address for a
@@ -4138,7 +4798,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         INVPCID => GENERAL_R_R,
 
         // PTWRITE
-        PTWRITE => { panic!("todo: ptwrite"); },
+        // TODO: untested
+        PTWRITE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
 
         // GFNI
         GF2P8AFFINEQB => GENERAL_RW_R
@@ -4148,45 +4811,101 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         GF2P8MULB => GENERAL_RW_R,
 
         // CET
-        WRUSS => { panic!("todo: wruss"); },
-        WRSS => { panic!("todo: wrss"); },
-        INCSSP => { panic!("todo: incssp"); },
-        SAVEPREVSSP => { panic!("todo: saveprevssp"); },
-        SETSSBSY => { panic!("todo: setssbsy"); },
-        CLRSSBSY => { panic!("todo: clrssbsy"); },
-        RSTORSSP => { panic!("todo: rstorssp"); },
-        ENDBR64 => { panic!("todo: endbr64"); },
-        ENDBR32 => { panic!("todo: endbr32"); },
+        WRUSS => GENERAL_W_R
+            .set_pl0()
+            .set_complex(true),
+        WRSS => GENERAL_W_R
+            .set_pl_special()
+            .set_complex(true),
+        INCSSP => GENERAL_R
+            .set_pl_special()
+            .set_complex(true),
+        SAVEPREVSSP => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_complex(true),
+        SETSSBSY => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        CLRSSBSY => BehaviorDigest::empty()
+            .set_pl0()
+            .set_operand(0, Access::ReadWrite)
+            .set_flags_access(Access::Write)
+            .set_complex(true),
+        RSTORSSP => BehaviorDigest::empty()
+            .set_pl_special()
+            .set_operand(0, Access::ReadWrite)
+            .set_flags_access(Access::Write)
+            .set_complex(true),
+        ENDBR64 => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        ENDBR32 => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
 
         // TDX
-        TDCALL => { panic!("todo: tdcall"); },
-        SEAMRET => { panic!("todo: seamret"); },
-        SEAMOPS => { panic!("todo: seamops"); },
-        SEAMCALL => { panic!("todo: seamcall"); },
+        TDCALL => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        SEAMRET => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        SEAMOPS => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
+        SEAMCALL => BehaviorDigest::empty()
+            .set_pl0()
+            .set_complex(true),
 
         // WAITPKG
-        TPAUSE => { panic!("todo: tpause"); },
-        UMONITOR => { panic!("todo: umonitor"); },
-        UMWAIT => { panic!("todo: umwait"); },
+        TPAUSE => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        UMONITOR => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        UMWAIT => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
 
         // UINTR
-        UIRET => { panic!("todo: uiret"); },
-        TESTUI => { panic!("todo: testui"); },
-        CLUI => { panic!("todo: clui"); },
-        STUI => { panic!("todo: stui"); },
-        SENDUIPI => { panic!("todo: senduipi"); },
+        UIRET => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        TESTUI => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        CLUI => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        STUI => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+        SENDUIPI => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
 
         // TSXLDTRK
-        XSUSLDTRK => { panic!("todo: xsusldtrk"); },
-        XRESLDTRK => { panic!("todo: xresldtrk"); },
+        // arguably these should be considered "complex" similar to `uintr` instructions above, but
+        // they are not (at this time). the arbitrary distinction here is that x{sus,res}ldtrk
+        // operate on nothing *but* the trackedness of loads, so interactions with this processor
+        // state can be easily determined by looking for these instructions. additionally, a user
+        // interested in this state is probably already looking for these instructions, so
+        // declaring them complex adds burden to all other use for no benefit.
+        XSUSLDTRK => BehaviorDigest::empty()
+            .set_pl_any(),
+        XRESLDTRK => BehaviorDigest::empty()
+            .set_pl_any(),
 
         // AVX512F
-        VALIGND => { panic!("todo: valignd"); },
-        VALIGNQ => { panic!("todo: valignq"); },
+        VALIGND => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VALIGNQ => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VBLENDMPD => GENERAL_W_R_R,
         VBLENDMPS => GENERAL_W_R_R,
-        VCOMPRESSPD => { panic!("todo: vcompresspd"); },
-        VCOMPRESSPS => { panic!("todo: vcompressps"); },
+        VCOMPRESSPD => GENERAL_W_R,
+        VCOMPRESSPS => GENERAL_W_R,
         VCVTPD2UDQ => GENERAL_W_R,
         VCVTTPD2UDQ => GENERAL_W_R,
         VCVTPS2UDQ => GENERAL_W_R,
@@ -4201,39 +4920,58 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VCVTUDQ2PS => GENERAL_W_R,
         VCVTUSI2USD => GENERAL_W_R,
         VCVTUSI2USS => GENERAL_W_R,
-        VEXPANDPD => { panic!("todo: vexpandpd"); },
-        VEXPANDPS => { panic!("todo: vexpandps"); },
-        VEXTRACTF32X4 => { panic!("todo: vextractf32x4"); },
-        VEXTRACTF64X4 => { panic!("todo: vextractf64x4"); },
-        VEXTRACTI32X4 => { panic!("todo: vextracti32x4"); },
-        VEXTRACTI64X4 => { panic!("todo: vextracti64x4"); },
-        VFIXUPIMMPD => { panic!("todo: vfixupimmpd"); },
-        VFIXUPIMMPS => { panic!("todo: vfixupimmps"); },
-        VFIXUPIMMSD => { panic!("todo: vfixupimmsd"); },
-        VFIXUPIMMSS => { panic!("todo: vfixupimmss"); },
+        VEXPANDPD => GENERAL_W_R,
+        VEXPANDPS => GENERAL_W_R,
+        VEXTRACTF32X4 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VEXTRACTF64X4 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VEXTRACTI32X4 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VEXTRACTI64X4 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VFIXUPIMMPD => GENERAL_RW_R_R
+            .set_operand(3, Access::Read),
+        VFIXUPIMMPS => GENERAL_RW_R_R
+            .set_operand(3, Access::Read),
+        VFIXUPIMMSD => GENERAL_RW_R_R
+            .set_operand(3, Access::Read),
+        VFIXUPIMMSS => GENERAL_RW_R_R
+            .set_operand(3, Access::Read),
         VGETEXPPD => GENERAL_W_R,
         VGETEXPPS => GENERAL_W_R,
         VGETEXPSD => GENERAL_W_R_R,
         VGETEXPSS => GENERAL_W_R_R,
-        VGETMANTPD => GENERAL_W_R,
-        VGETMANTPS => GENERAL_W_R,
-        VGETMANTSD => GENERAL_W_R,
-        VGETMANTSS => GENERAL_W_R,
-        VINSERTF32X4 => { panic!("todo: vinsertf32x4"); },
-        VINSERTF64X4 => { panic!("todo: vinsertf64x4"); },
-        VINSERTI64X4 => { panic!("todo: vinserti64x4"); },
+        VGETMANTPD => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VGETMANTPS => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VGETMANTSD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VGETMANTSS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VINSERTF32X4 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VINSERTF64X4 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VINSERTI64X4 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VMOVDQA32 => GENERAL_W_R,
         VMOVDQA64 => GENERAL_W_R,
         VMOVDQU32 => GENERAL_W_R,
         VMOVDQU64 => GENERAL_W_R,
         VPBLENDMD => GENERAL_W_R_R,
         VPBLENDMQ => GENERAL_W_R_R,
-        VPCMPD => { panic!("todo: vpcmpd"); },
-        VPCMPUD => { panic!("todo: vpcmpud"); },
-        VPCMPQ => { panic!("todo: vpcmpq"); },
-        VPCMPUQ => { panic!("todo: vpcmpuq"); },
-        VPCOMPRESSQ => { panic!("todo: vpcompressq"); },
-        VPCOMPRESSD => { panic!("todo: vpcompressd"); },
+        VPCMPD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCMPUD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCMPQ => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCMPUQ => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCOMPRESSQ => GENERAL_W_R,
+        VPCOMPRESSD => GENERAL_W_R,
         VPERMI2D => GENERAL_W_R_R,
         VPERMI2Q => GENERAL_W_R_R,
         VPERMI2PD => GENERAL_W_R_R,
@@ -4273,38 +5011,50 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_complex(true),
         VPSCATTERQQ => BehaviorDigest::empty()
             .set_complex(true),
-        VPSRAQ => { panic!("todo: vpsraq"); },
+        VPSRAQ => GENERAL_W_R_R,
         VPSRAVQ => GENERAL_W_R_R,
         VPTESTNMD => GENERAL_W_R_R,
         VPTESTNMQ => GENERAL_W_R_R,
-        VPTERNLOGD => { panic!("todo: vpternlogd"); },
-        VPTERNLOGQ => { panic!("todo: vpternlogq"); },
+        VPTERNLOGD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPTERNLOGQ => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VPTESTMD => GENERAL_W_R_R,
         VPTESTMQ => GENERAL_W_R_R,
         VRCP14PD => GENERAL_W_R,
         VRCP14PS => GENERAL_W_R,
         VRCP14SD => GENERAL_W_R_R,
         VRCP14SS => GENERAL_W_R_R,
-        VRNDSCALEPD => { panic!("todo: vrndscalepd"); },
-        VRNDSCALEPS => { panic!("todo: vrndscaleps"); },
-        VRNDSCALESD => { panic!("todo: vrndscalesd"); },
-        VRNDSCALESS => { panic!("todo: vrndscaless"); },
+        VRNDSCALEPD => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VRNDSCALEPS => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VRNDSCALESD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VRNDSCALESS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VRSQRT14PD => GENERAL_W_R,
         VRSQRT14PS => GENERAL_W_R,
         VRSQRT14SD => GENERAL_W_R_R,
         VRSQRT14SS => GENERAL_W_R_R,
-        VSCALEDPD => { panic!("todo: vscaledpd"); },
-        VSCALEDPS => { panic!("todo: vscaledps"); },
-        VSCALEDSD => { panic!("todo: vscaledsd"); },
-        VSCALEDSS => { panic!("todo: vscaledss"); },
-        VSCATTERDD => { panic!("todo: vscatterdd"); },
-        VSCATTERDQ => { panic!("todo: vscatterdq"); },
-        VSCATTERQD => { panic!("todo: vscatterqd"); },
-        VSCATTERQQ => { panic!("todo: vscatterqq"); },
-        VSHUFF32X4 => { panic!("todo: vshuff32x4"); },
-        VSHUFF64X2 => { panic!("todo: vshuff64x2"); },
-        VSHUFI32X4 => { panic!("todo: vshufi32x4"); },
-        VSHUFI64X2 => { panic!("todo: vshufi64x2"); },
+        // vvv --- these don't exist..
+        VSCALEDPD => BehaviorDigest::empty(),
+        VSCALEDPS => BehaviorDigest::empty(),
+        VSCALEDSD => BehaviorDigest::empty(),
+        VSCALEDSS => BehaviorDigest::empty(),
+        VSCATTERDD => BehaviorDigest::empty(),
+        VSCATTERDQ => BehaviorDigest::empty(),
+        VSCATTERQD => BehaviorDigest::empty(),
+        VSCATTERQQ => BehaviorDigest::empty(),
+        // ^^^ --- these don't exist..
+        VSHUFF32X4 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VSHUFF64X2 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VSHUFI32X4 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VSHUFI64X2 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
 
         // AVX512DQ
         VCVTTPD2QQ => GENERAL_W_R,
@@ -4317,44 +5067,65 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VCVTPS2UQQ => GENERAL_W_R,
         VCVTUQQ2PD => GENERAL_W_R,
         VCVTUQQ2PS => GENERAL_W_R,
-        VEXTRACTF64X2 => { panic!("todo: vextractf64x2"); },
-        VEXTRACTI64X2 => { panic!("todo: vextracti64x2"); },
-        VFPCLASSPD => { panic!("todo: vfpclasspd"); },
-        VFPCLASSPS => { panic!("todo: vfpclassps"); },
-        VFPCLASSSD => { panic!("todo: vfpclasssd"); },
-        VFPCLASSSS => { panic!("todo: vfpclassss"); },
-        VINSERTF64X2 => { panic!("todo: vinsertf64x2"); },
-        VINSERTI64X2 => { panic!("todo: vinserti64x2"); },
-        VPMOVM2D => { panic!("todo: vpmovm2d"); },
-        VPMOVM2Q => { panic!("todo: vpmovm2q"); },
-        VPMOVB2D => { panic!("todo: vpmovb2d"); },
-        VPMOVQ2M => { panic!("todo: vpmovq2m"); },
-        VRANGEPD => { panic!("todo: vrangepd"); },
-        VRANGEPS => { panic!("todo: vrangeps"); },
-        VRANGESD => { panic!("todo: vrangesd"); },
-        VRANGESS => { panic!("todo: vrangess"); },
-        VREDUCEPD => { panic!("todo: vreducepd"); },
-        VREDUCEPS => { panic!("todo: vreduceps"); },
-        VREDUCESD => { panic!("todo: vreducesd"); },
-        VREDUCESS => { panic!("todo: vreducess"); },
+        VEXTRACTF64X2 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VEXTRACTI64X2 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VFPCLASSPD => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VFPCLASSPS => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VFPCLASSSD => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VFPCLASSSS => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VINSERTF64X2 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VINSERTI64X2 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPMOVM2D => GENERAL_W_R,
+        VPMOVM2Q => GENERAL_W_R,
+        VPMOVB2D => GENERAL_W_R,
+        VPMOVQ2M => GENERAL_W_R,
+        VRANGEPD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VRANGEPS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VRANGESD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VRANGESS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VREDUCEPD => GENERAL_W_R_R
+            .set_operand(2, Access::Read),
+        VREDUCEPS => GENERAL_W_R_R
+            .set_operand(2, Access::Read),
+        VREDUCESD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VREDUCESS => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
 
         // AVX512BW
-        VDBPSADBW => { panic!("todo: vdbpsadbw"); },
+        VDBPSADBW => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VMOVDQU8 => GENERAL_W_R,
         VMOVDQU16 => GENERAL_W_R,
         VPBLENDMB => GENERAL_W_R_R,
         VPBLENDMW => GENERAL_W_R_R,
-        VPCMPB => { panic!("todo: vpcmpb"); },
-        VPCMPUB => { panic!("todo: vpcmpub"); },
-        VPCMPW => { panic!("todo: vpcmpw"); },
-        VPCMPUW => { panic!("todo: vpcmpuw"); },
-        VPERMW => { panic!("todo: vpermw"); },
+        VPCMPB => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCMPUB => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCMPW => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPCMPUW => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPERMW => GENERAL_W_R_R,
         VPERMI2B => GENERAL_W_R_R,
         VPERMI2W => GENERAL_W_R_R,
-        VPMOVM2B => { panic!("todo: vpmovm2b"); },
-        VPMOVM2W => { panic!("todo: vpmovm2w"); },
-        VPMOVB2M => { panic!("todo: vpmovb2m"); },
-        VPMOVW2M => { panic!("todo: vpmovw2m"); },
+        VPMOVM2B => GENERAL_W_R,
+        VPMOVM2W => GENERAL_W_R,
+        VPMOVB2M => GENERAL_W_R,
+        VPMOVW2M => GENERAL_W_R,
         VPMOVSWB => GENERAL_W_R,
         VPMOVUSWB => GENERAL_W_R,
         VPSLLVW => GENERAL_W_R_R,
@@ -4366,114 +5137,167 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VPTESTMW => GENERAL_W_R_R,
 
         // AVX512CD
-        VPBROADCASTM => { panic!("todo: vpbroadcastm"); },
-        VPCONFLICTD => { panic!("todo: vpconflictd"); },
-        VPCONFLICTQ => { panic!("todo: vpconflictq"); },
+        // TODO: this one does not exist
+        VPBROADCASTM => BehaviorDigest::empty(),
+        VPCONFLICTD => GENERAL_W_R,
+        VPCONFLICTQ => GENERAL_W_R,
         VPLZCNTD => GENERAL_W_R,
         VPLZCNTQ => GENERAL_W_R,
 
-        KUNPCKBW => { panic!("todo: kunpckbw"); },
-        KUNPCKWD => { panic!("todo: kunpckwd"); },
-        KUNPCKDQ => { panic!("todo: kunpckdq"); },
+        KUNPCKBW => GENERAL_W_R_R,
+        KUNPCKWD => GENERAL_W_R_R,
+        KUNPCKDQ => GENERAL_W_R_R,
 
-        KADDB => { panic!("todo: kaddb"); },
-        KANDB => { panic!("todo: kandb"); },
-        KANDNB => { panic!("todo: kandnb"); },
-        KMOVB => { panic!("todo: kmovb"); },
-        KNOTB => { panic!("todo: knotb"); },
-        KORB => { panic!("todo: korb"); },
-        KORTESTB => { panic!("todo: kortestb"); },
-        KSHIFTLB => { panic!("todo: kshiftlb"); },
-        KSHIFTRB => { panic!("todo: kshiftrb"); },
-        KTESTB => { panic!("todo: ktestb"); },
-        KXNORB => { panic!("todo: kxnorb"); },
-        KXORB => { panic!("todo: kxorb"); },
-        KADDW => { panic!("todo: kaddw"); },
-        KANDW => { panic!("todo: kandw"); },
-        KANDNW => { panic!("todo: kandnw"); },
-        KMOVW => { panic!("todo: kmovw"); },
-        KNOTW => { panic!("todo: knotw"); },
-        KORW => { panic!("todo: korw"); },
-        KORTESTW => { panic!("todo: kortestw"); },
-        KSHIFTLW => { panic!("todo: kshiftlw"); },
-        KSHIFTRW => { panic!("todo: kshiftrw"); },
-        KTESTW => { panic!("todo: ktestw"); },
-        KXNORW => { panic!("todo: kxnorw"); },
-        KXORW => { panic!("todo: kxorw"); },
-        KADDD => { panic!("todo: kaddd"); },
-        KANDD => { panic!("todo: kandd"); },
-        KANDND => { panic!("todo: kandnd"); },
-        KMOVD => { panic!("todo: kmovd"); },
-        KNOTD => { panic!("todo: knotd"); },
-        KORD => { panic!("todo: kord"); },
-        KORTESTD => { panic!("todo: kortestd"); },
-        KSHIFTLD => { panic!("todo: kshiftld"); },
-        KSHIFTRD => { panic!("todo: kshiftrd"); },
-        KTESTD => { panic!("todo: ktestd"); },
-        KXNORD => { panic!("todo: kxnord"); },
-        KXORD => { panic!("todo: kxord"); },
-        KADDQ => { panic!("todo: kaddq"); },
-        KANDQ => { panic!("todo: kandq"); },
-        KANDNQ => { panic!("todo: kandnq"); },
-        KMOVQ => { panic!("todo: kmovq"); },
-        KNOTQ => { panic!("todo: knotq"); },
-        KORQ => { panic!("todo: korq"); },
-        KORTESTQ => { panic!("todo: kortestq"); },
-        KSHIFTLQ => { panic!("todo: kshiftlq"); },
-        KSHIFTRQ => { panic!("todo: kshiftrq"); },
-        KTESTQ => { panic!("todo: ktestq"); },
-        KXNORQ => { panic!("todo: kxnorq"); },
-        KXORQ => { panic!("todo: kxorq"); },
+        KADDB => GENERAL_W_R_R,
+        KANDB => GENERAL_W_R_R,
+        KANDNB => GENERAL_W_R_R,
+        KMOVB => GENERAL_W_R,
+        KNOTB => GENERAL_W_R,
+        KORB => GENERAL_W_R_R,
+        KORTESTB => GENERAL_R_R
+            .set_flags_access(Access::Write),
+        KSHIFTLB => GENERAL_W_R_R,
+        KSHIFTRB => GENERAL_W_R_R,
+        KTESTB => GENERAL_R_R
+            .set_flags_access(Access::Write),
+        KXNORB => GENERAL_W_R_R,
+        KXORB => GENERAL_W_R_R,
+        KADDW => GENERAL_W_R_R,
+        KANDW => GENERAL_W_R_R,
+        KANDNW => GENERAL_W_R_R,
+        KMOVW => GENERAL_W_R,
+        KNOTW => GENERAL_W_R,
+        KORW => GENERAL_W_R_R,
+        KORTESTW => GENERAL_W_R_R
+            .set_flags_access(Access::Write),
+        KSHIFTLW => GENERAL_W_R_R,
+        KSHIFTRW => GENERAL_W_R_R,
+        KTESTW => GENERAL_W_R_R
+            .set_flags_access(Access::Write),
+        KXNORW => GENERAL_W_R_R,
+        KXORW => GENERAL_W_R_R,
+        KADDD => GENERAL_W_R_R,
+        KANDD => GENERAL_W_R_R,
+        KANDND => GENERAL_W_R_R,
+        KMOVD => GENERAL_W_R,
+        KNOTD => GENERAL_W_R,
+        KORD => GENERAL_W_R_R,
+        KORTESTD => GENERAL_W_R_R
+            .set_flags_access(Access::Write),
+        KSHIFTLD => GENERAL_W_R_R,
+        KSHIFTRD => GENERAL_W_R_R,
+        KTESTD => GENERAL_W_R_R
+            .set_flags_access(Access::Write),
+        KXNORD => GENERAL_W_R_R,
+        KXORD => GENERAL_W_R_R,
+        KADDQ => GENERAL_W_R_R,
+        KANDQ => GENERAL_W_R_R,
+        KANDNQ => GENERAL_W_R_R,
+        KMOVQ => GENERAL_W_R,
+        KNOTQ => GENERAL_W_R,
+        KORQ => GENERAL_W_R_R,
+        KORTESTQ => GENERAL_W_R_R
+            .set_flags_access(Access::Write),
+        KSHIFTLQ => GENERAL_W_R_R,
+        KSHIFTRQ => GENERAL_W_R_R,
+        KTESTQ => GENERAL_W_R_R
+            .set_flags_access(Access::Write),
+        KXNORQ => GENERAL_W_R_R,
+        KXORQ => GENERAL_W_R_R,
 
         // AVX512ER
-        VEXP2PD => { panic!("todo: vexp2pd"); },
-        VEXP2PS => { panic!("todo: vexp2ps"); },
-        VEXP2SD => { panic!("todo: vexp2sd"); },
-        VEXP2SS => { panic!("todo: vexp2ss"); },
-        VRCP28PD => { panic!("todo: vrcp28pd"); },
-        VRCP28PS => { panic!("todo: vrcp28ps"); },
-        VRCP28SD => { panic!("todo: vrcp28sd"); },
-        VRCP28SS => { panic!("todo: vrcp28ss"); },
-        VRSQRT28PD => { panic!("todo: vrsqrt28pd"); },
-        VRSQRT28PS => { panic!("todo: vrsqrt28ps"); },
-        VRSQRT28SD => { panic!("todo: vrsqrt28sd"); },
-        VRSQRT28SS => { panic!("todo: vrsqrt28ss"); },
+        VEXP2PD => GENERAL_W_R,
+        VEXP2PS => GENERAL_W_R,
+        // TODO: well, this one isn't real.
+        VEXP2SD => BehaviorDigest::empty(),
+        // TODO: or this one.
+        VEXP2SS => BehaviorDigest::empty(),
+        VRCP28PD => GENERAL_W_R,
+        VRCP28PS => GENERAL_W_R,
+        VRCP28SD => GENERAL_W_R_R,
+        VRCP28SS => GENERAL_W_R_R,
+        VRSQRT28PD => GENERAL_W_R,
+        VRSQRT28PS => GENERAL_W_R,
+        VRSQRT28SD => GENERAL_W_R_R,
+        VRSQRT28SS => GENERAL_W_R_R,
 
         // AVX512PF
-        VGATHERPF0DPD => { panic!("todo: vgatherpf0dpd"); },
-        VGATHERPF0DPS => { panic!("todo: vgatherpf0dps"); },
-        VGATHERPF0QPD => { panic!("todo: vgatherpf0qpd"); },
-        VGATHERPF0QPS => { panic!("todo: vgatherpf0qps"); },
-        VGATHERPF1DPD => { panic!("todo: vgatherpf1dpd"); },
-        VGATHERPF1DPS => { panic!("todo: vgatherpf1dps"); },
-        VGATHERPF1QPD => { panic!("todo: vgatherpf1qpd"); },
-        VGATHERPF1QPS => { panic!("todo: vgatherpf1qps"); },
-        VSCATTERPF0DPD => { panic!("todo: vscatterpf0dpd"); },
-        VSCATTERPF0DPS => { panic!("todo: vscatterpf0dps"); },
-        VSCATTERPF0QPD => { panic!("todo: vscatterpf0qpd"); },
-        VSCATTERPF0QPS => { panic!("todo: vscatterpf0qps"); },
-        VSCATTERPF1DPD => { panic!("todo: vscatterpf1dpd"); },
-        VSCATTERPF1DPS => { panic!("todo: vscatterpf1dps"); },
-        VSCATTERPF1QPD => { panic!("todo: vscatterpf1qpd"); },
-        VSCATTERPF1QPS => { panic!("todo: vscatterpf1qps"); },
+        VGATHERPF0DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF0DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF0QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF0QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
 
         // MPX
-        BNDMK => { panic!("todo: bndmk"); },
-        BNDCL => { panic!("todo: bndcl"); },
-        BNDCU => { panic!("todo: bndcu"); },
-        BNDCN => { panic!("todo: bndcn"); },
-        BNDMOV => { panic!("todo: bndmov"); },
-        BNDLDX => { panic!("todo: bndldx"); },
-        BNDSTX => { panic!("todo: bndstx"); },
+        BNDMK => GENERAL_W_R,
+        BNDCL => GENERAL_R,
+        BNDCU => GENERAL_R,
+        BNDCN => GENERAL_R,
+        BNDMOV => GENERAL_W_R,
+        BNDLDX => GENERAL_W_R
+            .set_complex(true),
+        BNDSTX => GENERAL_W_R
+            .set_complex(true),
 
-        VGF2P8AFFINEQB => { panic!("todo: vgf2p8affineqb"); },
-        VGF2P8AFFINEINVQB => { panic!("todo: vgf2p8affineinvqb"); },
-        VPSHRDQ => { panic!("todo: vpshrdq"); },
-        VPSHRDD => { panic!("todo: vpshrdd"); },
-        VPSHRDW => { panic!("todo: vpshrdw"); },
-        VPSHLDQ => { panic!("todo: vpshldq"); },
-        VPSHLDD => { panic!("todo: vpshldd"); },
-        VPSHLDW => { panic!("todo: vpshldw"); },
+        VGF2P8AFFINEQB => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VGF2P8AFFINEINVQB => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPSHRDQ => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPSHRDD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPSHRDW => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPSHLDQ => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPSHLDD => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VPSHLDW => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
         VBROADCASTF32X8 => GENERAL_W_R,
         VBROADCASTF64X4 => GENERAL_W_R,
         VBROADCASTF32X4 => GENERAL_W_R,
@@ -4484,16 +5308,25 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VBROADCASTI32X4 => GENERAL_W_R,
         VBROADCASTI64X2 => GENERAL_W_R,
         VBROADCASTI32X2 => GENERAL_W_R,
-        VEXTRACTI32X8 => { panic!("todo: vextracti32x8"); },
-        VEXTRACTF32X8 => { panic!("todo: vextractf32x8"); },
-        VINSERTI32X8 => { panic!("todo: vinserti32x8"); },
-        VINSERTF32X8 => { panic!("todo: vinsertf32x8"); },
-        VINSERTI32X4 => { panic!("todo: vinserti32x4"); },
-        V4FNMADDSS => { panic!("todo: v4fnmaddss"); },
-        V4FNMADDPS => { panic!("todo: v4fnmaddps"); },
+        VEXTRACTI32X8 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VEXTRACTF32X8 => GENERAL_W_R
+            .set_operand(2, Access::Read),
+        VINSERTI32X8 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VINSERTF32X8 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        VINSERTI32X4 => GENERAL_W_R_R
+            .set_operand(3, Access::Read),
+        V4FNMADDSS => GENERAL_RW_R_R
+            .set_complex(true),
+        V4FNMADDPS => GENERAL_RW_R_R
+            .set_complex(true),
         VCVTNEPS2BF16 => GENERAL_W_R,
-        V4FMADDSS => { panic!("todo: v4fmaddss"); },
-        V4FMADDPS => { panic!("todo: v4fmaddps"); },
+        V4FMADDSS => GENERAL_RW_R_R
+            .set_complex(true),
+        V4FMADDPS => GENERAL_RW_R_R
+            .set_complex(true),
         VCVTNE2PS2BF16 => GENERAL_W_R_R,
         VP2INTERSECTD => GENERAL_W_R_R,
         VP2INTERSECTQ => GENERAL_W_R_R,
@@ -4503,26 +5336,26 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VPDPWSSD => GENERAL_RW_R_R,
         VPDPBUSDS => GENERAL_RW_R_R,
         VDPBF16PS => GENERAL_RW_R_R,
-        VPBROADCASTMW2D => { panic!("todo: vpbroadcastmw2d"); },
-        VPBROADCASTMB2Q => { panic!("todo: vpbroadcastmb2q"); },
-        VPMOVD2M => { panic!("todo: vpmovd2m"); },
+        VPBROADCASTMW2D => GENERAL_W_R,
+        VPBROADCASTMB2Q => GENERAL_W_R,
+        VPMOVD2M => GENERAL_W_R,
         VPMOVQD => GENERAL_W_R,
         VPMOVWB => GENERAL_W_R,
         VPMOVDB => GENERAL_W_R,
         VPMOVDW => GENERAL_W_R,
         VPMOVQB => GENERAL_W_R,
         VPMOVQW => GENERAL_W_R,
-        VGF2P8MULB => { panic!("todo: vgf2p8mulb"); },
-        VPMADD52HUQ => { panic!("todo: vpmadd52huq"); },
-        VPMADD52LUQ => { panic!("todo: vpmadd52luq"); },
-        VPSHUFBITQMB => { panic!("todo: vpshufbitqmb"); },
-        VPERMB => { panic!("todo: vpermb"); },
-        VPEXPANDD => { panic!("todo: vpexpandd"); },
-        VPEXPANDQ => { panic!("todo: vpexpandq"); },
+        VGF2P8MULB => GENERAL_RW_R_R,
+        VPMADD52HUQ => GENERAL_RW_R_R,
+        VPMADD52LUQ => GENERAL_RW_R_R,
+        VPSHUFBITQMB => GENERAL_W_R_R,
+        VPERMB => GENERAL_W_R_R,
+        VPEXPANDD => GENERAL_W_R,
+        VPEXPANDQ => GENERAL_W_R,
         VPABSQ => GENERAL_W_R,
         VPRORVD => GENERAL_W_R_R,
         VPRORVQ => GENERAL_W_R_R,
-        VPMULTISHIFTQB => { panic!("todo: vpmultishiftqb"); },
+        VPMULTISHIFTQB => GENERAL_W_R_R,
         VPERMT2B => GENERAL_RW_R_R,
         VPERMT2W => GENERAL_RW_R_R,
         VPSHRDVQ => GENERAL_RW_R_R,
@@ -4544,21 +5377,33 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VSCALEFPS => GENERAL_W_R_R,
         VSCALEFPD => GENERAL_W_R_R,
         VPDPBUSD => GENERAL_W_R_R,
-        VCVTUSI2SD => { panic!("todo: vcvtusi2sd"); },
-        VCVTUSI2SS => { panic!("todo: vcvtusi2ss"); },
-        VPXORD => { panic!("todo: vpxord"); },
-        VPXORQ => { panic!("todo: vpxorq"); },
-        VPORD => { panic!("todo: vpord"); },
-        VPORQ => { panic!("todo: vporq"); },
-        VPANDND => { panic!("todo: vpandnd"); },
-        VPANDNQ => { panic!("todo: vpandnq"); },
-        VPANDD => { panic!("todo: vpandd"); },
-        VPANDQ => { panic!("todo: vpandq"); },
+        VCVTUSI2SD => GENERAL_W_R_R,
+        VCVTUSI2SS => GENERAL_W_R_R,
+        VPXORD => GENERAL_W_R_R,
+        VPXORQ => GENERAL_W_R_R,
+        VPORD => GENERAL_W_R_R,
+        VPORQ => GENERAL_W_R_R,
+        VPANDND => GENERAL_W_R_R,
+        VPANDNQ => GENERAL_W_R_R,
+        VPANDD => GENERAL_W_R_R,
+        VPANDQ => GENERAL_W_R_R,
 
-        PSMASH => { panic!("todo: psmash"); },
-        PVALIDATE => { panic!("todo: pvalidate"); },
-        RMPADJUST => { panic!("todo: rmpadjust"); },
-        RMPUPDATE => { panic!("todo: rmpupdate"); },
+        PSMASH => BehaviorDigest::empty()
+            .set_pl0()
+            .set_flags_access(Access::Write)
+            .set_complex(true),
+        PVALIDATE => BehaviorDigest::empty()
+            .set_pl0()
+            .set_flags_access(Access::Write)
+            .set_complex(true),
+        RMPADJUST => BehaviorDigest::empty()
+            .set_pl0()
+            .set_flags_access(Access::Write)
+            .set_complex(true),
+        RMPUPDATE => BehaviorDigest::empty()
+            .set_pl0()
+            .set_flags_access(Access::Write)
+            .set_complex(true),
 
     };
     Some(behavior)
