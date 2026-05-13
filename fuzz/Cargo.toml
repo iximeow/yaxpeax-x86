@@ -58,3 +58,9 @@ name = "small_reg_is_always_old_bank_if_possible"
 path = "fuzz_targets/small_reg_is_always_old_bank_if_possible.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "behavior_does_not_panic"
+path = "fuzz_targets/behavior_does_not_panic.rs"
+test = false
+doc = false

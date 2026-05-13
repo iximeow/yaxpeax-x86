@@ -131,7 +131,28 @@ impl Instruction {
             }
         };
         if behavior.is_nontrivial() {
-            if self.opcode() == Opcode::MULX {
+            if self.opcode() == Opcode::EXTRQ {
+                if self.operand_count > 2 {
+                    behavior = behavior
+                        .set_operand(2, Access::Read);
+                }
+            } else if self.opcode() == Opcode::INSERTQ {
+                if self.operand_count > 2 {
+                    behavior = behavior
+                        .set_operand(2, Access::Read)
+                        .set_operand(3, Access::Read);
+                }
+            } else if self.opcode() == Opcode::RETURN {
+                if self.operand_count != 0 {
+                    behavior = behavior
+                        .set_operand(0, Access::Read);
+                }
+            } else if self.opcode() == Opcode::RETF {
+                if self.operand_count != 0 {
+                    behavior = behavior
+                        .set_operand(0, Access::Read);
+                }
+            } else if self.opcode() == Opcode::MULX {
                 // `mulx` is always vex-encoded.
                 if self.prefixes.vex_unchecked().w() {
                     behavior = behavior
@@ -185,12 +206,6 @@ impl Instruction {
             }
         }
 
-        if let Some(evex) = self.prefixes.evex() {
-            if evex.mask_reg() != 0 {
-                behavior = behavior
-                    .set_operand(0, Access::ReadWrite);
-            }
-        }
         InstBehavior {
             inst: self,
             behavior
@@ -372,7 +387,7 @@ pub enum PrivilegeLevel {
 #[derive(Copy, Clone)]
 pub struct InstOperands<'inst> {
     inst: InstBehavior<'inst>,
-    implicit_ops: &'static [(Operand, Access)],
+    implicit_ops: &'static [ImplicitOperand],
 }
 
 impl<'inst> InstOperands<'inst> {
@@ -421,14 +436,21 @@ impl<'inst> Iterator for AccessIter<'inst> {
                 // we're going to keep searching through the loop.
                 self.next += 1;
                 if let Some(acc) = self.operands.inst.flags_access() {
-                    return Some((Operand::Register { reg: RegSpec::rflags() }, acc));
+                    if acc != Access::None {
+                        return Some((Operand::Register { reg: RegSpec::rflags() }, acc));
+                    }
                 }
             } else {
                 let implicit_idx = self.next - 1;
                 self.next += 1;
 
                 if let Some(entry) = self.operands.implicit_ops.get(implicit_idx as usize) {
-                    return Some(entry.clone());
+                    let access = if entry.write {
+                        Access::Write
+                    } else {
+                        Access::Read
+                    };
+                    return Some((entry.into_operand(), access));
                 } else {
                     // we've gotten to the end of implicit operands. flip to explicit operands,
                     // reset `next`, and continue searching.
@@ -468,12 +490,43 @@ pub struct OperandIter<'inst> {
 /// implicit operands to date are register reads/writes, and simple dereference of a register (such
 /// as `[rsp - 8] = ...` in a push).
 // TODO: this needs accessors for the elements or something.
+#[derive(Copy, Clone)]
 pub struct ImplicitOperand {
     // TODO: not suitable for public API!
     spec: OperandSpec,
     reg: RegSpec,
     disp: i32,
     write: bool,
+}
+
+impl ImplicitOperand {
+    fn into_operand(self) -> Operand {
+        match self.spec {
+            OperandSpec::RegRRR => {
+                Operand::Register { reg: self.reg }
+            },
+            OperandSpec::Deref => {
+                Operand::MemDeref { base: self.reg }
+            }
+            OperandSpec::Disp => {
+                Operand::Disp { base: self.reg, disp: self.disp }
+            }
+            OperandSpec::Deref_rdi => {
+                Operand::MemDeref { base: RegSpec::rdi() }
+            }
+            // from `xlat` specifically... `base` specifies rbx, infer ax as the index here.
+            OperandSpec::MemIndexScale => {
+                Operand::MemBaseIndexScale {
+                    base: self.reg,
+                    index: RegSpec::al(),
+                    scale: 1
+                }
+            }
+            spec => {
+                panic!("unexpected implicit op: {:?}", spec);
+            }
+        }
+    }
 }
 
 impl<'inst> Iterator for OperandIter<'inst> {
@@ -525,56 +578,33 @@ impl<'inst> InstBehavior<'inst> {
         }
 
         // TODO: all of these should be a `set_complex` bit.
-        if self.inst.opcode == Opcode::WRMSR {
-            Some(ComplexOp::WRMSR)
-        } else if self.inst.opcode == Opcode::PREFETCHNTA {
-            Some(ComplexOp::PREFETCHNTA)
-        } else if self.inst.opcode == Opcode::PREFETCH2 {
-            Some(ComplexOp::PREFETCHT2)
-        } else if self.inst.opcode == Opcode::PREFETCH1 {
-            Some(ComplexOp::PREFETCHT1)
-        } else if self.inst.opcode == Opcode::PREFETCH0 {
-            Some(ComplexOp::PREFETCHT0)
-        } else if self.inst.opcode == Opcode::BT && self.inst.operands[0] != OperandSpec::RegMMM {
-            Some(ComplexOp::BT)
-        } else if self.inst.opcode == Opcode::BTS && self.inst.operands[0] != OperandSpec::RegMMM {
-            Some(ComplexOp::BTS)
-        } else if self.inst.opcode == Opcode::BTR && self.inst.operands[0] != OperandSpec::RegMMM {
-            Some(ComplexOp::BTR)
-        } else if self.inst.opcode == Opcode::BTC && self.inst.operands[0] != OperandSpec::RegMMM {
-            Some(ComplexOp::BTC)
-        } else if self.inst.opcode == Opcode::VPGATHERDD {
-            Some(ComplexOp::VPGATHERDD)
-        } else if self.inst.opcode == Opcode::VPGATHERDQ {
-            Some(ComplexOp::VPGATHERDQ)
-        } else if self.inst.opcode == Opcode::VPGATHERQD {
-            Some(ComplexOp::VPGATHERQD)
-        } else if self.inst.opcode == Opcode::VPGATHERQQ {
-            Some(ComplexOp::VPGATHERQQ)
-        } else if self.inst.opcode == Opcode::VGATHERDPD {
-            Some(ComplexOp::VGATHERDPD)
-        } else if self.inst.opcode == Opcode::VGATHERDPS {
-            Some(ComplexOp::VGATHERDPS)
-        } else if self.inst.opcode == Opcode::VGATHERQPD {
-            Some(ComplexOp::VGATHERQPD)
-        } else if self.inst.opcode == Opcode::VGATHERQPS {
-            Some(ComplexOp::VGATHERQPS)
-        } else if self.inst.opcode == Opcode::VPSCATTERDD {
-            Some(ComplexOp::VPSCATTERDD)
-        } else if self.inst.opcode == Opcode::VPSCATTERDQ {
-            Some(ComplexOp::VPSCATTERDQ)
-        } else if self.inst.opcode == Opcode::VPSCATTERQD {
-            Some(ComplexOp::VPSCATTERQD)
-        } else if self.inst.opcode == Opcode::VPSCATTERQQ {
-            Some(ComplexOp::VPSCATTERQQ)
-        } else if self.inst.opcode == Opcode::MOVDIR64B {
-            Some(ComplexOp::MOVDIR64B)
-        } else if self.inst.opcode == Opcode::ENQCMD {
-            Some(ComplexOp::ENQCMD)
-        } else if self.inst.opcode == Opcode::ENQCMDS {
-            Some(ComplexOp::ENQCMDS)
+        if self.inst.opcode == Opcode::BT {
+            if self.inst.operands[0] != OperandSpec::RegMMM {
+                Some(ComplexOp::BT)
+            } else {
+                None
+            }
+        } else if self.inst.opcode == Opcode::BTS {
+            if self.inst.operands[0] != OperandSpec::RegMMM {
+                Some(ComplexOp::BTS)
+            } else {
+                None
+            }
+        } else if self.inst.opcode == Opcode::BTR {
+            if self.inst.operands[0] != OperandSpec::RegMMM {
+                Some(ComplexOp::BTR)
+            } else {
+                None
+            }
+        } else if self.inst.opcode == Opcode::BTC {
+            if self.inst.operands[0] != OperandSpec::RegMMM {
+                Some(ComplexOp::BTC)
+            } else {
+                None
+            }
         } else {
-            None
+            let comp: ComplexOp = unsafe { core::mem::transmute::<Opcode, ComplexOp>(self.inst.opcode) };
+            Some(comp)
         }
     }
 
@@ -593,11 +623,15 @@ impl<'inst> InstBehavior<'inst> {
             return Err(op);
         }
 
+        let implicit_ops = if let Some(ops) = self.implicit_oplist() {
+            ops
+        } else {
+            &[]
+        };
+
         Ok(InstOperands {
             inst: *self,
-            // TODO: actually select an implicit operands array based on... something from the
-            // instruction behavior, maybe?
-            implicit_ops: &[],
+            implicit_ops,
         })
     }
 
@@ -652,6 +686,92 @@ impl<'inst> InstBehavior<'inst> {
                 }
                 OperandSpec::Deref_esi => {
                     v.get_register(RegSpec::esi())
+                }
+                OperandSpec::Disp => {
+                    let base = v.get_register(inst.regs[1]);
+                    base.map(|addr| addr.wrapping_add(inst.disp as i32 as i64 as u64))
+                }
+                OperandSpec::Disp_mask => {
+                    let base = v.get_register(inst.regs[1]);
+                    base.map(|addr| addr.wrapping_add(inst.disp as i32 as i64 as u64))
+                }
+                OperandSpec::MemIndexScale => {
+                    let index = v.get_register(inst.regs[2]);
+                    index.map(|addr| {
+                        addr
+                            .wrapping_mul(inst.scale as u64)
+                    })
+                }
+                OperandSpec::MemIndexScale_mask => {
+                    let index = v.get_register(inst.regs[2]);
+                    index.map(|addr| {
+                        addr
+                            .wrapping_mul(inst.scale as u64)
+                    })
+                }
+                OperandSpec::MemIndexScaleDisp => {
+                    let index = v.get_register(inst.regs[2]);
+                    index.map(|addr| {
+                        addr
+                            .wrapping_mul(inst.scale as u64)
+                            .wrapping_add(inst.disp as i32 as i64 as u64)
+                    })
+                }
+                OperandSpec::MemIndexScaleDisp_mask => {
+                    let index = v.get_register(inst.regs[2]);
+                    index.map(|addr| {
+                        addr
+                            .wrapping_mul(inst.scale as u64)
+                            .wrapping_add(inst.disp as i32 as i64 as u64)
+                    })
+                }
+                OperandSpec::MemBaseIndexScale => {
+                    let base = v.get_register(inst.regs[1]);
+                    let index = v.get_register(inst.regs[2]);
+                    base.and_then(|base| {
+                        index.map(|index| {
+                            base
+                                .wrapping_add(index.wrapping_mul(inst.scale as u64))
+                        })
+                    })
+                }
+                OperandSpec::MemBaseIndexScale_mask => {
+                    let base = v.get_register(inst.regs[1]);
+                    let index = v.get_register(inst.regs[2]);
+                    base.and_then(|base| {
+                        index.map(|index| {
+                            base
+                                .wrapping_add(index.wrapping_mul(inst.scale as u64))
+                        })
+                    })
+                }
+                OperandSpec::MemBaseIndexScaleDisp => {
+                    let base = v.get_register(inst.regs[1]);
+                    let index = v.get_register(inst.regs[2]);
+                    base.and_then(|base| {
+                        index.map(|index| {
+                            base
+                                .wrapping_add(index.wrapping_mul(inst.scale as u64))
+                                .wrapping_add(inst.disp as i32 as i64 as u64)
+                        })
+                    })
+                }
+                OperandSpec::MemBaseIndexScaleDisp_mask => {
+                    let base = v.get_register(inst.regs[1]);
+                    let index = v.get_register(inst.regs[2]);
+                    base.and_then(|base| {
+                        index.map(|index| {
+                            base
+                                .wrapping_add(index.wrapping_mul(inst.scale as u64))
+                                .wrapping_add(inst.disp as i32 as i64 as u64)
+                        })
+                    })
+                }
+                OperandSpec::DispU64 => {
+                    Some(inst.disp)
+                }
+                OperandSpec::DispU32 => {
+                    Some(inst.disp as u32 as u64)
                 }
                 other => {
                     panic!("not-yet-handled memory operand: {:?}", other);
@@ -761,16 +881,22 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::RegRRR_maskmerge_sae |
                     OperandSpec::RegRRR_maskmerge_sae_noround => {
                         v.register_read(self.inst.regs[0]);
-                        v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        if self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                     }
                     OperandSpec::RegMMM_maskmerge |
                     OperandSpec::RegMMM_maskmerge_sae_noround => {
                         v.register_read(self.inst.regs[1]);
-                        v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        if self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                     }
                     OperandSpec::RegVex_maskmerge => {
                         v.register_read(self.inst.regs[3]);
-                        v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        if self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                     }
                     OperandSpec::ImmI8 |
                     OperandSpec::ImmU8 |
@@ -781,11 +907,14 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::ImmInDispField => {
                         // no register/memory access to report.
                     }
-                    _other => {
+                    other => {
                         // compute effective address...
                         let addr = compute_addr(v, &self.inst, op_spec);
                         let size = self.inst.mem_size().expect("memory operand implies memory access size")
                             .bytes_size().expect("non-complex instructions have well-defined bytes_size()");
+                        if other.is_masked() && self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                         // `lea` *just* computes the effective address, which we've done above.
                         // othrwise, the instruction will actually read this memory operand.
                         if self.inst.opcode != Opcode::LEA {
@@ -826,16 +955,22 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::RegRRR_maskmerge |
                     OperandSpec::RegRRR_maskmerge_sae |
                     OperandSpec::RegRRR_maskmerge_sae_noround => {
-                        v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        if self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                         v.register_write(self.inst.regs[0]);
                     }
                     OperandSpec::RegMMM_maskmerge |
                     OperandSpec::RegMMM_maskmerge_sae_noround => {
-                        v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        if self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                         v.register_write(self.inst.regs[1]);
                     }
                     OperandSpec::RegVex_maskmerge => {
-                        v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        if self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                         v.register_write(self.inst.regs[3]);
                     }
                     OperandSpec::ImmI8 |
@@ -847,11 +982,14 @@ impl<'inst> InstBehavior<'inst> {
                     OperandSpec::ImmInDispField => {
                         // no register/memory access to report.
                     }
-                    _other => {
+                    other => {
                         // compute effective address...
                         let addr = compute_addr(v, &self.inst, op_spec);
                         let size = self.inst.mem_size().expect("memory operand implies memory access size")
                             .bytes_size().expect("non-complex instructions have well-defined bytes_size()");
+                        if other.is_masked() && self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
+                            v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
+                        }
                         // no lea check necessary: the memory access is coded as a read and no
                         // instruction has a similar "fake" memory write.
                         v.memory_write(addr, size as u32);
@@ -928,11 +1066,11 @@ impl Access {
         LUT[bits as usize]
     }
 
-    fn is_read(&self) -> bool {
+    pub fn is_read(&self) -> bool {
         *self as u8 & 0b01 != 0
     }
 
-    fn is_write(&self) -> bool {
+    pub fn is_write(&self) -> bool {
         *self as u8 & 0b10 != 0
     }
 }
@@ -1166,74 +1304,267 @@ impl BehaviorDigest {
 /// *ptr |= (1 << bit)
 /// ```
 #[non_exhaustive]
+#[repr(u32)] // same repr as `Opcode`
 #[derive(Copy, Clone, Debug)]
 pub enum ComplexOp {
+    /// TODO: document,
+    IN = (Opcode::IN as u32),
+    OUT = (Opcode::OUT as u32),
+
+    IRET = (Opcode::IRET as u32),
+    IRETD = (Opcode::IRETD as u32),
+    IRETQ = (Opcode::IRETQ as u32),
+
+    VMREAD = (Opcode::VMREAD as u32),
+    VMWRITE = (Opcode::VMWRITE as u32),
+    VMCLEAR = (Opcode::VMCLEAR as u32),
+    VMCALL = (Opcode::VMCALL as u32),
+    VMLAUNCH = (Opcode::VMLAUNCH as u32),
+    VMRESUME = (Opcode::VMRESUME as u32),
+    PCONFIG = (Opcode::PCONFIG as u32),
+    ENCLS = (Opcode::ENCLS as u32),
+    ENCLV = (Opcode::ENCLV as u32),
+    XGETBV = (Opcode::XGETBV as u32),
+    XSETBV = (Opcode::XSETBV as u32),
+    VMFUNC = (Opcode::VMFUNC as u32),
+    XEND = (Opcode::XEND as u32),
+    XTEST = (Opcode::XTEST as u32),
+    ENCLU = (Opcode::ENCLU as u32),
+    RDPKRU = (Opcode::RDPKRU as u32),
+    WRPKRU = (Opcode::WRPKRU as u32),
+    CLZERO = (Opcode::CLZERO as u32),
+
     /// rdmsr/wrmsr are considered "complex" for reasons described in the enum doc comment.
-    RDMSR,
-    WRMSR,
+    RDMSR = (Opcode::RDMSR as u32),
+    WRMSR = (Opcode::WRMSR as u32),
 
     /// string instructions are considered "complex" for reasons described in the enum doc comment.
-    MOVS,
-    STOS,
-    LODS,
-    SCAS,
-    CMPS,
+    MOVS = (Opcode::MOVS as u32),
+    STOS = (Opcode::STOS as u32),
+    LODS = (Opcode::LODS as u32),
+    SCAS = (Opcode::SCAS as u32),
+    CMPS = (Opcode::CMPS as u32),
 
     /// prefetch instructions are considered "complex" for reasons described in the enum doc
     /// comment.
-    PREFETCHNTA,
-    PREFETCHT2,
-    PREFETCHT1,
-    PREFETCHT0,
+    PREFETCHNTA = (Opcode::PREFETCHNTA as u32),
+    PREFETCHT2 = (Opcode::PREFETCH2 as u32),
+    PREFETCHT1 = (Opcode::PREFETCH1 as u32),
+    PREFETCHT0 = (Opcode::PREFETCH0 as u32),
 
     /// scatter/gather instructions are considered "complex" for reasons described in the enum doc
     /// comment.
-    VPGATHERDD,
-    VPGATHERDQ,
-    VPGATHERQD,
-    VPGATHERQQ,
-    VGATHERDPD,
-    VGATHERDPS,
-    VGATHERQPD,
-    VGATHERQPS,
+    VPGATHERDD = (Opcode::VPGATHERDD as u32),
+    VPGATHERDQ = (Opcode::VPGATHERDQ as u32),
+    VPGATHERQD = (Opcode::VPGATHERQD as u32),
+    VPGATHERQQ = (Opcode::VPGATHERQQ as u32),
+    VGATHERDPD = (Opcode::VGATHERDPD as u32),
+    VGATHERDPS = (Opcode::VGATHERDPS as u32),
+    VGATHERQPD = (Opcode::VGATHERQPD as u32),
+    VGATHERQPS = (Opcode::VGATHERQPS as u32),
 
-    VPSCATTERDD,
-    VPSCATTERDQ,
-    VPSCATTERQD,
-    VPSCATTERQQ,
+    VPSCATTERDD = (Opcode::VPSCATTERDD as u32),
+    VPSCATTERDQ = (Opcode::VPSCATTERDQ as u32),
+    VPSCATTERQD = (Opcode::VPSCATTERQD as u32),
+    VPSCATTERQQ = (Opcode::VPSCATTERQQ as u32),
 
     /// bit test/set/reset/complement instructions are conditionally complex depending on their
     /// destination operand form, as described in the enum doc comment.
-    BT,
-    BTC,
-    BTR,
-    BTS,
+    BT = (Opcode::BT as u32),
+    BTC = (Opcode::BTC as u32),
+    BTR = (Opcode::BTR as u32),
+    BTS = (Opcode::BTS as u32),
 
     /// TODO: document
-    SYSCALL,
-    SYSRET,
+    SYSCALL = (Opcode::SYSCALL as u32),
+    SYSRET = (Opcode::SYSRET as u32),
 
     /// TODO: document
-    SWAPGS,
-    RDFSBASE,
-    WRFSBASE,
-    RDGSBASE,
-    WRGSBASE,
+    SYSENTER = (Opcode::SYSENTER as u32),
+    SYSEXIT = (Opcode::SYSEXIT as u32),
+
+    /// TODO: document
+    STR = (Opcode::STR as u32),
+    LTR = (Opcode::LTR as u32),
+    SLDT = (Opcode::SLDT as u32),
+    LLDT = (Opcode::LLDT as u32),
+    RSM = (Opcode::RSM as u32),
+
+    /// TODO: document
+    CLGI = (Opcode::CLGI as u32),
+    STGI = (Opcode::STGI as u32),
+    SKINIT = (Opcode::SKINIT as u32),
+    VMLOAD = (Opcode::VMLOAD as u32),
+    VMMCALL = (Opcode::VMMCALL as u32),
+    VMSAVE = (Opcode::VMSAVE as u32),
+    VMRUN = (Opcode::VMRUN as u32),
+    VMPTRLD = (Opcode::VMPTRLD as u32),
+    VMPTRST = (Opcode::VMPTRST as u32),
+
+    /// TODO: document
+    VZEROUPPER = (Opcode::VZEROUPPER as u32),
+    VZEROALL = (Opcode::VZEROALL as u32),
+
+    /// TODO: document
+    SWAPGS = (Opcode::SWAPGS as u32),
+    RDFSBASE = (Opcode::RDFSBASE as u32),
+    WRFSBASE = (Opcode::WRFSBASE as u32),
+    RDGSBASE = (Opcode::RDGSBASE as u32),
+    WRGSBASE = (Opcode::WRGSBASE as u32),
 
     /// movdir64b is considered complex primarily because it has two memory operands, but the
     /// destination operand (first, in Intel syntax) is expressly *not* a memory operand so far as
     /// syntax is concerned.
-    MOVDIR64B,
+    MOVDIR64B = (Opcode::MOVDIR64B as u32),
 
     /// TODO: document
-    ENQCMD,
-    ENQCMDS,
+    ENQCMD = (Opcode::ENQCMD as u32),
+    ENQCMDS = (Opcode::ENQCMDS as u32),
 
     /// TODO: document
-    V4FNMADDSS,
-    V4FNMADDPS,
-    V4FMADDSS,
-    V4FMADDPS,
+    V4FNMADDSS = (Opcode::V4FNMADDSS as u32),
+    V4FNMADDPS = (Opcode::V4FNMADDPS as u32),
+    V4FMADDSS = (Opcode::V4FMADDSS as u32),
+    V4FMADDPS = (Opcode::V4FMADDPS as u32),
+
+    /// TODO: document
+    FRSTOR = (Opcode::FRSTOR as u32),
+    FLDENV = (Opcode::FLDENV as u32),
+    FNSTENV = (Opcode::FNSTENV as u32),
+    FNSAVE = (Opcode::FNSAVE as u32),
+    FNSTCW = (Opcode::FNSTCW as u32),
+    FNSTSW = (Opcode::FNSTSW as u32),
+    FXSAVE = (Opcode::FXSAVE as u32),
+    FXRSTOR = (Opcode::FXRSTOR as u32),
+    LDMXCSR = (Opcode::LDMXCSR as u32),
+    VLDMXCSR = (Opcode::VLDMXCSR as u32),
+    STMXCSR = (Opcode::STMXCSR as u32),
+    VSTMXCSR = (Opcode::VSTMXCSR as u32),
+    XSAVE = (Opcode::XSAVE as u32),
+    XSAVEC = (Opcode::XSAVEC as u32),
+    XSAVES = (Opcode::XSAVES as u32),
+    XSAVEC64 = (Opcode::XSAVEC64 as u32),
+    XSAVES64 = (Opcode::XSAVES64 as u32),
+    XRSTOR = (Opcode::XRSTOR as u32),
+    XRSTORS = (Opcode::XRSTORS as u32),
+    XRSTORS64 = (Opcode::XRSTORS64 as u32),
+    XSAVEOPT = (Opcode::XSAVEOPT as u32),
+
+    /// TODO: document
+    MONITOR = (Opcode::MONITOR as u32),
+    MONITORX = (Opcode::MONITORX as u32),
+    MWAIT = (Opcode::MWAIT as u32),
+    MWAITX = (Opcode::MWAITX as u32),
+
+    /// TODO: document
+    XABORT = (Opcode::XABORT as u32),
+    XBEGIN = (Opcode::XBEGIN as u32),
+
+    /// TODO: document
+    RDPRU = (Opcode::RDPRU as u32),
+
+    /// TODO: document
+    HRESET = (Opcode::HRESET as u32),
+
+    /// TODO: document
+    TPAUSE = (Opcode::TPAUSE as u32),
+    UMONITOR = (Opcode::UMONITOR as u32),
+    UMWAIT = (Opcode::UMWAIT as u32),
+
+    /// TODO: document
+    VMXON = (Opcode::VMXON as u32),
+    VMXOFF = (Opcode::VMXOFF as u32),
+
+    /// TODO: document
+    UIRET = (Opcode::UIRET as u32),
+    TESTUI = (Opcode::TESTUI as u32),
+    CLUI = (Opcode::CLUI as u32),
+    STUI = (Opcode::STUI as u32),
+    SENDUIPI = (Opcode::SENDUIPI as u32),
+
+    /// TODO: document MPX
+    BNDLDX = (Opcode::BNDLDX as u32),
+    BNDSTX = (Opcode::BNDSTX as u32),
+
+    /// TODO: document TDX
+    TDCALL = (Opcode::TDCALL as u32),
+    SEAMRET = (Opcode::SEAMRET as u32),
+    SEAMOPS = (Opcode::SEAMOPS as u32),
+    SEAMCALL = (Opcode::SEAMCALL as u32),
+
+    /// TODO: document PSMASH
+    PSMASH = (Opcode::PSMASH as u32),
+    PVALIDATE = (Opcode::PVALIDATE as u32),
+    RMPADJUST = (Opcode::RMPADJUST as u32),
+    RMPUPDATE = (Opcode::RMPUPDATE as u32),
+
+    /// TODO: document CET
+    WRUSS = (Opcode::WRUSS as u32),
+    WRSS = (Opcode::WRSS as u32),
+    INCSSP = (Opcode::INCSSP as u32),
+    SAVEPREVSSP = (Opcode::SAVEPREVSSP as u32),
+    SETSSBSY = (Opcode::SETSSBSY as u32),
+    CLRSSBSY = (Opcode::CLRSSBSY as u32),
+    RSTORSSP = (Opcode::RSTORSSP as u32),
+    ENDBR64 = (Opcode::ENDBR64 as u32),
+    ENDBR32 = (Opcode::ENDBR32 as u32),
+
+    /// TODO: document PTWRITE
+    PTWRITE = (Opcode::PTWRITE as u32),
+    /*
+        VGATHERPF0DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF0DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF0QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF0QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VGATHERPF1QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF0QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1DPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1DPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1QPD => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+        VSCATTERPF1QPS => BehaviorDigest::empty()
+            .set_operand(0, Access::Read)
+            .set_complex(true),
+
+        // MPX
+     *
+
+        */
 }
 
 /// a visitor for collecting architectural accesses for an `Instruction`. used with
@@ -1921,7 +2252,7 @@ static ENTER_OPS: &'static [ImplicitOperand] = &[
         write: true,
     },
     ImplicitOperand {
-        spec: OperandSpec::Deref,
+        spec: OperandSpec::Disp,
         reg: RegSpec::rsp(),
         disp: -8i32,
         write: false,
@@ -2332,7 +2663,7 @@ static CALLF_OPS: &'static [ImplicitOperand] = &[
 
 static RETF_OPS: &'static [ImplicitOperand] = &[
     ImplicitOperand {
-        spec: OperandSpec::Disp,
+        spec: OperandSpec::Deref,
         reg: RegSpec::rsp(),
         disp: 0i32,
         write: false,
@@ -3117,8 +3448,6 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 73] = [
     ENTER_OPS,
 ];
 
-#[inline(never)]
-#[unsafe(no_mangle)]
 fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
     use Opcode::*;
     if opc == &MUL || opc == &IMUL || opc == &DIV || opc == &IDIV || opc == &NOP || opc == &CMPXCHG {
@@ -3277,7 +3606,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_complex(true),
         RETF => BehaviorDigest::empty()
             .set_pl_any()
-            .set_complex(true)
+            .set_nontrivial(true)
             .set_implicit_ops(RETF_IDX),
         ENTER => BehaviorDigest::empty()
             .set_implicit_ops(ENTER_IDX)
@@ -3290,7 +3619,7 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         MOV => GENERAL_RW_R,
         RETURN => BehaviorDigest::empty()
             .set_implicit_ops(RETURN_IDX)
-            .set_complex(true)
+            .set_nontrivial(true)
             .set_pl_any(),
         PUSHF => BehaviorDigest::empty()
             .set_implicit_ops(PUSHF_IDX)
@@ -3712,8 +4041,10 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         MOVNTI => GENERAL_W_R,
         MOVNTPS => GENERAL_W_R,
         MOVNTPD => GENERAL_W_R,
-        EXTRQ => GENERAL_RW_R,
-        INSERTQ => GENERAL_RW_R,
+        EXTRQ => GENERAL_RW_R
+            .set_nontrivial(true),
+        INSERTQ => GENERAL_RW_R
+            .set_nontrivial(true),
         MOVNTSS => GENERAL_W_R,
         MOVNTSD => GENERAL_W_R,
         MOVNTQ => GENERAL_W_R,
@@ -4571,8 +4902,9 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         FLD1 => BehaviorDigest::empty()
             .set_pl_any(),
         FLDCW => GENERAL_R,
-        FLDENV => BehaviorDigest::empty()
-            .set_pl_any(),
+        FLDENV => GENERAL_R
+            .set_pl_any()
+            .set_complex(true),
         // TODO: fpu stack write
         FLDL2E => BehaviorDigest::empty()
             .set_pl_any(),
