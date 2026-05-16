@@ -7243,8 +7243,6 @@ fn read_operands<
         OperandCase::ModRM_0x0f0d => {
             let r = instruction.regs[0].num & 0b111;
 
-            let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
-
             match r {
                 1 => {
                     instruction.opcode = Opcode::PREFETCHW;
