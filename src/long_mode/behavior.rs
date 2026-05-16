@@ -29,9 +29,9 @@ pub struct InstBehavior<'inst> {
 
 impl Instruction {
     pub fn behavior<'inst>(&'inst self) -> InstBehavior<'inst> {
-        let mut behavior = if let Some(behavior) = opcode2behavior(&self.opcode) {
-            behavior
-        } else {
+        let mut behavior = opcode2behavior(&self.opcode);
+
+        if behavior.is_nontrivial() {
             // mul and imul are incredibly frustrating, with multiple behaviors corresponding to
             // different encodings with different opcode counts. fix up behaviors here..
             if self.opcode == Opcode::MUL || (self.opcode == Opcode::IMUL && self.operand_count == 1) {
@@ -46,24 +46,18 @@ impl Instruction {
                     4 => MUL_IDX_1OP_DWORD,
                     _ /* 8 */ => MUL_IDX_1OP_QWORD,
                 };
-                BehaviorDigest::empty()
-                    .set_pl_any()
-                    .set_flags_access(Access::Write)
-                    .set_operand(0, Access::Read)
-                    .set_implicit_ops(ops_idx)
+                behavior = behavior
+                    .set_implicit_ops(ops_idx);
             } else if self.opcode == Opcode::IMUL {
-                let base_digest = BehaviorDigest::empty()
-                    .set_pl_any()
-                    .set_flags_access(Access::Write);
                 if self.operand_count == 2 {
-                    base_digest
+                    behavior = behavior
+                        .set_operand(0, Access::ReadWrite)
+                        .set_operand(1, Access::Read);
+                } else if self.operand_count == 3 {
+                    behavior = behavior
                         .set_operand(0, Access::ReadWrite)
                         .set_operand(1, Access::Read)
-                } else {
-                    base_digest
-                        .set_operand(0, Access::Write)
-                        .set_operand(1, Access::Read)
-                        .set_operand(2, Access::Read)
+                        .set_operand(2, Access::Read);
                 }
             } else if self.opcode == Opcode::DIV || self.opcode == Opcode::IDIV {
                 let op_width = if self.operands[0] == OperandSpec::RegMMM {
@@ -77,20 +71,13 @@ impl Instruction {
                     4 => DIV_IDX_1OP_DWORD,
                     _ /* 8 */ => DIV_IDX_1OP_QWORD,
                 };
-                BehaviorDigest::empty()
-                    .set_pl_any()
-                    .set_flags_access(Access::Write)
-                    .set_operand(0, Access::Read)
-                    .set_implicit_ops(ops_idx)
+                behavior = behavior
+                    .set_implicit_ops(ops_idx);
             } else if self.opcode == Opcode::NOP {
-                let mut digest = BehaviorDigest::empty()
-                    .set_pl_any();
                 if self.operand_count == 1 {
-                    digest = digest
+                    behavior = behavior
                         .set_operand(0, Access::None);
                 }
-
-                digest
             } else if self.opcode == Opcode::CMPXCHG {
                 let op_width = if self.operands[0] == OperandSpec::RegMMM {
                     self.regs[1].width()
@@ -103,35 +90,19 @@ impl Instruction {
                     4 => CMPXCHG_IDX_DWORD,
                     _ /* 8 */ => CMPXCHG_IDX_QWORD,
                 };
-                BehaviorDigest::empty()
-                    .set_pl_any()
-                    .set_flags_access(Access::Write)
-                    .set_operand(0, Access::ReadWrite)
-                    .set_operand(1, Access::Read)
-                    .set_implicit_ops(ops_idx)
+                behavior = behavior
+                    .set_implicit_ops(ops_idx);
             } else if self.opcode == Opcode::VMOVLPS || self.opcode == Opcode::VMOVHPS ||
                       self.opcode == Opcode::VMOVLPD || self.opcode == Opcode::VMOVHPD {
-                let mut base_digest = BehaviorDigest::empty()
-                    .set_pl_any()
-                    .set_operand(1, Access::Read);
-
                 if self.operand_count == 2 {
-                    base_digest = base_digest
+                    behavior = behavior
                         .set_operand(0, Access::ReadWrite);
                 } else {
-                    base_digest = base_digest
+                    behavior = behavior
                         .set_operand(0, Access::Write)
                         .set_operand(2, Access::Read);
                 }
-
-                base_digest
-            } else {
-                // TODO: words
-                unreachable!();
-            }
-        };
-        if behavior.is_nontrivial() {
-            if self.opcode() == Opcode::EXTRQ {
+            } else if self.opcode() == Opcode::EXTRQ {
                 if self.operand_count > 2 {
                     behavior = behavior
                         .set_operand(2, Access::Read);
@@ -201,7 +172,10 @@ impl Instruction {
                        .set_implicit_ops(RW_ECX_IDX);
                }
             } else {
-                // TODO: words
+                // there should never be an unhandled nontrivial opcode, but leave this in so
+                // fuzzing and testing can make sure. this way in normal builds the branch is empty
+                // and compilers can forget all about it for us.
+                #[cfg(feature = "_debug_internal_asserts")]
                 unreachable!();
             }
         }
@@ -548,6 +522,8 @@ impl<'inst> InstBehavior<'inst> {
         LUT[pl_bits as usize]
     }
 
+    /// 
+    #[cfg(feature = "unstable")]
     pub fn exceptions(&self) -> ExceptionInfo {
         let mut exceptions = ExceptionInfo::empty();
         if self.privilege_level() != Some(PrivilegeLevel::Any) {
@@ -603,6 +579,9 @@ impl<'inst> InstBehavior<'inst> {
                 None
             }
         } else {
+            // Safety: every `Opcode` with a `BehaviorDigest` that is `set_complex(true)` has a
+            // corresponding `ComplexOp` variant set to the same integer value, and the two types
+            // agree on repr.
             let comp: ComplexOp = unsafe { core::mem::transmute::<Opcode, ComplexOp>(self.inst.opcode) };
             Some(comp)
         }
@@ -1178,10 +1157,19 @@ impl BehaviorDigest {
 ///
 /// complex instructions and appropriate handling are documented on a best-effort basis below.
 ///
+/// ### `rdmsr`, `wrmsr`, and all other instructions that directly read or write MSRs
+///
+/// the library API has no way to express MSRs as read or written locations, and must defer to user
+/// code to track reads or writes of this state.
+///
+/// "other instructions" include `wrfsbase`, `wrgsbase`, `rdfsbase`, `rdgsbase`, `syscall`,
+/// `sysenter`, `rdpru`, `rdtsc`, and others.
+///
 /// ### the `xsave` family
 ///
 /// this section applies for all of `xsave`, `xsaveopt`, `xsavec`, `xsavec64`, `xsaves`,
-/// `xsaves64`, `xrstor`, `xrstors`, `xrstors64`.
+/// `xsaves64`, `xrstor`, `xrstors`, `xrstors64`, as well as many other instructions operating on
+/// bulk processor state and `mxcsr`.
 ///
 /// these instructions are considered "complex" because the actual amount of data read or written
 /// depends on dynamic processor state, specifically, bits in `xcr0`. further, the upper bound of
@@ -1195,6 +1183,16 @@ impl BehaviorDigest {
 ///
 /// see the Intel SDM chapter `13.1 XSAVE-Supported Features And State-Component Bitmaps` for more
 /// details.
+///
+/// other related instructions, like `fnstenv`, `frstor`, and others, simply save and restore
+/// architectural state that is not expressed in the library API and cannot be included in implicit
+/// operand lists (such as `mxcsr`).
+///
+/// ### `in`, `out`, including rep-prefixed forms
+///
+/// port I/O instructions use a register or immedate to select an I/O port, meaning the literal
+/// operand and architectural operation are totally distinct. the library API does not currently
+/// have an operand form for I/O ports, so these instructions are "complex".
 ///
 /// ### rep-prefixed string instructions
 ///
@@ -1225,8 +1223,9 @@ impl BehaviorDigest {
 ///
 /// ### AVX512 scatter/gather instructions
 ///
-/// this section applies for all of `vpscatter{dd,dq,qd,qq}` and `vpgather{dd,dq,qd,qq}`. TODO: and
-/// dpd, and qpd, and dps, and qps,
+/// this section applies for all of `vpscatter{dd,dq,qd,qq}` and `vpgather{dd,dq,qd,qq}`.
+/// additionally, the vector scatter/gather prefetch instructions
+/// `v{gather,scatter}pf0{dps,dpd,qps,qpd}` are complex in part for these reasons.
 ///
 /// these instructions are considered "complex" because their memory access characteristics are
 /// actually to many memory addresses using the lanes of the vector register used as an index in
@@ -1237,16 +1236,19 @@ impl BehaviorDigest {
 /// add one if this is the only use. therefore there is no way to express these memory accesses and
 /// the instructions are considered complex.
 ///
-/// ### `monitor`, `monitorx`
+/// the vector scatter/gather instructions additionally are complex for the same reasons as
+/// prefetch instructions described below.
+///
+/// ### `monitor`, `monitorx`, `mwait`, `mwaitx`
 ///
 /// these instructions reference memory but neither read nor write it. instead, `monitor` primes
 /// hardware to watch for accesses to the specified address, while `mwait` waits for an access to
-/// some earlier `monitor`-primed adddress.
+/// some earlier `monitor`-primed adddress. this address-monitoring hardware is not expressed in
+/// the library API and makes this family of instructions "complex" due to reading or writing
+/// unrepresented state.
 ///
 /// arguably `monitor` could be described as a load; it sets the A-bit in page tables, is ordered
-/// as a load, and is subject to the permission checking associated with a byte load. but is it
-/// *actually* doing a load? it might just be translating the linear address to a physical address
-/// for monitoring, which *only* requires the page table walk.
+/// as a load, and is subject to the permission checking associated with a byte load.
 ///
 /// ### `syscall/sysret`, `sysenter/sysexit`
 ///
@@ -1255,16 +1257,19 @@ impl BehaviorDigest {
 /// these instructions may behave quite differently than a "normal" shuffling of
 /// `rip`/`rflags`/`cs`.
 ///
-/// ### `vmread`, `vmwrite`, `vmrun`, `vmsave`, `vmload`
+/// ### `vmread`, `vmwrite`, `vmrun`, `vmsave`, `vmload`, and SVM/VMX generally
 ///
-/// these instructions are considered "complex" because their actual operand use differs
-/// substantially from their encoding.
+/// for instructions that *have* an operand, their operand's semantics differs substantially from a
+/// "normal" understanding of the literal operand.
 ///
 /// for `vmread` and `vmwrite`, the memory operand may be `[rax]`, but it is implicitly an access
 /// to the current VMCS - and, indeed, not even an access to "memory".
 ///
 /// for `vmrun`, `vmsave`, and `vmload`, the operand is "`rax`", but expects `rax` to carry a
 /// physical address to a VMCB which is then loaded from or stored into.
+///
+/// generally, SVM/VMX instructions operate on a hidden VMCB/VMCS structure and are "complex" for
+/// interacting with architectural state that is not expressed in library APIs.
 ///
 /// ### `vzeroupper`, `vzeroall`
 ///
@@ -1284,11 +1289,26 @@ impl BehaviorDigest {
 /// but due to the microarchitectural effects this would be misleading. so, these are "complex" and
 /// should be handled by user code as a no-op, or read, or access hint, etc.
 ///
+/// ### `clzero`, `clflush`, `clflushopt`, `clwb`
+///
+/// these instructions are "complex" because the amount of memory that is operated on is
+/// processor-dependent and the accessed address is *not* simply the effective address of the
+/// memory operand.
+///
+/// the size of an x86 cache line is _typically_ 64 bytes, but is reported per-processor in CPUID
+/// information (leaf `eax=1`: `clflush line size`, AMD leaf `eax=8000_0005`: `cache line size`).
+///
+/// some x86 processors have had 32-byte cache lines.
+///
+/// `clflush`, `clflushopt`, and `clwb` are closer to a no-op in terms of architectural state. they
+/// are included as "complex" for the reasons above and in support of library uses which want to
+/// precisely model memory, such as in modeling the execution of multi-processor systems.
+///
 /// ### `bts`, `btc`, `bt`
 ///
-/// these instructions are considered "complex" when the destination is a memory operand because
-/// the effective address of the modified word/dword/qword is a function of both operands of the
-/// instruction.
+/// these instructions are *conditionally* "complex". when the destination is a memory operand they
+/// are complex because the effective address of the modified word/dword/qword is a function of
+/// both operands of the instruction.
 ///
 /// in particular, the accessed location is the word/dword/qword at the first operand's effective
 /// address *plus* the second operand divided by the access size. as a worked example with a dword
@@ -1298,136 +1318,173 @@ impl BehaviorDigest {
 /// rcx := 0x203
 ///
 /// // bts dword [rax], ecx
-/// ptr = rax + (rcx / 32) => 0x1_0000_0303
-/// bit = rcx % 32         => 3
+/// ptr = rax + (rcx / 32)  ; 0x1_0000_0303
+/// bit = rcx % 32          ; 3
 /// cf := (*ptr >> bit) & 1
 /// *ptr |= (1 << bit)
+///
+/// this was very dismaying to learn! the library API has no hope of expressing this! but the fact
+/// that the test harness detected this is strong evidence it works...
 /// ```
+///
+/// ### `enqcmd`, `enqcmds`
+///
+/// these instructions use "enqueue stores" to write to what are expected to be "enqueue registers"
+/// via MMIO. additionally, i do not have hardware to test these against "normal" memory, so these
+/// are "complex" out of caution.
+///
+/// ### CET-related instructions (`wrss`, `incssp`, `clrssbsy`, etc)
+///
+/// CET-related instructions manipulate shadow stack state, which is a kind-of-hidden architectural
+/// state that is not expressed in the library API. these instructions are considered "complex" due
+/// to reading or writing that state.
+///
+/// ### `ltr`, `str`, `lldt`, `sldt`, `lidt`, `sidt`, `lgdt`, `sgdt`, (AMD: `clgi`, `stgi`)
+///
+/// these instructions all directly manage architectural state which is not expressed in the
+/// library API.
+///
+/// ### `xgetbv`/`xsetbv`
+///
+/// these instructions operate on `xcr*` registers (namely, `xcr0`), which is not currently
+/// expressible in the library API, so these are considered "complex".
+///
+/// ### `v4f*madd`
+///
+/// `v4f*` family multiply-add instructions operate on ranges of registers that are not (currently)
+/// expressed precisely in the library API; the {x,y,z}mm register set these operate on is obtained by
+/// "mask the low two bits of the SIMD register, the result is the base of and the next three are
+/// the rest of the bank". this *could* be expressed in the library API but seems like it would be
+/// awkward. the instructions seem uncommon, so they are "complex" for expediency.
+///
+/// ### `movdir64b`
+///
+/// movdir64b is considered complex primarily because it has two memory operands, but the
+/// destination operand (first, in Intel syntax) is expressly *not* a memory operand so far as
+/// syntax is concerned.
+///
+/// ### `hreset`
+///
+/// `hreset` manages microarchitectural processor history, but is considered "complex" somewhat
+/// arbitrarily as its sole responsibility is to operate on state that is not expressed in the
+/// library API.
+///
+/// ### `psmash`, `pvalidate`, `rmpadjust`, `rmpupdate`
+///
+/// `psmash`-related instructions depend on architectural state which is described in more depth
+/// above, but not currently expressed in the library API, so they are "complex".
+///
+/// ### `ptwrite`
+///
+/// `ptwrite` modifies processor state that is not expressed in the library API currently, so it
+/// is "complex".
+///
+/// ### Restricted Transactional Memory (RTM)
+///
+/// `xbegin`, `xend`, `xtest`, and `xabort` are all "complex" because the RTM instructions relate
+/// to architectural state for memory transactions which are not expressed in the library API.
+/// additionally, these instructions have consequences for control flow that are not easily
+/// expressed in the library API.
+///
+/// ### `pconfig`
+///
+/// `pconfig` is "complex" because it alters architectural state and has complex semantics. the
+/// instruction is similar to `getsec` or `cpuid` in intended breadth and like `cpuid` could
+/// perhaps be made non-complex on the expectation that library users interested in *this
+/// instruction* would look for the opcode instead.
+///
+/// out of caution, and because this is a CPL=0-only relatively-rare instruction, this is still
+/// "complex".
+///
+/// ### `bndldx`, `bndstx`
+///
+/// these MPX instructions are "complex" because the interpretation of their operands differs
+/// substantially from the typical meaning, and they interact with architectural state (bounds
+/// table entries, "BTEs") that is not expressed in the library API.
+///
+/// ### `iret`, `iretd`, `iretq`
+///
+/// interrupt return instructions are considered "complex" purely for their semantics being, well,
+/// complex. they interact with the current execution mode, privilege level, requested privilege
+/// level of returned-to segments, and shadow stacks.
+///
+/// most architectural state they interact with is expressed in the library API. these are
+/// difficult to consider "complex" by the general guidelines above. in truth, they are complex
+/// mostly because they are uncommon, typically executed at CPL=0, and more difficult to
+/// comprehensively test. these may stop being considered complex in a future release.
+///
+/// ### OSPKE
+///
+/// `rdpkru` and `wrpkru` are considered complex because these instructions operate on the `pkru`
+/// register, which is not expressed in the library API today. these may stop being considered
+/// complex in a future release, at which point `pkru` would be an implicit operand as appropriate.
+///
+/// ### `rsm`
+///
+/// this instruction is considered complex for a few related reasons:
+///
+/// * yours truly does not really know much about SMM at all, so it's not clear if there are
+///   architectural state gotchas involved in transitioning to/from SMM
+/// * yours truly is not sure how much state is covered by the processor state save/restore on SMM
+///   transition, and has no way to validate if any implicit operand list describing the
+///   reads/writes is correct.
+///
+/// you know how to test SMM transitions and returns, please write me!
+///
+/// ### WAITPKG
+///
+/// `tpause`, `umonitor`, and `umwait` are considered complex for different reasons:
+///
+/// * `umonitor` and `umwait` are complex in similar ways to `monitor` and `mwait`.
+/// * `tpause` is considered "complex" because the implicit operands are compared with the TSC; one
+///   might imagine the library would report an implicit read of the TSC MSR, but there is no
+///   library API to describe MSR accesses yet.
+///
+/// ### UINTR
+///
+/// UINTR-related instructions are considered complex for varied reasons:
+///
+/// * `stui`, `clui`, `testui`: these instructions manipulate a bit in `rflags` and probably do not
+///   need to be complex (similar to `sti`, `cli`). these may lose their "complex" status in a future
+///   release.
+/// * `senduipi`: this instruction is "complex" because the user-IPI mechanism involves the
+///   user-interrupt target table (UITT) and referenced user posted-interrupt descriptor (UPID).
+/// * `uiret`: this instruction is only "complex" because it is considered uncommon (for now?),
+///   this author has no hardware to test it on, and it's not immediately clear how this relates to
+///   a corresponding UPID (if i've even read the documentation correctly!)
+///
+/// ### TDX
+///
+/// TDX-related instructions are considered complex because they are not more precisely tested and
+/// are assumed as-complex-as-VMX in the first place.
 #[non_exhaustive]
 #[repr(u32)] // same repr as `Opcode`
 #[derive(Copy, Clone, Debug)]
 pub enum ComplexOp {
-    /// TODO: document,
-    IN = (Opcode::IN as u32),
-    OUT = (Opcode::OUT as u32),
-
-    IRET = (Opcode::IRET as u32),
-    IRETD = (Opcode::IRETD as u32),
-    IRETQ = (Opcode::IRETQ as u32),
-
-    VMREAD = (Opcode::VMREAD as u32),
-    VMWRITE = (Opcode::VMWRITE as u32),
-    VMCLEAR = (Opcode::VMCLEAR as u32),
-    VMCALL = (Opcode::VMCALL as u32),
-    VMLAUNCH = (Opcode::VMLAUNCH as u32),
-    VMRESUME = (Opcode::VMRESUME as u32),
-    PCONFIG = (Opcode::PCONFIG as u32),
-    ENCLS = (Opcode::ENCLS as u32),
-    ENCLV = (Opcode::ENCLV as u32),
-    XGETBV = (Opcode::XGETBV as u32),
-    XSETBV = (Opcode::XSETBV as u32),
-    VMFUNC = (Opcode::VMFUNC as u32),
-    XEND = (Opcode::XEND as u32),
-    XTEST = (Opcode::XTEST as u32),
-    ENCLU = (Opcode::ENCLU as u32),
-    RDPKRU = (Opcode::RDPKRU as u32),
-    WRPKRU = (Opcode::WRPKRU as u32),
-    CLZERO = (Opcode::CLZERO as u32),
-
-    /// rdmsr/wrmsr are considered "complex" for reasons described in the enum doc comment.
+    /// rdmsr/wrmsr are considered "complex" for reasons in the enum doc comment.
     RDMSR = (Opcode::RDMSR as u32),
     WRMSR = (Opcode::WRMSR as u32),
 
-    /// string instructions are considered "complex" for reasons described in the enum doc comment.
-    MOVS = (Opcode::MOVS as u32),
-    STOS = (Opcode::STOS as u32),
-    LODS = (Opcode::LODS as u32),
-    SCAS = (Opcode::SCAS as u32),
-    CMPS = (Opcode::CMPS as u32),
+    /// `rdtsc` and `rdtscp` read MSRs and can be modeled as a special form of `rdmsr`; they are
+    /// "complex" in the same way.
+    RDTSC = (Opcode::RDTSC as u32),
+    RDTSCP = (Opcode::RDTSCP as u32),
 
-    /// prefetch instructions are considered "complex" for reasons described in the enum doc
-    /// comment.
-    PREFETCHNTA = (Opcode::PREFETCHNTA as u32),
-    PREFETCHT2 = (Opcode::PREFETCH2 as u32),
-    PREFETCHT1 = (Opcode::PREFETCH1 as u32),
-    PREFETCHT0 = (Opcode::PREFETCH0 as u32),
+    /// `rdpru` reads MSRs and can be modeled as a special form of `rdmsr`; it is "complex" in the
+    /// same way.
+    RDPRU = (Opcode::RDPRU as u32),
 
-    /// scatter/gather instructions are considered "complex" for reasons described in the enum doc
-    /// comment.
-    VPGATHERDD = (Opcode::VPGATHERDD as u32),
-    VPGATHERDQ = (Opcode::VPGATHERDQ as u32),
-    VPGATHERQD = (Opcode::VPGATHERQD as u32),
-    VPGATHERQQ = (Opcode::VPGATHERQQ as u32),
-    VGATHERDPD = (Opcode::VGATHERDPD as u32),
-    VGATHERDPS = (Opcode::VGATHERDPS as u32),
-    VGATHERQPD = (Opcode::VGATHERQPD as u32),
-    VGATHERQPS = (Opcode::VGATHERQPS as u32),
-
-    VPSCATTERDD = (Opcode::VPSCATTERDD as u32),
-    VPSCATTERDQ = (Opcode::VPSCATTERDQ as u32),
-    VPSCATTERQD = (Opcode::VPSCATTERQD as u32),
-    VPSCATTERQQ = (Opcode::VPSCATTERQQ as u32),
-
-    /// bit test/set/reset/complement instructions are conditionally complex depending on their
-    /// destination operand form, as described in the enum doc comment.
-    BT = (Opcode::BT as u32),
-    BTC = (Opcode::BTC as u32),
-    BTR = (Opcode::BTR as u32),
-    BTS = (Opcode::BTS as u32),
-
-    /// TODO: document
-    SYSCALL = (Opcode::SYSCALL as u32),
-    SYSRET = (Opcode::SYSRET as u32),
-
-    /// TODO: document
-    SYSENTER = (Opcode::SYSENTER as u32),
-    SYSEXIT = (Opcode::SYSEXIT as u32),
-
-    /// TODO: document
-    STR = (Opcode::STR as u32),
-    LTR = (Opcode::LTR as u32),
-    SLDT = (Opcode::SLDT as u32),
-    LLDT = (Opcode::LLDT as u32),
-    RSM = (Opcode::RSM as u32),
-
-    /// TODO: document
-    CLGI = (Opcode::CLGI as u32),
-    STGI = (Opcode::STGI as u32),
-    SKINIT = (Opcode::SKINIT as u32),
-    VMLOAD = (Opcode::VMLOAD as u32),
-    VMMCALL = (Opcode::VMMCALL as u32),
-    VMSAVE = (Opcode::VMSAVE as u32),
-    VMRUN = (Opcode::VMRUN as u32),
-    VMPTRLD = (Opcode::VMPTRLD as u32),
-    VMPTRST = (Opcode::VMPTRST as u32),
-
-    /// TODO: document
-    VZEROUPPER = (Opcode::VZEROUPPER as u32),
-    VZEROALL = (Opcode::VZEROALL as u32),
-
-    /// TODO: document
+    /// instructions interacting with MSRs, such as these (`IA32_FS_BASE`, `IA32_GS_BASE`,
+    /// `IA32_KERNEL_GS_BASE`) are complex for the moment.
     SWAPGS = (Opcode::SWAPGS as u32),
     RDFSBASE = (Opcode::RDFSBASE as u32),
     WRFSBASE = (Opcode::WRFSBASE as u32),
     RDGSBASE = (Opcode::RDGSBASE as u32),
     WRGSBASE = (Opcode::WRGSBASE as u32),
 
-    /// movdir64b is considered complex primarily because it has two memory operands, but the
-    /// destination operand (first, in Intel syntax) is expressly *not* a memory operand so far as
-    /// syntax is concerned.
-    MOVDIR64B = (Opcode::MOVDIR64B as u32),
-
-    /// TODO: document
-    ENQCMD = (Opcode::ENQCMD as u32),
-    ENQCMDS = (Opcode::ENQCMDS as u32),
-
-    /// TODO: document
-    V4FNMADDSS = (Opcode::V4FNMADDSS as u32),
-    V4FNMADDPS = (Opcode::V4FNMADDPS as u32),
-    V4FMADDSS = (Opcode::V4FMADDSS as u32),
-    V4FMADDPS = (Opcode::V4FMADDPS as u32),
-
-    /// TODO: document
+    /// the bulk processor state save/restore instructions, as well as `mxcsr`-related
+    /// instructions, are considered complex for reasons described under `fxsave` in the enum doc
+    /// comment above.
     FRSTOR = (Opcode::FRSTOR as u32),
     FLDENV = (Opcode::FLDENV as u32),
     FNSTENV = (Opcode::FNSTENV as u32),
@@ -1450,55 +1507,97 @@ pub enum ComplexOp {
     XRSTORS64 = (Opcode::XRSTORS64 as u32),
     XSAVEOPT = (Opcode::XSAVEOPT as u32),
 
-    /// TODO: document
+    /// in/out are considered "complex" for reasons in the enum doc comment.
+    IN = (Opcode::IN as u32),
+    OUT = (Opcode::OUT as u32),
+
+    /// string instructions are considered "complex" for reasons in the enum doc comment.
+    MOVS = (Opcode::MOVS as u32),
+    STOS = (Opcode::STOS as u32),
+    LODS = (Opcode::LODS as u32),
+    SCAS = (Opcode::SCAS as u32),
+    CMPS = (Opcode::CMPS as u32),
+
+    /// scatter/gather instructions are considered "complex" for reasons in the enum doc comment.
+    VPGATHERDD = (Opcode::VPGATHERDD as u32),
+    VPGATHERDQ = (Opcode::VPGATHERDQ as u32),
+    VPGATHERQD = (Opcode::VPGATHERQD as u32),
+    VPGATHERQQ = (Opcode::VPGATHERQQ as u32),
+    VGATHERDPD = (Opcode::VGATHERDPD as u32),
+    VGATHERDPS = (Opcode::VGATHERDPS as u32),
+    VGATHERQPD = (Opcode::VGATHERQPD as u32),
+    VGATHERQPS = (Opcode::VGATHERQPS as u32),
+
+    VPSCATTERDD = (Opcode::VPSCATTERDD as u32),
+    VPSCATTERDQ = (Opcode::VPSCATTERDQ as u32),
+    VPSCATTERQD = (Opcode::VPSCATTERQD as u32),
+    VPSCATTERQQ = (Opcode::VPSCATTERQQ as u32),
+
+    /// monitor/mwait instructions are considered "complex" for reasons in the enum doc comment.
     MONITOR = (Opcode::MONITOR as u32),
     MONITORX = (Opcode::MONITORX as u32),
     MWAIT = (Opcode::MWAIT as u32),
     MWAITX = (Opcode::MWAITX as u32),
 
-    /// TODO: document
-    XABORT = (Opcode::XABORT as u32),
-    XBEGIN = (Opcode::XBEGIN as u32),
+    /// the syscall/systenter and sysexit/sysret instructions are considered complex because of
+    /// their interaction with architectural state that is not expressible purely as register or
+    /// memory accesses.
+    SYSCALL = (Opcode::SYSCALL as u32),
+    SYSRET = (Opcode::SYSRET as u32),
+    SYSENTER = (Opcode::SYSENTER as u32),
+    SYSEXIT = (Opcode::SYSEXIT as u32),
 
-    /// TODO: document
-    RDPRU = (Opcode::RDPRU as u32),
+    /// SVM instructions generally are considered "complex" for reasons in the doc comment above.
+    SKINIT = (Opcode::SKINIT as u32),
+    VMLOAD = (Opcode::VMLOAD as u32),
+    VMMCALL = (Opcode::VMMCALL as u32),
+    VMSAVE = (Opcode::VMSAVE as u32),
+    VMRUN = (Opcode::VMRUN as u32),
+    VMPTRLD = (Opcode::VMPTRLD as u32),
+    VMPTRST = (Opcode::VMPTRST as u32),
 
-    /// TODO: document
-    HRESET = (Opcode::HRESET as u32),
-
-    /// TODO: document
-    TPAUSE = (Opcode::TPAUSE as u32),
-    UMONITOR = (Opcode::UMONITOR as u32),
-    UMWAIT = (Opcode::UMWAIT as u32),
-
-    /// TODO: document
+    /// VMX instructions, too, are considered "complex" for similar reasons as SVM.
     VMXON = (Opcode::VMXON as u32),
     VMXOFF = (Opcode::VMXOFF as u32),
+    VMREAD = (Opcode::VMREAD as u32),
+    VMWRITE = (Opcode::VMWRITE as u32),
+    VMCLEAR = (Opcode::VMCLEAR as u32),
+    VMCALL = (Opcode::VMCALL as u32),
+    VMLAUNCH = (Opcode::VMLAUNCH as u32),
+    VMRESUME = (Opcode::VMRESUME as u32),
+    VMFUNC = (Opcode::VMFUNC as u32),
 
-    /// TODO: document
-    UIRET = (Opcode::UIRET as u32),
-    TESTUI = (Opcode::TESTUI as u32),
-    CLUI = (Opcode::CLUI as u32),
-    STUI = (Opcode::STUI as u32),
-    SENDUIPI = (Opcode::SENDUIPI as u32),
+    /// vzeroupper/vzeroall are considered "complex" for reasons in the doc comment above.
+    VZEROUPPER = (Opcode::VZEROUPPER as u32),
+    VZEROALL = (Opcode::VZEROALL as u32),
 
-    /// TODO: document MPX
-    BNDLDX = (Opcode::BNDLDX as u32),
-    BNDSTX = (Opcode::BNDSTX as u32),
+    /// clzero, clflush, clflushopt, and clwb are considered "complex" for reasons in the enum doc
+    /// comment.
+    CLZERO = (Opcode::CLZERO as u32),
+    CLFLUSH = (Opcode::CLFLUSH as u32),
+    CLFLUSHOPT = (Opcode::CLFLUSHOPT as u32),
+    CLWB = (Opcode::CLWB as u32),
 
-    /// TODO: document TDX
-    TDCALL = (Opcode::TDCALL as u32),
-    SEAMRET = (Opcode::SEAMRET as u32),
-    SEAMOPS = (Opcode::SEAMOPS as u32),
-    SEAMCALL = (Opcode::SEAMCALL as u32),
+    /// prefetch instructions are considered "complex" for reasons in the enum doc comment.
+    PREFETCHNTA = (Opcode::PREFETCHNTA as u32),
+    PREFETCHT2 = (Opcode::PREFETCH2 as u32),
+    PREFETCHT1 = (Opcode::PREFETCH1 as u32),
+    PREFETCHT0 = (Opcode::PREFETCH0 as u32),
 
-    /// TODO: document PSMASH
-    PSMASH = (Opcode::PSMASH as u32),
-    PVALIDATE = (Opcode::PVALIDATE as u32),
-    RMPADJUST = (Opcode::RMPADJUST as u32),
-    RMPUPDATE = (Opcode::RMPUPDATE as u32),
+    /// bit test/set/reset/complement instructions are conditionally complex depending on their
+    /// destination operand form, as described in the enum doc comment.
+    BT = (Opcode::BT as u32),
+    BTC = (Opcode::BTC as u32),
+    BTR = (Opcode::BTR as u32),
+    BTS = (Opcode::BTS as u32),
 
-    /// TODO: document CET
+    /// enqueue stores in an archtecturally interesting way, and write to
+    /// architecturally-interesting non-memory locations, so they are "complex".
+    ENQCMD = (Opcode::ENQCMD as u32),
+    ENQCMDS = (Opcode::ENQCMDS as u32),
+
+    /// shadow stacks and other CET machinery involve modifies processor state that cannot be
+    /// expressed by `yaxpeax-x86` as any particular location currently, so it is "complex".
     WRUSS = (Opcode::WRUSS as u32),
     WRSS = (Opcode::WRSS as u32),
     INCSSP = (Opcode::INCSSP as u32),
@@ -1509,62 +1608,127 @@ pub enum ComplexOp {
     ENDBR64 = (Opcode::ENDBR64 as u32),
     ENDBR32 = (Opcode::ENDBR32 as u32),
 
-    /// TODO: document PTWRITE
+    /// str/ldr and sldt/lldt are considered complex because of their interaction with
+    /// architectural state that is not expressible purely as register or memory accesses.
+    STR = (Opcode::STR as u32),
+    LTR = (Opcode::LTR as u32),
+    SLDT = (Opcode::SLDT as u32),
+    LLDT = (Opcode::LLDT as u32),
+
+    /// likewise, the AMD global interrupt flag (GIF) is not expressible as an architectural
+    /// location by `yaxpeax-x86`, and so instructions operating on it are "complex".
+    CLGI = (Opcode::CLGI as u32),
+    STGI = (Opcode::STGI as u32),
+
+    /// `xgetbv`/`xsetbv` are "complex" because the library API does not have a way to express
+    /// extended control registers (xcr0 and the like).
+    XGETBV = (Opcode::XGETBV as u32),
+    XSETBV = (Opcode::XSETBV as u32),
+
+    /// `v4f*` family multiply-add instructions operate on ranges of registers that are not
+    /// (currently) expressed precisely in the library API
+    V4FNMADDSS = (Opcode::V4FNMADDSS as u32),
+    V4FNMADDPS = (Opcode::V4FNMADDPS as u32),
+    V4FMADDSS = (Opcode::V4FMADDSS as u32),
+    V4FMADDPS = (Opcode::V4FMADDPS as u32),
+
+    /// movdir64b is considered complex primarily because it has two memory operands, but the
+    /// destination operand (first, in Intel syntax) is expressly *not* a memory operand so far as
+    /// syntax is concerned.
+    MOVDIR64B = (Opcode::MOVDIR64B as u32),
+
+    /// `hreset` manages microarchitectural processor history, but is considered "complex" somewhat
+    /// arbitrarily as its sole responsibility is to operate on state that is not expressed in the
+    /// library API.
+    HRESET = (Opcode::HRESET as u32),
+
+    /// `psmash`-related instructions depend on architectural state which is described in more depth
+    /// above, but not currently expressed in the library API, so they are "complex".
+    PSMASH = (Opcode::PSMASH as u32),
+    PVALIDATE = (Opcode::PVALIDATE as u32),
+    RMPADJUST = (Opcode::RMPADJUST as u32),
+    RMPUPDATE = (Opcode::RMPUPDATE as u32),
+
+    /// `ptwrite` modifies processor state that is not expressed in the library API currently, so it
+    /// is "complex".
     PTWRITE = (Opcode::PTWRITE as u32),
-    /*
-        VGATHERPF0DPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF0DPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF0QPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF0QPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF1DPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF1DPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF1QPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VGATHERPF1QPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF0DPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF0DPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF0QPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF0QPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF1DPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF1DPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF1QPD => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
-        VSCATTERPF1QPS => BehaviorDigest::empty()
-            .set_operand(0, Access::Read)
-            .set_complex(true),
 
-        // MPX
-     *
+    /// these instructions are all documented as complex for the reasons under `Restricted
+    /// Transactional Memory` (RTM) above.
+    XABORT = (Opcode::XABORT as u32),
+    XBEGIN = (Opcode::XBEGIN as u32),
+    XEND = (Opcode::XEND as u32),
+    XTEST = (Opcode::XTEST as u32),
 
-        */
+    /// `pconfig` is "complex" because it alters architectural state and has complex semantics.
+    PCONFIG = (Opcode::PCONFIG as u32),
+
+    /// some MPX-related instructions are considered complex for the reasons described in the enum
+    /// doc comment above.
+    BNDLDX = (Opcode::BNDLDX as u32),
+    BNDSTX = (Opcode::BNDSTX as u32),
+
+    /// `iret*` instructions are considered complex for the reasons described in the enum doc
+    /// comment above.
+    IRET = (Opcode::IRET as u32),
+    IRETD = (Opcode::IRETD as u32),
+    IRETQ = (Opcode::IRETQ as u32),
+
+    /// enclave-related instructions are considered complex for the reasons described in the enum
+    /// doc comment above.
+    ENCLS = (Opcode::ENCLS as u32),
+    ENCLV = (Opcode::ENCLV as u32),
+    ENCLU = (Opcode::ENCLU as u32),
+
+    /// OSPKE-related instructions are considered complex for the reasons described in the enum doc
+    /// comment above.
+    RDPKRU = (Opcode::RDPKRU as u32),
+    WRPKRU = (Opcode::WRPKRU as u32),
+
+    /// `rsm` is considered complex for the reasons related to SMM described in the enum doc
+    /// comment above.
+    RSM = (Opcode::RSM as u32),
+
+    /// WAITPKG-related instructions are considered complex for the reasons described in the enum
+    /// doc comment above.
+    TPAUSE = (Opcode::TPAUSE as u32),
+    UMONITOR = (Opcode::UMONITOR as u32),
+    UMWAIT = (Opcode::UMWAIT as u32),
+
+    /// UINTR-related instructions are considered complex for the reasons described in the enum
+    /// doc comment above.
+    UIRET = (Opcode::UIRET as u32),
+    TESTUI = (Opcode::TESTUI as u32),
+    CLUI = (Opcode::CLUI as u32),
+    STUI = (Opcode::STUI as u32),
+    SENDUIPI = (Opcode::SENDUIPI as u32),
+
+    /// TDX-related instructions are considered complex for the reasons described in the enum
+    /// doc comment above.
+    TDCALL = (Opcode::TDCALL as u32),
+    SEAMRET = (Opcode::SEAMRET as u32),
+    SEAMOPS = (Opcode::SEAMOPS as u32),
+    SEAMCALL = (Opcode::SEAMCALL as u32),
+
+    /// vector scatter/gather prefetch instructions are considered complex for the reasons "normal"
+    /// scatter/gather are complex, as well as the reasons "normal" prefetch instructions are
+    /// complex.
+    VGATHERPF0DPD = (Opcode::VGATHERPF0DPD as u32),
+    VGATHERPF0DPS = (Opcode::VGATHERPF0DPS as u32),
+    VGATHERPF0QPD = (Opcode::VGATHERPF0QPD as u32),
+    VGATHERPF0QPS = (Opcode::VGATHERPF0QPS as u32),
+    VGATHERPF1DPD = (Opcode::VGATHERPF1DPD as u32),
+    VGATHERPF1DPS = (Opcode::VGATHERPF1DPS as u32),
+    VGATHERPF1QPD = (Opcode::VGATHERPF1QPD as u32),
+    VGATHERPF1QPS = (Opcode::VGATHERPF1QPS as u32),
+    VSCATTERPF0DPD = (Opcode::VSCATTERPF0DPD as u32),
+    VSCATTERPF0DPS = (Opcode::VSCATTERPF0DPS as u32),
+    VSCATTERPF0QPD = (Opcode::VSCATTERPF0QPD as u32),
+    VSCATTERPF0QPS = (Opcode::VSCATTERPF0QPS as u32),
+    VSCATTERPF1DPD = (Opcode::VSCATTERPF1DPD as u32),
+    VSCATTERPF1DPS = (Opcode::VSCATTERPF1DPS as u32),
+    VSCATTERPF1QPD = (Opcode::VSCATTERPF1QPD as u32),
+    VSCATTERPF1QPS = (Opcode::VSCATTERPF1QPS as u32),
 }
 
 /// a visitor for collecting architectural accesses for an `Instruction`. used with
@@ -3448,15 +3612,10 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 73] = [
     ENTER_OPS,
 ];
 
-fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
+#[inline(never)]
+#[unsafe(no_mangle)]
+fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
     use Opcode::*;
-    if opc == &MUL || opc == &IMUL || opc == &DIV || opc == &IDIV || opc == &NOP || opc == &CMPXCHG {
-        return None;
-    }
-    if opc == &VMOVHPS || opc == &VMOVHPD || opc == &VMOVLPS || opc == &VMOVLPD {
-        return None;
-    }
-
     let behavior = match opc {
         ADD => GENERAL_RW_R_FLAGWRITE,
         OR => GENERAL_RW_R_FLAGWRITE,
@@ -3480,7 +3639,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_complex(true),
         BTS => GENERAL_RW_R_FLAGWRITE
             .set_complex(true),
-        CMPXCHG => GENERAL_RW_R_FLAGWRITE,
+        CMPXCHG => GENERAL_RW_R_FLAGWRITE
+            .set_nontrivial(true),
         CMPXCHG8B => GENERAL_RW_R_FLAGWRITE
             .set_implicit_ops(CMPXCHG8B_IDX),
         CMPXCHG16B => GENERAL_RW_R_FLAGWRITE
@@ -3555,7 +3715,6 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         MOVSXD => GENERAL_RW_R,
         SHRD => GENERAL_RW_R_FLAGWRITE
             .set_operand(2, Access::Read),
-        // TODO: should be complex?
         HLT => BehaviorDigest::empty()
             .set_pl0(),
         CALL => BehaviorDigest::empty()
@@ -3660,7 +3819,11 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_pl_special()
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read),
-        IMUL => BehaviorDigest::empty(), // unreachable due to branch above match
+        IMUL => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_flags_access(Access::Write)
+            .set_operand(0, Access::Read) // operands are adjusted via non_trivial
+            .set_nontrivial(true),
         JO => JCC,
         JNO => JCC,
         JB => JCC,
@@ -3693,9 +3856,21 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         CMOVP => CMOVCC,
         CMOVS => CMOVCC,
         CMOVZ => CMOVCC,
-        DIV => BehaviorDigest::empty(), // unreachable due to branch above match
-        IDIV => BehaviorDigest::empty(), // same as div
-        MUL => BehaviorDigest::empty(), // same as div
+        DIV => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_flags_access(Access::Write)
+            .set_operand(0, Access::Read)
+            .set_nontrivial(true),
+        IDIV => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_flags_access(Access::Write)
+            .set_operand(0, Access::Read)
+            .set_nontrivial(true),
+        MUL => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_flags_access(Access::Write)
+            .set_operand(0, Access::Read)
+            .set_nontrivial(true),
         SETO => SETCC,
         SETNO => SETCC,
         SETB => SETCC,
@@ -3766,7 +3941,8 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_pl0(),
         RDTSCP => BehaviorDigest::empty()
             .set_pl_special()
-            .set_implicit_ops(RDTSCP_IDX),
+            .set_implicit_ops(RDTSCP_IDX)
+            .set_complex(true),
         // TODO: invlpg does not generate a page fault, so it's "memory" only in generating an
         // address.
         INVLPG => BehaviorDigest::empty()
@@ -3813,17 +3989,21 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         // architectural state. but for some kinds of memory (WC, for example), cache coherency is
         // more lax and the executing processor's cache is in fact writing up to 64 bytes of novel
         // data to main memory.
-        CLFLUSH => GENERAL_W,
+        CLFLUSH => GENERAL_W
+            .set_complex(true),
         // same argument as `clflush`.
-        CLFLUSHOPT => GENERAL_W,
+        CLFLUSHOPT => GENERAL_W
+            .set_complex(true),
         // same argument as `clflush`.
-        CLWB => GENERAL_W,
+        CLWB => GENERAL_W
+            .set_complex(true),
         WRMSR => BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
         RDTSC => BehaviorDigest::empty()
             .set_implicit_ops(RDTSC_IDX)
-            .set_pl_special(),
+            .set_pl_special()
+            .set_complex(true),
         RDMSR => BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
@@ -4325,10 +4505,22 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
         VMOVHLPS => GENERAL_W_R_R,
         VMOVLHPS => GENERAL_W_R_R,
         // these four are not actually reached due to check above
-        VMOVHPD => BehaviorDigest::empty(),
-        VMOVHPS => BehaviorDigest::empty(),
-        VMOVLPD => BehaviorDigest::empty(),
-        VMOVLPS => BehaviorDigest::empty(),
+        VMOVHPD => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(1, Access::Read)
+            .set_nontrivial(true),
+        VMOVHPS => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(1, Access::Read)
+            .set_nontrivial(true),
+        VMOVLPD => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(1, Access::Read)
+            .set_nontrivial(true),
+        VMOVLPS => BehaviorDigest::empty()
+            .set_pl_any()
+            .set_operand(1, Access::Read)
+            .set_nontrivial(true),
         VMOVMSKPD => GENERAL_W_R,
         VMOVMSKPS => GENERAL_W_R,
         VMOVNTDQ => GENERAL_W_R,
@@ -5738,5 +5930,5 @@ fn opcode2behavior(opc: &Opcode) -> Option<BehaviorDigest> {
             .set_complex(true),
 
     };
-    Some(behavior)
+    behavior
 }
