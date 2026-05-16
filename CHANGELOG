@@ -9,6 +9,8 @@
 * removed 3DNow support from AMD uarch-specific decoders after K10
 * RegSpec register helpers to construct RegSpec from register numbers are now const fn
   (RegSpec::xmm, RegSpec::q, RegSpec::d, RegSpec::st, etc)
+* new crate feature flag, `unstable`, for library features that may see
+  breaking changes across semver-compatible releases.
 * for uarch-specific decoding, there is now a feature bit for Intel Key Locker. this corrects an
   issue where Key Locker instructions would decode under AMD-specific decoders.
 * push-immediate, pushf, popf, leave, and xlat now all report a correct memory

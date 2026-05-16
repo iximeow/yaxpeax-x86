@@ -56,6 +56,10 @@ use-serde = ["yaxpeax-arch/use-serde", "serde", "serde_derive"]
 
 colors = ["yaxpeax-arch/colors"]
 
+# feature for library surface areas that are *NOT STABLE*. these will change in
+# semver-incompatible ways across any releases.
+unstable = []
+
 # This enables some capstone benchmarks over the same
 # instruction bytes used to bench this code.
 capstone_bench = []
@@ -66,3 +70,6 @@ profiling = []
 
 # do not use this. it is for development and library debugging only.
 _debug_internal_disasm_stats = []
+
+# do not use this. it is for development and library testing only.
+_debug_internal_asserts = []
