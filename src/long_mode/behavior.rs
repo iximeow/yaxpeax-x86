@@ -523,7 +523,7 @@ impl<'inst> InstBehavior<'inst> {
     }
 
     /// 
-    #[cfg(feature = "unstable")]
+//    #[cfg(feature = "unstable")]
     pub fn exceptions(&self) -> ExceptionInfo {
         let mut exceptions = ExceptionInfo::empty();
         if self.privilege_level() != Some(PrivilegeLevel::Any) {
@@ -3615,1613 +3615,1624 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 73] = [
 #[inline(never)]
 #[unsafe(no_mangle)]
 fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
-    use Opcode::*;
-    let behavior = match opc {
-        ADD => GENERAL_RW_R_FLAGWRITE,
-        OR => GENERAL_RW_R_FLAGWRITE,
-        ADC => GENERAL_RW_R_FLAGRW,
-        SBB => GENERAL_RW_R_FLAGRW,
-        AND => GENERAL_RW_R_FLAGWRITE,
-        SUB => GENERAL_RW_R_FLAGWRITE,
-        XOR => GENERAL_RW_R_FLAGWRITE,
-        CMP => GENERAL_R_R_FLAGWRITE,
-        ROL => GENERAL_RW_R_FLAGWRITE,
-        ROR => GENERAL_RW_R_FLAGWRITE,
-        RCL => GENERAL_RW_R_FLAGRW,
-        RCR => GENERAL_RW_R_FLAGRW,
-        SHL => GENERAL_RW_R_FLAGWRITE,
-        SHR => GENERAL_RW_R_FLAGWRITE,
-        SAL => GENERAL_RW_R_FLAGWRITE,
-        SAR => GENERAL_RW_R_FLAGWRITE,
-        BTC => GENERAL_RW_R_FLAGWRITE
-            .set_complex(true),
-        BTR => GENERAL_RW_R_FLAGWRITE
-            .set_complex(true),
-        BTS => GENERAL_RW_R_FLAGWRITE
-            .set_complex(true),
-        CMPXCHG => GENERAL_RW_R_FLAGWRITE
-            .set_nontrivial(true),
-        CMPXCHG8B => GENERAL_RW_R_FLAGWRITE
-            .set_implicit_ops(CMPXCHG8B_IDX),
-        CMPXCHG16B => GENERAL_RW_R_FLAGWRITE
-            .set_implicit_ops(CMPXCHG16B_IDX),
-        DEC => GENERAL_RW_FLAGWRITE,
-        INC => GENERAL_RW_FLAGWRITE,
-        NEG => GENERAL_RW_FLAGWRITE,
-        NOT => GENERAL_RW,
-        XADD => GENERAL_RW_RW_FLAGRW,
-        XCHG => GENERAL_RW_RW,
+    let idx = (*opc as u32) & 0xfff;
+    TABLE[idx as usize]
+}
 
-        CMPS => GENERAL_RW_RW_FLAGWRITE
+#[cfg(feature = "_debug_internal_asserts")]
+#[test]
+fn behavior_table_size_is_right() {
+    use strum::EnumCount;
+    assert_eq!(TABLE.len(), super::Opcode::COUNT);
+}
+
+/// this table MUST line up with Opcode declaration order in `mod.rs`.
+static TABLE: [BehaviorDigest; 1413] = [
+    /* ADD => */ GENERAL_RW_R_FLAGWRITE,
+    /* OR => */ GENERAL_RW_R_FLAGWRITE,
+    /* ADC => */ GENERAL_RW_R_FLAGRW,
+    /* SBB => */ GENERAL_RW_R_FLAGRW,
+    /* AND => */ GENERAL_RW_R_FLAGWRITE,
+    /* SUB => */ GENERAL_RW_R_FLAGWRITE,
+    /* XOR => */ GENERAL_RW_R_FLAGWRITE,
+    /* CMP => */ GENERAL_R_R_FLAGWRITE,
+    /* ROL => */ GENERAL_RW_R_FLAGWRITE,
+    /* ROR => */ GENERAL_RW_R_FLAGWRITE,
+    /* RCL => */ GENERAL_RW_R_FLAGRW,
+    /* RCR => */ GENERAL_RW_R_FLAGRW,
+    /* SHL => */ GENERAL_RW_R_FLAGWRITE,
+    /* SHR => */ GENERAL_RW_R_FLAGWRITE,
+    /* SAL => */ GENERAL_RW_R_FLAGWRITE,
+    /* SAR => */ GENERAL_RW_R_FLAGWRITE,
+    /* BTC => */ GENERAL_RW_R_FLAGWRITE
+            .set_complex(true),
+    /* BTR => */ GENERAL_RW_R_FLAGWRITE
+            .set_complex(true),
+    /* BTS => */ GENERAL_RW_R_FLAGWRITE
+            .set_complex(true),
+    /* CMPXCHG => */ GENERAL_RW_R_FLAGWRITE
+            .set_nontrivial(true),
+    /* CMPXCHG8B => */ GENERAL_RW_R_FLAGWRITE
+            .set_implicit_ops(CMPXCHG8B_IDX),
+    /* CMPXCHG16B => */ GENERAL_RW_R_FLAGWRITE
+            .set_implicit_ops(CMPXCHG16B_IDX),
+    /* DEC => */ GENERAL_RW_FLAGWRITE,
+    /* INC => */ GENERAL_RW_FLAGWRITE,
+    /* NEG => */ GENERAL_RW_FLAGWRITE,
+    /* NOT => */ GENERAL_RW,
+    /* XADD => */ GENERAL_RW_RW_FLAGRW,
+    /* XCHG => */ GENERAL_RW_RW,
+
+    /* CMPS => */ GENERAL_RW_RW_FLAGWRITE
             .set_implicit_ops(MOVS_IDX),
-        SCAS => GENERAL_W_R_FLAGREAD
+    /* SCAS => */ GENERAL_W_R_FLAGREAD
             .set_implicit_ops(SCAS_IDX), // TODO: second operand is `aX`, right?
-        MOVS => GENERAL_W_R_FLAGREAD
+    /* MOVS => */ GENERAL_W_R_FLAGREAD
             .set_implicit_ops(MOVS_IDX),
-        LODS => GENERAL_W_R_FLAGREAD
+    /* LODS => */ GENERAL_W_R_FLAGREAD
             .set_implicit_ops(LODS_IDX),
-        STOS => GENERAL_W_R_FLAGREAD
+    /* STOS => */ GENERAL_W_R_FLAGREAD
             .set_implicit_ops(STOS_IDX),
-        INS => GENERAL_W_R,
-        OUTS => GENERAL_R_R,
+    /* INS => */ GENERAL_W_R,
+    /* OUTS => */ GENERAL_R_R,
 
         // "Invalid" should never be a publicly-visible Opcode variant..
-        Invalid => BehaviorDigest::empty()
+    /* Invalid => */ BehaviorDigest::empty()
             .set_complex(true),
-        BT => GENERAL_R_R_FLAGWRITE
+    /* BT => */ GENERAL_R_R_FLAGWRITE
             .set_complex(true),
-        BSF => GENERAL_RW_R_FLAGWRITE,
-        BSR => GENERAL_RW_R_FLAGWRITE,
-        TZCNT => GENERAL_RW_R_FLAGWRITE,
-        MOVSS => GENERAL_RW_R,
-        ADDSS => GENERAL_RW_R,
-        SUBSS => GENERAL_RW_R,
-        MULSS => GENERAL_RW_R,
-        DIVSS => GENERAL_RW_R,
-        MINSS => GENERAL_RW_R,
-        MAXSS => GENERAL_RW_R,
-        SQRTSS => GENERAL_RW_R,
-        MOVSD => GENERAL_RW_R,
-        SQRTSD => GENERAL_RW_R,
-        ADDSD => GENERAL_RW_R,
-        SUBSD => GENERAL_RW_R,
-        MULSD => GENERAL_RW_R,
-        DIVSD => GENERAL_RW_R,
-        MINSD => GENERAL_RW_R,
-        MAXSD => GENERAL_RW_R,
-        MOVSLDUP => GENERAL_W_R,
-        MOVSHDUP => GENERAL_W_R,
-        MOVDDUP => GENERAL_W_R,
-        HADDPS => GENERAL_RW_R,
-        HSUBPS => GENERAL_RW_R,
-        ADDSUBPD => GENERAL_RW_R,
-        ADDSUBPS => GENERAL_RW_R,
-        CVTSI2SS => GENERAL_W_R,
-        CVTSI2SD => GENERAL_W_R,
-        CVTTSD2SI => GENERAL_W_R,
-        CVTTPS2DQ => GENERAL_W_R,
-        CVTPD2DQ => GENERAL_W_R,
-        CVTPD2PS => GENERAL_W_R,
-        CVTPS2DQ => GENERAL_W_R,
-        CVTSD2SI => GENERAL_RW_R,
-        CVTSD2SS => GENERAL_RW_R,
-        CVTTSS2SI => GENERAL_RW_R,
-        CVTSS2SI => GENERAL_RW_R,
-        CVTSS2SD => GENERAL_RW_R,
-        CVTDQ2PD => GENERAL_W_R,
-        LDDQU => GENERAL_W_R,
-        MOVZX => GENERAL_RW_R,
-        MOVSX => GENERAL_RW_R,
-        MOVSXD => GENERAL_RW_R,
-        SHRD => GENERAL_RW_R_FLAGWRITE
+    /* BSF => */ GENERAL_RW_R_FLAGWRITE,
+    /* BSR => */ GENERAL_RW_R_FLAGWRITE,
+    /* TZCNT => */ GENERAL_RW_R_FLAGWRITE,
+    /* MOVSS => */ GENERAL_RW_R,
+    /* ADDSS => */ GENERAL_RW_R,
+    /* SUBSS => */ GENERAL_RW_R,
+    /* MULSS => */ GENERAL_RW_R,
+    /* DIVSS => */ GENERAL_RW_R,
+    /* MINSS => */ GENERAL_RW_R,
+    /* MAXSS => */ GENERAL_RW_R,
+    /* SQRTSS => */ GENERAL_RW_R,
+    /* MOVSD => */ GENERAL_RW_R,
+    /* SQRTSD => */ GENERAL_RW_R,
+    /* ADDSD => */ GENERAL_RW_R,
+    /* SUBSD => */ GENERAL_RW_R,
+    /* MULSD => */ GENERAL_RW_R,
+    /* DIVSD => */ GENERAL_RW_R,
+    /* MINSD => */ GENERAL_RW_R,
+    /* MAXSD => */ GENERAL_RW_R,
+    /* MOVSLDUP => */ GENERAL_W_R,
+    /* MOVSHDUP => */ GENERAL_W_R,
+    /* MOVDDUP => */ GENERAL_W_R,
+    /* HADDPS => */ GENERAL_RW_R,
+    /* HSUBPS => */ GENERAL_RW_R,
+    /* ADDSUBPD => */ GENERAL_RW_R,
+    /* ADDSUBPS => */ GENERAL_RW_R,
+    /* CVTSI2SS => */ GENERAL_W_R,
+    /* CVTSI2SD => */ GENERAL_W_R,
+    /* CVTTSD2SI => */ GENERAL_W_R,
+    /* CVTTPS2DQ => */ GENERAL_W_R,
+    /* CVTPD2DQ => */ GENERAL_W_R,
+    /* CVTPD2PS => */ GENERAL_W_R,
+    /* CVTPS2DQ => */ GENERAL_W_R,
+    /* CVTSD2SI => */ GENERAL_RW_R,
+    /* CVTSD2SS => */ GENERAL_RW_R,
+    /* CVTTSS2SI => */ GENERAL_RW_R,
+    /* CVTSS2SI => */ GENERAL_RW_R,
+    /* CVTSS2SD => */ GENERAL_RW_R,
+    /* CVTDQ2PD => */ GENERAL_W_R,
+    /* LDDQU => */ GENERAL_W_R,
+    /* MOVZX => */ GENERAL_RW_R,
+    /* MOVSX => */ GENERAL_RW_R,
+    /* MOVSXD => */ GENERAL_RW_R,
+    /* SHRD => */ GENERAL_RW_R_FLAGWRITE
             .set_operand(2, Access::Read),
-        HLT => BehaviorDigest::empty()
+    /* HLT => */ BehaviorDigest::empty()
             .set_pl0(),
-        CALL => BehaviorDigest::empty()
+    /* CALL => */ BehaviorDigest::empty()
             .set_implicit_ops(CALL_OPS_IDX)
             .set_pl_any()
             .set_operand(0, Access::Read),
-        CALLF => BehaviorDigest::empty()
+    /* CALLF => */ BehaviorDigest::empty()
             .set_implicit_ops(CALLF_OPS_IDX)
             .set_pl_any()
             .set_operand(0, Access::Read),
-        JMP => BehaviorDigest::empty()
+    /* JMP => */ BehaviorDigest::empty()
             .set_implicit_ops(JMP_OPS_IDX)
             .set_pl_any()
             .set_operand(0, Access::Read),
-        JMPF => BehaviorDigest::empty()
+    /* JMPF => */ BehaviorDigest::empty()
             .set_implicit_ops(JMPF_OPS_IDX)
             .set_pl_any()
             .set_operand(0, Access::Read),
-        PUSH => BehaviorDigest::empty()
+    /* PUSH => */ BehaviorDigest::empty()
             .set_implicit_ops(PUSH_OPS_IDX)
             .set_pl_any()
             .set_operand(0, Access::Read),
-        POP => BehaviorDigest::empty()
+    /* POP => */ BehaviorDigest::empty()
             .set_implicit_ops(POP_OPS_IDX)
             .set_pl_any()
             .set_operand(0, Access::Write),
-        LEA => GENERAL_W_R,
-        NOP => GENERAL,
-        PREFETCHNTA => GENERAL_R,
-        PREFETCH0 => GENERAL_R,
-        PREFETCH1 => GENERAL_R,
-        PREFETCH2 => GENERAL_R,
-        POPF => BehaviorDigest::empty()
+    /* LEA => */ GENERAL_W_R,
+    /* NOP => */ GENERAL,
+    /* PREFETCHNTA => */ GENERAL_R,
+    /* PREFETCH0 => */ GENERAL_R,
+    /* PREFETCH1 => */ GENERAL_R,
+    /* PREFETCH2 => */ GENERAL_R,
+    /* POPF => */ BehaviorDigest::empty()
             .set_implicit_ops(POPF_IDX)
             .set_pl_any(),
-        INT => GENERAL_R,
-        INTO => GENERAL_R_FLAGREAD,
+    /* INT => */ GENERAL_R,
+    /* INTO => */ GENERAL_R_FLAGREAD,
         // TODO: should there be implicit operands for the iret instructions? they're complex
         // anyway..
-        IRET => BehaviorDigest::empty()
+    /* IRET => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        IRETD => BehaviorDigest::empty()
+    /* IRETD => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        IRETQ => BehaviorDigest::empty()
+    /* IRETQ => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        RETF => BehaviorDigest::empty()
+    /* RETF => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_nontrivial(true)
             .set_implicit_ops(RETF_IDX),
-        ENTER => BehaviorDigest::empty()
+    /* ENTER => */ BehaviorDigest::empty()
             .set_implicit_ops(ENTER_IDX)
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read)
             .set_pl_any(),
-        LEAVE => BehaviorDigest::empty()
+    /* LEAVE => */ BehaviorDigest::empty()
             .set_implicit_ops(LEAVE_IDX)
             .set_pl_any(),
-        MOV => GENERAL_RW_R,
-        RETURN => BehaviorDigest::empty()
+    /* MOV => */ GENERAL_RW_R,
+    /* RETURN => */ BehaviorDigest::empty()
             .set_implicit_ops(RETURN_IDX)
             .set_nontrivial(true)
             .set_pl_any(),
-        PUSHF => BehaviorDigest::empty()
+    /* PUSHF => */ BehaviorDigest::empty()
             .set_implicit_ops(PUSHF_IDX)
             .set_pl_any(),
-        WAIT => GENERAL,
-        CBW => BehaviorDigest::empty()
+    /* WAIT => */ GENERAL,
+    /* CBW => */ BehaviorDigest::empty()
             .set_implicit_ops(CBW_IDX)
             .set_pl_any(),
-        CWDE => BehaviorDigest::empty()
+    /* CWDE => */ BehaviorDigest::empty()
             .set_implicit_ops(CWDE_IDX)
             .set_pl_any(),
-        CDQE => BehaviorDigest::empty()
+    /* CDQE => */ BehaviorDigest::empty()
             .set_implicit_ops(CDQE_IDX)
             .set_pl_any(),
-        CWD => BehaviorDigest::empty()
+    /* CWD => */ BehaviorDigest::empty()
             .set_implicit_ops(CWD_IDX)
             .set_pl_any(),
-        CDQ => BehaviorDigest::empty()
+    /* CDQ => */ BehaviorDigest::empty()
             .set_implicit_ops(CDQ_IDX)
             .set_pl_any(),
-        CQO => BehaviorDigest::empty()
+    /* CQO => */ BehaviorDigest::empty()
             .set_implicit_ops(CQO_IDX)
             .set_pl_any(),
-        LAHF => BehaviorDigest::empty()
+    /* LAHF => */ BehaviorDigest::empty()
             .set_implicit_ops(LAHF_IDX)
             .set_pl_any(),
-        SAHF => BehaviorDigest::empty()
+    /* SAHF => */ BehaviorDigest::empty()
             .set_implicit_ops(SAHF_IDX)
             .set_pl_any(),
-        TEST => GENERAL_R_R_FLAGWRITE,
-        IN => BehaviorDigest::empty()
+    /* TEST => */ GENERAL_R_R_FLAGWRITE,
+    /* IN => */ BehaviorDigest::empty()
             .set_complex(true)
             .set_pl_special()
             .set_operand(0, Access::Write)
             .set_operand(1, Access::Read),
-        OUT => BehaviorDigest::empty()
+    /* OUT => */ BehaviorDigest::empty()
             .set_complex(true)
             .set_pl_special()
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read),
-        IMUL => BehaviorDigest::empty()
+    /* IMUL => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_flags_access(Access::Write)
             .set_operand(0, Access::Read) // operands are adjusted via non_trivial
             .set_nontrivial(true),
-        JO => JCC,
-        JNO => JCC,
-        JB => JCC,
-        JNB => JCC,
-        JZ => JCC,
-        JNZ => JCC,
-        JA => JCC,
-        JNA => JCC,
-        JS => JCC,
-        JNS => JCC,
-        JP => JCC,
-        JNP => JCC,
-        JL => JCC,
-        JGE => JCC,
-        JLE => JCC,
-        JG => JCC,
-        CMOVA => CMOVCC,
-        CMOVB => CMOVCC,
-        CMOVG => CMOVCC,
-        CMOVGE => CMOVCC,
-        CMOVL => CMOVCC,
-        CMOVLE => CMOVCC,
-        CMOVNA => CMOVCC,
-        CMOVNB => CMOVCC,
-        CMOVNO => CMOVCC,
-        CMOVNP => CMOVCC,
-        CMOVNS => CMOVCC,
-        CMOVNZ => CMOVCC,
-        CMOVO => CMOVCC,
-        CMOVP => CMOVCC,
-        CMOVS => CMOVCC,
-        CMOVZ => CMOVCC,
-        DIV => BehaviorDigest::empty()
+    /* JO => */ JCC,
+    /* JNO => */ JCC,
+    /* JB => */ JCC,
+    /* JNB => */ JCC,
+    /* JZ => */ JCC,
+    /* JNZ => */ JCC,
+    /* JA => */ JCC,
+    /* JNA => */ JCC,
+    /* JS => */ JCC,
+    /* JNS => */ JCC,
+    /* JP => */ JCC,
+    /* JNP => */ JCC,
+    /* JL => */ JCC,
+    /* JGE => */ JCC,
+    /* JLE => */ JCC,
+    /* JG => */ JCC,
+    /* CMOVA => */ CMOVCC,
+    /* CMOVB => */ CMOVCC,
+    /* CMOVG => */ CMOVCC,
+    /* CMOVGE => */ CMOVCC,
+    /* CMOVL => */ CMOVCC,
+    /* CMOVLE => */ CMOVCC,
+    /* CMOVNA => */ CMOVCC,
+    /* CMOVNB => */ CMOVCC,
+    /* CMOVNO => */ CMOVCC,
+    /* CMOVNP => */ CMOVCC,
+    /* CMOVNS => */ CMOVCC,
+    /* CMOVNZ => */ CMOVCC,
+    /* CMOVO => */ CMOVCC,
+    /* CMOVP => */ CMOVCC,
+    /* CMOVS => */ CMOVCC,
+    /* CMOVZ => */ CMOVCC,
+    /* DIV => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_flags_access(Access::Write)
             .set_operand(0, Access::Read)
             .set_nontrivial(true),
-        IDIV => BehaviorDigest::empty()
+    /* IDIV => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_flags_access(Access::Write)
             .set_operand(0, Access::Read)
             .set_nontrivial(true),
-        MUL => BehaviorDigest::empty()
+    /* MUL => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_flags_access(Access::Write)
             .set_operand(0, Access::Read)
             .set_nontrivial(true),
-        SETO => SETCC,
-        SETNO => SETCC,
-        SETB => SETCC,
-        SETAE => SETCC,
-        SETZ => SETCC,
-        SETNZ => SETCC,
-        SETBE => SETCC,
-        SETA => SETCC,
-        SETS => SETCC,
-        SETNS => SETCC,
-        SETP => SETCC,
-        SETNP => SETCC,
-        SETL => SETCC,
-        SETGE => SETCC,
-        SETLE => SETCC,
-        SETG => SETCC,
-        CPUID => BehaviorDigest::empty()
+    /* SETO => */ SETCC,
+    /* SETNO => */ SETCC,
+    /* SETB => */ SETCC,
+    /* SETAE => */ SETCC,
+    /* SETZ => */ SETCC,
+    /* SETNZ => */ SETCC,
+    /* SETBE => */ SETCC,
+    /* SETA => */ SETCC,
+    /* SETS => */ SETCC,
+    /* SETNS => */ SETCC,
+    /* SETP => */ SETCC,
+    /* SETNP => */ SETCC,
+    /* SETL => */ SETCC,
+    /* SETGE => */ SETCC,
+    /* SETLE => */ SETCC,
+    /* SETG => */ SETCC,
+    /* CPUID => */ BehaviorDigest::empty()
             .set_implicit_ops(CPUID_IDX)
             .set_pl_any(),
-        UD0 => GENERAL,
-        UD1 => GENERAL
+    /* UD0 => */ GENERAL,
+    /* UD1 => */ GENERAL
             .set_operand(0, Access::None)
             .set_operand(1, Access::None),
-        UD2 => GENERAL,
-        WBINVD => BehaviorDigest::empty()
+    /* UD2 => */ GENERAL,
+    /* WBINVD => */ BehaviorDigest::empty()
             .set_pl0(),
-        INVD =>  BehaviorDigest::empty()
+    /* INVD => */  BehaviorDigest::empty()
             .set_pl0(),
-        SYSRET => BehaviorDigest::empty()
+    /* SYSRET => */ BehaviorDigest::empty()
             .set_pl0(),
-        CLTS => BehaviorDigest::empty()
+    /* CLTS => */ BehaviorDigest::empty()
             .set_implicit_ops(CLTS_IDX)
             .set_pl0(),
-        SYSCALL => BehaviorDigest::empty()
+    /* SYSCALL => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        LSL =>  BehaviorDigest::empty()
+    /* LSL => */  BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_operand(1, Access::Read)
             .set_flags_access(Access::Write),
-        LAR => BehaviorDigest::empty()
+    /* LAR => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_operand(1, Access::Read)
             .set_flags_access(Access::Write),
-        SGDT => BehaviorDigest::empty()
+    /* SGDT => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_operand(0, Access::Write),
-        SIDT => BehaviorDigest::empty()
+    /* SIDT => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_operand(0, Access::Write),
-        LGDT => BehaviorDigest::empty()
+    /* LGDT => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read),
-        LIDT => BehaviorDigest::empty()
+    /* LIDT => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read),
-        SMSW => BehaviorDigest::empty()
+    /* SMSW => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Write)
             .set_implicit_ops(SMSW_IDX),
-        LMSW => BehaviorDigest::empty()
+    /* LMSW => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
             .set_implicit_ops(LMSW_IDX),
-        SWAPGS => BehaviorDigest::empty()
+    /* SWAPGS => */ BehaviorDigest::empty()
             .set_pl0(),
-        RDTSCP => BehaviorDigest::empty()
+    /* RDTSCP => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_implicit_ops(RDTSCP_IDX)
             .set_complex(true),
         // TODO: invlpg does not generate a page fault, so it's "memory" only in generating an
         // address.
-        INVLPG => BehaviorDigest::empty()
+    /* INVLPG => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read),
         // TODO: this is only complex because while the memory access is 512 bytes,
         // `MemoryAccessSize::bytes_size()` does not report it as such.
-        FXSAVE => BehaviorDigest::empty()
+    /* FXSAVE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_complex(true),
         // TODO: this is only complex because while the memory access is 512 bytes,
         // `MemoryAccessSize::bytes_size()` does not report it as such.
-        FXRSTOR => BehaviorDigest::empty()
+    /* FXRSTOR => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        LDMXCSR => BehaviorDigest::empty()
+    /* LDMXCSR => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true)
             .set_pl_any(),
-        STMXCSR => BehaviorDigest::empty()
+    /* STMXCSR => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_complex(true)
             .set_pl_any(),
-        XSAVE => BehaviorDigest::empty()
+    /* XSAVE => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_pl_any()
             .set_complex(true),
-        XRSTOR => BehaviorDigest::empty()
+    /* XRSTOR => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_pl_any()
             .set_complex(true),
-        XSAVEOPT => BehaviorDigest::empty()
+    /* XSAVEOPT => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_pl_any()
             .set_complex(true),
-        LFENCE => GENERAL,
-        MFENCE => GENERAL,
-        SFENCE => GENERAL,
+    /* LFENCE => */ GENERAL,
+    /* MFENCE => */ GENERAL,
+    /* SFENCE => */ GENERAL,
         // in almost all cases `clflush` does not "write" anything, but it is more of a write than
         // a read; from any other processor's perspective, the cache coherency protocol would
         // ensure that other processors' caches "are" memory and this would be a no-op for
         // architectural state. but for some kinds of memory (WC, for example), cache coherency is
         // more lax and the executing processor's cache is in fact writing up to 64 bytes of novel
         // data to main memory.
-        CLFLUSH => GENERAL_W
+    /* CLFLUSH => */ GENERAL_W
             .set_complex(true),
         // same argument as `clflush`.
-        CLFLUSHOPT => GENERAL_W
+    /* CLFLUSHOPT => */ GENERAL_W
             .set_complex(true),
         // same argument as `clflush`.
-        CLWB => GENERAL_W
+    /* CLWB => */ GENERAL_W
             .set_complex(true),
-        WRMSR => BehaviorDigest::empty()
+    /* WRMSR => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        RDTSC => BehaviorDigest::empty()
+    /* RDTSC => */ BehaviorDigest::empty()
             .set_implicit_ops(RDTSC_IDX)
             .set_pl_special()
             .set_complex(true),
-        RDMSR => BehaviorDigest::empty()
+    /* RDMSR => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        RDPMC => BehaviorDigest::empty()
+    /* RDPMC => */ BehaviorDigest::empty()
             .set_implicit_ops(RDPMC_IDX)
             .set_pl_special(),
-        SLDT => BehaviorDigest::empty()
+    /* SLDT => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_operand(0, Access::Write)
             .set_complex(true),
-        STR => BehaviorDigest::empty()
+    /* STR => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Write)
             .set_complex(true),
-        LLDT => BehaviorDigest::empty()
+    /* LLDT => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        LTR => BehaviorDigest::empty()
+    /* LTR => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VERR => GENERAL_R_FLAGWRITE,
-        VERW =>  GENERAL_R_FLAGWRITE,
-        CMC => GENERAL_FLAGRW,
-        CLC => GENERAL_FLAGRW,
-        STC => GENERAL_FLAGRW,
-        CLI => GENERAL_FLAGRW
+    /* VERR => */ GENERAL_R_FLAGWRITE,
+    /* VERW => */  GENERAL_R_FLAGWRITE,
+    /* CMC => */ GENERAL_FLAGRW,
+    /* CLC => */ GENERAL_FLAGRW,
+    /* STC => */ GENERAL_FLAGRW,
+    /* CLI => */ GENERAL_FLAGRW
             .set_pl_special(),
-        STI => GENERAL_FLAGRW
+    /* STI => */ GENERAL_FLAGRW
             .set_pl_special(),
-        CLD => GENERAL_FLAGRW,
-        STD => GENERAL_FLAGRW,
-        JMPE => BehaviorDigest::empty()
+    /* CLD => */ GENERAL_FLAGRW,
+    /* STD => */ GENERAL_FLAGRW,
+    /* JMPE => */ BehaviorDigest::empty()
             .set_pl_any() // TODO: don't have a processor with jmpe to validate
             .set_operand(0, Access::Read)
             .set_implicit_ops(JMP_OPS_IDX),
-        POPCNT => GENERAL_W_R_FLAGWRITE,
-        MOVDQU => GENERAL_W_R,
-        MOVDQA => GENERAL_W_R,
-        MOVQ => GENERAL_W_R,
-        CMPSS => GENERAL_RW_R
+    /* POPCNT => */ GENERAL_W_R_FLAGWRITE,
+    /* MOVDQU => */ GENERAL_W_R,
+    /* MOVDQA => */ GENERAL_W_R,
+    /* MOVQ => */ GENERAL_W_R,
+    /* CMPSS => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        CMPSD => GENERAL_RW_R
+    /* CMPSD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        UNPCKLPS => GENERAL_RW_R,
-        UNPCKLPD => GENERAL_RW_R,
-        UNPCKHPS => GENERAL_RW_R,
-        UNPCKHPD => GENERAL_RW_R,
-        PSHUFHW => GENERAL_W_R
+    /* UNPCKLPS => */ GENERAL_RW_R,
+    /* UNPCKLPD => */ GENERAL_RW_R,
+    /* UNPCKHPS => */ GENERAL_RW_R,
+    /* UNPCKHPD => */ GENERAL_RW_R,
+    /* PSHUFHW => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        PSHUFLW => GENERAL_W_R
+    /* PSHUFLW => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        MOVUPS => GENERAL_W_R,
-        MOVQ2DQ => GENERAL_W_R,
-        MOVDQ2Q => GENERAL_W_R,
-        RSQRTSS => GENERAL_RW_R,
-        RCPSS => GENERAL_RW_R,
+    /* MOVUPS => */ GENERAL_W_R,
+    /* MOVQ2DQ => */ GENERAL_W_R,
+    /* MOVDQ2Q => */ GENERAL_W_R,
+    /* RSQRTSS => */ GENERAL_RW_R,
+    /* RCPSS => */ GENERAL_RW_R,
 
-        ANDN => GENERAL_W_R_R
+    /* ANDN => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        BEXTR => GENERAL_W_R_R
+    /* BEXTR => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        BLSI => GENERAL_W_R_FLAGWRITE,
-        BLSMSK => GENERAL_W_R_FLAGWRITE,
-        BLSR => GENERAL_W_R_FLAGWRITE,
-        VMCLEAR => BehaviorDigest::empty()
+    /* BLSI => */ GENERAL_W_R_FLAGWRITE,
+    /* BLSMSK => */ GENERAL_W_R_FLAGWRITE,
+    /* BLSR => */ GENERAL_W_R_FLAGWRITE,
+    /* VMCLEAR => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VMXON => BehaviorDigest::empty()
+    /* VMXON => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        VMCALL => BehaviorDigest::empty()
+    /* VMCALL => */ BehaviorDigest::empty()
             .set_complex(true),
-        VMLAUNCH => BehaviorDigest::empty()
+    /* VMLAUNCH => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        VMRESUME => BehaviorDigest::empty()
+    /* VMRESUME => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        VMXOFF => BehaviorDigest::empty()
+    /* VMXOFF => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        PCONFIG => BehaviorDigest::empty()
+    /* PCONFIG => */ BehaviorDigest::empty()
             .set_complex(true),
-        MONITOR => BehaviorDigest::empty()
+    /* MONITOR => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_implicit_ops(MONITOR_IDX)
             .set_complex(true),
-        MWAIT => BehaviorDigest::empty()
+    /* MWAIT => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        MONITORX => BehaviorDigest::empty()
+    /* MONITORX => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_implicit_ops(MONITOR_IDX)
             .set_complex(true),
-        MWAITX => BehaviorDigest::empty()
+    /* MWAITX => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        CLAC => BehaviorDigest::empty()
+    /* CLAC => */ BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write),
-        STAC => BehaviorDigest::empty()
+    /* STAC => */ BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write),
-        ENCLS => BehaviorDigest::empty()
+    /* ENCLS => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        ENCLV => BehaviorDigest::empty()
+    /* ENCLV => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        XGETBV => BehaviorDigest::empty()
+    /* XGETBV => */ BehaviorDigest::empty()
             .set_complex(true),
-        XSETBV =>  BehaviorDigest::empty()
+    /* XSETBV => */  BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        VMFUNC => BehaviorDigest::empty()
+    /* VMFUNC => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        XABORT => BehaviorDigest::empty()
+    /* XABORT => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        XBEGIN => BehaviorDigest::empty()
+    /* XBEGIN => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        XEND => BehaviorDigest::empty()
+    /* XEND => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        XTEST => BehaviorDigest::empty()
+    /* XTEST => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        ENCLU => BehaviorDigest::empty()
+    /* ENCLU => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        RDPKRU => BehaviorDigest::empty()
+    /* RDPKRU => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        WRPKRU => BehaviorDigest::empty()
-            .set_pl_any()
-            .set_complex(true),
-
-        RDPRU => BehaviorDigest::empty()
-            .set_pl_any()
-            .set_complex(true),
-        CLZERO => BehaviorDigest::empty()
+    /* WRPKRU => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
 
-        RDSEED => BehaviorDigest::empty()
+    /* RDPRU => */ BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+    /* CLZERO => */ BehaviorDigest::empty()
+            .set_pl_any()
+            .set_complex(true),
+
+    /* RDSEED => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_flags_access(Access::Write)
             .set_pl_any(),
-        RDRAND => BehaviorDigest::empty()
+    /* RDRAND => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_flags_access(Access::Write)
             .set_pl_any(),
 
-        ADDPS => GENERAL_RW_R,
-        ADDPD => GENERAL_RW_R,
-        ANDNPS => GENERAL_RW_R,
-        ANDNPD => GENERAL_RW_R,
-        ANDPS => GENERAL_RW_R,
-        ANDPD => GENERAL_RW_R,
-        BSWAP => GENERAL_RW,
-        CMPPD => GENERAL_RW_R
+    /* ADDPS => */ GENERAL_RW_R,
+    /* ADDPD => */ GENERAL_RW_R,
+    /* ANDNPS => */ GENERAL_RW_R,
+    /* ANDNPD => */ GENERAL_RW_R,
+    /* ANDPS => */ GENERAL_RW_R,
+    /* ANDPD => */ GENERAL_RW_R,
+    /* BSWAP => */ GENERAL_RW,
+    /* CMPPD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        CMPPS =>  GENERAL_RW_R
+    /* CMPPS => */  GENERAL_RW_R
             .set_operand(2, Access::Read),
-        COMISD => GENERAL_R_R_FLAGWRITE,
-        COMISS => GENERAL_R_R_FLAGWRITE,
-        CVTDQ2PS => GENERAL_W_R,
-        CVTPI2PS => GENERAL_RW_R,
+    /* COMISD => */ GENERAL_R_R_FLAGWRITE,
+    /* COMISS => */ GENERAL_R_R_FLAGWRITE,
+    /* CVTDQ2PS => */ GENERAL_W_R,
+    /* CVTPI2PS => */ GENERAL_RW_R,
         // TODO: are these cvtp*2p* instructions targeting mmx actually read-write on the
         // destination? what happens to the top 16 bits of the destination?
-        CVTPI2PD => GENERAL_W_R,
-        CVTPS2PD => GENERAL_W_R,
-        CVTPS2PI => GENERAL_W_R,
-        CVTPD2PI => GENERAL_W_R,
-        CVTTPS2PI => GENERAL_W_R,
-        CVTTPD2PI => GENERAL_W_R,
+    /* CVTPI2PD => */ GENERAL_W_R,
+    /* CVTPS2PD => */ GENERAL_W_R,
+    /* CVTPS2PI => */ GENERAL_W_R,
+    /* CVTPD2PI => */ GENERAL_W_R,
+    /* CVTTPS2PI => */ GENERAL_W_R,
+    /* CVTTPD2PI => */ GENERAL_W_R,
         // exciting: zeroes the upper half of the xmm register, but leaves ymm/zmm unmodified
-        CVTTPD2DQ => GENERAL_W_R,
-        DIVPS => GENERAL_RW_R,
-        DIVPD => GENERAL_RW_R,
-        EMMS => GENERAL,
+    /* CVTTPD2DQ => */ GENERAL_W_R,
+    /* DIVPS => */ GENERAL_RW_R,
+    /* DIVPD => */ GENERAL_RW_R,
+    /* EMMS => */ GENERAL,
         // TODO: untested, don't have relevant hardware..
-        GETSEC => BehaviorDigest::empty()
+    /* GETSEC => */ BehaviorDigest::empty()
             .set_pl_any(),
-        LFS => GENERAL_W_R
+    /* LFS => */ GENERAL_W_R
             .set_implicit_ops(LFS_IDX),
-        LGS => GENERAL_W_R
+    /* LGS => */ GENERAL_W_R
             .set_implicit_ops(LGS_IDX),
-        LSS => GENERAL_W_R
+    /* LSS => */ GENERAL_W_R
             .set_implicit_ops(LSS_IDX),
-        MASKMOVQ => GENERAL_R_R
+    /* MASKMOVQ => */ GENERAL_R_R
             .set_implicit_ops(MASKMOVQ_IDX),
-        MASKMOVDQU => GENERAL_R_R
+    /* MASKMOVDQU => */ GENERAL_R_R
             .set_implicit_ops(MASKMOVQ_IDX),
-        MAXPS => GENERAL_RW_R,
-        MAXPD => GENERAL_RW_R,
-        MINPS => GENERAL_RW_R,
-        MINPD => GENERAL_RW_R,
-        MOVAPS => GENERAL_W_R,
-        MOVAPD => GENERAL_W_R,
-        MOVD => GENERAL_W_R,
-        MOVLPS => GENERAL_RW_R,
-        MOVLPD => GENERAL_RW_R,
-        MOVHPS => GENERAL_RW_R,
-        MOVHPD => GENERAL_RW_R,
-        MOVLHPS => GENERAL_RW_R,
-        MOVHLPS => GENERAL_RW_R,
-        MOVUPD => GENERAL_W_R,
-        MOVMSKPS => GENERAL_RW_R,
-        MOVMSKPD => GENERAL_RW_R,
-        MOVNTI => GENERAL_W_R,
-        MOVNTPS => GENERAL_W_R,
-        MOVNTPD => GENERAL_W_R,
-        EXTRQ => GENERAL_RW_R
+    /* MAXPS => */ GENERAL_RW_R,
+    /* MAXPD => */ GENERAL_RW_R,
+    /* MINPS => */ GENERAL_RW_R,
+    /* MINPD => */ GENERAL_RW_R,
+    /* MOVAPS => */ GENERAL_W_R,
+    /* MOVAPD => */ GENERAL_W_R,
+    /* MOVD => */ GENERAL_W_R,
+    /* MOVLPS => */ GENERAL_RW_R,
+    /* MOVLPD => */ GENERAL_RW_R,
+    /* MOVHPS => */ GENERAL_RW_R,
+    /* MOVHPD => */ GENERAL_RW_R,
+    /* MOVLHPS => */ GENERAL_RW_R,
+    /* MOVHLPS => */ GENERAL_RW_R,
+    /* MOVUPD => */ GENERAL_W_R,
+    /* MOVMSKPS => */ GENERAL_RW_R,
+    /* MOVMSKPD => */ GENERAL_RW_R,
+    /* MOVNTI => */ GENERAL_W_R,
+    /* MOVNTPS => */ GENERAL_W_R,
+    /* MOVNTPD => */ GENERAL_W_R,
+    /* EXTRQ => */ GENERAL_RW_R
             .set_nontrivial(true),
-        INSERTQ => GENERAL_RW_R
+    /* INSERTQ => */ GENERAL_RW_R
             .set_nontrivial(true),
-        MOVNTSS => GENERAL_W_R,
-        MOVNTSD => GENERAL_W_R,
-        MOVNTQ => GENERAL_W_R,
-        MOVNTDQ => GENERAL_W_R,
-        MULPS => GENERAL_RW_R,
-        MULPD => GENERAL_RW_R,
-        ORPS => GENERAL_RW_R,
-        ORPD => GENERAL_RW_R,
-        PACKSSDW => GENERAL_RW_R,
-        PACKSSWB => GENERAL_RW_R,
-        PACKUSWB => GENERAL_RW_R,
-        PADDB => GENERAL_RW_R,
-        PADDD => GENERAL_RW_R,
-        PADDQ => GENERAL_RW_R,
-        PADDSB => GENERAL_RW_R,
-        PADDSW => GENERAL_RW_R,
-        PADDUSB => GENERAL_RW_R,
-        PADDUSW => GENERAL_RW_R,
-        PADDW => GENERAL_RW_R,
-        PAND => GENERAL_RW_R,
-        PANDN => GENERAL_RW_R,
-        PAVGB => GENERAL_RW_R,
-        PAVGW => GENERAL_RW_R,
-        PCMPEQB => GENERAL_RW_R,
-        PCMPEQD => GENERAL_RW_R,
-        PCMPEQW => GENERAL_RW_R,
-        PCMPGTB => GENERAL_RW_R,
-        PCMPGTD => GENERAL_RW_R,
-        PCMPGTW => GENERAL_RW_R,
-        PINSRW => GENERAL_RW_R
+    /* MOVNTSS => */ GENERAL_W_R,
+    /* MOVNTSD => */ GENERAL_W_R,
+    /* MOVNTQ => */ GENERAL_W_R,
+    /* MOVNTDQ => */ GENERAL_W_R,
+    /* MULPS => */ GENERAL_RW_R,
+    /* MULPD => */ GENERAL_RW_R,
+    /* ORPS => */ GENERAL_RW_R,
+    /* ORPD => */ GENERAL_RW_R,
+    /* PACKSSDW => */ GENERAL_RW_R,
+    /* PACKSSWB => */ GENERAL_RW_R,
+    /* PACKUSWB => */ GENERAL_RW_R,
+    /* PADDB => */ GENERAL_RW_R,
+    /* PADDD => */ GENERAL_RW_R,
+    /* PADDQ => */ GENERAL_RW_R,
+    /* PADDSB => */ GENERAL_RW_R,
+    /* PADDSW => */ GENERAL_RW_R,
+    /* PADDUSB => */ GENERAL_RW_R,
+    /* PADDUSW => */ GENERAL_RW_R,
+    /* PADDW => */ GENERAL_RW_R,
+    /* PAND => */ GENERAL_RW_R,
+    /* PANDN => */ GENERAL_RW_R,
+    /* PAVGB => */ GENERAL_RW_R,
+    /* PAVGW => */ GENERAL_RW_R,
+    /* PCMPEQB => */ GENERAL_RW_R,
+    /* PCMPEQD => */ GENERAL_RW_R,
+    /* PCMPEQW => */ GENERAL_RW_R,
+    /* PCMPGTB => */ GENERAL_RW_R,
+    /* PCMPGTD => */ GENERAL_RW_R,
+    /* PCMPGTW => */ GENERAL_RW_R,
+    /* PINSRW => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PMADDWD => GENERAL_RW_R,
-        PMAXSW => GENERAL_RW_R,
-        PMAXUB => GENERAL_RW_R,
-        PMINSW => GENERAL_RW_R,
-        PMINUB => GENERAL_RW_R,
-        PMOVMSKB => GENERAL_RW_R,
-        PMULHUW => GENERAL_RW_R,
-        PMULHW => GENERAL_RW_R,
-        PMULLW => GENERAL_RW_R,
-        PMULUDQ => GENERAL_RW_R,
-        POR => GENERAL_RW_R,
-        PSADBW => GENERAL_RW_R,
-        PSHUFW => GENERAL_RW_R
+    /* PMADDWD => */ GENERAL_RW_R,
+    /* PMAXSW => */ GENERAL_RW_R,
+    /* PMAXUB => */ GENERAL_RW_R,
+    /* PMINSW => */ GENERAL_RW_R,
+    /* PMINUB => */ GENERAL_RW_R,
+    /* PMOVMSKB => */ GENERAL_RW_R,
+    /* PMULHUW => */ GENERAL_RW_R,
+    /* PMULHW => */ GENERAL_RW_R,
+    /* PMULLW => */ GENERAL_RW_R,
+    /* PMULUDQ => */ GENERAL_RW_R,
+    /* POR => */ GENERAL_RW_R,
+    /* PSADBW => */ GENERAL_RW_R,
+    /* PSHUFW => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PSHUFD => GENERAL_RW_R
+    /* PSHUFD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PSLLD => GENERAL_RW_R,
-        PSLLDQ => GENERAL_RW_R,
-        PSLLQ => GENERAL_RW_R,
-        PSLLW => GENERAL_RW_R,
-        PSRAD => GENERAL_RW_R,
-        PSRAW => GENERAL_RW_R,
-        PSRLD => GENERAL_RW_R,
-        PSRLDQ => GENERAL_RW_R,
-        PSRLQ => GENERAL_RW_R,
-        PSRLW => GENERAL_RW_R,
-        PSUBB => GENERAL_RW_R,
-        PSUBD => GENERAL_RW_R,
-        PSUBQ => GENERAL_RW_R,
-        PSUBSB => GENERAL_RW_R,
-        PSUBSW => GENERAL_RW_R,
-        PSUBUSB => GENERAL_RW_R,
-        PSUBUSW => GENERAL_RW_R,
-        PSUBW => GENERAL_RW_R,
-        PUNPCKHBW => GENERAL_RW_R,
-        PUNPCKHDQ => GENERAL_RW_R,
-        PUNPCKHWD => GENERAL_RW_R,
-        PUNPCKLBW => GENERAL_RW_R,
-        PUNPCKLDQ => GENERAL_RW_R,
-        PUNPCKLWD => GENERAL_RW_R,
-        PUNPCKLQDQ => GENERAL_RW_R,
-        PUNPCKHQDQ => GENERAL_RW_R,
-        PXOR => GENERAL_RW_R,
-        RCPPS => GENERAL_W_R,
-        RSM => BehaviorDigest::empty()
+    /* PSLLD => */ GENERAL_RW_R,
+    /* PSLLDQ => */ GENERAL_RW_R,
+    /* PSLLQ => */ GENERAL_RW_R,
+    /* PSLLW => */ GENERAL_RW_R,
+    /* PSRAD => */ GENERAL_RW_R,
+    /* PSRAW => */ GENERAL_RW_R,
+    /* PSRLD => */ GENERAL_RW_R,
+    /* PSRLDQ => */ GENERAL_RW_R,
+    /* PSRLQ => */ GENERAL_RW_R,
+    /* PSRLW => */ GENERAL_RW_R,
+    /* PSUBB => */ GENERAL_RW_R,
+    /* PSUBD => */ GENERAL_RW_R,
+    /* PSUBQ => */ GENERAL_RW_R,
+    /* PSUBSB => */ GENERAL_RW_R,
+    /* PSUBSW => */ GENERAL_RW_R,
+    /* PSUBUSB => */ GENERAL_RW_R,
+    /* PSUBUSW => */ GENERAL_RW_R,
+    /* PSUBW => */ GENERAL_RW_R,
+    /* PUNPCKHBW => */ GENERAL_RW_R,
+    /* PUNPCKHDQ => */ GENERAL_RW_R,
+    /* PUNPCKHWD => */ GENERAL_RW_R,
+    /* PUNPCKLBW => */ GENERAL_RW_R,
+    /* PUNPCKLDQ => */ GENERAL_RW_R,
+    /* PUNPCKLWD => */ GENERAL_RW_R,
+    /* PUNPCKLQDQ => */ GENERAL_RW_R,
+    /* PUNPCKHQDQ => */ GENERAL_RW_R,
+    /* PXOR => */ GENERAL_RW_R,
+    /* RCPPS => */ GENERAL_W_R,
+    /* RSM => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        RSQRTPS => GENERAL_W_R,
-        SHLD => GENERAL_RW_R_R
+    /* RSQRTPS => */ GENERAL_W_R,
+    /* SHLD => */ GENERAL_RW_R_R
             .set_flags_access(Access::Write),
-        SHUFPD => GENERAL_RW_R_R,
-        SHUFPS => GENERAL_RW_R_R,
+    /* SHUFPD => */ GENERAL_RW_R_R,
+    /* SHUFPS => */ GENERAL_RW_R_R,
         // TODO: slhd is not real, typo of shld
-        SLHD => BehaviorDigest::empty(),
-        SQRTPS => GENERAL_W_R,
-        SQRTPD => GENERAL_W_R,
-        SUBPS => GENERAL_RW_R,
-        SUBPD => GENERAL_RW_R,
-        SYSENTER => BehaviorDigest::empty()
+    /* SLHD => */ BehaviorDigest::empty(),
+    /* SQRTPS => */ GENERAL_W_R,
+    /* SQRTPD => */ GENERAL_W_R,
+    /* SUBPS => */ GENERAL_RW_R,
+    /* SUBPD => */ GENERAL_RW_R,
+    /* SYSENTER => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        SYSEXIT => BehaviorDigest::empty()
+    /* SYSEXIT => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        UCOMISD => GENERAL_R_R_FLAGWRITE,
-        UCOMISS => GENERAL_R_R_FLAGWRITE,
-        VMREAD => BehaviorDigest::empty()
+    /* UCOMISD => */ GENERAL_R_R_FLAGWRITE,
+    /* UCOMISS => */ GENERAL_R_R_FLAGWRITE,
+    /* VMREAD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_operand(1, Access::Read)
             .set_pl0()
             .set_complex(true),
-        VMWRITE => BehaviorDigest::empty()
+    /* VMWRITE => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read)
             .set_pl0()
             .set_complex(true),
-        XORPS => GENERAL_RW_R,
-        XORPD => GENERAL_RW_R,
+    /* XORPS => */ GENERAL_RW_R,
+    /* XORPD => */ GENERAL_RW_R,
 
-        VMOVDDUP => GENERAL_W_R,
-        VPSHUFLW => GENERAL_W_R
+    /* VMOVDDUP => */ GENERAL_W_R,
+    /* VPSHUFLW => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VPSHUFHW => GENERAL_W_R
+    /* VPSHUFHW => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VHADDPS => GENERAL_W_R_R,
-        VHSUBPS => GENERAL_W_R_R,
-        VADDSUBPS => GENERAL_W_R_R,
-        VCVTPD2DQ => GENERAL_W_R,
-        VLDDQU => GENERAL_W_R,
+    /* VHADDPS => */ GENERAL_W_R_R,
+    /* VHSUBPS => */ GENERAL_W_R_R,
+    /* VADDSUBPS => */ GENERAL_W_R_R,
+    /* VCVTPD2DQ => */ GENERAL_W_R,
+    /* VLDDQU => */ GENERAL_W_R,
 
-        VCOMISD => GENERAL_R_R_FLAGWRITE,
-        VCOMISS => GENERAL_R_R_FLAGWRITE,
-        VUCOMISD => GENERAL_R_R_FLAGWRITE,
-        VUCOMISS => GENERAL_R_R_FLAGWRITE,
-        VADDPD => GENERAL_W_R_R,
-        VADDPS => GENERAL_W_R_R,
-        VADDSD => GENERAL_W_R_R,
-        VADDSS => GENERAL_W_R_R,
-        VADDSUBPD => GENERAL_W_R_R,
-        VAESDEC => GENERAL_W_R_R,
-        VAESDECLAST => GENERAL_W_R_R,
-        VAESENC => GENERAL_W_R_R,
-        VAESENCLAST => GENERAL_W_R_R,
-        VAESIMC => GENERAL_W_R,
-        VAESKEYGENASSIST => GENERAL_W_R_R,
-        VBLENDPD => GENERAL_W_R_R_IMM8,
-        VBLENDPS => GENERAL_W_R_R_IMM8,
-        VBLENDVPD => GENERAL_W_R_R
+    /* VCOMISD => */ GENERAL_R_R_FLAGWRITE,
+    /* VCOMISS => */ GENERAL_R_R_FLAGWRITE,
+    /* VUCOMISD => */ GENERAL_R_R_FLAGWRITE,
+    /* VUCOMISS => */ GENERAL_R_R_FLAGWRITE,
+    /* VADDPD => */ GENERAL_W_R_R,
+    /* VADDPS => */ GENERAL_W_R_R,
+    /* VADDSD => */ GENERAL_W_R_R,
+    /* VADDSS => */ GENERAL_W_R_R,
+    /* VADDSUBPD => */ GENERAL_W_R_R,
+    /* VAESDEC => */ GENERAL_W_R_R,
+    /* VAESDECLAST => */ GENERAL_W_R_R,
+    /* VAESENC => */ GENERAL_W_R_R,
+    /* VAESENCLAST => */ GENERAL_W_R_R,
+    /* VAESIMC => */ GENERAL_W_R,
+    /* VAESKEYGENASSIST => */ GENERAL_W_R_R,
+    /* VBLENDPD => */ GENERAL_W_R_R_IMM8,
+    /* VBLENDPS => */ GENERAL_W_R_R_IMM8,
+    /* VBLENDVPD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VBLENDVPS => GENERAL_W_R_R
+    /* VBLENDVPS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VBROADCASTF128 => GENERAL_W_R,
-        VBROADCASTI128 => GENERAL_W_R,
-        VBROADCASTSD => GENERAL_W_R,
-        VBROADCASTSS => GENERAL_W_R,
-        VCMPSD => GENERAL_W_R_R_IMM8,
-        VCMPSS => GENERAL_W_R_R_IMM8,
-        VCMPPD => GENERAL_W_R_R
+    /* VBROADCASTF128 => */ GENERAL_W_R,
+    /* VBROADCASTI128 => */ GENERAL_W_R,
+    /* VBROADCASTSD => */ GENERAL_W_R,
+    /* VBROADCASTSS => */ GENERAL_W_R,
+    /* VCMPSD => */ GENERAL_W_R_R_IMM8,
+    /* VCMPSS => */ GENERAL_W_R_R_IMM8,
+    /* VCMPPD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VCMPPS =>  GENERAL_W_R_R
+    /* VCMPPS => */  GENERAL_W_R_R
             .set_operand(3, Access::Read),
         // TODO: SUPER suspicious about the RW_R/W_R confusion here.
         // vcvtss2si says that dest[0:63] are written but omits bits 64 and up.
         // vcvtsd2si says taht dest[0:63] are written and upper bits are taken from src1.
         // is src1 used generally?
-        VCVTDQ2PD => GENERAL_W_R,
-        VCVTDQ2PS => GENERAL_W_R,
-        VCVTPD2PS => GENERAL_W_R,
-        VCVTPH2PS => GENERAL_W_R,
-        VCVTPS2DQ => GENERAL_W_R,
-        VCVTPS2PD => GENERAL_W_R,
-        VCVTSS2SD => GENERAL_W_R_R,
-        VCVTSI2SS => GENERAL_W_R_R,
-        VCVTSI2SD => GENERAL_W_R_R,
-        VCVTSD2SI => GENERAL_RW_R,
-        VCVTSD2SS => GENERAL_W_R_R,
-        VCVTPS2PH => GENERAL_W_R_R,
-        VCVTSS2SI => GENERAL_RW_R,
-        VCVTTPD2DQ => GENERAL_W_R,
-        VCVTTPS2DQ => GENERAL_W_R,
-        VCVTTSS2SI => GENERAL_RW_R,
-        VCVTTSD2SI => GENERAL_RW_R,
-        VDIVPD => GENERAL_W_R_R,
-        VDIVPS => GENERAL_W_R_R,
-        VDIVSD => GENERAL_W_R_R,
-        VDIVSS => GENERAL_W_R_R,
-        VDPPD => GENERAL_W_R_R
+    /* VCVTDQ2PD => */ GENERAL_W_R,
+    /* VCVTDQ2PS => */ GENERAL_W_R,
+    /* VCVTPD2PS => */ GENERAL_W_R,
+    /* VCVTPH2PS => */ GENERAL_W_R,
+    /* VCVTPS2DQ => */ GENERAL_W_R,
+    /* VCVTPS2PD => */ GENERAL_W_R,
+    /* VCVTSS2SD => */ GENERAL_W_R_R,
+    /* VCVTSI2SS => */ GENERAL_W_R_R,
+    /* VCVTSI2SD => */ GENERAL_W_R_R,
+    /* VCVTSD2SI => */ GENERAL_RW_R,
+    /* VCVTSD2SS => */ GENERAL_W_R_R,
+    /* VCVTPS2PH => */ GENERAL_W_R_R,
+    /* VCVTSS2SI => */ GENERAL_RW_R,
+    /* VCVTTPD2DQ => */ GENERAL_W_R,
+    /* VCVTTPS2DQ => */ GENERAL_W_R,
+    /* VCVTTSS2SI => */ GENERAL_RW_R,
+    /* VCVTTSD2SI => */ GENERAL_RW_R,
+    /* VDIVPD => */ GENERAL_W_R_R,
+    /* VDIVPS => */ GENERAL_W_R_R,
+    /* VDIVSD => */ GENERAL_W_R_R,
+    /* VDIVSS => */ GENERAL_W_R_R,
+    /* VDPPD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VDPPS => GENERAL_W_R_R
+    /* VDPPS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VEXTRACTF128 => GENERAL_W_R
+    /* VEXTRACTF128 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTI128 => GENERAL_W_R
+    /* VEXTRACTI128 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTPS => GENERAL_W_R
+    /* VEXTRACTPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VFMADD132PD => GENERAL_RW_R_R,
-        VFMADD132PS => GENERAL_RW_R_R,
-        VFMADD132SD => GENERAL_RW_R_R,
-        VFMADD132SS => GENERAL_RW_R_R,
-        VFMADD213PD => GENERAL_RW_R_R,
-        VFMADD213PS => GENERAL_RW_R_R,
-        VFMADD213SD => GENERAL_RW_R_R,
-        VFMADD213SS => GENERAL_RW_R_R,
-        VFMADD231PD => GENERAL_RW_R_R,
-        VFMADD231PS => GENERAL_RW_R_R,
-        VFMADD231SD => GENERAL_RW_R_R,
-        VFMADD231SS => GENERAL_RW_R_R,
-        VFMADDSUB132PD => GENERAL_RW_R_R,
-        VFMADDSUB132PS => GENERAL_RW_R_R,
-        VFMADDSUB213PD => GENERAL_RW_R_R,
-        VFMADDSUB213PS => GENERAL_RW_R_R,
-        VFMADDSUB231PD => GENERAL_RW_R_R,
-        VFMADDSUB231PS => GENERAL_RW_R_R,
-        VFMSUB132PD => GENERAL_RW_R_R,
-        VFMSUB132PS => GENERAL_RW_R_R,
-        VFMSUB132SD => GENERAL_RW_R_R,
-        VFMSUB132SS => GENERAL_RW_R_R,
-        VFMSUB213PD => GENERAL_RW_R_R,
-        VFMSUB213PS => GENERAL_RW_R_R,
-        VFMSUB213SD => GENERAL_RW_R_R,
-        VFMSUB213SS => GENERAL_RW_R_R,
-        VFMSUB231PD => GENERAL_RW_R_R,
-        VFMSUB231PS => GENERAL_RW_R_R,
-        VFMSUB231SD => GENERAL_RW_R_R,
-        VFMSUB231SS => GENERAL_RW_R_R,
-        VFMSUBADD132PD => GENERAL_RW_R_R,
-        VFMSUBADD132PS => GENERAL_RW_R_R,
-        VFMSUBADD213PD => GENERAL_RW_R_R,
-        VFMSUBADD213PS => GENERAL_RW_R_R,
-        VFMSUBADD231PD => GENERAL_RW_R_R,
-        VFMSUBADD231PS => GENERAL_RW_R_R,
-        VFNMADD132PD => GENERAL_RW_R_R,
-        VFNMADD132PS => GENERAL_RW_R_R,
-        VFNMADD132SD => GENERAL_RW_R_R,
-        VFNMADD132SS => GENERAL_RW_R_R,
-        VFNMADD213PD => GENERAL_RW_R_R,
-        VFNMADD213PS => GENERAL_RW_R_R,
-        VFNMADD213SD => GENERAL_RW_R_R,
-        VFNMADD213SS => GENERAL_RW_R_R,
-        VFNMADD231PD => GENERAL_RW_R_R,
-        VFNMADD231PS => GENERAL_RW_R_R,
-        VFNMADD231SD => GENERAL_RW_R_R,
-        VFNMADD231SS => GENERAL_RW_R_R,
-        VFNMSUB132PD => GENERAL_RW_R_R,
-        VFNMSUB132PS => GENERAL_RW_R_R,
-        VFNMSUB132SD => GENERAL_RW_R_R,
-        VFNMSUB132SS => GENERAL_RW_R_R,
-        VFNMSUB213PD => GENERAL_RW_R_R,
-        VFNMSUB213PS => GENERAL_RW_R_R,
-        VFNMSUB213SD => GENERAL_RW_R_R,
-        VFNMSUB213SS => GENERAL_RW_R_R,
-        VFNMSUB231PD => GENERAL_RW_R_R,
-        VFNMSUB231PS => GENERAL_RW_R_R,
-        VFNMSUB231SD => GENERAL_RW_R_R,
-        VFNMSUB231SS => GENERAL_RW_R_R,
-        VGATHERDPD => BehaviorDigest::empty()
+    /* VFMADD132PD => */ GENERAL_RW_R_R,
+    /* VFMADD132PS => */ GENERAL_RW_R_R,
+    /* VFMADD132SD => */ GENERAL_RW_R_R,
+    /* VFMADD132SS => */ GENERAL_RW_R_R,
+    /* VFMADD213PD => */ GENERAL_RW_R_R,
+    /* VFMADD213PS => */ GENERAL_RW_R_R,
+    /* VFMADD213SD => */ GENERAL_RW_R_R,
+    /* VFMADD213SS => */ GENERAL_RW_R_R,
+    /* VFMADD231PD => */ GENERAL_RW_R_R,
+    /* VFMADD231PS => */ GENERAL_RW_R_R,
+    /* VFMADD231SD => */ GENERAL_RW_R_R,
+    /* VFMADD231SS => */ GENERAL_RW_R_R,
+    /* VFMADDSUB132PD => */ GENERAL_RW_R_R,
+    /* VFMADDSUB132PS => */ GENERAL_RW_R_R,
+    /* VFMADDSUB213PD => */ GENERAL_RW_R_R,
+    /* VFMADDSUB213PS => */ GENERAL_RW_R_R,
+    /* VFMADDSUB231PD => */ GENERAL_RW_R_R,
+    /* VFMADDSUB231PS => */ GENERAL_RW_R_R,
+    /* VFMSUB132PD => */ GENERAL_RW_R_R,
+    /* VFMSUB132PS => */ GENERAL_RW_R_R,
+    /* VFMSUB132SD => */ GENERAL_RW_R_R,
+    /* VFMSUB132SS => */ GENERAL_RW_R_R,
+    /* VFMSUB213PD => */ GENERAL_RW_R_R,
+    /* VFMSUB213PS => */ GENERAL_RW_R_R,
+    /* VFMSUB213SD => */ GENERAL_RW_R_R,
+    /* VFMSUB213SS => */ GENERAL_RW_R_R,
+    /* VFMSUB231PD => */ GENERAL_RW_R_R,
+    /* VFMSUB231PS => */ GENERAL_RW_R_R,
+    /* VFMSUB231SD => */ GENERAL_RW_R_R,
+    /* VFMSUB231SS => */ GENERAL_RW_R_R,
+    /* VFMSUBADD132PD => */ GENERAL_RW_R_R,
+    /* VFMSUBADD132PS => */ GENERAL_RW_R_R,
+    /* VFMSUBADD213PD => */ GENERAL_RW_R_R,
+    /* VFMSUBADD213PS => */ GENERAL_RW_R_R,
+    /* VFMSUBADD231PD => */ GENERAL_RW_R_R,
+    /* VFMSUBADD231PS => */ GENERAL_RW_R_R,
+    /* VFNMADD132PD => */ GENERAL_RW_R_R,
+    /* VFNMADD132PS => */ GENERAL_RW_R_R,
+    /* VFNMADD132SD => */ GENERAL_RW_R_R,
+    /* VFNMADD132SS => */ GENERAL_RW_R_R,
+    /* VFNMADD213PD => */ GENERAL_RW_R_R,
+    /* VFNMADD213PS => */ GENERAL_RW_R_R,
+    /* VFNMADD213SD => */ GENERAL_RW_R_R,
+    /* VFNMADD213SS => */ GENERAL_RW_R_R,
+    /* VFNMADD231PD => */ GENERAL_RW_R_R,
+    /* VFNMADD231PS => */ GENERAL_RW_R_R,
+    /* VFNMADD231SD => */ GENERAL_RW_R_R,
+    /* VFNMADD231SS => */ GENERAL_RW_R_R,
+    /* VFNMSUB132PD => */ GENERAL_RW_R_R,
+    /* VFNMSUB132PS => */ GENERAL_RW_R_R,
+    /* VFNMSUB132SD => */ GENERAL_RW_R_R,
+    /* VFNMSUB132SS => */ GENERAL_RW_R_R,
+    /* VFNMSUB213PD => */ GENERAL_RW_R_R,
+    /* VFNMSUB213PS => */ GENERAL_RW_R_R,
+    /* VFNMSUB213SD => */ GENERAL_RW_R_R,
+    /* VFNMSUB213SS => */ GENERAL_RW_R_R,
+    /* VFNMSUB231PD => */ GENERAL_RW_R_R,
+    /* VFNMSUB231PS => */ GENERAL_RW_R_R,
+    /* VFNMSUB231SD => */ GENERAL_RW_R_R,
+    /* VFNMSUB231SS => */ GENERAL_RW_R_R,
+    /* VGATHERDPD => */ BehaviorDigest::empty()
             .set_complex(true),
-        VGATHERDPS => BehaviorDigest::empty()
+    /* VGATHERDPS => */ BehaviorDigest::empty()
             .set_complex(true),
-        VGATHERQPD => BehaviorDigest::empty()
+    /* VGATHERQPD => */ BehaviorDigest::empty()
             .set_complex(true),
-        VGATHERQPS => BehaviorDigest::empty()
+    /* VGATHERQPS => */ BehaviorDigest::empty()
             .set_complex(true),
-        VHADDPD => GENERAL_W_R_R,
-        VHSUBPD => GENERAL_W_R_R,
-        VINSERTF128 => GENERAL_W_R_R_IMM8,
-        VINSERTI128 => GENERAL_W_R_R_IMM8,
-        VINSERTPS => GENERAL_W_R_R_IMM8,
-        VMASKMOVDQU => GENERAL_R_R
+    /* VHADDPD => */ GENERAL_W_R_R,
+    /* VHSUBPD => */ GENERAL_W_R_R,
+    /* VINSERTF128 => */ GENERAL_W_R_R_IMM8,
+    /* VINSERTI128 => */ GENERAL_W_R_R_IMM8,
+    /* VINSERTPS => */ GENERAL_W_R_R_IMM8,
+    /* VMASKMOVDQU => */ GENERAL_R_R
             .set_nontrivial(true),
-        VMASKMOVPD => GENERAL_W_R_R,
-        VMASKMOVPS => GENERAL_W_R_R,
-        VMAXPD => GENERAL_W_R_R,
-        VMAXPS => GENERAL_W_R_R,
-        VMAXSD => GENERAL_W_R_R,
-        VMAXSS => GENERAL_W_R_R,
-        VMINPD => GENERAL_W_R_R,
-        VMINPS => GENERAL_W_R_R,
-        VMINSD => GENERAL_W_R_R,
-        VMINSS => GENERAL_W_R_R,
-        VMOVAPD => GENERAL_W_R,
-        VMOVAPS => GENERAL_W_R,
-        VMOVD => GENERAL_W_R,
-        VMOVDQA => GENERAL_W_R,
-        VMOVDQU => GENERAL_W_R,
-        VMOVHLPS => GENERAL_W_R_R,
-        VMOVLHPS => GENERAL_W_R_R,
+    /* VMASKMOVPD => */ GENERAL_W_R_R,
+    /* VMASKMOVPS => */ GENERAL_W_R_R,
+    /* VMAXPD => */ GENERAL_W_R_R,
+    /* VMAXPS => */ GENERAL_W_R_R,
+    /* VMAXSD => */ GENERAL_W_R_R,
+    /* VMAXSS => */ GENERAL_W_R_R,
+    /* VMINPD => */ GENERAL_W_R_R,
+    /* VMINPS => */ GENERAL_W_R_R,
+    /* VMINSD => */ GENERAL_W_R_R,
+    /* VMINSS => */ GENERAL_W_R_R,
+    /* VMOVAPD => */ GENERAL_W_R,
+    /* VMOVAPS => */ GENERAL_W_R,
+    /* VMOVD => */ GENERAL_W_R,
+    /* VMOVDQA => */ GENERAL_W_R,
+    /* VMOVDQU => */ GENERAL_W_R,
+    /* VMOVHLPS => */ GENERAL_W_R_R,
+    /* VMOVLHPS => */ GENERAL_W_R_R,
         // these four are not actually reached due to check above
-        VMOVHPD => BehaviorDigest::empty()
+    /* VMOVHPD => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(1, Access::Read)
             .set_nontrivial(true),
-        VMOVHPS => BehaviorDigest::empty()
+    /* VMOVHPS => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(1, Access::Read)
             .set_nontrivial(true),
-        VMOVLPD => BehaviorDigest::empty()
+    /* VMOVLPD => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(1, Access::Read)
             .set_nontrivial(true),
-        VMOVLPS => BehaviorDigest::empty()
+    /* VMOVLPS => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(1, Access::Read)
             .set_nontrivial(true),
-        VMOVMSKPD => GENERAL_W_R,
-        VMOVMSKPS => GENERAL_W_R,
-        VMOVNTDQ => GENERAL_W_R,
-        VMOVNTDQA => GENERAL_W_R,
-        VMOVNTPD => GENERAL_W_R,
-        VMOVNTPS => GENERAL_W_R,
-        VMOVQ => GENERAL_W_R,
-        VMOVSS => GENERAL_W_R_R,
-        VMOVSD => GENERAL_W_R_R,
-        VMOVSHDUP => GENERAL_W_R,
-        VMOVSLDUP => GENERAL_W_R,
-        VMOVUPD => GENERAL_W_R,
-        VMOVUPS => GENERAL_W_R,
-        VMPSADBW => GENERAL_W_R_R
+    /* VMOVMSKPD => */ GENERAL_W_R,
+    /* VMOVMSKPS => */ GENERAL_W_R,
+    /* VMOVNTDQ => */ GENERAL_W_R,
+    /* VMOVNTDQA => */ GENERAL_W_R,
+    /* VMOVNTPD => */ GENERAL_W_R,
+    /* VMOVNTPS => */ GENERAL_W_R,
+    /* VMOVQ => */ GENERAL_W_R,
+    /* VMOVSS => */ GENERAL_W_R_R,
+    /* VMOVSD => */ GENERAL_W_R_R,
+    /* VMOVSHDUP => */ GENERAL_W_R,
+    /* VMOVSLDUP => */ GENERAL_W_R,
+    /* VMOVUPD => */ GENERAL_W_R,
+    /* VMOVUPS => */ GENERAL_W_R,
+    /* VMPSADBW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VMULPD => GENERAL_W_R_R,
-        VMULPS => GENERAL_W_R_R,
-        VMULSD => GENERAL_W_R_R,
-        VMULSS => GENERAL_W_R_R,
-        VPABSB => GENERAL_W_R,
-        VPABSD => GENERAL_W_R,
-        VPABSW => GENERAL_W_R,
-        VPACKSSDW => GENERAL_W_R_R,
-        VPACKUSDW => GENERAL_W_R_R,
-        VPACKSSWB => GENERAL_W_R_R,
-        VPACKUSWB => GENERAL_W_R_R,
-        VPADDB => GENERAL_W_R_R,
-        VPADDD => GENERAL_W_R_R,
-        VPADDQ => GENERAL_W_R_R,
-        VPADDSB => GENERAL_W_R_R,
-        VPADDSW => GENERAL_W_R_R,
-        VPADDUSB => GENERAL_W_R_R,
-        VPADDUSW => GENERAL_W_R_R,
-        VPADDW => GENERAL_W_R_R,
-        VPALIGNR => GENERAL_W_R_R_IMM8,
-        VANDPD => GENERAL_W_R_R,
-        VANDPS => GENERAL_W_R_R,
-        VORPD => GENERAL_W_R_R,
-        VORPS => GENERAL_W_R_R,
-        VANDNPD => GENERAL_W_R_R,
-        VANDNPS => GENERAL_W_R_R,
-        VPAND => GENERAL_W_R_R,
-        VPANDN => GENERAL_W_R_R,
-        VPAVGB => GENERAL_W_R_R,
-        VPAVGW => GENERAL_W_R_R,
-        VPBLENDD => GENERAL_W_R_R
+    /* VMULPD => */ GENERAL_W_R_R,
+    /* VMULPS => */ GENERAL_W_R_R,
+    /* VMULSD => */ GENERAL_W_R_R,
+    /* VMULSS => */ GENERAL_W_R_R,
+    /* VPABSB => */ GENERAL_W_R,
+    /* VPABSD => */ GENERAL_W_R,
+    /* VPABSW => */ GENERAL_W_R,
+    /* VPACKSSDW => */ GENERAL_W_R_R,
+    /* VPACKUSDW => */ GENERAL_W_R_R,
+    /* VPACKSSWB => */ GENERAL_W_R_R,
+    /* VPACKUSWB => */ GENERAL_W_R_R,
+    /* VPADDB => */ GENERAL_W_R_R,
+    /* VPADDD => */ GENERAL_W_R_R,
+    /* VPADDQ => */ GENERAL_W_R_R,
+    /* VPADDSB => */ GENERAL_W_R_R,
+    /* VPADDSW => */ GENERAL_W_R_R,
+    /* VPADDUSB => */ GENERAL_W_R_R,
+    /* VPADDUSW => */ GENERAL_W_R_R,
+    /* VPADDW => */ GENERAL_W_R_R,
+    /* VPALIGNR => */ GENERAL_W_R_R_IMM8,
+    /* VANDPD => */ GENERAL_W_R_R,
+    /* VANDPS => */ GENERAL_W_R_R,
+    /* VORPD => */ GENERAL_W_R_R,
+    /* VORPS => */ GENERAL_W_R_R,
+    /* VANDNPD => */ GENERAL_W_R_R,
+    /* VANDNPS => */ GENERAL_W_R_R,
+    /* VPAND => */ GENERAL_W_R_R,
+    /* VPANDN => */ GENERAL_W_R_R,
+    /* VPAVGB => */ GENERAL_W_R_R,
+    /* VPAVGW => */ GENERAL_W_R_R,
+    /* VPBLENDD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPBLENDVB => GENERAL_W_R_R
+    /* VPBLENDVB => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPBLENDW => GENERAL_W_R_R
+    /* VPBLENDW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPBROADCASTB => GENERAL_W_R,
-        VPBROADCASTD => GENERAL_W_R,
-        VPBROADCASTQ => GENERAL_W_R,
-        VPBROADCASTW => GENERAL_W_R,
-        VPCLMULQDQ => GENERAL_W_R_R
+    /* VPBROADCASTB => */ GENERAL_W_R,
+    /* VPBROADCASTD => */ GENERAL_W_R,
+    /* VPBROADCASTQ => */ GENERAL_W_R,
+    /* VPBROADCASTW => */ GENERAL_W_R,
+    /* VPCLMULQDQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPEQB => GENERAL_W_R_R,
-        VPCMPEQD => GENERAL_W_R_R,
-        VPCMPEQQ => GENERAL_W_R_R,
-        VPCMPEQW => GENERAL_W_R_R,
-        VPCMPGTB => GENERAL_W_R_R,
-        VPCMPGTD => GENERAL_W_R_R,
-        VPCMPGTQ => GENERAL_W_R_R,
-        VPCMPGTW => GENERAL_W_R_R,
-        VPCMPESTRI => GENERAL_R_R
+    /* VPCMPEQB => */ GENERAL_W_R_R,
+    /* VPCMPEQD => */ GENERAL_W_R_R,
+    /* VPCMPEQQ => */ GENERAL_W_R_R,
+    /* VPCMPEQW => */ GENERAL_W_R_R,
+    /* VPCMPGTB => */ GENERAL_W_R_R,
+    /* VPCMPGTD => */ GENERAL_W_R_R,
+    /* VPCMPGTQ => */ GENERAL_W_R_R,
+    /* VPCMPGTW => */ GENERAL_W_R_R,
+    /* VPCMPESTRI => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_nontrivial(true),
-        VPCMPESTRM => GENERAL_R_R
+    /* VPCMPESTRM => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_nontrivial(true),
-        VPCMPISTRI => GENERAL_R_R
+    /* VPCMPISTRI => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_implicit_ops(PCMPISTRI_IDX),
-        VPCMPISTRM => GENERAL_R_R
+    /* VPCMPISTRM => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_implicit_ops(PCMPISTRM_IDX),
-        VPERM2F128 => GENERAL_W_R_R
+    /* VPERM2F128 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPERM2I128 => GENERAL_W_R_R
+    /* VPERM2I128 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPERMD => GENERAL_W_R_R,
-        VPERMILPD => GENERAL_W_R_R,
-        VPERMILPS => GENERAL_W_R_R,
-        VPERMPD => GENERAL_W_R_R,
-        VPERMPS => GENERAL_W_R_R,
-        VPERMQ => GENERAL_W_R_R,
-        VPEXTRB => GENERAL_W_R
+    /* VPERMD => */ GENERAL_W_R_R,
+    /* VPERMILPD => */ GENERAL_W_R_R,
+    /* VPERMILPS => */ GENERAL_W_R_R,
+    /* VPERMPD => */ GENERAL_W_R_R,
+    /* VPERMPS => */ GENERAL_W_R_R,
+    /* VPERMQ => */ GENERAL_W_R_R,
+    /* VPEXTRB => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VPEXTRD => GENERAL_W_R
+    /* VPEXTRD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VPEXTRQ => GENERAL_W_R
+    /* VPEXTRQ => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VPEXTRW => GENERAL_W_R
+    /* VPEXTRW => */ GENERAL_W_R
             .set_operand(2, Access::Read),
         // TODO: complex
-        VPGATHERDD => BehaviorDigest::empty()
+    /* VPGATHERDD => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPGATHERDQ => BehaviorDigest::empty()
+    /* VPGATHERDQ => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPGATHERQD => BehaviorDigest::empty()
+    /* VPGATHERQD => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPGATHERQQ => BehaviorDigest::empty()
+    /* VPGATHERQQ => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPHADDD => GENERAL_W_R_R,
-        VPHADDSW => GENERAL_W_R_R,
-        VPHADDW => GENERAL_W_R_R,
-        VPMADDUBSW => GENERAL_W_R_R,
-        VPHMINPOSUW => GENERAL_W_R,
-        VPHSUBD => GENERAL_W_R_R,
-        VPHSUBSW => GENERAL_W_R_R,
-        VPHSUBW => GENERAL_W_R_R,
-        VPINSRB => GENERAL_W_R_R
+    /* VPHADDD => */ GENERAL_W_R_R,
+    /* VPHADDSW => */ GENERAL_W_R_R,
+    /* VPHADDW => */ GENERAL_W_R_R,
+    /* VPMADDUBSW => */ GENERAL_W_R_R,
+    /* VPHMINPOSUW => */ GENERAL_W_R,
+    /* VPHSUBD => */ GENERAL_W_R_R,
+    /* VPHSUBSW => */ GENERAL_W_R_R,
+    /* VPHSUBW => */ GENERAL_W_R_R,
+    /* VPINSRB => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPINSRD => GENERAL_W_R_R
+    /* VPINSRD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPINSRQ => GENERAL_W_R_R
+    /* VPINSRQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPINSRW => GENERAL_W_R_R
+    /* VPINSRW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPMADDWD => GENERAL_W_R_R,
-        VPMASKMOVD => GENERAL_W_R_R,
-        VPMASKMOVQ => GENERAL_W_R_R,
-        VPMAXSB => GENERAL_W_R_R,
-        VPMAXSD => GENERAL_W_R_R,
-        VPMAXSW => GENERAL_W_R_R,
-        VPMAXUB => GENERAL_W_R_R,
-        VPMAXUW => GENERAL_W_R_R,
-        VPMAXUD => GENERAL_W_R_R,
-        VPMINSB => GENERAL_W_R_R,
-        VPMINSW => GENERAL_W_R_R,
-        VPMINSD => GENERAL_W_R_R,
-        VPMINUB => GENERAL_W_R_R,
-        VPMINUW => GENERAL_W_R_R,
-        VPMINUD => GENERAL_W_R_R,
-        VPMOVMSKB => GENERAL_W_R,
-        VPMOVSXBD => GENERAL_W_R,
-        VPMOVSXBQ => GENERAL_W_R,
-        VPMOVSXBW => GENERAL_W_R,
-        VPMOVSXDQ => GENERAL_W_R,
-        VPMOVSXWD => GENERAL_W_R,
-        VPMOVSXWQ => GENERAL_W_R,
-        VPMOVZXBD => GENERAL_W_R,
-        VPMOVZXBQ => GENERAL_W_R,
-        VPMOVZXBW => GENERAL_W_R,
-        VPMOVZXDQ => GENERAL_W_R,
-        VPMOVZXWD => GENERAL_W_R,
-        VPMOVZXWQ => GENERAL_W_R,
-        VPMULDQ => GENERAL_W_R_R,
-        VPMULHRSW => GENERAL_W_R_R,
-        VPMULHUW => GENERAL_W_R_R,
-        VPMULHW => GENERAL_W_R_R,
-        VPMULLQ => GENERAL_W_R_R,
-        VPMULLD => GENERAL_W_R_R,
-        VPMULLW => GENERAL_W_R_R,
-        VPMULUDQ => GENERAL_W_R_R,
-        VPOR => GENERAL_W_R_R,
-        VPSADBW => GENERAL_W_R_R,
-        VPSHUFB => GENERAL_W_R_R,
-        VPSHUFD => GENERAL_W_R_R,
-        VPSIGNB => GENERAL_W_R_R,
-        VPSIGND => GENERAL_W_R_R,
-        VPSIGNW => GENERAL_W_R_R,
-        VPSLLD => GENERAL_W_R_R,
-        VPSLLDQ => GENERAL_W_R_R,
-        VPSLLQ => GENERAL_W_R_R,
-        VPSLLVD => GENERAL_W_R_R,
-        VPSLLVQ => GENERAL_W_R_R,
-        VPSLLW => GENERAL_W_R_R,
-        VPSRAD => GENERAL_W_R_R,
-        VPSRAVD => GENERAL_W_R_R,
-        VPSRAW => GENERAL_W_R_R,
-        VPSRLD => GENERAL_W_R_R,
-        VPSRLDQ => GENERAL_W_R_R,
-        VPSRLQ => GENERAL_W_R_R,
-        VPSRLVD => GENERAL_W_R_R,
-        VPSRLVQ => GENERAL_W_R_R,
-        VPSRLW => GENERAL_W_R_R,
-        VPSUBB => GENERAL_W_R_R,
-        VPSUBD => GENERAL_W_R_R,
-        VPSUBQ => GENERAL_W_R_R,
-        VPSUBSB => GENERAL_W_R_R,
-        VPSUBSW => GENERAL_W_R_R,
-        VPSUBUSB => GENERAL_W_R_R,
-        VPSUBUSW => GENERAL_W_R_R,
-        VPSUBW => GENERAL_W_R_R,
-        VPTEST => GENERAL_R_R_FLAGWRITE,
-        VPUNPCKHBW => GENERAL_W_R_R,
-        VPUNPCKHDQ => GENERAL_W_R_R,
-        VPUNPCKHQDQ => GENERAL_W_R_R,
-        VPUNPCKHWD => GENERAL_W_R_R,
-        VPUNPCKLBW => GENERAL_W_R_R,
-        VPUNPCKLDQ => GENERAL_W_R_R,
-        VPUNPCKLQDQ => GENERAL_W_R_R,
-        VPUNPCKLWD => GENERAL_W_R_R,
-        VPXOR => GENERAL_W_R_R,
-        VRCPPS => GENERAL_W_R,
-        VROUNDPD => GENERAL_W_R_R,
-        VROUNDPS => GENERAL_W_R_R,
-        VROUNDSD => GENERAL_W_R_R
+    /* VPMADDWD => */ GENERAL_W_R_R,
+    /* VPMASKMOVD => */ GENERAL_W_R_R,
+    /* VPMASKMOVQ => */ GENERAL_W_R_R,
+    /* VPMAXSB => */ GENERAL_W_R_R,
+    /* VPMAXSD => */ GENERAL_W_R_R,
+    /* VPMAXSW => */ GENERAL_W_R_R,
+    /* VPMAXUB => */ GENERAL_W_R_R,
+    /* VPMAXUW => */ GENERAL_W_R_R,
+    /* VPMAXUD => */ GENERAL_W_R_R,
+    /* VPMINSB => */ GENERAL_W_R_R,
+    /* VPMINSW => */ GENERAL_W_R_R,
+    /* VPMINSD => */ GENERAL_W_R_R,
+    /* VPMINUB => */ GENERAL_W_R_R,
+    /* VPMINUW => */ GENERAL_W_R_R,
+    /* VPMINUD => */ GENERAL_W_R_R,
+    /* VPMOVMSKB => */ GENERAL_W_R,
+    /* VPMOVSXBD => */ GENERAL_W_R,
+    /* VPMOVSXBQ => */ GENERAL_W_R,
+    /* VPMOVSXBW => */ GENERAL_W_R,
+    /* VPMOVSXDQ => */ GENERAL_W_R,
+    /* VPMOVSXWD => */ GENERAL_W_R,
+    /* VPMOVSXWQ => */ GENERAL_W_R,
+    /* VPMOVZXBD => */ GENERAL_W_R,
+    /* VPMOVZXBQ => */ GENERAL_W_R,
+    /* VPMOVZXBW => */ GENERAL_W_R,
+    /* VPMOVZXDQ => */ GENERAL_W_R,
+    /* VPMOVZXWD => */ GENERAL_W_R,
+    /* VPMOVZXWQ => */ GENERAL_W_R,
+    /* VPMULDQ => */ GENERAL_W_R_R,
+    /* VPMULHRSW => */ GENERAL_W_R_R,
+    /* VPMULHUW => */ GENERAL_W_R_R,
+    /* VPMULHW => */ GENERAL_W_R_R,
+    /* VPMULLQ => */ GENERAL_W_R_R,
+    /* VPMULLD => */ GENERAL_W_R_R,
+    /* VPMULLW => */ GENERAL_W_R_R,
+    /* VPMULUDQ => */ GENERAL_W_R_R,
+    /* VPOR => */ GENERAL_W_R_R,
+    /* VPSADBW => */ GENERAL_W_R_R,
+    /* VPSHUFB => */ GENERAL_W_R_R,
+    /* VPSHUFD => */ GENERAL_W_R_R,
+    /* VPSIGNB => */ GENERAL_W_R_R,
+    /* VPSIGND => */ GENERAL_W_R_R,
+    /* VPSIGNW => */ GENERAL_W_R_R,
+    /* VPSLLD => */ GENERAL_W_R_R,
+    /* VPSLLDQ => */ GENERAL_W_R_R,
+    /* VPSLLQ => */ GENERAL_W_R_R,
+    /* VPSLLVD => */ GENERAL_W_R_R,
+    /* VPSLLVQ => */ GENERAL_W_R_R,
+    /* VPSLLW => */ GENERAL_W_R_R,
+    /* VPSRAD => */ GENERAL_W_R_R,
+    /* VPSRAVD => */ GENERAL_W_R_R,
+    /* VPSRAW => */ GENERAL_W_R_R,
+    /* VPSRLD => */ GENERAL_W_R_R,
+    /* VPSRLDQ => */ GENERAL_W_R_R,
+    /* VPSRLQ => */ GENERAL_W_R_R,
+    /* VPSRLVD => */ GENERAL_W_R_R,
+    /* VPSRLVQ => */ GENERAL_W_R_R,
+    /* VPSRLW => */ GENERAL_W_R_R,
+    /* VPSUBB => */ GENERAL_W_R_R,
+    /* VPSUBD => */ GENERAL_W_R_R,
+    /* VPSUBQ => */ GENERAL_W_R_R,
+    /* VPSUBSB => */ GENERAL_W_R_R,
+    /* VPSUBSW => */ GENERAL_W_R_R,
+    /* VPSUBUSB => */ GENERAL_W_R_R,
+    /* VPSUBUSW => */ GENERAL_W_R_R,
+    /* VPSUBW => */ GENERAL_W_R_R,
+    /* VPTEST => */ GENERAL_R_R_FLAGWRITE,
+    /* VPUNPCKHBW => */ GENERAL_W_R_R,
+    /* VPUNPCKHDQ => */ GENERAL_W_R_R,
+    /* VPUNPCKHQDQ => */ GENERAL_W_R_R,
+    /* VPUNPCKHWD => */ GENERAL_W_R_R,
+    /* VPUNPCKLBW => */ GENERAL_W_R_R,
+    /* VPUNPCKLDQ => */ GENERAL_W_R_R,
+    /* VPUNPCKLQDQ => */ GENERAL_W_R_R,
+    /* VPUNPCKLWD => */ GENERAL_W_R_R,
+    /* VPXOR => */ GENERAL_W_R_R,
+    /* VRCPPS => */ GENERAL_W_R,
+    /* VROUNDPD => */ GENERAL_W_R_R,
+    /* VROUNDPS => */ GENERAL_W_R_R,
+    /* VROUNDSD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VROUNDSS => GENERAL_W_R_R
+    /* VROUNDSS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VRSQRTPS => GENERAL_W_R,
-        VRSQRTSS => GENERAL_W_R_R,
-        VRCPSS => GENERAL_W_R_R,
-        VSHUFPD => GENERAL_W_R_R
+    /* VRSQRTPS => */ GENERAL_W_R,
+    /* VRSQRTSS => */ GENERAL_W_R_R,
+    /* VRCPSS => */ GENERAL_W_R_R,
+    /* VSHUFPD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VSHUFPS => GENERAL_W_R_R
+    /* VSHUFPS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VSQRTPD => GENERAL_W_R,
-        VSQRTPS => GENERAL_W_R,
-        VSQRTSS => GENERAL_W_R_R,
-        VSQRTSD => GENERAL_W_R_R,
-        VSUBPD => GENERAL_W_R_R,
-        VSUBPS => GENERAL_W_R_R,
-        VSUBSD => GENERAL_W_R_R,
-        VSUBSS => GENERAL_W_R_R,
-        VTESTPD => GENERAL_R_R
+    /* VSQRTPD => */ GENERAL_W_R,
+    /* VSQRTPS => */ GENERAL_W_R,
+    /* VSQRTSS => */ GENERAL_W_R_R,
+    /* VSQRTSD => */ GENERAL_W_R_R,
+    /* VSUBPD => */ GENERAL_W_R_R,
+    /* VSUBPS => */ GENERAL_W_R_R,
+    /* VSUBSD => */ GENERAL_W_R_R,
+    /* VSUBSS => */ GENERAL_W_R_R,
+    /* VTESTPD => */ GENERAL_R_R
             .set_flags_access(Access::Write),
-        VTESTPS => GENERAL_R_R
+    /* VTESTPS => */ GENERAL_R_R
             .set_flags_access(Access::Write),
-        VUNPCKHPD => GENERAL_W_R_R,
-        VUNPCKHPS => GENERAL_W_R_R,
-        VUNPCKLPD => GENERAL_W_R_R,
-        VUNPCKLPS => GENERAL_W_R_R,
-        VXORPD => GENERAL_W_R_R,
-        VXORPS => GENERAL_W_R_R,
-        VZEROUPPER => BehaviorDigest::empty()
+    /* VUNPCKHPD => */ GENERAL_W_R_R,
+    /* VUNPCKHPS => */ GENERAL_W_R_R,
+    /* VUNPCKLPD => */ GENERAL_W_R_R,
+    /* VUNPCKLPS => */ GENERAL_W_R_R,
+    /* VXORPD => */ GENERAL_W_R_R,
+    /* VXORPS => */ GENERAL_W_R_R,
+    /* VZEROUPPER => */ BehaviorDigest::empty()
             .set_complex(true),
-        VZEROALL => BehaviorDigest::empty()
+    /* VZEROALL => */ BehaviorDigest::empty()
             .set_complex(true),
-        VLDMXCSR => BehaviorDigest::empty()
+    /* VLDMXCSR => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true)
             .set_pl_any(),
-        VSTMXCSR => BehaviorDigest::empty()
+    /* VSTMXCSR => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_complex(true)
             .set_pl_any(),
 
-        PCLMULQDQ => GENERAL_RW_R
+    /* PCLMULQDQ => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        AESKEYGENASSIST => GENERAL_W_R
+    /* AESKEYGENASSIST => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        AESIMC => GENERAL_W_R,
-        AESENC => GENERAL_RW_R,
-        AESENCLAST => GENERAL_RW_R,
-        AESDEC => GENERAL_RW_R,
-        AESDECLAST => GENERAL_RW_R,
-        PCMPGTQ => GENERAL_RW_R,
-        PCMPISTRM => GENERAL_R_R
+    /* AESIMC => */ GENERAL_W_R,
+    /* AESENC => */ GENERAL_RW_R,
+    /* AESENCLAST => */ GENERAL_RW_R,
+    /* AESDEC => */ GENERAL_RW_R,
+    /* AESDECLAST => */ GENERAL_RW_R,
+    /* PCMPGTQ => */ GENERAL_RW_R,
+    /* PCMPISTRM => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_implicit_ops(PCMPISTRM_IDX),
-        PCMPISTRI => GENERAL_R_R
+    /* PCMPISTRI => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_implicit_ops(PCMPISTRI_IDX),
-        PCMPESTRI => GENERAL_R_R
+    /* PCMPESTRI => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_nontrivial(true),
-        PACKUSDW => GENERAL_RW_R,
-        PCMPESTRM => GENERAL_R_R
+    /* PACKUSDW => */ GENERAL_RW_R,
+    /* PCMPESTRM => */ GENERAL_R_R
             .set_operand(2, Access::Read)
             .set_flags_access(Access::Write)
             .set_nontrivial(true),
-        PCMPEQQ => GENERAL_RW_R,
-        PTEST => GENERAL_R_R
+    /* PCMPEQQ => */ GENERAL_RW_R,
+    /* PTEST => */ GENERAL_R_R
             .set_flags_access(Access::Write),
-        PHMINPOSUW => GENERAL_W_R,
-        DPPS => GENERAL_RW_R
+    /* PHMINPOSUW => */ GENERAL_W_R,
+    /* DPPS => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        DPPD => GENERAL_RW_R
+    /* DPPD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        MPSADBW => GENERAL_RW_R
+    /* MPSADBW => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PMOVZXDQ => GENERAL_RW_R,
-        PMOVSXDQ => GENERAL_RW_R,
-        PMOVZXBD => GENERAL_RW_R,
-        PMOVSXBD => GENERAL_RW_R,
-        PMOVZXWQ => GENERAL_RW_R,
-        PMOVSXWQ => GENERAL_RW_R,
-        PMOVZXBQ => GENERAL_RW_R,
-        PMOVSXBQ => GENERAL_RW_R,
-        PMOVSXWD => GENERAL_RW_R,
-        PMOVZXWD => GENERAL_RW_R,
-        PEXTRQ => GENERAL_W_R
+    /* PMOVZXDQ => */ GENERAL_RW_R,
+    /* PMOVSXDQ => */ GENERAL_RW_R,
+    /* PMOVZXBD => */ GENERAL_RW_R,
+    /* PMOVSXBD => */ GENERAL_RW_R,
+    /* PMOVZXWQ => */ GENERAL_RW_R,
+    /* PMOVSXWQ => */ GENERAL_RW_R,
+    /* PMOVZXBQ => */ GENERAL_RW_R,
+    /* PMOVSXBQ => */ GENERAL_RW_R,
+    /* PMOVSXWD => */ GENERAL_RW_R,
+    /* PMOVZXWD => */ GENERAL_RW_R,
+    /* PEXTRQ => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        PEXTRD => GENERAL_W_R
+    /* PEXTRD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        PEXTRW => GENERAL_W_R
+    /* PEXTRW => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        PEXTRB => GENERAL_W_R
+    /* PEXTRB => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        PMOVSXBW => GENERAL_RW_R,
-        PMOVZXBW => GENERAL_RW_R,
-        PINSRQ => GENERAL_RW_R
+    /* PMOVSXBW => */ GENERAL_RW_R,
+    /* PMOVZXBW => */ GENERAL_RW_R,
+    /* PINSRQ => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PINSRD => GENERAL_RW_R
+    /* PINSRD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PINSRB => GENERAL_RW_R
+    /* PINSRB => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        EXTRACTPS => GENERAL_W_R
+    /* EXTRACTPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        INSERTPS => GENERAL_W_R
+    /* INSERTPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        ROUNDSS => GENERAL_RW_R
+    /* ROUNDSS => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        ROUNDSD => GENERAL_RW_R
+    /* ROUNDSD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        ROUNDPS => GENERAL_W_R
+    /* ROUNDPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        ROUNDPD => GENERAL_W_R
+    /* ROUNDPD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        PMAXSB => GENERAL_RW_R,
-        PMAXSD => GENERAL_RW_R,
-        PMAXUW => GENERAL_RW_R,
-        PMAXUD => GENERAL_RW_R,
-        PMINSD => GENERAL_RW_R,
-        PMINSB => GENERAL_RW_R,
-        PMINUD => GENERAL_RW_R,
-        PMINUW => GENERAL_RW_R,
+    /* PMAXSB => */ GENERAL_RW_R,
+    /* PMAXSD => */ GENERAL_RW_R,
+    /* PMAXUW => */ GENERAL_RW_R,
+    /* PMAXUD => */ GENERAL_RW_R,
+    /* PMINSD => */ GENERAL_RW_R,
+    /* PMINSB => */ GENERAL_RW_R,
+    /* PMINUD => */ GENERAL_RW_R,
+    /* PMINUW => */ GENERAL_RW_R,
         // TODO: need to remove; doesn't exist
-        BLENDW => BehaviorDigest::empty(),
-        PBLENDVB => GENERAL_RW_R
+    /* BLENDW => */ BehaviorDigest::empty(),
+    /* PBLENDVB => */ GENERAL_RW_R
             .set_implicit_ops(XMM0_READ_IDX),
-        PBLENDW => GENERAL_RW_R
+    /* PBLENDW => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        BLENDVPS => GENERAL_RW_R
+    /* BLENDVPS => */ GENERAL_RW_R
             .set_implicit_ops(XMM0_READ_IDX),
-        BLENDVPD => GENERAL_RW_R
+    /* BLENDVPD => */ GENERAL_RW_R
             .set_implicit_ops(XMM0_READ_IDX),
-        BLENDPS => GENERAL_RW_R
+    /* BLENDPS => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        BLENDPD => GENERAL_RW_R
+    /* BLENDPD => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PMULDQ => GENERAL_RW_R,
-        MOVNTDQA => GENERAL_W_R,
-        PMULLD => GENERAL_RW_R,
-        PALIGNR => GENERAL_RW_R
+    /* PMULDQ => */ GENERAL_RW_R,
+    /* MOVNTDQA => */ GENERAL_W_R,
+    /* PMULLD => */ GENERAL_RW_R,
+    /* PALIGNR => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        PSIGNW => GENERAL_RW_R,
-        PSIGND => GENERAL_RW_R,
-        PSIGNB => GENERAL_RW_R,
-        PSHUFB => GENERAL_RW_R,
-        PMULHRSW => GENERAL_RW_R,
-        PMADDUBSW => GENERAL_RW_R,
-        PABSD => GENERAL_W_R,
-        PABSW => GENERAL_W_R,
-        PABSB => GENERAL_W_R,
-        PHSUBSW => GENERAL_RW_R,
-        PHSUBW => GENERAL_RW_R,
-        PHSUBD => GENERAL_RW_R,
-        PHADDD => GENERAL_RW_R,
-        PHADDSW => GENERAL_RW_R,
-        PHADDW => GENERAL_RW_R,
-        HSUBPD => GENERAL_RW_R,
-        HADDPD => GENERAL_RW_R,
+    /* PSIGNW => */ GENERAL_RW_R,
+    /* PSIGND => */ GENERAL_RW_R,
+    /* PSIGNB => */ GENERAL_RW_R,
+    /* PSHUFB => */ GENERAL_RW_R,
+    /* PMULHRSW => */ GENERAL_RW_R,
+    /* PMADDUBSW => */ GENERAL_RW_R,
+    /* PABSD => */ GENERAL_W_R,
+    /* PABSW => */ GENERAL_W_R,
+    /* PABSB => */ GENERAL_W_R,
+    /* PHSUBSW => */ GENERAL_RW_R,
+    /* PHSUBW => */ GENERAL_RW_R,
+    /* PHSUBD => */ GENERAL_RW_R,
+    /* PHADDD => */ GENERAL_RW_R,
+    /* PHADDSW => */ GENERAL_RW_R,
+    /* PHADDW => */ GENERAL_RW_R,
+    /* HSUBPD => */ GENERAL_RW_R,
+    /* HADDPD => */ GENERAL_RW_R,
 
-        SHA1RNDS4 => GENERAL_RW_R_R,
-        SHA1NEXTE => GENERAL_RW_R,
-        SHA1MSG1 => GENERAL_RW_R,
-        SHA1MSG2 => GENERAL_RW_R,
-        SHA256RNDS2 => GENERAL_RW_R
+    /* SHA1RNDS4 => */ GENERAL_RW_R_R,
+    /* SHA1NEXTE => */ GENERAL_RW_R,
+    /* SHA1MSG1 => */ GENERAL_RW_R,
+    /* SHA1MSG2 => */ GENERAL_RW_R,
+    /* SHA256RNDS2 => */ GENERAL_RW_R
             .set_implicit_ops(XMM0_READ_IDX),
-        SHA256MSG1 => GENERAL_RW_R,
-        SHA256MSG2 => GENERAL_RW_R,
+    /* SHA256MSG1 => */ GENERAL_RW_R,
+    /* SHA256MSG2 => */ GENERAL_RW_R,
 
-        LZCNT => GENERAL_W_R
+    /* LZCNT => */ GENERAL_W_R
             .set_flags_access(Access::Write),
-        CLGI => BehaviorDigest::empty()
+    /* CLGI => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        STGI => BehaviorDigest::empty()
+    /* STGI => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        SKINIT => BehaviorDigest::empty()
+    /* SKINIT => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Read),
-        VMLOAD => BehaviorDigest::empty()
+    /* VMLOAD => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Read),
-        VMMCALL => BehaviorDigest::empty()
+    /* VMMCALL => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        VMSAVE => BehaviorDigest::empty()
+    /* VMSAVE => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Read),
-        VMRUN => BehaviorDigest::empty()
+    /* VMRUN => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Read),
-        INVLPGA => BehaviorDigest::empty()
+    /* INVLPGA => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read),
-        INVLPGB => BehaviorDigest::empty()
+    /* INVLPGB => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
             .set_operand(1, Access::Read)
             .set_operand(2, Access::Read),
-        TLBSYNC => BehaviorDigest::empty()
+    /* TLBSYNC => */ BehaviorDigest::empty()
             .set_pl0(),
 
-        MOVBE => GENERAL_W_R,
+    /* MOVBE => */ GENERAL_W_R,
 
-        ADCX => GENERAL_RW_R
+    /* ADCX => */ GENERAL_RW_R
             .set_flags_access(Access::ReadWrite),
-        ADOX => GENERAL_RW_R
+    /* ADOX => */ GENERAL_RW_R
             .set_flags_access(Access::ReadWrite),
 
-        PREFETCHW => BehaviorDigest::empty()
+    /* PREFETCHW => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read),
 
-        RDPID => BehaviorDigest::empty()
+    /* RDPID => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write),
-        VMPTRLD => BehaviorDigest::empty()
+    /* VMPTRLD => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VMPTRST => BehaviorDigest::empty()
+    /* VMPTRST => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::Write)
             .set_complex(true),
 
-        BZHI => GENERAL_W_R_R
+    /* BZHI => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        MULX => BehaviorDigest::empty()
+    /* MULX => */ BehaviorDigest::empty()
             .set_operand(0, Access::Write)
             .set_operand(1, Access::Write)
             .set_operand(2, Access::Read)
             .set_nontrivial(true),
-        SHLX => GENERAL_W_R_R,
-        SHRX => GENERAL_W_R_R,
-        SARX => GENERAL_W_R_R,
-        PDEP => GENERAL_W_R_R,
-        PEXT => GENERAL_W_R_R,
-        RORX => GENERAL_W_R_R,
-        XRSTORS => BehaviorDigest::empty()
+    /* SHLX => */ GENERAL_W_R_R,
+    /* SHRX => */ GENERAL_W_R_R,
+    /* SARX => */ GENERAL_W_R_R,
+    /* PDEP => */ GENERAL_W_R_R,
+    /* PEXT => */ GENERAL_W_R_R,
+    /* RORX => */ GENERAL_W_R_R,
+    /* XRSTORS => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Read)
             .set_implicit_ops(READ_EDX_EAX_IDX),
-        XRSTORS64 => BehaviorDigest::empty()
+    /* XRSTORS64 => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Read)
             .set_implicit_ops(READ_EDX_EAX_IDX),
-        XSAVEC => BehaviorDigest::empty()
+    /* XSAVEC => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true)
             .set_operand(0, Access::Write)
             .set_implicit_ops(READ_EDX_EAX_IDX),
-        XSAVEC64 => BehaviorDigest::empty()
+    /* XSAVEC64 => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true)
             .set_operand(0, Access::Write)
             .set_implicit_ops(READ_EDX_EAX_IDX),
-        XSAVES => BehaviorDigest::empty()
+    /* XSAVES => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Write)
             .set_implicit_ops(READ_EDX_EAX_IDX),
-        XSAVES64 => BehaviorDigest::empty()
+    /* XSAVES64 => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true)
             .set_operand(0, Access::Write)
             .set_implicit_ops(READ_EDX_EAX_IDX),
 
-        RDFSBASE => BehaviorDigest::empty()
+    /* RDFSBASE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write),
-        RDGSBASE => BehaviorDigest::empty()
+    /* RDGSBASE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write),
-        WRFSBASE => BehaviorDigest::empty()
+    /* WRFSBASE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read),
-        WRGSBASE => BehaviorDigest::empty()
+    /* WRGSBASE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read),
 
-        CRC32 => GENERAL_RW_R,
-        SALC => BehaviorDigest::empty()
+    /* CRC32 => */ GENERAL_RW_R,
+    /* SALC => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_flags_access(Access::Read)
             .set_implicit_ops(WRITE_AL_IDX),
-        XLAT => BehaviorDigest::empty()
+    /* XLAT => */ BehaviorDigest::empty()
             .set_implicit_ops(XLAT_IDX)
             .set_pl_any(),
 
         // TODO: none of x87 is verified well.. and what about the bits in the FPU status word..
         // and what about pushes/pops from the x87 operand stack..
         // TODO: read st(0), write st(0)
-        F2XM1 => BehaviorDigest::empty()
+    /* F2XM1 => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FABS => GENERAL, // TODO: this is really an implicit write to st(0)
-        FADD => GENERAL_RW_R,
-        FADDP => GENERAL_RW_R,
-        FBLD => GENERAL_W_R,
-        FBSTP => GENERAL_W_R,
-        FCHS => GENERAL_W_R,
-        FCMOVB => GENERAL_W_R_FLAGREAD,
-        FCMOVBE => GENERAL_W_R_FLAGREAD,
-        FCMOVE => GENERAL_W_R_FLAGREAD,
-        FCMOVNB => GENERAL_W_R_FLAGREAD,
-        FCMOVNBE => GENERAL_W_R_FLAGREAD,
-        FCMOVNE => GENERAL_W_R_FLAGREAD,
-        FCMOVNU => GENERAL_W_R_FLAGREAD,
-        FCMOVU => GENERAL_W_R_FLAGREAD,
-        FCOM => GENERAL_R_R,
-        FCOMI => GENERAL_R_R_FLAGWRITE,
-        FCOMIP => GENERAL_R_R_FLAGWRITE,
-        FCOMP => GENERAL_R_R,
-        FCOMPP => GENERAL_R_R,
+    /* FABS => */ GENERAL, // TODO: this is really an implicit write to st(0)
+    /* FADD => */ GENERAL_RW_R,
+    /* FADDP => */ GENERAL_RW_R,
+    /* FBLD => */ GENERAL_W_R,
+    /* FBSTP => */ GENERAL_W_R,
+    /* FCHS => */ GENERAL_W_R,
+    /* FCMOVB => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVBE => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVE => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVNB => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVNBE => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVNE => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVNU => */ GENERAL_W_R_FLAGREAD,
+    /* FCMOVU => */ GENERAL_W_R_FLAGREAD,
+    /* FCOM => */ GENERAL_R_R,
+    /* FCOMI => */ GENERAL_R_R_FLAGWRITE,
+    /* FCOMIP => */ GENERAL_R_R_FLAGWRITE,
+    /* FCOMP => */ GENERAL_R_R,
+    /* FCOMPP => */ GENERAL_R_R,
         // TODO: st(0) -> st(0)
-        FCOS => BehaviorDigest::empty()
+    /* FCOS => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: x87 stack pointer dec
-        FDECSTP => BehaviorDigest::empty()
+    /* FDECSTP => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FDIV => GENERAL_RW_R,
+    /* FDIV => */ GENERAL_RW_R,
         // TODO: x87 stack pop
-        FDIVP => GENERAL_RW_R,
-        FDIVR => GENERAL_RW_R,
+    /* FDIVP => */ GENERAL_RW_R,
+    /* FDIVR => */ GENERAL_RW_R,
         // TODO: x87 stack pop
-        FDIVRP => GENERAL_RW_R,
-        FENI8087_NOP => BehaviorDigest::empty()
+    /* FDIVRP => */ GENERAL_RW_R,
+    /* FENI8087_NOP => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FDISI8087_NOP => BehaviorDigest::empty()
+    /* FDISI8087_NOP => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: the behavior here is ... inaccurate. st(i) is not read, but state associated with
         // that register is modified. so it's kind of read?
-        FFREE => BehaviorDigest::empty()
+    /* FFREE => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_pl_any(),
         // same as `ffree` above.
-        FFREEP => BehaviorDigest::empty()
+    /* FFREEP => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_pl_any(),
-        FIADD => GENERAL_RW_R,
-        FICOM => GENERAL_R_R,
-        FICOMP => GENERAL_R_R,
-        FIDIV => GENERAL_RW_R,
-        FIDIVR => GENERAL_RW_R,
+    /* FIADD => */ GENERAL_RW_R,
+    /* FICOM => */ GENERAL_R_R,
+    /* FICOMP => */ GENERAL_R_R,
+    /* FIDIV => */ GENERAL_RW_R,
+    /* FIDIVR => */ GENERAL_RW_R,
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
-        FILD => GENERAL_W_R,
-        FIMUL => GENERAL_RW_R,
+    /* FILD => */ GENERAL_W_R,
+    /* FIMUL => */ GENERAL_RW_R,
         // TODO: x87 stack pointer inc
-        FINCSTP => BehaviorDigest::empty()
+    /* FINCSTP => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FIST => GENERAL_W_R,
-        FISTP => GENERAL_W_R,
-        FISTTP => GENERAL_W_R,
-        FISUB => GENERAL_RW_R,
-        FISUBR => GENERAL_RW_R,
+    /* FIST => */ GENERAL_W_R,
+    /* FISTP => */ GENERAL_W_R,
+    /* FISTTP => */ GENERAL_W_R,
+    /* FISUB => */ GENERAL_RW_R,
+    /* FISUBR => */ GENERAL_RW_R,
         // TODO: writing to st(0) is only kind of accurate, this *pushes* to the operand stack..
-        FLD => GENERAL_W_R,
+    /* FLD => */ GENERAL_W_R,
         // TODO: fpu stack write
-        FLD1 => BehaviorDigest::empty()
+    /* FLD1 => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FLDCW => GENERAL_R,
-        FLDENV => GENERAL_R
+    /* FLDCW => */ GENERAL_R,
+    /* FLDENV => */ GENERAL_R
             .set_pl_any()
             .set_complex(true),
         // TODO: fpu stack write
-        FLDL2E => BehaviorDigest::empty()
+    /* FLDL2E => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: fpu stack write
-        FLDL2T => BehaviorDigest::empty()
+    /* FLDL2T => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: fpu stack write
-        FLDLG2 => BehaviorDigest::empty()
+    /* FLDLG2 => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: fpu stack write
-        FLDLN2 => BehaviorDigest::empty()
+    /* FLDLN2 => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: fpu stack write
-        FLDPI =>  BehaviorDigest::empty()
+    /* FLDPI => */  BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: fpu stack write
-        FLDZ =>  BehaviorDigest::empty()
+    /* FLDZ => */  BehaviorDigest::empty()
             .set_pl_any(),
-        FMUL => GENERAL_RW_R,
-        FMULP => GENERAL_RW_R,
+    /* FMUL => */ GENERAL_RW_R,
+    /* FMULP => */ GENERAL_RW_R,
         // TODO: report change to x87 flags?
-        FNCLEX => BehaviorDigest::empty()
+    /* FNCLEX => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: report change to x87 flags?
-        FNINIT => BehaviorDigest::empty()
+    /* FNINIT => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FNOP => BehaviorDigest::empty()
+    /* FNOP => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FNSAVE => BehaviorDigest::empty()
+    /* FNSAVE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_complex(true),
-        FNSTCW => BehaviorDigest::empty()
+    /* FNSTCW => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_complex(true),
-        FNSTENV => BehaviorDigest::empty()
+    /* FNSTENV => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_complex(true),
         // TODO: never produced..
-        FNSTOR => BehaviorDigest::empty(),
-        FNSTSW => BehaviorDigest::empty()
+    /* FNSTOR => */ BehaviorDigest::empty(),
+    /* FNSTSW => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_complex(true),
         // TODO: read st(1) with atan(st(1)/st(0)) and pop
-        FPATAN => BehaviorDigest::empty()
+    /* FPATAN => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: read st(0), st(1), write st(0)
-        FPREM => BehaviorDigest::empty()
+    /* FPREM => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: read st(0), st(1), write st(0)
-        FPREM1 => BehaviorDigest::empty()
+    /* FPREM1 => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: read st(0), write, push?
-        FPTAN => BehaviorDigest::empty()
+    /* FPTAN => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: read st(0), write, push?
-        FRNDINT => BehaviorDigest::empty()
+    /* FRNDINT => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FRSTOR => BehaviorDigest::empty()
+    /* FRSTOR => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Write)
             .set_complex(true),
         // TODO: read st(0), st(1)
-        FSCALE => BehaviorDigest::empty()
+    /* FSCALE => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: report this as a complex instruction?
-        FSETPM287_NOP => BehaviorDigest::empty()
+    /* FSETPM287_NOP => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: st(0) -> st(0)
-        FSIN => BehaviorDigest::empty()
+    /* FSIN => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: st(0) -> st(0)
-        FSINCOS => BehaviorDigest::empty()
+    /* FSINCOS => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: st(0) -> st(0)
-        FSQRT => BehaviorDigest::empty()
+    /* FSQRT => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FST => GENERAL_W_R,
-        FSTP => GENERAL_W_R,
-        FSTPNCE => GENERAL_W_R,
-        FSUB => GENERAL_RW_R,
-        FSUBP => GENERAL_RW_R,
-        FSUBR => GENERAL_RW_R,
-        FSUBRP => GENERAL_RW_R,
+    /* FST => */ GENERAL_W_R,
+    /* FSTP => */ GENERAL_W_R,
+    /* FSTPNCE => */ GENERAL_W_R,
+    /* FSUB => */ GENERAL_RW_R,
+    /* FSUBP => */ GENERAL_RW_R,
+    /* FSUBR => */ GENERAL_RW_R,
+    /* FSUBRP => */ GENERAL_RW_R,
         // TODO: report change to x87 flags, read of st(0)?
-        FTST => BehaviorDigest::empty()
+    /* FTST => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FUCOM => GENERAL_R_R,
-        FUCOMI => GENERAL_R_R_FLAGWRITE,
-        FUCOMIP => GENERAL_R_R_FLAGWRITE,
-        FUCOMP => GENERAL_R_R,
-        FUCOMPP => GENERAL_R_R,
+    /* FUCOM => */ GENERAL_R_R,
+    /* FUCOMI => */ GENERAL_R_R_FLAGWRITE,
+    /* FUCOMIP => */ GENERAL_R_R_FLAGWRITE,
+    /* FUCOMP => */ GENERAL_R_R,
+    /* FUCOMPP => */ GENERAL_R_R,
         // TODO: report change to x87 flags?
-        FXAM => BehaviorDigest::empty()
+    /* FXAM => */ BehaviorDigest::empty()
             .set_pl_any(),
-        FXCH => GENERAL_RW_RW,
+    /* FXCH => */ GENERAL_RW_RW,
         // TODO: read st(0), write st(0), x87 push
-        FXTRACT => BehaviorDigest::empty()
+    /* FXTRACT => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: read st(0), write st(0)
-        FYL2X => BehaviorDigest::empty()
+    /* FYL2X => */ BehaviorDigest::empty()
             .set_pl_any(),
         // TODO: read st(0), write st(0)
-        FYL2XP1 => BehaviorDigest::empty()
+    /* FYL2XP1 => */ BehaviorDigest::empty()
             .set_pl_any(),
 
-        LOOPNZ => BehaviorDigest::empty()
+    /* LOOPNZ => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read)
             .set_flags_access(Access::ReadWrite)
             .set_nontrivial(true),
-        LOOPZ => BehaviorDigest::empty()
+    /* LOOPZ => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read)
             .set_flags_access(Access::ReadWrite)
             .set_nontrivial(true),
-        LOOP => BehaviorDigest::empty()
+    /* LOOP => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read)
             .set_flags_access(Access::ReadWrite)
             .set_nontrivial(true),
-        JRCXZ => BehaviorDigest::empty()
+    /* JRCXZ => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(0, Access::Read)
             .set_nontrivial(true),
@@ -5229,43 +5240,43 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         // started shipping in Tremont, 2020 sept 23
         // while this instruction is marked "write, read", the written first operand is a register
         // interpreteed as an address for a memory destination through the `es` selector.
-        MOVDIR64B => GENERAL_W_R
+    /* MOVDIR64B => */ GENERAL_W_R
             .set_complex(true),
-        MOVDIRI => GENERAL_W_R,
+    /* MOVDIRI => */ GENERAL_W_R,
 
         // started shipping in Tiger Lake, 2020 sept 2
-        AESDEC128KL => GENERAL_RW_R
+    /* AESDEC128KL => */ GENERAL_RW_R
             .set_flags_access(Access::Write),
-        AESDEC256KL => GENERAL_RW_R
+    /* AESDEC256KL => */ GENERAL_RW_R
             .set_flags_access(Access::Write),
-        AESDECWIDE128KL => GENERAL_R
+    /* AESDECWIDE128KL => */ GENERAL_R
             .set_implicit_ops(RW_XMM0TO7_IDX)
             .set_flags_access(Access::Write),
-        AESDECWIDE256KL => GENERAL_R
+    /* AESDECWIDE256KL => */ GENERAL_R
             .set_implicit_ops(RW_XMM0TO7_IDX)
             .set_flags_access(Access::Write),
-        AESENC128KL => GENERAL_RW_R
+    /* AESENC128KL => */ GENERAL_RW_R
             .set_flags_access(Access::Write),
-        AESENC256KL => GENERAL_RW_R
+    /* AESENC256KL => */ GENERAL_RW_R
             .set_flags_access(Access::Write),
-        AESENCWIDE128KL => GENERAL_R
+    /* AESENCWIDE128KL => */ GENERAL_R
             .set_implicit_ops(RW_XMM0TO7_IDX)
             .set_flags_access(Access::Write),
-        AESENCWIDE256KL => GENERAL_R
+    /* AESENCWIDE256KL => */ GENERAL_R
             .set_implicit_ops(RW_XMM0TO7_IDX)
             .set_flags_access(Access::Write),
-        ENCODEKEY128 => GENERAL_W_R
+    /* ENCODEKEY128 => */ GENERAL_W_R
             .set_implicit_ops(ENCODEKEY_IDX)
             .set_flags_access(Access::Write),
-        ENCODEKEY256 => GENERAL_W_R
+    /* ENCODEKEY256 => */ GENERAL_W_R
             .set_implicit_ops(ENCODEKEY_IDX)
             .set_flags_access(Access::Write),
-        LOADIWKEY => GENERAL_R_R
+    /* LOADIWKEY => */ GENERAL_R_R
             .set_implicit_ops(LOADIWKEY_IDX)
             .set_flags_access(Access::Write),
 
         // unsure
-        HRESET => BehaviorDigest::empty()
+    /* HRESET => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read) // but really, "explicit imm8 operand is ignored"
             .set_implicit_ops(READ_EAX_IDX)
             .set_complex(true),
@@ -5273,41 +5284,41 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         // 3dnow. note these are yet untested!
         // the 3dnow DSP instructions (pi2fw, pf2iw, pfnacc, pfpnacc, pswapd)
         // are even more untested.
-        FEMMS => GENERAL,
-        PI2FW => GENERAL_RW_R,
-        PI2FD => GENERAL_W_R,
-        PF2IW => GENERAL_RW_R,
-        PF2ID => GENERAL_W_R,
-        PMULHRW => GENERAL_RW_R,
-        PFCMPGE => GENERAL_RW_R,
-        PFMIN => GENERAL_RW_R,
-        PFRCP => GENERAL_W_R,
-        PFRSQRT => GENERAL_W_R,
-        PFSUB => GENERAL_RW_R,
-        PFADD => GENERAL_RW_R,
-        PFCMPGT => GENERAL_RW_R,
-        PFMAX => GENERAL_RW_R,
-        PFRCPIT1 => GENERAL_RW_R,
-        PFRSQIT1 => GENERAL_RW_R,
-        PFSUBR => GENERAL_RW_R,
-        PFACC => GENERAL_RW_R,
-        PFCMPEQ => GENERAL_RW_R,
-        PFMUL => GENERAL_RW_R,
-        PFMULHRW => GENERAL_RW_R,
-        PFRCPIT2 => GENERAL_RW_R,
-        PFNACC => GENERAL_RW_R,
-        PFPNACC => GENERAL_RW_R,
-        PSWAPD => GENERAL_RW_RW,
-        PAVGUSB => GENERAL_RW_R,
+    /* FEMMS => */ GENERAL,
+    /* PI2FW => */ GENERAL_RW_R,
+    /* PI2FD => */ GENERAL_W_R,
+    /* PF2IW => */ GENERAL_RW_R,
+    /* PF2ID => */ GENERAL_W_R,
+    /* PMULHRW => */ GENERAL_RW_R,
+    /* PFCMPGE => */ GENERAL_RW_R,
+    /* PFMIN => */ GENERAL_RW_R,
+    /* PFRCP => */ GENERAL_W_R,
+    /* PFRSQRT => */ GENERAL_W_R,
+    /* PFSUB => */ GENERAL_RW_R,
+    /* PFADD => */ GENERAL_RW_R,
+    /* PFCMPGT => */ GENERAL_RW_R,
+    /* PFMAX => */ GENERAL_RW_R,
+    /* PFRCPIT1 => */ GENERAL_RW_R,
+    /* PFRSQIT1 => */ GENERAL_RW_R,
+    /* PFSUBR => */ GENERAL_RW_R,
+    /* PFACC => */ GENERAL_RW_R,
+    /* PFCMPEQ => */ GENERAL_RW_R,
+    /* PFMUL => */ GENERAL_RW_R,
+    /* PFMULHRW => */ GENERAL_RW_R,
+    /* PFRCPIT2 => */ GENERAL_RW_R,
+    /* PFNACC => */ GENERAL_RW_R,
+    /* PFPNACC => */ GENERAL_RW_R,
+    /* PSWAPD => */ GENERAL_RW_RW,
+    /* PAVGUSB => */ GENERAL_RW_R,
 
         // ENQCMD
         // similar to movdir64b, but more complex; the first operand is also an address for a
         // memory destination.
-        ENQCMD =>  GENERAL_W_R
+    /* ENQCMD => */  GENERAL_W_R
             .set_flags_access(Access::Write)
             .set_pl0()
             .set_complex(true),
-        ENQCMDS => GENERAL_W_R
+    /* ENQCMDS => */ GENERAL_W_R
             .set_flags_access(Access::Write)
             .set_pl0()
             .set_complex(true),
@@ -5315,97 +5326,97 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         // INVPCID
         // this almost meets the bar to be "complex", given that it manages non-architectural
         // state not described by the operand iterator. but.. not quite, for now?
-        INVEPT => GENERAL_R_R,
+    /* INVEPT => */ GENERAL_R_R,
         // similar to above.
-        INVVPID => GENERAL_R_R,
+    /* INVVPID => */ GENERAL_R_R,
         // again, similar to `invept` above.
-        INVPCID => GENERAL_R_R,
+    /* INVPCID => */ GENERAL_R_R,
 
         // PTWRITE
         // TODO: untested
-        PTWRITE => BehaviorDigest::empty()
+    /* PTWRITE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
 
         // GFNI
-        GF2P8AFFINEQB => GENERAL_RW_R
+    /* GF2P8AFFINEQB => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        GF2P8AFFINEINVQB => GENERAL_RW_R
+    /* GF2P8AFFINEINVQB => */ GENERAL_RW_R
             .set_operand(2, Access::Read),
-        GF2P8MULB => GENERAL_RW_R,
+    /* GF2P8MULB => */ GENERAL_RW_R,
 
         // CET
-        WRUSS => GENERAL_W_R
+    /* WRUSS => */ GENERAL_W_R
             .set_pl0()
             .set_complex(true),
-        WRSS => GENERAL_W_R
+    /* WRSS => */ GENERAL_W_R
             .set_pl_special()
             .set_complex(true),
-        INCSSP => GENERAL_R
+    /* INCSSP => */ GENERAL_R
             .set_pl_special()
             .set_complex(true),
-        SAVEPREVSSP => BehaviorDigest::empty()
+    /* SAVEPREVSSP => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_complex(true),
-        SETSSBSY => BehaviorDigest::empty()
+    /* SETSSBSY => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        CLRSSBSY => BehaviorDigest::empty()
+    /* CLRSSBSY => */ BehaviorDigest::empty()
             .set_pl0()
             .set_operand(0, Access::ReadWrite)
             .set_flags_access(Access::Write)
             .set_complex(true),
-        RSTORSSP => BehaviorDigest::empty()
+    /* RSTORSSP => */ BehaviorDigest::empty()
             .set_pl_special()
             .set_operand(0, Access::ReadWrite)
             .set_flags_access(Access::Write)
             .set_complex(true),
-        ENDBR64 => BehaviorDigest::empty()
+    /* ENDBR64 => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        ENDBR32 => BehaviorDigest::empty()
+    /* ENDBR32 => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
 
         // TDX
-        TDCALL => BehaviorDigest::empty()
+    /* TDCALL => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        SEAMRET => BehaviorDigest::empty()
+    /* SEAMRET => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        SEAMOPS => BehaviorDigest::empty()
+    /* SEAMOPS => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
-        SEAMCALL => BehaviorDigest::empty()
+    /* SEAMCALL => */ BehaviorDigest::empty()
             .set_pl0()
             .set_complex(true),
 
         // WAITPKG
-        TPAUSE => BehaviorDigest::empty()
+    /* TPAUSE => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        UMONITOR => BehaviorDigest::empty()
+    /* UMONITOR => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        UMWAIT => BehaviorDigest::empty()
+    /* UMWAIT => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
 
         // UINTR
-        UIRET => BehaviorDigest::empty()
+    /* UIRET => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        TESTUI => BehaviorDigest::empty()
+    /* TESTUI => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        CLUI => BehaviorDigest::empty()
+    /* CLUI => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        STUI => BehaviorDigest::empty()
+    /* STUI => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
-        SENDUIPI => BehaviorDigest::empty()
+    /* SENDUIPI => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_complex(true),
 
@@ -5416,519 +5427,516 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
         // state can be easily determined by looking for these instructions. additionally, a user
         // interested in this state is probably already looking for these instructions, so
         // declaring them complex adds burden to all other use for no benefit.
-        XSUSLDTRK => BehaviorDigest::empty()
+    /* XSUSLDTRK => */ BehaviorDigest::empty()
             .set_pl_any(),
-        XRESLDTRK => BehaviorDigest::empty()
+    /* XRESLDTRK => */ BehaviorDigest::empty()
             .set_pl_any(),
 
         // AVX512F
-        VALIGND => GENERAL_W_R_R
+    /* VALIGND => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VALIGNQ => GENERAL_W_R_R
+    /* VALIGNQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VBLENDMPD => GENERAL_W_R_R,
-        VBLENDMPS => GENERAL_W_R_R,
-        VCOMPRESSPD => GENERAL_W_R,
-        VCOMPRESSPS => GENERAL_W_R,
-        VCVTPD2UDQ => GENERAL_W_R,
-        VCVTTPD2UDQ => GENERAL_W_R,
-        VCVTPS2UDQ => GENERAL_W_R,
-        VCVTTPS2UDQ => GENERAL_W_R,
-        VCVTQQ2PD => GENERAL_W_R,
-        VCVTQQ2PS => GENERAL_W_R,
-        VCVTSD2USI => GENERAL_W_R,
-        VCVTTSD2USI => GENERAL_W_R,
-        VCVTSS2USI => GENERAL_W_R,
-        VCVTTSS2USI => GENERAL_W_R,
-        VCVTUDQ2PD => GENERAL_W_R,
-        VCVTUDQ2PS => GENERAL_W_R,
-        VCVTUSI2USD => GENERAL_W_R,
-        VCVTUSI2USS => GENERAL_W_R,
-        VEXPANDPD => GENERAL_W_R,
-        VEXPANDPS => GENERAL_W_R,
-        VEXTRACTF32X4 => GENERAL_W_R
+    /* VBLENDMPD => */ GENERAL_W_R_R,
+    /* VBLENDMPS => */ GENERAL_W_R_R,
+    /* VCOMPRESSPD => */ GENERAL_W_R,
+    /* VCOMPRESSPS => */ GENERAL_W_R,
+    /* VCVTPD2UDQ => */ GENERAL_W_R,
+    /* VCVTTPD2UDQ => */ GENERAL_W_R,
+    /* VCVTPS2UDQ => */ GENERAL_W_R,
+    /* VCVTTPS2UDQ => */ GENERAL_W_R,
+    /* VCVTQQ2PD => */ GENERAL_W_R,
+    /* VCVTQQ2PS => */ GENERAL_W_R,
+    /* VCVTSD2USI => */ GENERAL_W_R,
+    /* VCVTTSD2USI => */ GENERAL_W_R,
+    /* VCVTSS2USI => */ GENERAL_W_R,
+    /* VCVTTSS2USI => */ GENERAL_W_R,
+    /* VCVTUDQ2PD => */ GENERAL_W_R,
+    /* VCVTUDQ2PS => */ GENERAL_W_R,
+    /* VCVTUSI2USD => */ GENERAL_W_R,
+    /* VCVTUSI2USS => */ GENERAL_W_R,
+    /* VEXPANDPD => */ GENERAL_W_R,
+    /* VEXPANDPS => */ GENERAL_W_R,
+    /* VEXTRACTF32X4 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTF64X4 => GENERAL_W_R
+    /* VEXTRACTF64X4 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTI32X4 => GENERAL_W_R
+    /* VEXTRACTI32X4 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTI64X4 => GENERAL_W_R
+    /* VEXTRACTI64X4 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VFIXUPIMMPD => GENERAL_RW_R_R
+    /* VFIXUPIMMPD => */ GENERAL_RW_R_R
             .set_operand(3, Access::Read),
-        VFIXUPIMMPS => GENERAL_RW_R_R
+    /* VFIXUPIMMPS => */ GENERAL_RW_R_R
             .set_operand(3, Access::Read),
-        VFIXUPIMMSD => GENERAL_RW_R_R
+    /* VFIXUPIMMSD => */ GENERAL_RW_R_R
             .set_operand(3, Access::Read),
-        VFIXUPIMMSS => GENERAL_RW_R_R
+    /* VFIXUPIMMSS => */ GENERAL_RW_R_R
             .set_operand(3, Access::Read),
-        VGETEXPPD => GENERAL_W_R,
-        VGETEXPPS => GENERAL_W_R,
-        VGETEXPSD => GENERAL_W_R_R,
-        VGETEXPSS => GENERAL_W_R_R,
-        VGETMANTPD => GENERAL_W_R
+    /* VGETEXPPD => */ GENERAL_W_R,
+    /* VGETEXPPS => */ GENERAL_W_R,
+    /* VGETEXPSD => */ GENERAL_W_R_R,
+    /* VGETEXPSS => */ GENERAL_W_R_R,
+    /* VGETMANTPD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VGETMANTPS => GENERAL_W_R
+    /* VGETMANTPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VGETMANTSD => GENERAL_W_R_R
+    /* VGETMANTSD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VGETMANTSS => GENERAL_W_R_R
+    /* VGETMANTSS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VINSERTF32X4 => GENERAL_W_R_R
+    /* VINSERTF32X4 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VINSERTF64X4 => GENERAL_W_R_R
+    /* VINSERTF64X4 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VINSERTI64X4 => GENERAL_W_R_R
+    /* VINSERTI64X4 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VMOVDQA32 => GENERAL_W_R,
-        VMOVDQA64 => GENERAL_W_R,
-        VMOVDQU32 => GENERAL_W_R,
-        VMOVDQU64 => GENERAL_W_R,
-        VPBLENDMD => GENERAL_W_R_R,
-        VPBLENDMQ => GENERAL_W_R_R,
-        VPCMPD => GENERAL_W_R_R
+    /* VMOVDQA32 => */ GENERAL_W_R,
+    /* VMOVDQA64 => */ GENERAL_W_R,
+    /* VMOVDQU32 => */ GENERAL_W_R,
+    /* VMOVDQU64 => */ GENERAL_W_R,
+    /* VPBLENDMD => */ GENERAL_W_R_R,
+    /* VPBLENDMQ => */ GENERAL_W_R_R,
+    /* VPCMPD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPUD => GENERAL_W_R_R
+    /* VPCMPUD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPQ => GENERAL_W_R_R
+    /* VPCMPQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPUQ => GENERAL_W_R_R
+    /* VPCMPUQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCOMPRESSQ => GENERAL_W_R,
-        VPCOMPRESSD => GENERAL_W_R,
-        VPERMI2D => GENERAL_W_R_R,
-        VPERMI2Q => GENERAL_W_R_R,
-        VPERMI2PD => GENERAL_W_R_R,
-        VPERMI2PS => GENERAL_W_R_R,
-        VPERMT2D => GENERAL_W_R_R,
-        VPERMT2Q => GENERAL_W_R_R,
-        VPERMT2PD => GENERAL_W_R_R,
-        VPERMT2PS => GENERAL_W_R_R,
-        VPMAXSQ => GENERAL_W_R_R,
-        VPMAXUQ => GENERAL_W_R_R,
-        VPMINSQ => GENERAL_W_R_R,
-        VPMINUQ => GENERAL_W_R_R,
-        VPMOVSQB => GENERAL_W_R,
-        VPMOVUSQB => GENERAL_W_R,
-        VPMOVSQW => GENERAL_W_R,
-        VPMOVUSQW => GENERAL_W_R,
-        VPMOVSQD => GENERAL_W_R,
-        VPMOVUSQD => GENERAL_W_R,
-        VPMOVSDB => GENERAL_W_R,
-        VPMOVUSDB => GENERAL_W_R,
-        VPMOVSDW => GENERAL_W_R,
-        VPMOVUSDW => GENERAL_W_R,
-        VPROLD => GENERAL_W_R_R,
-        VPROLQ => GENERAL_W_R_R,
-        VPROLVD => GENERAL_W_R_R,
-        VPROLVQ => GENERAL_W_R_R,
-        VPRORD => GENERAL_W_R_R,
-        VPRORQ => GENERAL_W_R_R,
-        VPRORRD => GENERAL_W_R_R,
-        VPRORRQ => GENERAL_W_R_R,
+    /* VPCOMPRESSQ => */ GENERAL_W_R,
+    /* VPCOMPRESSD => */ GENERAL_W_R,
+    /* VPERMI2D => */ GENERAL_W_R_R,
+    /* VPERMI2Q => */ GENERAL_W_R_R,
+    /* VPERMI2PD => */ GENERAL_W_R_R,
+    /* VPERMI2PS => */ GENERAL_W_R_R,
+    /* VPERMT2D => */ GENERAL_W_R_R,
+    /* VPERMT2Q => */ GENERAL_W_R_R,
+    /* VPERMT2PD => */ GENERAL_W_R_R,
+    /* VPERMT2PS => */ GENERAL_W_R_R,
+    /* VPMAXSQ => */ GENERAL_W_R_R,
+    /* VPMAXUQ => */ GENERAL_W_R_R,
+    /* VPMINSQ => */ GENERAL_W_R_R,
+    /* VPMINUQ => */ GENERAL_W_R_R,
+    /* VPMOVSQB => */ GENERAL_W_R,
+    /* VPMOVUSQB => */ GENERAL_W_R,
+    /* VPMOVSQW => */ GENERAL_W_R,
+    /* VPMOVUSQW => */ GENERAL_W_R,
+    /* VPMOVSQD => */ GENERAL_W_R,
+    /* VPMOVUSQD => */ GENERAL_W_R,
+    /* VPMOVSDB => */ GENERAL_W_R,
+    /* VPMOVUSDB => */ GENERAL_W_R,
+    /* VPMOVSDW => */ GENERAL_W_R,
+    /* VPMOVUSDW => */ GENERAL_W_R,
+    /* VPROLD => */ GENERAL_W_R_R,
+    /* VPROLQ => */ GENERAL_W_R_R,
+    /* VPROLVD => */ GENERAL_W_R_R,
+    /* VPROLVQ => */ GENERAL_W_R_R,
+    /* VPRORD => */ GENERAL_W_R_R,
+    /* VPRORQ => */ GENERAL_W_R_R,
+    /* VPRORRD => */ GENERAL_W_R_R,
+    /* VPRORRQ => */ GENERAL_W_R_R,
         // TODO: complex
-        VPSCATTERDD => BehaviorDigest::empty()
+    /* VPSCATTERDD => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPSCATTERDQ => BehaviorDigest::empty()
+    /* VPSCATTERDQ => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPSCATTERQD => BehaviorDigest::empty()
+    /* VPSCATTERQD => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPSCATTERQQ => BehaviorDigest::empty()
+    /* VPSCATTERQQ => */ BehaviorDigest::empty()
             .set_complex(true),
-        VPSRAQ => GENERAL_W_R_R,
-        VPSRAVQ => GENERAL_W_R_R,
-        VPTESTNMD => GENERAL_W_R_R,
-        VPTESTNMQ => GENERAL_W_R_R,
-        VPTERNLOGD => GENERAL_W_R_R
+    /* VPSRAQ => */ GENERAL_W_R_R,
+    /* VPSRAVQ => */ GENERAL_W_R_R,
+    /* VPTESTNMD => */ GENERAL_W_R_R,
+    /* VPTESTNMQ => */ GENERAL_W_R_R,
+    /* VPTERNLOGD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPTERNLOGQ => GENERAL_W_R_R
+    /* VPTERNLOGQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPTESTMD => GENERAL_W_R_R,
-        VPTESTMQ => GENERAL_W_R_R,
-        VRCP14PD => GENERAL_W_R,
-        VRCP14PS => GENERAL_W_R,
-        VRCP14SD => GENERAL_W_R_R,
-        VRCP14SS => GENERAL_W_R_R,
-        VRNDSCALEPD => GENERAL_W_R
+    /* VPTESTMD => */ GENERAL_W_R_R,
+    /* VPTESTMQ => */ GENERAL_W_R_R,
+    /* VRCP14PD => */ GENERAL_W_R,
+    /* VRCP14PS => */ GENERAL_W_R,
+    /* VRCP14SD => */ GENERAL_W_R_R,
+    /* VRCP14SS => */ GENERAL_W_R_R,
+    /* VRNDSCALEPD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VRNDSCALEPS => GENERAL_W_R
+    /* VRNDSCALEPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VRNDSCALESD => GENERAL_W_R_R
+    /* VRNDSCALESD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VRNDSCALESS => GENERAL_W_R_R
+    /* VRNDSCALESS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VRSQRT14PD => GENERAL_W_R,
-        VRSQRT14PS => GENERAL_W_R,
-        VRSQRT14SD => GENERAL_W_R_R,
-        VRSQRT14SS => GENERAL_W_R_R,
+    /* VRSQRT14PD => */ GENERAL_W_R,
+    /* VRSQRT14PS => */ GENERAL_W_R,
+    /* VRSQRT14SD => */ GENERAL_W_R_R,
+    /* VRSQRT14SS => */ GENERAL_W_R_R,
         // vvv --- these don't exist..
-        VSCALEDPD => BehaviorDigest::empty(),
-        VSCALEDPS => BehaviorDigest::empty(),
-        VSCALEDSD => BehaviorDigest::empty(),
-        VSCALEDSS => BehaviorDigest::empty(),
-        VSCATTERDD => BehaviorDigest::empty(),
-        VSCATTERDQ => BehaviorDigest::empty(),
-        VSCATTERQD => BehaviorDigest::empty(),
-        VSCATTERQQ => BehaviorDigest::empty(),
+    /* VSCALEDPD => */ BehaviorDigest::empty(),
+    /* VSCALEDPS => */ BehaviorDigest::empty(),
+    /* VSCALEDSD => */ BehaviorDigest::empty(),
+    /* VSCALEDSS => */ BehaviorDigest::empty(),
+    /* VSCATTERDD => */ BehaviorDigest::empty(),
+    /* VSCATTERDQ => */ BehaviorDigest::empty(),
+    /* VSCATTERQD => */ BehaviorDigest::empty(),
+    /* VSCATTERQQ => */ BehaviorDigest::empty(),
         // ^^^ --- these don't exist..
-        VSHUFF32X4 => GENERAL_W_R_R
+    /* VSHUFF32X4 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VSHUFF64X2 => GENERAL_W_R_R
+    /* VSHUFF64X2 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VSHUFI32X4 => GENERAL_W_R_R
+    /* VSHUFI32X4 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VSHUFI64X2 => GENERAL_W_R_R
+    /* VSHUFI64X2 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
 
         // AVX512DQ
-        VCVTTPD2QQ => GENERAL_W_R,
-        VCVTPD2QQ => GENERAL_W_R,
-        VCVTTPD2UQQ => GENERAL_W_R,
-        VCVTPD2UQQ => GENERAL_W_R,
-        VCVTTPS2QQ => GENERAL_W_R,
-        VCVTPS2QQ => GENERAL_W_R,
-        VCVTTPS2UQQ => GENERAL_W_R,
-        VCVTPS2UQQ => GENERAL_W_R,
-        VCVTUQQ2PD => GENERAL_W_R,
-        VCVTUQQ2PS => GENERAL_W_R,
-        VEXTRACTF64X2 => GENERAL_W_R
+    /* VCVTTPD2QQ => */ GENERAL_W_R,
+    /* VCVTPD2QQ => */ GENERAL_W_R,
+    /* VCVTTPD2UQQ => */ GENERAL_W_R,
+    /* VCVTPD2UQQ => */ GENERAL_W_R,
+    /* VCVTTPS2QQ => */ GENERAL_W_R,
+    /* VCVTPS2QQ => */ GENERAL_W_R,
+    /* VCVTTPS2UQQ => */ GENERAL_W_R,
+    /* VCVTPS2UQQ => */ GENERAL_W_R,
+    /* VCVTUQQ2PD => */ GENERAL_W_R,
+    /* VCVTUQQ2PS => */ GENERAL_W_R,
+    /* VEXTRACTF64X2 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTI64X2 => GENERAL_W_R
+    /* VEXTRACTI64X2 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VFPCLASSPD => GENERAL_W_R
+    /* VFPCLASSPD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VFPCLASSPS => GENERAL_W_R
+    /* VFPCLASSPS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VFPCLASSSD => GENERAL_W_R
+    /* VFPCLASSSD => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VFPCLASSSS => GENERAL_W_R
+    /* VFPCLASSSS => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VINSERTF64X2 => GENERAL_W_R_R
+    /* VINSERTF64X2 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VINSERTI64X2 => GENERAL_W_R_R
+    /* VINSERTI64X2 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPMOVM2D => GENERAL_W_R,
-        VPMOVM2Q => GENERAL_W_R,
-        VPMOVB2D => GENERAL_W_R,
-        VPMOVQ2M => GENERAL_W_R,
-        VRANGEPD => GENERAL_W_R_R
+    /* VPMOVM2D => */ GENERAL_W_R,
+    /* VPMOVM2Q => */ GENERAL_W_R,
+    /* VPMOVB2D => */ GENERAL_W_R,
+    /* VPMOVQ2M => */ GENERAL_W_R,
+    /* VRANGEPD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VRANGEPS => GENERAL_W_R_R
+    /* VRANGEPS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VRANGESD => GENERAL_W_R_R
+    /* VRANGESD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VRANGESS => GENERAL_W_R_R
+    /* VRANGESS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VREDUCEPD => GENERAL_W_R_R
+    /* VREDUCEPD => */ GENERAL_W_R_R
             .set_operand(2, Access::Read),
-        VREDUCEPS => GENERAL_W_R_R
+    /* VREDUCEPS => */ GENERAL_W_R_R
             .set_operand(2, Access::Read),
-        VREDUCESD => GENERAL_W_R_R
+    /* VREDUCESD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VREDUCESS => GENERAL_W_R_R
+    /* VREDUCESS => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
 
         // AVX512BW
-        VDBPSADBW => GENERAL_W_R_R
+    /* VDBPSADBW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VMOVDQU8 => GENERAL_W_R,
-        VMOVDQU16 => GENERAL_W_R,
-        VPBLENDMB => GENERAL_W_R_R,
-        VPBLENDMW => GENERAL_W_R_R,
-        VPCMPB => GENERAL_W_R_R
+    /* VMOVDQU8 => */ GENERAL_W_R,
+    /* VMOVDQU16 => */ GENERAL_W_R,
+    /* VPBLENDMB => */ GENERAL_W_R_R,
+    /* VPBLENDMW => */ GENERAL_W_R_R,
+    /* VPCMPB => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPUB => GENERAL_W_R_R
+    /* VPCMPUB => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPW => GENERAL_W_R_R
+    /* VPCMPW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPCMPUW => GENERAL_W_R_R
+    /* VPCMPUW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPERMW => GENERAL_W_R_R,
-        VPERMI2B => GENERAL_W_R_R,
-        VPERMI2W => GENERAL_W_R_R,
-        VPMOVM2B => GENERAL_W_R,
-        VPMOVM2W => GENERAL_W_R,
-        VPMOVB2M => GENERAL_W_R,
-        VPMOVW2M => GENERAL_W_R,
-        VPMOVSWB => GENERAL_W_R,
-        VPMOVUSWB => GENERAL_W_R,
-        VPSLLVW => GENERAL_W_R_R,
-        VPSRAVW => GENERAL_W_R_R,
-        VPSRLVW => GENERAL_W_R_R,
-        VPTESTNMB => GENERAL_W_R_R,
-        VPTESTNMW => GENERAL_W_R_R,
-        VPTESTMB => GENERAL_W_R_R,
-        VPTESTMW => GENERAL_W_R_R,
+    /* VPERMW => */ GENERAL_W_R_R,
+    /* VPERMI2B => */ GENERAL_W_R_R,
+    /* VPERMI2W => */ GENERAL_W_R_R,
+    /* VPMOVM2B => */ GENERAL_W_R,
+    /* VPMOVM2W => */ GENERAL_W_R,
+    /* VPMOVB2M => */ GENERAL_W_R,
+    /* VPMOVW2M => */ GENERAL_W_R,
+    /* VPMOVSWB => */ GENERAL_W_R,
+    /* VPMOVUSWB => */ GENERAL_W_R,
+    /* VPSLLVW => */ GENERAL_W_R_R,
+    /* VPSRAVW => */ GENERAL_W_R_R,
+    /* VPSRLVW => */ GENERAL_W_R_R,
+    /* VPTESTNMB => */ GENERAL_W_R_R,
+    /* VPTESTNMW => */ GENERAL_W_R_R,
+    /* VPTESTMB => */ GENERAL_W_R_R,
+    /* VPTESTMW => */ GENERAL_W_R_R,
 
         // AVX512CD
         // TODO: this one does not exist
-        VPBROADCASTM => BehaviorDigest::empty(),
-        VPCONFLICTD => GENERAL_W_R,
-        VPCONFLICTQ => GENERAL_W_R,
-        VPLZCNTD => GENERAL_W_R,
-        VPLZCNTQ => GENERAL_W_R,
+    /* VPBROADCASTM => */ BehaviorDigest::empty(),
+    /* VPCONFLICTD => */ GENERAL_W_R,
+    /* VPCONFLICTQ => */ GENERAL_W_R,
+    /* VPLZCNTD => */ GENERAL_W_R,
+    /* VPLZCNTQ => */ GENERAL_W_R,
 
-        KUNPCKBW => GENERAL_W_R_R,
-        KUNPCKWD => GENERAL_W_R_R,
-        KUNPCKDQ => GENERAL_W_R_R,
+    /* KUNPCKBW => */ GENERAL_W_R_R,
+    /* KUNPCKWD => */ GENERAL_W_R_R,
+    /* KUNPCKDQ => */ GENERAL_W_R_R,
 
-        KADDB => GENERAL_W_R_R,
-        KANDB => GENERAL_W_R_R,
-        KANDNB => GENERAL_W_R_R,
-        KMOVB => GENERAL_W_R,
-        KNOTB => GENERAL_W_R,
-        KORB => GENERAL_W_R_R,
-        KORTESTB => GENERAL_R_R
+    /* KADDB => */ GENERAL_W_R_R,
+    /* KANDB => */ GENERAL_W_R_R,
+    /* KANDNB => */ GENERAL_W_R_R,
+    /* KMOVB => */ GENERAL_W_R,
+    /* KNOTB => */ GENERAL_W_R,
+    /* KORB => */ GENERAL_W_R_R,
+    /* KORTESTB => */ GENERAL_R_R
             .set_flags_access(Access::Write),
-        KSHIFTLB => GENERAL_W_R_R,
-        KSHIFTRB => GENERAL_W_R_R,
-        KTESTB => GENERAL_R_R
+    /* KSHIFTLB => */ GENERAL_W_R_R,
+    /* KSHIFTRB => */ GENERAL_W_R_R,
+    /* KTESTB => */ GENERAL_R_R
             .set_flags_access(Access::Write),
-        KXNORB => GENERAL_W_R_R,
-        KXORB => GENERAL_W_R_R,
-        KADDW => GENERAL_W_R_R,
-        KANDW => GENERAL_W_R_R,
-        KANDNW => GENERAL_W_R_R,
-        KMOVW => GENERAL_W_R,
-        KNOTW => GENERAL_W_R,
-        KORW => GENERAL_W_R_R,
-        KORTESTW => GENERAL_W_R_R
+    /* KXNORB => */ GENERAL_W_R_R,
+    /* KXORB => */ GENERAL_W_R_R,
+    /* KADDW => */ GENERAL_W_R_R,
+    /* KANDW => */ GENERAL_W_R_R,
+    /* KANDNW => */ GENERAL_W_R_R,
+    /* KMOVW => */ GENERAL_W_R,
+    /* KNOTW => */ GENERAL_W_R,
+    /* KORW => */ GENERAL_W_R_R,
+    /* KORTESTW => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        KSHIFTLW => GENERAL_W_R_R,
-        KSHIFTRW => GENERAL_W_R_R,
-        KTESTW => GENERAL_W_R_R
+    /* KSHIFTLW => */ GENERAL_W_R_R,
+    /* KSHIFTRW => */ GENERAL_W_R_R,
+    /* KTESTW => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        KXNORW => GENERAL_W_R_R,
-        KXORW => GENERAL_W_R_R,
-        KADDD => GENERAL_W_R_R,
-        KANDD => GENERAL_W_R_R,
-        KANDND => GENERAL_W_R_R,
-        KMOVD => GENERAL_W_R,
-        KNOTD => GENERAL_W_R,
-        KORD => GENERAL_W_R_R,
-        KORTESTD => GENERAL_W_R_R
+    /* KXNORW => */ GENERAL_W_R_R,
+    /* KXORW => */ GENERAL_W_R_R,
+    /* KADDD => */ GENERAL_W_R_R,
+    /* KANDD => */ GENERAL_W_R_R,
+    /* KANDND => */ GENERAL_W_R_R,
+    /* KMOVD => */ GENERAL_W_R,
+    /* KNOTD => */ GENERAL_W_R,
+    /* KORD => */ GENERAL_W_R_R,
+    /* KORTESTD => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        KSHIFTLD => GENERAL_W_R_R,
-        KSHIFTRD => GENERAL_W_R_R,
-        KTESTD => GENERAL_W_R_R
+    /* KSHIFTLD => */ GENERAL_W_R_R,
+    /* KSHIFTRD => */ GENERAL_W_R_R,
+    /* KTESTD => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        KXNORD => GENERAL_W_R_R,
-        KXORD => GENERAL_W_R_R,
-        KADDQ => GENERAL_W_R_R,
-        KANDQ => GENERAL_W_R_R,
-        KANDNQ => GENERAL_W_R_R,
-        KMOVQ => GENERAL_W_R,
-        KNOTQ => GENERAL_W_R,
-        KORQ => GENERAL_W_R_R,
-        KORTESTQ => GENERAL_W_R_R
+    /* KXNORD => */ GENERAL_W_R_R,
+    /* KXORD => */ GENERAL_W_R_R,
+    /* KADDQ => */ GENERAL_W_R_R,
+    /* KANDQ => */ GENERAL_W_R_R,
+    /* KANDNQ => */ GENERAL_W_R_R,
+    /* KMOVQ => */ GENERAL_W_R,
+    /* KNOTQ => */ GENERAL_W_R,
+    /* KORQ => */ GENERAL_W_R_R,
+    /* KORTESTQ => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        KSHIFTLQ => GENERAL_W_R_R,
-        KSHIFTRQ => GENERAL_W_R_R,
-        KTESTQ => GENERAL_W_R_R
+    /* KSHIFTLQ => */ GENERAL_W_R_R,
+    /* KSHIFTRQ => */ GENERAL_W_R_R,
+    /* KTESTQ => */ GENERAL_W_R_R
             .set_flags_access(Access::Write),
-        KXNORQ => GENERAL_W_R_R,
-        KXORQ => GENERAL_W_R_R,
+    /* KXNORQ => */ GENERAL_W_R_R,
+    /* KXORQ => */ GENERAL_W_R_R,
 
         // AVX512ER
-        VEXP2PD => GENERAL_W_R,
-        VEXP2PS => GENERAL_W_R,
+    /* VEXP2PD => */ GENERAL_W_R,
+    /* VEXP2PS => */ GENERAL_W_R,
         // TODO: well, this one isn't real.
-        VEXP2SD => BehaviorDigest::empty(),
+    /* VEXP2SD => */ BehaviorDigest::empty(),
         // TODO: or this one.
-        VEXP2SS => BehaviorDigest::empty(),
-        VRCP28PD => GENERAL_W_R,
-        VRCP28PS => GENERAL_W_R,
-        VRCP28SD => GENERAL_W_R_R,
-        VRCP28SS => GENERAL_W_R_R,
-        VRSQRT28PD => GENERAL_W_R,
-        VRSQRT28PS => GENERAL_W_R,
-        VRSQRT28SD => GENERAL_W_R_R,
-        VRSQRT28SS => GENERAL_W_R_R,
+    /* VEXP2SS => */ BehaviorDigest::empty(),
+    /* VRCP28PD => */ GENERAL_W_R,
+    /* VRCP28PS => */ GENERAL_W_R,
+    /* VRCP28SD => */ GENERAL_W_R_R,
+    /* VRCP28SS => */ GENERAL_W_R_R,
+    /* VRSQRT28PD => */ GENERAL_W_R,
+    /* VRSQRT28PS => */ GENERAL_W_R,
+    /* VRSQRT28SD => */ GENERAL_W_R_R,
+    /* VRSQRT28SS => */ GENERAL_W_R_R,
 
         // AVX512PF
-        VGATHERPF0DPD => BehaviorDigest::empty()
+    /* VGATHERPF0DPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF0DPS => BehaviorDigest::empty()
+    /* VGATHERPF0DPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF0QPD => BehaviorDigest::empty()
+    /* VGATHERPF0QPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF0QPS => BehaviorDigest::empty()
+    /* VGATHERPF0QPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF1DPD => BehaviorDigest::empty()
+    /* VGATHERPF1DPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF1DPS => BehaviorDigest::empty()
+    /* VGATHERPF1DPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF1QPD => BehaviorDigest::empty()
+    /* VGATHERPF1QPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VGATHERPF1QPS => BehaviorDigest::empty()
+    /* VGATHERPF1QPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF0DPD => BehaviorDigest::empty()
+    /* VSCATTERPF0DPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF0DPS => BehaviorDigest::empty()
+    /* VSCATTERPF0DPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF0QPD => BehaviorDigest::empty()
+    /* VSCATTERPF0QPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF0QPS => BehaviorDigest::empty()
+    /* VSCATTERPF0QPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF1DPD => BehaviorDigest::empty()
+    /* VSCATTERPF1DPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF1DPS => BehaviorDigest::empty()
+    /* VSCATTERPF1DPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF1QPD => BehaviorDigest::empty()
+    /* VSCATTERPF1QPD => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
-        VSCATTERPF1QPS => BehaviorDigest::empty()
+    /* VSCATTERPF1QPS => */ BehaviorDigest::empty()
             .set_operand(0, Access::Read)
             .set_complex(true),
 
         // MPX
-        BNDMK => GENERAL_W_R,
-        BNDCL => GENERAL_R,
-        BNDCU => GENERAL_R,
-        BNDCN => GENERAL_R,
-        BNDMOV => GENERAL_W_R,
-        BNDLDX => GENERAL_W_R
+    /* BNDMK => */ GENERAL_W_R,
+    /* BNDCL => */ GENERAL_R,
+    /* BNDCU => */ GENERAL_R,
+    /* BNDCN => */ GENERAL_R,
+    /* BNDMOV => */ GENERAL_W_R,
+    /* BNDLDX => */ GENERAL_W_R
             .set_complex(true),
-        BNDSTX => GENERAL_W_R
+    /* BNDSTX => */ GENERAL_W_R
             .set_complex(true),
 
-        VGF2P8AFFINEQB => GENERAL_W_R_R
+    /* VGF2P8AFFINEQB => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VGF2P8AFFINEINVQB => GENERAL_W_R_R
+    /* VGF2P8AFFINEINVQB => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPSHRDQ => GENERAL_W_R_R
+    /* VPSHRDQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPSHRDD => GENERAL_W_R_R
+    /* VPSHRDD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPSHRDW => GENERAL_W_R_R
+    /* VPSHRDW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPSHLDQ => GENERAL_W_R_R
+    /* VPSHLDQ => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPSHLDD => GENERAL_W_R_R
+    /* VPSHLDD => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VPSHLDW => GENERAL_W_R_R
+    /* VPSHLDW => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VBROADCASTF32X8 => GENERAL_W_R,
-        VBROADCASTF64X4 => GENERAL_W_R,
-        VBROADCASTF32X4 => GENERAL_W_R,
-        VBROADCASTF64X2 => GENERAL_W_R,
-        VBROADCASTF32X2 => GENERAL_W_R,
-        VBROADCASTI32X8 => GENERAL_W_R,
-        VBROADCASTI64X4 => GENERAL_W_R,
-        VBROADCASTI32X4 => GENERAL_W_R,
-        VBROADCASTI64X2 => GENERAL_W_R,
-        VBROADCASTI32X2 => GENERAL_W_R,
-        VEXTRACTI32X8 => GENERAL_W_R
+    /* VBROADCASTF32X8 => */ GENERAL_W_R,
+    /* VBROADCASTF64X4 => */ GENERAL_W_R,
+    /* VBROADCASTF32X4 => */ GENERAL_W_R,
+    /* VBROADCASTF64X2 => */ GENERAL_W_R,
+    /* VBROADCASTF32X2 => */ GENERAL_W_R,
+    /* VBROADCASTI32X8 => */ GENERAL_W_R,
+    /* VBROADCASTI64X4 => */ GENERAL_W_R,
+    /* VBROADCASTI32X4 => */ GENERAL_W_R,
+    /* VBROADCASTI64X2 => */ GENERAL_W_R,
+    /* VBROADCASTI32X2 => */ GENERAL_W_R,
+    /* VEXTRACTI32X8 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VEXTRACTF32X8 => GENERAL_W_R
+    /* VEXTRACTF32X8 => */ GENERAL_W_R
             .set_operand(2, Access::Read),
-        VINSERTI32X8 => GENERAL_W_R_R
+    /* VINSERTI32X8 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VINSERTF32X8 => GENERAL_W_R_R
+    /* VINSERTF32X8 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        VINSERTI32X4 => GENERAL_W_R_R
+    /* VINSERTI32X4 => */ GENERAL_W_R_R
             .set_operand(3, Access::Read),
-        V4FNMADDSS => GENERAL_RW_R_R
+    /* V4FNMADDSS => */ GENERAL_RW_R_R
             .set_complex(true),
-        V4FNMADDPS => GENERAL_RW_R_R
+    /* V4FNMADDPS => */ GENERAL_RW_R_R
             .set_complex(true),
-        VCVTNEPS2BF16 => GENERAL_W_R,
-        V4FMADDSS => GENERAL_RW_R_R
+    /* VCVTNEPS2BF16 => */ GENERAL_W_R,
+    /* V4FMADDSS => */ GENERAL_RW_R_R
             .set_complex(true),
-        V4FMADDPS => GENERAL_RW_R_R
+    /* V4FMADDPS => */ GENERAL_RW_R_R
             .set_complex(true),
-        VCVTNE2PS2BF16 => GENERAL_W_R_R,
-        VP2INTERSECTD => GENERAL_W_R_R,
-        VP2INTERSECTQ => GENERAL_W_R_R,
-        VP4DPWSSDS => GENERAL_RW_R_R,
-        VP4DPWSSD => GENERAL_RW_R_R,
-        VPDPWSSDS => GENERAL_RW_R_R,
-        VPDPWSSD => GENERAL_RW_R_R,
-        VPDPBUSDS => GENERAL_RW_R_R,
-        VDPBF16PS => GENERAL_RW_R_R,
-        VPBROADCASTMW2D => GENERAL_W_R,
-        VPBROADCASTMB2Q => GENERAL_W_R,
-        VPMOVD2M => GENERAL_W_R,
-        VPMOVQD => GENERAL_W_R,
-        VPMOVWB => GENERAL_W_R,
-        VPMOVDB => GENERAL_W_R,
-        VPMOVDW => GENERAL_W_R,
-        VPMOVQB => GENERAL_W_R,
-        VPMOVQW => GENERAL_W_R,
-        VGF2P8MULB => GENERAL_RW_R_R,
-        VPMADD52HUQ => GENERAL_RW_R_R,
-        VPMADD52LUQ => GENERAL_RW_R_R,
-        VPSHUFBITQMB => GENERAL_W_R_R,
-        VPERMB => GENERAL_W_R_R,
-        VPEXPANDD => GENERAL_W_R,
-        VPEXPANDQ => GENERAL_W_R,
-        VPABSQ => GENERAL_W_R,
-        VPRORVD => GENERAL_W_R_R,
-        VPRORVQ => GENERAL_W_R_R,
-        VPMULTISHIFTQB => GENERAL_W_R_R,
-        VPERMT2B => GENERAL_RW_R_R,
-        VPERMT2W => GENERAL_RW_R_R,
-        VPSHRDVQ => GENERAL_RW_R_R,
-        VPSHRDVD => GENERAL_RW_R_R,
-        VPSHRDVW => GENERAL_RW_R_R,
-        VPSHLDVQ => GENERAL_RW_R_R,
-        VPSHLDVD => GENERAL_RW_R_R,
-        VPSHLDVW => GENERAL_RW_R_R,
-        VPCOMPRESSB => GENERAL_W_R,
-        VPCOMPRESSW => GENERAL_W_R,
-        VPEXPANDB => GENERAL_W_R,
-        VPEXPANDW => GENERAL_W_R,
-        VPOPCNTD => GENERAL_W_R,
-        VPOPCNTQ => GENERAL_W_R,
-        VPOPCNTB => GENERAL_W_R,
-        VPOPCNTW => GENERAL_W_R,
-        VSCALEFSS => GENERAL_W_R_R,
-        VSCALEFSD => GENERAL_W_R_R,
-        VSCALEFPS => GENERAL_W_R_R,
-        VSCALEFPD => GENERAL_W_R_R,
-        VPDPBUSD => GENERAL_W_R_R,
-        VCVTUSI2SD => GENERAL_W_R_R,
-        VCVTUSI2SS => GENERAL_W_R_R,
-        VPXORD => GENERAL_W_R_R,
-        VPXORQ => GENERAL_W_R_R,
-        VPORD => GENERAL_W_R_R,
-        VPORQ => GENERAL_W_R_R,
-        VPANDND => GENERAL_W_R_R,
-        VPANDNQ => GENERAL_W_R_R,
-        VPANDD => GENERAL_W_R_R,
-        VPANDQ => GENERAL_W_R_R,
+    /* VCVTNE2PS2BF16 => */ GENERAL_W_R_R,
+    /* VP2INTERSECTD => */ GENERAL_W_R_R,
+    /* VP2INTERSECTQ => */ GENERAL_W_R_R,
+    /* VP4DPWSSDS => */ GENERAL_RW_R_R,
+    /* VP4DPWSSD => */ GENERAL_RW_R_R,
+    /* VPDPWSSDS => */ GENERAL_RW_R_R,
+    /* VPDPWSSD => */ GENERAL_RW_R_R,
+    /* VPDPBUSDS => */ GENERAL_RW_R_R,
+    /* VDPBF16PS => */ GENERAL_RW_R_R,
+    /* VPBROADCASTMW2D => */ GENERAL_W_R,
+    /* VPBROADCASTMB2Q => */ GENERAL_W_R,
+    /* VPMOVD2M => */ GENERAL_W_R,
+    /* VPMOVQD => */ GENERAL_W_R,
+    /* VPMOVWB => */ GENERAL_W_R,
+    /* VPMOVDB => */ GENERAL_W_R,
+    /* VPMOVDW => */ GENERAL_W_R,
+    /* VPMOVQB => */ GENERAL_W_R,
+    /* VPMOVQW => */ GENERAL_W_R,
+    /* VGF2P8MULB => */ GENERAL_RW_R_R,
+    /* VPMADD52HUQ => */ GENERAL_RW_R_R,
+    /* VPMADD52LUQ => */ GENERAL_RW_R_R,
+    /* VPSHUFBITQMB => */ GENERAL_W_R_R,
+    /* VPERMB => */ GENERAL_W_R_R,
+    /* VPEXPANDD => */ GENERAL_W_R,
+    /* VPEXPANDQ => */ GENERAL_W_R,
+    /* VPABSQ => */ GENERAL_W_R,
+    /* VPRORVD => */ GENERAL_W_R_R,
+    /* VPRORVQ => */ GENERAL_W_R_R,
+    /* VPMULTISHIFTQB => */ GENERAL_W_R_R,
+    /* VPERMT2B => */ GENERAL_RW_R_R,
+    /* VPERMT2W => */ GENERAL_RW_R_R,
+    /* VPSHRDVQ => */ GENERAL_RW_R_R,
+    /* VPSHRDVD => */ GENERAL_RW_R_R,
+    /* VPSHRDVW => */ GENERAL_RW_R_R,
+    /* VPSHLDVQ => */ GENERAL_RW_R_R,
+    /* VPSHLDVD => */ GENERAL_RW_R_R,
+    /* VPSHLDVW => */ GENERAL_RW_R_R,
+    /* VPCOMPRESSB => */ GENERAL_W_R,
+    /* VPCOMPRESSW => */ GENERAL_W_R,
+    /* VPEXPANDB => */ GENERAL_W_R,
+    /* VPEXPANDW => */ GENERAL_W_R,
+    /* VPOPCNTD => */ GENERAL_W_R,
+    /* VPOPCNTQ => */ GENERAL_W_R,
+    /* VPOPCNTB => */ GENERAL_W_R,
+    /* VPOPCNTW => */ GENERAL_W_R,
+    /* VSCALEFSS => */ GENERAL_W_R_R,
+    /* VSCALEFSD => */ GENERAL_W_R_R,
+    /* VSCALEFPS => */ GENERAL_W_R_R,
+    /* VSCALEFPD => */ GENERAL_W_R_R,
+    /* VPDPBUSD => */ GENERAL_W_R_R,
+    /* VCVTUSI2SD => */ GENERAL_W_R_R,
+    /* VCVTUSI2SS => */ GENERAL_W_R_R,
+    /* VPXORD => */ GENERAL_W_R_R,
+    /* VPXORQ => */ GENERAL_W_R_R,
+    /* VPORD => */ GENERAL_W_R_R,
+    /* VPORQ => */ GENERAL_W_R_R,
+    /* VPANDND => */ GENERAL_W_R_R,
+    /* VPANDNQ => */ GENERAL_W_R_R,
+    /* VPANDD => */ GENERAL_W_R_R,
+    /* VPANDQ => */ GENERAL_W_R_R,
 
-        PSMASH => BehaviorDigest::empty()
+    /* PSMASH => */ BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write)
             .set_complex(true),
-        PVALIDATE => BehaviorDigest::empty()
+    /* PVALIDATE => */ BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write)
             .set_complex(true),
-        RMPADJUST => BehaviorDigest::empty()
+    /* RMPADJUST => */ BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write)
             .set_complex(true),
-        RMPUPDATE => BehaviorDigest::empty()
+    /* RMPUPDATE => */ BehaviorDigest::empty()
             .set_pl0()
             .set_flags_access(Access::Write)
             .set_complex(true),
-
-    };
-    behavior
-}
+];

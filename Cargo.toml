@@ -17,6 +17,12 @@ yaxpeax-arch = { version = "0.3.1", default-features = false, features = [] }
 "serde_derive" = { version = "1.0", optional = true }
 "cfg-if" = "1.0.0"
 
+# if yaxpeax-x86 ever pulls this into your dep tree: sorry! please report that!
+# this is only used for verifying library structures are kept in sync. it
+# should only be pulled in with the _debug_internal_asserts feature which you
+# should not be using!
+strum = { version = "0.28.0", features = ["derive"], optional = true }
+
 [dev-dependencies]
 rand = { version = "0.10.0", features = ["thread_rng"] }
 asmlinator = { version = "2.0.0" }
@@ -38,7 +44,7 @@ opt-level = 3
 lto = true
 
 [features]
-default = ["std", "colors", "use-serde", "fmt"]
+default = ["std", "colors", "use-serde", "fmt", "behavior"]
 
 # opt-in for some apis that are really much nicer with String
 std = ["alloc", "yaxpeax-arch/std"]
@@ -51,6 +57,13 @@ alloc = ["yaxpeax-arch/alloc"]
 
 # feature for formatting instructions and their components
 fmt = []
+
+# feature for additional instruction behavior information
+#
+# as of writing this includes an additional ~6kb of combined code and data
+# per-decoder. much like `fmt`, this is mostly useful to ensure that unused
+# data truly is not included in a build.
+behavior = []
 
 use-serde = ["yaxpeax-arch/use-serde", "serde", "serde_derive"]
 
@@ -72,4 +85,4 @@ profiling = []
 _debug_internal_disasm_stats = []
 
 # do not use this. it is for development and library testing only.
-_debug_internal_asserts = []
+_debug_internal_asserts = ["strum"]
