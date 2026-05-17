@@ -9,11 +9,23 @@ Step.start("crate")
 Step.push("build")
 Build.run({"cargo", "build"}) -- `run` automatically records stdout and stderr to log files named after the command
 Step.advance("test")
-Build.run({"cargo", "test"}, {name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
+-- default features include "behavior" which gets the relatively slow (and KVM-requiring) behavior validation tests
+Build.run({"cargo", "test", "--features", "_debug_internal_asserts", "--", "--skip", "kvm"}, {name="test stdlib/fmt"}) -- artifacts are stored under `name` if that's present
+-- but no default features means these aren't built in!
 Build.run({"cargo", "test", "--no-default-features"}, {name="test nostdlib/nofmt"})
 Build.run({"cargo", "test", "--no-default-features", "--features", "fmt"}, {name="test nostdlib/fmt"})
 Build.run({"cargo", "test", "--no-default-features", "--features", "std"}, {name="test nostdlib/std"})
+Build.run({"cargo", "test", "--no-default-features", "--features", "unstable"}, {name="test nostdlib/unstable"})
 Build.run({"cargo", "test", "--no-default-features", "--features", "std,fmt"}, {name="test nostdlib/std+fmt"})
+Build.run({"cargo", "test", "--no-default-features", "--features", "std,fmt,unstable"}, {name="test nostdlib/std+fmt+unstable"})
+
+Step.advance("test-kvm")
+Build.run({"cargo", "test", "--release", "--no-default-features", "--features", "behavior"}, {name="test nostdlib/behavior"})
+Build.run({"cargo", "test", "--release", "--no-default-features", "--features", "behavior,fmt"}, {name="test nostdlib/behavior+fmt"})
+Build.run({"cargo", "test", "--release", "--no-default-features", "--features", "behavior,std"}, {name="test nostdlib/behavior+std"})
+Build.run({"cargo", "test", "--release", "--no-default-features", "--features", "behavior,fmt,std,_debug_internal_asserts"}, {name="test nostdlib/behavior+fmt+std"})
+Build.run({"cargo", "test", "--release", "--no-default-features", "--features", "behavior,fmt,std,unstable,_debug_internal_asserts"}, {name="test nostdlib/behavior+fmt+std+unstable"})
+
 
 -- the interesting benchmarking happens through disas-bench, but the in-tree capstone bench isn't gone *quite* yet.
 Step.start("bench")
