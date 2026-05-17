@@ -1054,7 +1054,7 @@ impl Access {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub struct BehaviorDigest {
     // laid out like:
     //
@@ -3612,8 +3612,6 @@ static IMPLICIT_OPS_LIST: [&[ImplicitOperand]; 73] = [
     ENTER_OPS,
 ];
 
-#[inline(never)]
-#[unsafe(no_mangle)]
 fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
     let idx = (*opc as u32) & 0xfff;
     TABLE[idx as usize]
@@ -3624,6 +3622,8 @@ fn opcode2behavior(opc: &Opcode) -> BehaviorDigest {
 fn behavior_table_size_is_right() {
     use strum::EnumCount;
     assert_eq!(TABLE.len(), super::Opcode::COUNT);
+
+    assert_eq!(opcode2behavior(&Opcode::VMOVLHPS), GENERAL_W_R_R);
 }
 
 /// this table MUST line up with Opcode declaration order in `mod.rs`.
@@ -4514,7 +4514,6 @@ static TABLE: [BehaviorDigest; 1413] = [
     /* VMOVDQA => */ GENERAL_W_R,
     /* VMOVDQU => */ GENERAL_W_R,
     /* VMOVHLPS => */ GENERAL_W_R_R,
-    /* VMOVLHPS => */ GENERAL_W_R_R,
         // these four are not actually reached due to check above
     /* VMOVHPD => */ BehaviorDigest::empty()
             .set_pl_any()
@@ -4524,6 +4523,7 @@ static TABLE: [BehaviorDigest; 1413] = [
             .set_pl_any()
             .set_operand(1, Access::Read)
             .set_nontrivial(true),
+    /* VMOVLHPS => */ GENERAL_W_R_R,
     /* VMOVLPD => */ BehaviorDigest::empty()
             .set_pl_any()
             .set_operand(1, Access::Read)

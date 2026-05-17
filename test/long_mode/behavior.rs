@@ -4,14 +4,10 @@ mod kvm {
     use asmlinator::x86_64::{GuestAddress, Vm, VcpuExit, kvm_regs, kvm_sregs};
 
     use yaxpeax_x86::long_mode;
+    use yaxpeax_x86::long_mode::Instruction;
     use yaxpeax_x86::long_mode::behavior::Exception;
 
-    use yaxpeax_arch::LengthedInstruction;
-    use yaxpeax_x86::long_mode::Instruction;
-
     use rand::prelude::*;
-
-    use std::fmt::Write;
 
     #[derive(Debug, Copy, Clone)]
     struct ExpectedMemAccess {
@@ -40,28 +36,93 @@ mod kvm {
     }
 
     #[derive(Debug)]
-    #[allow(dead_code)]
     enum CheckErr {
         ComplexOp(long_mode::behavior::ComplexOp),
     }
 
-    struct AccessTestCtx<'a> {
-        regs: &'a mut kvm_regs,
-        _vm: &'a Vm,
+    struct TestAccesses {
         preserve_rsp: bool,
         used_regs: [bool; 16],
         expected_reg: Vec<ExpectedRegAccess>,
         expected_mem: Vec<ExpectedMemAccess>,
     }
 
+    struct AccessTestCtx<'a> {
+        regs: &'a mut kvm_regs,
+        accs: TestAccesses,
+    }
+
     impl<'a> AccessTestCtx<'a> {
         fn into_expectations(self) -> (Vec<ExpectedRegAccess>, Vec<ExpectedMemAccess>) {
-            let AccessTestCtx {
+            let TestAccesses {
                 expected_reg,
                 expected_mem,
                 ..
-            } = self;
+            } = self.accs;
             (expected_reg, expected_mem)
+        }
+
+        // randomize initial test VM state as described by this AccessTestCtx; it's possible that
+        // after this point a `visit_accesses` pass will reset some of these registers to different
+        // values as they may be used for address calculations.
+        //
+        // along the way, deposit any registers this test ctx declares to be "used" as an explicit
+        // entry in `cares`. later testing should not permute these registers, even if they are not
+        // directly declared as read by any operand, implicit or explicit.
+        fn randomize_unused(&mut self, cares: &mut Vec<RegSpec>) {
+            let mut rng = rand::rng();
+
+            if !self.accs.used_regs[0] {
+                self.regs.rax = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rax());
+            }
+            if !self.accs.used_regs[1] {
+                self.regs.rbx = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rbx());
+            }
+            if !self.accs.used_regs[2] {
+                self.regs.rcx = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rcx());
+            }
+            if !self.accs.used_regs[3] {
+                self.regs.rdx = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rdx());
+            }
+            if !self.accs.used_regs[4] {
+                self.regs.rsi = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rsi());
+            }
+            if !self.accs.used_regs[5] {
+                self.regs.rdi = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rdi());
+            }
+            if !self.accs.preserve_rsp {
+                if !self.accs.used_regs[6] {
+                    self.regs.rsp = rng.next_u64();
+                } else {
+                    cares.push(RegSpec::rsp());
+                }
+            }
+            if !self.accs.used_regs[7] {
+                self.regs.rbp = rng.next_u64();
+            } else {
+                cares.push(RegSpec::rbp());
+            }
+
+            self.regs.r8 = rng.next_u64();
+            self.regs.r9 = rng.next_u64();
+            self.regs.r10 = rng.next_u64();
+            self.regs.r11 = rng.next_u64();
+            self.regs.r12 = rng.next_u64();
+            self.regs.r13 = rng.next_u64();
+            self.regs.r14 = rng.next_u64();
+            self.regs.r15 = rng.next_u64();
         }
     }
 
@@ -71,13 +132,13 @@ mod kvm {
 
     impl<'a> AccessVisitor for AccessTestCtx<'a> {
         fn register_read(&mut self, reg: RegSpec) {
-            self.expected_reg.push(ExpectedRegAccess {
+            self.accs.expected_reg.push(ExpectedRegAccess {
                 write: false,
                 reg,
             });
         }
         fn register_write(&mut self, reg: RegSpec) {
-            self.expected_reg.push(ExpectedRegAccess {
+            self.accs.expected_reg.push(ExpectedRegAccess {
                 write: true,
                 reg,
             });
@@ -96,8 +157,8 @@ mod kvm {
 
                     // some ridiculous circumstances require us to not permute rsp, even
                     // though we *would* set it to a mapped address.
-                    let allocated = self.used_regs[reg.num() as usize] ||
-                        (reg.num() == RegSpec::rsp().num() && self.preserve_rsp);
+                    let allocated = self.accs.used_regs[reg.num() as usize] ||
+                        (reg.num() == RegSpec::rsp().num() && self.accs.preserve_rsp);
 
                     if allocated {
                         let value = unsafe {
@@ -113,7 +174,7 @@ mod kvm {
                         unsafe {
                             (self.regs as *mut _ as *mut u64).offset(kvm_reg_nr as isize).write(value);
                         }
-                        self.used_regs[reg.num() as usize] = true;
+                        self.accs.used_regs[reg.num() as usize] = true;
                         Some(value)
                     }
                 }
@@ -128,7 +189,7 @@ mod kvm {
                 addr: address.expect("can compute expected address"),
                 size,
             };
-            self.expected_mem.push(acc);
+            self.accs.expected_mem.push(acc);
         }
         fn memory_write(&mut self, address: Option<u64>, size: u32) {
             let acc = ExpectedMemAccess {
@@ -136,78 +197,8 @@ mod kvm {
                 addr: address.expect("can compute expected address"),
                 size,
             };
-            self.expected_mem.push(acc);
+            self.accs.expected_mem.push(acc);
         }
-    }
-
-    fn run(vm: &mut Vm) {
-        let mut exits = 0;
-        let end_pc = loop {
-//            eprintln!("about to run! here's some state:");
-/*
-            let regs = vm.get_regs().unwrap();
-            unsafe {
-            let bytes = vm.host_ptr(GuestAddress(regs.rip));
-            let slc = std::slice::from_raw_parts(bytes, 15);
-            let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
-                .decode_slice(slc);
-            if let Ok(decoded) = decoded {
-                eprintln!("step. next: {:06x}: {}", regs.rip, decoded);
-            }
-            }
-*/
-
-//            dump_regs(&regs);
-//            let sregs = vm.get_sregs().unwrap();
-//            eprintln!("sregs: {:?}", sregs);
-            let exit = vm.run().expect("can run vcpu");
-            exits += 1;
-            match exit {
-                VcpuExit::MmioRead { addr, buf } => {
-                    eprintln!("mmio: [{:08x}:{}] <- ..", addr, buf.len());
-                    // TODO: with expected memory accesses we should be able to perhaps pick some
-                    // values ahead of time and permute them (so as to tickle flags changes in
-                    // `add [rcx], rdi` for example.
-                    buf.fill(1);
-                }
-                VcpuExit::MmioWrite { addr, buf } => {
-                    eprintln!("mmio: .. -> [{:08x}:{}]", addr, buf.len());
-                }
-                VcpuExit::Debug { pc, info } => {
-                    let regs = vm.get_regs().unwrap();
-                    dump_regs(&regs);
-                    unsafe {
-                        let bytes = vm.host_ptr(GuestAddress(pc));
-                        let slc = std::slice::from_raw_parts(bytes, 15);
-                        let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
-                            .decode_slice(slc);
-                        if let Ok(decoded) = decoded {
-                            eprintln!("step. next: {:06x}: {}", info.pc, decoded);
-                        } else {
-                            eprintln!("garbage @ {:06x}", info.pc);
-                        }
-                    }
-                    // break info.pc;
-                }
-                VcpuExit::Hlt => {
-                    // eprintln!("hit hlt");
-                    let regs = vm.get_regs().unwrap();
-                    // dump_regs(&regs);
-                    break regs.rip;
-                }
-                other => {
-                    eprintln!("unhandled exit: {:?} ... after {}", other, exits);
-                    let regs = vm.get_regs().unwrap();
-                    dump_regs(&regs);
-                    let sregs = vm.get_sregs().unwrap();
-                    eprintln!("sregs: {:?}", sregs);
-                    panic!("stop");
-                }
-            }
-        };
-
-        eprintln!("run exits at {:08x}", end_pc);
-        return;
     }
 
     fn dump_regs(regs: &kvm_regs) {
@@ -765,50 +756,15 @@ mod kvm {
         Ok(())
     }
 
-    fn inrange_displacements(_vm: &Vm, inst: &long_mode::Instruction) -> Result<bool, CheckErr> {
-        // see comment on `map_test_mem`. this limit is partially used to figure out what memory
-        // must be backed by real memory vs holes that can have mmio traps.
-        let disp_lim = 511;
-
-        let ops = match inst.behavior().all_operands() {
-            Ok(ops) => ops,
-            Err(complex) => {
-                return Err(CheckErr::ComplexOp(complex));
-            }
-        };
-
-        for op in ops.iter().operands() {
-            let disp = match op {
-                long_mode::Operand::AbsoluteU32 { .. } |
-                long_mode::Operand::AbsoluteU64 { .. } => {
-                    return Ok(false);
-                }
-                long_mode::Operand::Disp { disp, .. } => disp,
-                long_mode::Operand::MemIndexScaleDisp { disp, .. } => disp,
-                long_mode::Operand::MemBaseIndexScaleDisp { disp, .. } => disp,
-                long_mode::Operand::DispMasked { disp, .. } => disp,
-                long_mode::Operand::MemIndexScaleDispMasked { disp, .. } => disp,
-                long_mode::Operand::MemBaseIndexScaleDispMasked { disp, .. } => disp,
-                _ => {
-                    continue;
-                }
-            };
-
-            if disp > disp_lim {
-                return Ok(false);
-            }
-        }
-
-        Ok(true)
-    }
-
     fn check_behavior(vm: &mut Vm, inst: &[u8]) -> Result<(), CheckErr> {
-        check_behavior_with_regs(vm, inst, [false; 16], &[])
+        check_behavior_with_regs(vm, inst, None, &[])
     }
+
+    // reg_preserves: [bool; 16]
 
     // `reg_preserves` declares a set of registers, numbered by their *Linux KVM API number*, as in
     // the position in `kvm_regs`, that must be preserved by the test.
-    fn check_behavior_with_regs(vm: &mut Vm, inst: &[u8], reg_preserves: [bool; 16], mem_patches: &[MemPatch]) -> Result<(), CheckErr> {
+    fn check_behavior_with_regs(vm: &mut Vm, inst: &[u8], expect_accs: Option<TestAccesses>, mem_patches: &[MemPatch]) -> Result<(), CheckErr> {
         let decoded = yaxpeax_x86::long_mode::InstDecoder::default()
             .decode_slice(inst).expect("can decode");
 
@@ -840,10 +796,6 @@ mod kvm {
         use yaxpeax_arch::LengthedInstruction;
         assert_eq!(insts.len(), 0.wrapping_offset(decoded.len()) as usize + 1);
 
-        if !inrange_displacements(vm, &decoded)? {
-            panic!("unable to test '{}': displacement(s) are larger than test VM memory.", decoded);
-        }
-
         let behavior = decoded.behavior();
 
         // TODO: this does an infinite loop when run??
@@ -856,82 +808,47 @@ mod kvm {
         // vm.set_single_step(true).expect("can enable single-step");
         vm.program(insts.as_slice(), &mut regs);
 
-        let mut rng = rand::rng();
-
         // a set of registers whose values we are directed to care about. these are subtracted from
         // dontcares, later.
         let mut cares = Vec::new();
 
-        if !reg_preserves[0] {
-            regs.rax = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rax());
-        }
-        if !reg_preserves[1] {
-            regs.rbx = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rbx());
-        }
-        if !reg_preserves[2] {
-            regs.rcx = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rcx());
-        }
-        if !reg_preserves[3] {
-            regs.rdx = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rdx());
-        }
-        if !reg_preserves[4] {
-            regs.rsi = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rsi());
-        }
-        if !reg_preserves[5] {
-            regs.rdi = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rdi());
-        }
-        if !vm.idt_configured() {
-            if !reg_preserves[6] {
-                regs.rsp = rng.next_u64();
-            } else {
-                cares.push(RegSpec::rsp());
+        let ctx = match expect_accs {
+            Some(mut accs) => {
+                accs.preserve_rsp = vm.idt_configured();
+                let mut ctx = AccessTestCtx {
+                    regs: &mut regs,
+                    accs,
+                };
+                ctx.randomize_unused(&mut cares);
+                ctx
             }
-        }
-        if !reg_preserves[7] {
-            regs.rbp = rng.next_u64();
-        } else {
-            cares.push(RegSpec::rbp());
-        }
+            None => {
+                let accs = TestAccesses {
+                    // if an interrupt handler is initialized with rsp pointing to addresses that cause
+                    // MMIO exits the vcpu ends up in a loop doing nothing particularly interesting
+                    // (seemingly in a loop trying to raise #UD after resetting?). this is a Linux issue
+                    // i'm not tracking down right now. instead, if the IDT is initialized then keep the
+                    // rsp pointed somewhere "normal" so that exceptions still work right.
+                    //
+                    // to reproduce this issue, set this to `false` unconditionally, then run
+                    // `kvm_verify_popmem`. it will infinite loop in the kernel and you'll see
+                    // x86_decode_emulated_instruction failing over and over and over and ...
+                    preserve_rsp: vm.idt_configured(),
+                    used_regs: [false; 16],
+                    expected_reg: Vec::new(),
+                    expected_mem: Vec::new(),
+                };
+                let mut ctx = AccessTestCtx {
+                    regs: &mut regs,
+                    accs,
+                };
+                ctx.randomize_unused(&mut cares);
+                behavior.visit_accesses(&mut ctx).map_err(|e| CheckErr::ComplexOp(e))?;
 
-        regs.r8 = rng.next_u64();
-        regs.r9 = rng.next_u64();
-        regs.r10 = rng.next_u64();
-        regs.r11 = rng.next_u64();
-        regs.r12 = rng.next_u64();
-        regs.r13 = rng.next_u64();
-        regs.r14 = rng.next_u64();
-        regs.r15 = rng.next_u64();
-
-        let mut ctx = AccessTestCtx {
-            regs: &mut regs,
-            _vm: vm,
-            // if an interrupt handler is initialized with rsp pointing to addresses that cause
-            // MMIO exits the vcpu ends up in a loop doing nothing particularly interesting
-            // (seemingly in a loop trying to raise #UD after resetting?). this is a Linux issue
-            // i'm not tracking down right now. instead, if the IDT is initialized then keep the
-            // rsp pointed somewhere "normal" so that exceptions still work right.
-            //
-            // to reproduce this issue, set this to `false` unconditionally, then run
-            // `kvm_verify_popmem`. it will infinite loop in the kernel and you'll see
-            // x86_decode_emulated_instruction failing over and over and over and ...
-            preserve_rsp: vm.idt_configured(),
-            used_regs: reg_preserves,
-            expected_reg: Vec::new(),
-            expected_mem: Vec::new(),
+                ctx
+            }
         };
-        behavior.visit_accesses(&mut ctx).map_err(|e| CheckErr::ComplexOp(e))?;
+
         let (expected_reg, mut expected_mem) = ctx.into_expectations();
         for patch in mem_patches.iter() {
             expected_mem.push(ExpectedMemAccess {
@@ -949,7 +866,7 @@ mod kvm {
 
         permute_dontcares(dontcare_regs.as_slice(), &mut regs);
 
-//        eprintln!("setting regs to: {:?}", regs);
+        eprintln!("setting regs to: {:?}", regs);
         vm.set_regs(&regs).unwrap();
 
         let expected_end = regs.rip + insts.len() as u64;
@@ -1119,6 +1036,9 @@ mod kvm {
         check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
 
+    /*
+     * TODO: this doesn't fit in the test framework really: `ins` will cause an I/O exit, which
+     * immediately fails the test.
     #[test]
     fn kvm_verify_ins() {
         let mut vm = create_test_vm();
@@ -1127,74 +1047,7 @@ mod kvm {
         let inst: &'static [u8] = &[0x6c];
         check_behavior(&mut vm, inst).expect("behavior check is ok");
     }
-
-    #[test]
-    fn test_pf() {
-        use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::InstDecoder;
-
-        let mut vm = create_test_vm();
-
-        let decoder = InstDecoder::default();
-
-        let inst = &[
-            // verr dx
-            0x0f, 0x00, 0xe2,
-            // verw dx
-            0x0f, 0x00, 0xea,
-            // jmpf mword [rcx]
-            //
-            // because there is no operand override prefix, this is am m16:32
-            // (!  not 64 !) operand.
-            0xff, 0x29,
-            // hlt (unreached)
-            0xf4,
-        ];
-
-        let do_fault = &[
-            // nop then int3 to have clear evidence that the vcpu took the jmpf
-            // and the GDT works, before using the IDT.
-            0x90, 0xcc,
-        ];
-
-        let before_sregs = vm.get_sregs().unwrap();
-        let mut regs = vm.get_regs().unwrap();
-
-        vm.program(inst.as_slice(), &mut regs);
-
-        vm.write_mem(GuestAddress(0x83000), do_fault);
-
-        let int1_far_addr = &mut [0; 6];
-        int1_far_addr[..4].copy_from_slice(&0x83000u32.to_le_bytes());
-        int1_far_addr[4..].copy_from_slice(&before_sregs.cs.selector.to_le_bytes());
-        vm.write_mem(GuestAddress(0x80000), int1_far_addr);
-
-        regs.rdx = vm.selector_cs() as u64;
-        regs.rcx = 0x80000;
-
-        let mut reader = U8Reader::new(inst.as_slice());
-        eprintln!("going to run...");
-        let mut offset = regs.rip;
-        loop {
-            let decoded = decoder.decode(&mut reader).expect("can decode");
-            use yaxpeax_arch::LengthedInstruction;
-            eprintln!("{:04x}: {}", offset, decoded);
-            offset = offset.wrapping_offset(decoded.len());
-            if decoded.opcode() == yaxpeax_x86::long_mode::Opcode::HLT {
-                break;
-            }
-        }
-
-        vm.set_regs(&regs).unwrap();
-
-        vm.set_single_step(true).expect("can enable single-step");
-
-        run(&mut vm);
-
-// TODO: capture the VcpuExit::Exception
-//        let intr_exit = exception_exit(&vm);
-//        assert_eq!(intr_exit, Some(Exception::BP));
-    }
+    */
 
     #[test]
     fn behavior_verify_kvm() {
@@ -1329,20 +1182,6 @@ mod kvm {
                 check_behavior(&mut vm, &inst[..inst_len]).expect("behavior check is ok");
             }
         }
-    }
-
-    fn test_prelude(bytes: &[u8], instr: &Instruction) {
-        let inst_len = 0.wrapping_offset(instr.len()) as usize;
-        assert_eq!(inst_len, bytes.len());
-
-        let mut bytes_text = String::new();
-        for b in bytes.iter() {
-            if !bytes_text.is_empty() {
-                bytes_text.push_str(" ");
-            }
-            write!(bytes_text, "{:02x}", b).expect("can format");
-        }
-        eprintln!("checking behavior of {bytes_text}: {instr}");
     }
 
     #[test]
@@ -1627,9 +1466,7 @@ mod kvm {
                         Ok(()) => {}
                         Err(CheckErr::ComplexOp(op)) => {
                             // uncheckable but not a failure
-                        }
-                        Err(e) => {
-                            panic!("check error: {:?}", e);
+                            eprintln!("cannot check {:?}", op);
                         }
                     }
                 }
@@ -1686,9 +1523,7 @@ mod kvm {
                             Ok(()) => {}
                             Err(CheckErr::ComplexOp(op)) => {
                                 // uncheckable but not a failure
-                            }
-                            Err(e) => {
-                                panic!("check error: {:?}", e);
+                                eprintln!("cannot check {:?}", op);
                             }
                         }
                     }
@@ -1768,9 +1603,7 @@ mod kvm {
                         Ok(()) => {}
                         Err(CheckErr::ComplexOp(op)) => {
                             // uncheckable but not a failure
-                        }
-                        Err(e) => {
-                            panic!("check error: {:?}", e);
+                            eprintln!("cannot check {:?}", op);
                         }
                     }
                 }
@@ -1850,9 +1683,7 @@ mod kvm {
                             Ok(()) => {}
                             Err(CheckErr::ComplexOp(op)) => {
                                 // uncheckable but not a failure
-                            }
-                            Err(e) => {
-                                panic!("check error: {:?}", e);
+                                eprintln!("cannot check {:?}", op);
                             }
                         }
                     }
@@ -2279,15 +2110,7 @@ mod kvm {
     }
 
     mod sse_gpr {
-        use super::create_test_vm;
-        use super::test_prelude;
-        use super::MemPatch;
-        use super::check_behavior;
-        use super::check_behavior_with_regs;
-
-        use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
-        use yaxpeax_x86::long_mode;
+        use yaxpeax_x86::long_mode::Opcode;
 
         pub static OPCODES: &'static [Opcode] = &[
             Opcode::PEXTRB,
@@ -2303,13 +2126,14 @@ mod kvm {
     // because these modify VM control structures, the VM is not retained across checks in a test.
     mod table_instrs {
         use super::create_test_vm;
-        use super::test_prelude;
         use super::MemPatch;
-        use super::check_behavior;
         use super::check_behavior_with_regs;
+        use super::TestAccesses;
+        use super::ExpectedRegAccess;
+        use super::ExpectedMemAccess;
 
         use yaxpeax_arch::{Decoder, U8Reader};
-        use yaxpeax_x86::long_mode::{Instruction, Opcode};
+        use yaxpeax_x86::long_mode::{Instruction, Opcode, RegSpec};
         use yaxpeax_x86::long_mode;
 
         pub static OPCODES: &'static [Opcode] = &[
@@ -2329,14 +2153,36 @@ mod kvm {
             let decoder = long_mode::uarch::amd::zen5();
             let mut buf = Instruction::default();
 
-            static INSTS: &'static [&'static [u8]] = &[
-                // lgdt
-                &[0x0f, 0x01, 0x10],
-                &[0x66, 0x0f, 0x01, 0x10],
-                &[0x67, 0x0f, 0x01, 0x10],
+            const PATCH_ADDR: u64 = 0x1_0000_0000;
+
+            // the instructions below read `[rax]`, so set `rax` as used and declare it in
+            // `used_regs` so randomization does not clobber.
+            let mut used_regs = [false; 16];
+            used_regs[0] = true;
+
+            let tests: Vec<(&'static [u8], TestAccesses)> = vec![
+                // lgdt mword [rax]
+                (&[0x0f, 0x01, 0x10], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x66, 0x0f, 0x01, 0x10], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x67, 0x0f, 0x01, 0x10], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 10 }],
+                }),
             ];
 
-            for inst in INSTS {
+            for (inst, accs) in tests.into_iter() {
                 let mut vm = create_test_vm();
                 vm.set_single_step(true).expect("can enable single-step");
 
@@ -2345,22 +2191,17 @@ mod kvm {
                 patch_bytes.extend_from_slice(&4095u16.to_le_bytes());
                 patch_bytes.extend_from_slice(&vm.gdt_addr().0.to_le_bytes());
                 let patch = MemPatch {
-                    addr: 0x1_0000_0000,
+                    addr: PATCH_ADDR,
                     bytes: patch_bytes,
                 };
                 let mut regs = vm.get_regs().expect("can get regs");
                 regs.rax = patch.addr;
                 vm.set_regs(&regs).expect("can set regs");
-                // keep rax as-is
-                let mut preserves = [false; 16];
-                preserves[0] = true;
 
                 let mut reader = U8Reader::new(&inst);
                 assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
 
-                test_prelude(inst, &buf);
-
-                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]).expect("behavior check is ok");
+                check_behavior_with_regs(&mut vm, &inst, Some(accs), &[patch]).expect("behavior check is ok");
             }
         }
 
@@ -2370,14 +2211,36 @@ mod kvm {
             let decoder = long_mode::uarch::amd::zen5();
             let mut buf = Instruction::default();
 
-            static INSTS: &'static [&'static [u8]] = &[
-                // lidt
-                &[0x0f, 0x01, 0x18],
-                &[0x66, 0x0f, 0x01, 0x18],
-                &[0x67, 0x0f, 0x01, 0x18],
+            const PATCH_ADDR: u64 = 0x1_0000_0000;
+
+            // the instructions below read `[rax]`, so set `rax` as used and declare it in
+            // `used_regs` so randomization does not clobber.
+            let mut used_regs = [false; 16];
+            used_regs[0] = true;
+
+            let tests: Vec<(&'static [u8], TestAccesses)> = vec![
+                // iidt mword [rax]
+                (&[0x0f, 0x01, 0x18], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x66, 0x0f, 0x01, 0x18], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x67, 0x0f, 0x01, 0x18], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 10 }],
+                }),
             ];
 
-            for inst in INSTS {
+            for (inst, accs) in tests.into_iter() {
                 let mut vm = create_test_vm();
                 vm.set_single_step(true).expect("can enable single-step");
 
@@ -2386,22 +2249,17 @@ mod kvm {
                 patch_bytes.extend_from_slice(&4095u16.to_le_bytes());
                 patch_bytes.extend_from_slice(&vm.idt_addr().0.to_le_bytes());
                 let patch = MemPatch {
-                    addr: 0x1_0000_0000,
+                    addr: PATCH_ADDR,
                     bytes: patch_bytes,
                 };
                 let mut regs = vm.get_regs().expect("can get regs");
                 regs.rax = patch.addr;
                 vm.set_regs(&regs).expect("can set regs");
-                // keep rax as-is
-                let mut preserves = [false; 16];
-                preserves[0] = true;
 
                 let mut reader = U8Reader::new(&inst);
                 assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
 
-                test_prelude(inst, &buf);
-
-                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]).expect("behavior check is ok");
+                check_behavior_with_regs(&mut vm, &inst, Some(accs), &[patch]).expect("behavior check is ok");
             }
         }
 
@@ -2411,14 +2269,36 @@ mod kvm {
             let decoder = long_mode::uarch::amd::zen5();
             let mut buf = Instruction::default();
 
-            static INSTS: &'static [&'static [u8]] = &[
-                // lldt
-                &[0x0f, 0x00, 0x10],
-                &[0x66, 0x0f, 0x00, 0x10],
-                &[0x67, 0x0f, 0x00, 0x10],
+            const PATCH_ADDR: u64 = 0x1_0000_0000;
+
+            // the instructions below read `[rax]`, so set `rax` as used and declare it in
+            // `used_regs` so randomization does not clobber.
+            let mut used_regs = [false; 16];
+            used_regs[0] = true;
+
+            let tests: Vec<(&'static [u8], TestAccesses)> = vec![
+                // iidt mword [rax]
+                (&[0x0f, 0x00, 0x10], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 2 }],
+                }),
+                (&[0x66, 0x0f, 0x00, 0x10], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 2 }],
+                }),
+                (&[0x67, 0x0f, 0x00, 0x10], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: false, addr: PATCH_ADDR, size: 2 }],
+                }),
             ];
 
-            for inst in INSTS {
+            for (inst, accs) in tests.into_iter() {
                 let mut vm = create_test_vm();
                 vm.set_single_step(true).expect("can enable single-step");
 
@@ -2430,22 +2310,17 @@ mod kvm {
                 let mut patch_bytes = Vec::new();
                 patch_bytes.extend_from_slice(&0u16.to_le_bytes());
                 let patch = MemPatch {
-                    addr: 0x1_0000_0000,
+                    addr: PATCH_ADDR,
                     bytes: patch_bytes,
                 };
                 let mut regs = vm.get_regs().expect("can get regs");
                 regs.rax = patch.addr;
                 vm.set_regs(&regs).expect("can set regs");
-                // keep rax as-is
-                let mut preserves = [false; 16];
-                preserves[0] = true;
 
                 let mut reader = U8Reader::new(&inst);
                 assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
 
-                test_prelude(inst, &buf);
-
-                check_behavior_with_regs(&mut vm, &inst, preserves, &[patch]).expect("behavior check is ok");
+                check_behavior_with_regs(&mut vm, &inst, Some(accs), &[patch]).expect("behavior check is ok");
             }
         }
 
@@ -2455,31 +2330,84 @@ mod kvm {
             let decoder = long_mode::uarch::amd::zen5();
             let mut buf = Instruction::default();
 
-            static INSTS: &'static [&'static [u8]] = &[
+            const PATCH_ADDR: u64 = 0x1_0000_0000;
+
+            // the instructions below read `[rax]`, so set `rax` as used and declare it in
+            // `used_regs` so randomization does not clobber.
+            let mut used_regs = [false; 16];
+            used_regs[0] = true;
+
+            let tests: Vec<(&'static [u8], TestAccesses)> = vec![
                 // sgdt
-                &[0x0f, 0x01, 0x00],
-                &[0x66, 0x0f, 0x01, 0x00],
-                &[0x67, 0x0f, 0x01, 0x00],
+                (&[0x0f, 0x01, 0x00], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x66, 0x0f, 0x01, 0x00], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x67, 0x0f, 0x01, 0x00], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 10 }],
+                }),
                 // sidt
-                &[0x0f, 0x01, 0x08],
-                &[0x66, 0x0f, 0x01, 0x08],
-                &[0x67, 0x0f, 0x01, 0x08],
+                (&[0x0f, 0x01, 0x08], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x66, 0x0f, 0x01, 0x08], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 10 }],
+                }),
+                (&[0x67, 0x0f, 0x01, 0x08], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 10 }],
+                }),
                 // sldt
-                &[0x0f, 0x00, 0x00],
-                &[0x66, 0x0f, 0x00, 0x00],
-                &[0x67, 0x0f, 0x00, 0x00],
+                (&[0x0f, 0x00, 0x00], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 2 }],
+                }),
+                (&[0x66, 0x0f, 0x00, 0x00], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 2 }],
+                }),
+                (&[0x67, 0x0f, 0x00, 0x00], TestAccesses {
+                    preserve_rsp: true,
+                    used_regs,
+                    expected_reg: vec![ExpectedRegAccess { write: false, reg: RegSpec::rax() }],
+                    expected_mem: vec![ExpectedMemAccess { write: true, addr: PATCH_ADDR, size: 2 }],
+                }),
             ];
 
-            for inst in INSTS {
+            for (inst, accs) in tests.into_iter() {
                 let mut vm = create_test_vm();
                 vm.set_single_step(true).expect("can enable single-step");
+                let mut regs = vm.get_regs().expect("can get regs");
+                regs.rax = PATCH_ADDR;
+                vm.set_regs(&regs).expect("can set regs");
 
                 let mut reader = U8Reader::new(&inst);
                 assert!(decoder.decode_into(&mut buf, &mut reader).is_ok());
 
-                test_prelude(inst, &buf);
-
-                check_behavior(&mut vm, &inst).expect("behavior check is ok");
+                check_behavior_with_regs(&mut vm, &inst, Some(accs), &[]).expect("behavior check is ok");
             }
         }
     }
