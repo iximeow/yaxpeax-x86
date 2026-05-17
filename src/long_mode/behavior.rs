@@ -1,9 +1,41 @@
+//! behavior information for x86-64 instructions.
+//!
+//! this module allows users of yaxpeax-x86 to collect operand read/write information about
+//! instructions ([`InstBehavior::get_operand()`]), as well as allowed execution level
+//! ([`InstBehavior::privilege_level()`]), potential exceptions ([`InstBehavior::exceptions()`]),
+//! and iterating all explicit and implicit operands ([`InstBehavior::all_operands()`]).
+//!
+//! additionally, [`ComplexOp`] enumerates instructions that may be considered "complex" - either
+//! involving architectural state not expressed in yaxpeax-x86' API or otherwise affecting machine
+//! state in a way that simply considering the operands as-presented would be inaccurate. where
+//! possible, `ComplexOp` tries to guide users towards how to handle such instructions.
+//!
+//! some behavior information in this module is "unstable", meaning it must be opted into with
+//! `feature = ["unstable"]` on yaxpeax-x86; information from "unstable" interfaces may be
+//! less-tested and change across semver-compatible releases! if you want to use unstable
+//! interfaces here, first: thank you!! please report any issues, and second: consider pinning to a
+//! specific minor version while setting `feature = ["unstable"]` if instruction behavior becoming
+//! more correct might present an issue in your application.
+
+#![deny(missing_docs)]
+
+// a lot of people have told me that we don't need to read code anymore, just like we "never look at
+// machine code anymore". sit with me and have a sad laugh for a moment. if we weren't here, reading
+// and thinking and talking about how to model the computer, where would the training data come
+// from? "you're not being left behind, it's a personal choice!", i've heard. a year later this has
+// evolved into "it is an abdication of your responsibility as an engineer to not pay Anthropic".
+// it is our moral responsibility to build the highest quality software in service of furthering
+// the rot? it is an abdication of ethics to claim all works are good.
+
 use super::{Instruction, Opcode, Operand, OperandSpec};
 use super::RegSpec;
 
 /// an accessor for run-time characteristics of instructions.
 ///
-/// ... TODO words ...
+/// generally, behavior accessors across architectures are expected to have a `behavior()`
+/// entrypoint on a decoded instruction. it is not clear which properties of `behavior()`
+/// generalize across architectures (yet!) but presumably something like `all_operands()` and
+/// `Access` do.
 ///
 /// additionally, of note for x86:
 ///
@@ -15,11 +47,10 @@ use super::RegSpec;
 ///   operation (consider `call qword [rcx]`; `qword [rcx]` is one memory access, but the implied
 ///   push of a return address is a second memory operation).
 /// * `{,e,r}flags` is often written and sometimes read, but almost never as an explicit source or
-///   destination operand. this can be queried with `flags_access()`, in addition to its inclusion
-///   as an implicit operand.
+///   destination operand. this can be queried with [`flags_access()`].
 ///
 /// it's also useful to know if implicit and explicit operands are reads, writes, or both, such as
-/// when diagnosing a run-time fault. to iterate over this information, `operands().accesses()`. or
+/// when diagnosing a run-time fault. to iterate over this information, `all_operands().iter()`. or
 /// `visit_accesses(&mut ..)` to collect all operand/access information for this instruction.
 #[derive(Copy, Clone)]
 pub struct InstBehavior<'inst> {
@@ -28,6 +59,14 @@ pub struct InstBehavior<'inst> {
 }
 
 impl Instruction {
+    /// get a struct to query behaviors of an instruction.
+    ///
+    /// "behaviors" is broad! as of writing, "behavior" covers "implicit and explicit operand
+    /// reads/writes", "possible exceptions", "allowed privilege levels", and "instruction has
+    /// additional semantics not easily expressed by this library".
+    ///
+    /// see the documentation for [`InstBehavior`] as well as the
+    /// [`behavior`][yaxpeax_x86::long_mode::behavior] module for more information.
     pub fn behavior<'inst>(&'inst self) -> InstBehavior<'inst> {
         let mut behavior = opcode2behavior(&self.opcode);
 
@@ -252,6 +291,10 @@ impl Exception {
     /// Control Protection Exception
     pub const CP: Exception = Exception::vector(21);
 
+    /// construct an `Exception` for the provided exception vector number.
+    ///
+    /// this is provided for convenience when converting (for example) the number in an x86
+    /// exception handler to the kinds of `Exception` in this library.
     pub const fn vector(vector: u8) -> Self {
         Self { vector }
     }
@@ -262,6 +305,11 @@ impl Exception {
     }
 
     #[cfg(feature = "fmt")]
+    /// get the typical mnemonic for this `Exception`, if one is documented.
+    ///
+    /// the names returned by helper do not include a leading `#`. they come from the Intel SDM
+    /// chapter 7.3 "SOURCES OF INTERRUPTS" table 7-1 "Protected-Mode Exceptions and Interrupts".
+    /// similar descriptions can be found in the AMD APM.
     pub fn name(&self) -> Option<&'static str> {
         static NAMES: [Option<&'static str>; 22] = [
             Some("DE"), Some("DB"), Some("NMI"), Some("BP"),
@@ -294,20 +342,24 @@ impl fmt::Debug for Exception {
 }
 
 impl ExceptionInfo {
+    /// construct an empty set of possible exception vectors.
     pub fn empty() -> Self {
         Self {
             possible_vectors: 0,
         }
     }
 
+    /// test if this `ExceptionInfo` has any possible vector set.
     pub fn any(&self) -> bool {
         self.possible_vectors != 0
     }
 
+    /// test if this `ExceptionInfo` has no vector set.
     pub fn none(&self) -> bool {
         !self.any()
     }
 
+    /// test if this `ExceptionInfo` indicates that exception `e` may be raised.
     pub fn may(&self, e: Exception) -> bool {
         (self.possible_vectors & (1 << e.vector)) != 0
     }
@@ -323,6 +375,8 @@ impl ExceptionInfo {
         self.possible_vectors |= bit;
     }
 
+    /// record that exception `e` is or is not (`b`) possible in this `ExceptionInfo` record, but
+    /// in a more chaining-friendly way.
     pub const fn with(mut self, e: Exception, b: bool) -> Self {
         self.set(e, b);
         self
@@ -351,13 +405,25 @@ fn test_exception_info() {
     assert_eq!(info.possible_vectors, 0x12000);
 }
 
+/// a description of the privilege level (that is, value of `CPL` in the current code selector)
+/// that allows executing the corresponding instruction.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PrivilegeLevel {
+    /// the corresponding instruction can run at any privilege level.
     Any = 0b00,
+    /// the corresponding instruction can only run when `CPL=0` (aka "in ring 0").
     PL0 = 0b01,
+    /// the corresponding instruction has more complex rule for when it is allowed.
+    ///
+    /// this may mean the instruction is either "Any" or "PL0" depending on other processor state
+    /// (such as `rdtsc`), or it may mean the instruction simply does not relate directly to
+    /// `CPL=3`/`CPL=0` (such as for `iret`).
     Special = 0b10,
 }
 
+/// a handle for an instruction, its behavior, and any related implicit operands.
+///
+/// this is only useful for [`InstOperands::iter()`].
 #[derive(Copy, Clone)]
 pub struct InstOperands<'inst> {
     inst: InstBehavior<'inst>,
@@ -365,11 +431,17 @@ pub struct InstOperands<'inst> {
 }
 
 impl<'inst> InstOperands<'inst> {
+    /// establish an iterator over the operands described in this `InstOperands`.
     pub fn iter(self) -> AccessIter<'inst> {
         AccessIter::new(self)
     }
 }
 
+/// this struct implements [`Iterator`] to allow library users to walk all explicit and implicit
+/// operands for the corresponding instruction, along with if they are used for reading or for
+/// writing.
+///
+/// implicit operands are always walked first, explicit operands are walked last.
 pub struct AccessIter<'inst> {
     operands: InstOperands<'inst>,
     explicit: bool,
@@ -385,6 +457,8 @@ impl<'inst> AccessIter<'inst> {
         }
     }
 
+    /// weaken this iterator to only returning the operands corresponding to this instruction,
+    /// without specific access information.
     pub fn operands(self) -> OperandIter<'inst> {
         OperandIter { inner: self }
     }
@@ -437,7 +511,8 @@ impl<'inst> Iterator for AccessIter<'inst> {
 
         if self.next < self.operands.inst.inst.operand_count() {
             let op = self.operands.inst.inst.operand(self.next);
-            let access = self.operands.inst.operand_access(self.next).expect("defined operand has defined access");
+            let access = self.operands.inst.operand_access(self.next)
+                .expect("defined operand has defined access");
             debug_assert!(
                 access != Access::None || (
                     self.operands.inst.inst.opcode == Opcode::NOP ||
@@ -454,6 +529,11 @@ impl<'inst> Iterator for AccessIter<'inst> {
     }
 }
 
+/// a reduced-strength iterator of an instruction's implicit and explicit operands.
+///
+/// unlike `AccessIter`, this iterator does not provide read/write information, simply that
+/// operands are or are not present. this is more likely useful for some kinds of instruction
+/// printing than automated instruction analysis.
 pub struct OperandIter<'inst> {
     inner: AccessIter<'inst>,
 }
@@ -512,6 +592,11 @@ impl<'inst> Iterator for OperandIter<'inst> {
 }
 
 impl<'inst> InstBehavior<'inst> {
+    #[cfg(feature = "unstable")]
+    /// get the [`PrivilegeLevel`] for this instruction.
+    ///
+    /// returns `None` if no privilege level information is recorded for the instruction. such
+    /// cases are a bug, please report if you see them.
     pub fn privilege_level(&self) -> Option<PrivilegeLevel> {
         let pl_bits = self.behavior.behavior & 0b11;
         const LUT: [Option<PrivilegeLevel>; 4] = [
@@ -522,8 +607,11 @@ impl<'inst> InstBehavior<'inst> {
         LUT[pl_bits as usize]
     }
 
-    /// 
-//    #[cfg(feature = "unstable")]
+    #[cfg(feature = "unstable")]
+    /// get the [`ExceptionInfo`] for this instruction.
+    ///
+    /// this is very much best-effort and poorly tested. it is behind the `unstable` feature for a
+    /// reason!
     pub fn exceptions(&self) -> ExceptionInfo {
         let mut exceptions = ExceptionInfo::empty();
         if self.privilege_level() != Some(PrivilegeLevel::Any) {
@@ -545,15 +633,21 @@ impl<'inst> InstBehavior<'inst> {
         exceptions
     }
 
-    fn as_complex_op(&self) -> Option<ComplexOp> {
-        // if the behavior is not complex, it is *definitely* not complex. if the behavior is
+    /// transform this instruction's [`Opcode`] into a [`ComplexOp`], if the instruction is
+    /// "complex".
+    ///
+    /// documentation on [`ComplexOp`] covers what instructions are considered "complex" by
+    /// yaxpeax-x86 and why in more detail. correct analysis of a function (or program!) in the
+    /// presence of complex instructions may require consulting the Intel Software Developer's
+    /// Manual or AMD Architecture Programmer's Manual.
+    pub fn as_complex_op(&self) -> Option<ComplexOp> {
+        // if the behavior is not complex, it is *definitely* not a complex op. if the behavior is
         // complex, it's really a "depending on the specific instruction and operands it might
         // be"...
         if !self.behavior.is_complex() {
             return None;
         }
 
-        // TODO: all of these should be a `set_complex` bit.
         if self.inst.opcode == Opcode::BT {
             if self.inst.operands[0] != OperandSpec::RegMMM {
                 Some(ComplexOp::BT)
@@ -614,12 +708,17 @@ impl<'inst> InstBehavior<'inst> {
         })
     }
 
+    /// get the `Access` behavior this instruction has for `rflags`.
+    ///
+    /// note that as the documentation for [`Access`] describes, "read" and "write" have slightly
+    /// different meanings for the flags register than other locations.
+    // this implies that `rflags` must never appear in an implicit operand list.
     pub fn flags_access(&self) -> Option<Access> {
         let flag_acc = (self.behavior.behavior >> 2) & 0b11;
         Access::from_bits(flag_acc)
     }
 
-    pub fn implicit_oplist(&self) -> Option<&'static [ImplicitOperand]> {
+    fn implicit_oplist(&self) -> Option<&'static [ImplicitOperand]> {
         let ops_idx = self.behavior.extra;
         if ops_idx == 0 {
             return None;
@@ -629,8 +728,13 @@ impl<'inst> InstBehavior<'inst> {
         Some(&IMPLICIT_OPS_LIST[ops_idx as usize])
     }
 
+    /// get the `Access` behavor for an explicit operand of this instruction.
+    ///
+    /// `None` means that there is no operand at the given index, while `Some(Access::None)` means
+    /// there is an operand, and the instruction does not actually access it (as for `nop`, `ud0`,
+    /// and `ud1`)
     pub fn operand_access(&self, idx: u8) -> Option<Access> {
-        if idx >= 4 {
+        if idx >= self.inst.operand_count {
             return None;
         }
 
@@ -638,13 +742,24 @@ impl<'inst> InstBehavior<'inst> {
         Access::from_bits(op_acc)
     }
 
+    /// iterate all operands in the instruction and report them to the provided `AccessVisitor`.
+    ///
+    /// this is a more informative, but somewhat more specialized, interface than simply iterating
+    /// [`InstBehavior::all_operands()`]. for memory operands, address calculations are reported to
+    /// the access visitor as reads of the relevant registers. if all dependent values are
+    /// available, the resulting effective address is computed and reported as part of the memory
+    /// access.
+    ///
+    /// `visit_accesses()` is slightly more efficient in this than iterating `all_operands()` as
+    /// well, as it uses unstable internal representations directly, rather than converting to API
+    /// types and back for every operand.
     pub fn visit_accesses<T: AccessVisitor>(&self, v: &mut T) -> Result<(), ComplexOp> {
         if let Some(op) = self.as_complex_op() {
             return Err(op);
         }
 
         fn compute_addr<T: AccessVisitor>(v: &mut T, inst: &Instruction, op_spec: OperandSpec) -> Option<u64> {
-            // TODO: test assertions feature?
+            #[cfg(feature = "_debug_internal_asserts")]
             if !op_spec.is_memory() {
                 panic!("expected memory operand but got {:?}", op_spec);
             }
@@ -753,6 +868,8 @@ impl<'inst> InstBehavior<'inst> {
                     Some(inst.disp as u32 as u64)
                 }
                 other => {
+                    // this could be `_debug_internal_assertions`-gated, but i'm not quite that
+                    // confident yet..
                     panic!("not-yet-handled memory operand: {:?}", other);
                 }
             }
@@ -776,7 +893,11 @@ impl<'inst> InstBehavior<'inst> {
                         OperandSpec::Deref_edi => RegSpec::edi(),
                         OperandSpec::Deref_esi => RegSpec::esi(),
                         OperandSpec::Deref => self.inst.regs[1],
-                        other => { panic!("TODO: unreachable {:?}", other); }
+                        other => {
+                            // this could be `_debug_internal_assertions`-gated, but i'm not quite
+                            // that confident yet..
+                            panic!("TODO: unreachable {:?}", other);
+                        }
                     };
                     if op.write {
                         v.register_write(reg);
@@ -796,7 +917,9 @@ impl<'inst> InstBehavior<'inst> {
                             }
                         }
                         OperandSpec::MemIndexScale => {
-                            // HACK HACK HACK
+                            // HACK HACK HACK this is just how i've decided to interpret
+                            // `MemIndexScale` as an operand spec; it's only for xlat. adding
+                            // another field to implicit operands just for this is a little silly..
                             let base = v.get_register(op.reg);
                             let index = v.get_register(RegSpec::al());
                             if let (Some(base), Some(index)) = (base, index) {
@@ -806,6 +929,8 @@ impl<'inst> InstBehavior<'inst> {
                             }
                         }
                         other => {
+                            // this could be `_debug_internal_assertions`-gated, but i'm not quite
+                            // that confident yet..
                             panic!("impossible operand spec {:?}", other);
                         }
                     };
@@ -969,7 +1094,7 @@ impl<'inst> InstBehavior<'inst> {
                         if other.is_masked() && self.inst.prefixes.evex_unchecked().mask_reg() != 0 {
                             v.register_read(RegSpec::mask(self.inst.prefixes.evex_unchecked().mask_reg()));
                         }
-                        // no lea check necessary: the memory access is coded as a read and no
+                        // no lea check necessary: its memory access is coded as a read and no
                         // instruction has a similar "fake" memory write.
                         v.memory_write(addr, size as u32);
                     }
@@ -1045,17 +1170,23 @@ impl Access {
         LUT[bits as usize]
     }
 
+    /// is this access a read?
+    ///
+    /// if it is `ReadWrite`, this will be `true` as will `is_write`.
     pub fn is_read(&self) -> bool {
         *self as u8 & 0b01 != 0
     }
 
+    /// is this access a write?
+    ///
+    /// if it is `ReadWrite`, this will be `true` as will `is_read`.
     pub fn is_write(&self) -> bool {
         *self as u8 & 0b10 != 0
     }
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct BehaviorDigest {
+struct BehaviorDigest {
     // laid out like:
     //
     // |7 6|5 4|3 2|1 0|
@@ -1081,7 +1212,6 @@ pub struct BehaviorDigest {
     extra: u16,
 }
 
-// TODO: the various `set_pl*()` are not actually used yet..
 #[allow(dead_code)]
 impl BehaviorDigest {
     const fn empty() -> BehaviorDigest {
@@ -1457,9 +1587,13 @@ impl BehaviorDigest {
 ///
 /// TDX-related instructions are considered complex because they are not more precisely tested and
 /// are assumed as-complex-as-VMX in the first place.
+// TODO: this could be declared through a macro that does something like:
+// "declare_opcode_subset! { }" which gets a list of identifiers and generates the
+// `Opcode::<ident> as u32` rhs. but a vim macro will do for now.
 #[non_exhaustive]
 #[repr(u32)] // same repr as `Opcode`
 #[derive(Copy, Clone, Debug)]
+#[allow(missing_docs)]
 pub enum ComplexOp {
     /// rdmsr/wrmsr are considered "complex" for reasons in the enum doc comment.
     RDMSR = (Opcode::RDMSR as u32),
@@ -1765,13 +1899,30 @@ pub trait AccessVisitor {
     /// if any `get_register()` returns `None` in an address calculation, the subsequent
     /// `memory_read()` or `memory_write()` for that operand will be given an `address` of `None`.
     ///
-    /// if `get_register` is implemented withhout calling `register_read`, the 
-    /// if `get_register()` is given a custom implementation, be sure to either call `
+    /// `get_register()` may be implemented withhout calling `register_read()`, in which case when
+    /// used with `visit_accesses` the register/memory read/writes will all correspond directly to
+    /// implicit and explicit operands.
     fn get_register(&mut self, reg: RegSpec) -> Option<u64> {
         self.register_read(reg);
         None
     }
+    /// record that the instruction reads a memory location.
+    ///
+    /// when used with `visit_accesses`, an address is only provided when yaxpeax-x86 can calculate
+    /// an effective address (i.e. `get_register()` calls for all dependent registers return a
+    /// value). all non-`ComplexOp` instructions have a known memory access size, so this is always
+    /// reported regardless of if *where* is not known.
+    ///
+    /// some instructions can both read and write memory (consider `call [addr]`).
     fn memory_read(&mut self, address: Option<u64>, size: u32);
+    /// record that the instruction writes a memory location.
+    ///
+    /// when used with `visit_accesses`, an address is only provided when yaxpeax-x86 can calculate
+    /// an effective address (i.e. `get_register()` calls for all dependent registers return a
+    /// value). all non-`ComplexOp` instructions have a known memory access size, so this is always
+    /// reported regardless of if *where* is not known.
+    ///
+    /// some instructions can both read and write memory (consider `call [addr]`).
     fn memory_write(&mut self, address: Option<u64>, size: u32);
 }
 
@@ -4038,7 +4189,7 @@ static TABLE: [BehaviorDigest; 1413] = [
             .set_operand(0, Access::Read)
             .set_complex(true),
     /* VERR => */ GENERAL_R_FLAGWRITE,
-    /* VERW => */  GENERAL_R_FLAGWRITE,
+    /* VERW => */ GENERAL_R_FLAGWRITE,
     /* CMC => */ GENERAL_FLAGRW,
     /* CLC => */ GENERAL_FLAGRW,
     /* STC => */ GENERAL_FLAGRW,
