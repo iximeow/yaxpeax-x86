@@ -15,9 +15,7 @@ mod kvm {
 
     fn host_decoder() -> protected_mode::InstDecoder {
         // Safety: it's cpuid, everything supports leaf eax=1.
-        let leaf1 = unsafe {
-            core::arch::x86_64::__cpuid(1)
-        };
+        let leaf1 = core::arch::x86_64::__cpuid(1);
         match leaf1.eax {
             0x00b40f40 => {
                 // zen 5 (my 9950x)
