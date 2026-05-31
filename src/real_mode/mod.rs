@@ -8342,12 +8342,7 @@ fn read_operands<
                 instruction.opcode = Opcode::SMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                let bank = if !instruction.prefixes.operand_size() {
-                    RegisterBank::W
-                } else {
-                    RegisterBank::D
-                };
-                instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
             } else if r == 5 {
                 let mod_bits = modrm >> 6;
                 if mod_bits != 0b11 {
