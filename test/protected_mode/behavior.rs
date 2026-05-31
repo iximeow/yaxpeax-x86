@@ -1,5 +1,4 @@
-
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
 mod kvm {
     use asmlinator::x86_64::{
         IsaMode, GuestAddress,
