@@ -26,6 +26,7 @@ strum = { version = "0.28.0", features = ["derive"], optional = true }
 [dev-dependencies]
 rand = { version = "0.10.0", features = ["thread_rng"] }
 asmlinator = { version = "2.1.0" }
+tempfile = { version = "=3.24.0" }
 
 [[test]]
 name = "test"

@@ -1,3 +1,5 @@
+mod masm;
+
 use core::fmt;
 
 // allowing these deprecated items for the time being, not yet breaking yaxpeax-x86 apis
@@ -3581,6 +3583,8 @@ pub enum DisplayStyle {
     /// C-style syntax for instructions, like
     /// `rax += [rdx + rcx * 2 + 0x1234]`
     C,
+    /// format instructions in the syntax used by the Microsoft Assembler (MASM)
+    Masm,
     // one might imagine an ATT style here, which is mostly interesting for reversing operand
     // order.
     // well.
@@ -3626,7 +3630,10 @@ impl <'instr, T: fmt::Write, Y: YaxColors> Colorize<T, Y> for InstructionDisplay
 struct NoContext;
 
 impl Instruction {
-    /// format this instruction into `out` as a plain text string.
+    /// format this instruction into `out` as a plain text string, in the default display
+    /// configuration for an `x86_64` instruction (that is, roughly Intel syntax).
+    ///
+    /// for more customizable formatting options, see [`Instruction::display_with`].
     #[cfg_attr(feature="profiling", inline(never))]
     pub fn write_to<T: fmt::Write>(&self, out: &mut T) -> fmt::Result {
         let mut out = yaxpeax_arch::display::FmtSink::new(out);
@@ -4148,6 +4155,9 @@ impl <'instr, T: fmt::Write, Y: YaxColors> ShowContextual<u64, NoContext, T, Y> 
             DisplayStyle::C => {
                 contextualize_c(instr, &mut out)
             }
+            DisplayStyle::Masm => {
+                masm::contextualize(&instr, &mut out)
+            }
         }
     }
 }
@@ -4441,6 +4451,9 @@ mod buffer_sink {
                 }
                 DisplayStyle::C => {
                     contextualize_c(&display.instr, &mut handle)?;
+                }
+                DisplayStyle::Masm => {
+                    super::masm::contextualize(&display.instr, &mut handle)?;
                 }
             }
 
