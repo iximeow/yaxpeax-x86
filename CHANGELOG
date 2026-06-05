@@ -18,6 +18,11 @@
   AVX-512. everything else (including assemblers like nasm, masm, gas, ..) since
   standardized on "rn-sae", the spelling for the rounding mode in subsequent
   versions of the SDM and now APM.
+* fix several instructions having incorrectly-large register or memory access sizes.
+  `roundss` and `roundsd` were overly-large, as were `pmovsxbd`, `pmovzxwq`,
+  `pmovsxwq`, and `cvtss2sd`. additionally, `lfs`, `lgs`, and `lss` in 64-bit
+  mode have 32-bit operand forms (yielding 32 + 16 == 48 bits of memory
+  accessed).
 
 ## 2.1.0
 

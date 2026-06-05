@@ -6511,9 +6511,9 @@ fn read_operands<
                     .with_id(words.offset() as u32 * 8 - 8 + 1)
             );
             if instruction.operands[1] != OperandSpec::RegMMM {
-                if instruction.opcode == Opcode::CMPSS {
+                if instruction.opcode == Opcode::CMPSS || instruction.opcode == Opcode::ROUNDSS {
                     instruction.mem_size = 4;
-                } else if instruction.opcode == Opcode::CMPSD {
+                } else if instruction.opcode == Opcode::CMPSD || instruction.opcode == Opcode::ROUNDSD {
                     instruction.mem_size = 8;
                 } else {
                     instruction.mem_size = 16;
@@ -6787,7 +6787,7 @@ fn read_operands<
             if instruction.operands[1] != OperandSpec::RegMMM {
                 if [Opcode::PMOVSXBQ, Opcode::PMOVZXBQ].contains(&instruction.opcode) {
                     instruction.mem_size = 2;
-                } else if [Opcode::PMOVZXBD, Opcode::UCOMISS, Opcode::COMISS].contains(&instruction.opcode) {
+                } else if [Opcode::PMOVZXBD, Opcode::PMOVSXBD, Opcode::PMOVZXWQ, Opcode::PMOVSXWQ, Opcode::UCOMISS, Opcode::COMISS, Opcode::CVTSS2SD].contains(&instruction.opcode) {
                     instruction.mem_size = 4;
                 } else {
                     instruction.mem_size = 8;
@@ -6806,9 +6806,13 @@ fn read_operands<
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if instruction.prefixes.rex_unchecked().w() {
                     instruction.mem_size = 10;
-                } else {
+                } else if instruction.prefixes.operand_size() {
+                    instruction.regs[0].bank = RegisterBank::W;
                     instruction.mem_size = 4;
-                }
+                } else {
+                    instruction.regs[0].bank = RegisterBank::D;
+                    instruction.mem_size = 6;
+               }
             } else if [Opcode::ENQCMD, Opcode::ENQCMDS].contains(&instruction.opcode) {
                 instruction.mem_size = 64;
             } else {
@@ -7498,7 +7502,8 @@ fn read_operands<
                     }
                     7 => {
                         instruction.opcode = Opcode::RDPID;
-                        instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
+                        // > "The value of CS.D and operand-size prefixes (66H and REX.W) do not affect the behavior of the RDPID instruction."
+                        instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::Q, sink)?;
                         if instruction.operands[0] != OperandSpec::RegMMM {
                             return Err(DecodeError::InvalidOperand);
                         }
@@ -7937,11 +7942,7 @@ fn read_operands<
                 if op == OperandCase::G_xmm_U_mm {
                     return Err(DecodeError::InvalidOperand);
                 } else {
-                    if instruction.prefixes.rex_unchecked().w() {
-                        instruction.mem_size = 8;
-                    } else {
-                        instruction.mem_size = 4;
-                    }
+                    instruction.mem_size = 8;
                 }
             }
         },
@@ -8447,12 +8448,11 @@ fn read_operands<
                     instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                 }
             } else if r == 4 {
-                // TODO: this permits storing only to word-size registers
-                // spec suggets this might do something different for f.ex rdi?
+                // TODO: note that this was incorrectly choosing 16-bit operands every time
                 instruction.opcode = Opcode::SMSW;
                 instruction.operand_count = 1;
                 instruction.mem_size = 2;
-                instruction.operands[0] = read_E(words, instruction, modrm, RegisterBank::W, sink)?;
+                instruction.operands[0] = read_E(words, instruction, modrm, self.vqp_size(), sink)?;
             } else if r == 5 {
                 let mod_bits = modrm >> 6;
                 if mod_bits != 0b11 {
@@ -8687,7 +8687,8 @@ fn read_operands<
                             return Err(DecodeError::InvalidOpcode);
                         }
                     };
-                    let bank = if instruction.prefixes.rex_unchecked().w() { RegisterBank::Q } else { RegisterBank::D };
+                    // TPAUSE is always a 32-bit register.
+                    let bank = RegisterBank::D;
                     instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                     instruction.operand_count = 1;
                 }
@@ -8701,8 +8702,8 @@ fn read_operands<
                         6 => {
                             instruction.opcode = Opcode::UMWAIT;
                             instruction.regs[0] = RegSpec {
-                                bank: if instruction.prefixes.rex_unchecked().w() { RegisterBank::Q } else { RegisterBank::D },
-                                num: m + if instruction.prefixes.rex_unchecked().x() { 0b1000 } else { 0 },
+                                bank: RegisterBank::D,
+                                num: m + if instruction.prefixes.rex_unchecked().b() { 0b1000 } else { 0 },
                             };
                             instruction.operands[0] = OperandSpec::RegRRR;
                             instruction.operand_count = 1;
