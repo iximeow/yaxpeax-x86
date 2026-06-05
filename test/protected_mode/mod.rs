@@ -2395,9 +2395,9 @@ fn prefixed_0f() {
     test_display(&[0x0f, 0x17, 0x00], "movhps qword [eax], xmm0");
     test_display(&[0x0f, 0x18, 0xc0], "nop eax"); // capstone says invalid, xed says nop
     test_display(&[0x0f, 0x18, 0x00], "prefetchnta zmmword [eax]");
-    test_display(&[0x0f, 0x18, 0x08], "prefetch0 zmmword [eax]");
-    test_display(&[0x0f, 0x18, 0x10], "prefetch1 zmmword [eax]");
-    test_display(&[0x0f, 0x18, 0x18], "prefetch2 zmmword [eax]");
+    test_display(&[0x0f, 0x18, 0x08], "prefetcht0 zmmword [eax]");
+    test_display(&[0x0f, 0x18, 0x10], "prefetcht1 zmmword [eax]");
+    test_display(&[0x0f, 0x18, 0x18], "prefetcht2 zmmword [eax]");
     test_display(&[0x0f, 0x18, 0x20], "nop zmmword [eax]");
     test_display(&[0x0f, 0x18, 0xcc], "nop esp");
     test_display(&[0x0f, 0x19, 0x20], "nop dword [eax]");

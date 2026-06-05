@@ -3219,9 +3219,9 @@ mod prefixed_0f {
         testcase!(&[0x0f, 0x17, 0x00], "movhps qword [rax], xmm0"),
         testcase!(&[0x0f, 0x18, 0xc0], "nop eax"), // capstone says invalid, xed says nop
         testcase!(&[0x0f, 0x18, 0x00], "prefetchnta zmmword [rax]"),
-        testcase!(&[0x0f, 0x18, 0x08], "prefetch0 zmmword [rax]"),
-        testcase!(&[0x0f, 0x18, 0x10], "prefetch1 zmmword [rax]"),
-        testcase!(&[0x0f, 0x18, 0x18], "prefetch2 zmmword [rax]"),
+        testcase!(&[0x0f, 0x18, 0x08], "prefetcht0 zmmword [rax]"),
+        testcase!(&[0x0f, 0x18, 0x10], "prefetcht1 zmmword [rax]"),
+        testcase!(&[0x0f, 0x18, 0x18], "prefetcht2 zmmword [rax]"),
         testcase!(&[0x0f, 0x18, 0x20], "nop zmmword [rax]"),
         testcase!(&[0x4f, 0x0f, 0x18, 0x20], "nop zmmword [r8]"),
         testcase!(&[0x0f, 0x18, 0xcc], "nop esp"),

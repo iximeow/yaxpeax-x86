@@ -188,9 +188,9 @@ fn test_real_mode() {
     test_display(&[0x0f, 0x16, 0xcf], "movlhps xmm1, xmm7");
     test_display(&[0x0f, 0x17, 0x00], "movhps qword [bx + si * 1], xmm0");
     test_display(&[0x0f, 0x18, 0x00], "prefetchnta zmmword [bx + si * 1]");
-    test_display(&[0x0f, 0x18, 0x08], "prefetch0 zmmword [bx + si * 1]");
-    test_display(&[0x0f, 0x18, 0x10], "prefetch1 zmmword [bx + si * 1]");
-    test_display(&[0x0f, 0x18, 0x18], "prefetch2 zmmword [bx + si * 1]");
+    test_display(&[0x0f, 0x18, 0x08], "prefetcht0 zmmword [bx + si * 1]");
+    test_display(&[0x0f, 0x18, 0x10], "prefetcht1 zmmword [bx + si * 1]");
+    test_display(&[0x0f, 0x18, 0x18], "prefetcht2 zmmword [bx + si * 1]");
     test_display(&[0x0f, 0x18, 0x20], "nop zmmword [bx + si * 1]");
     test_display(&[0x0f, 0x18, 0xc0], "nop ax");
     test_display(&[0x0f, 0x18, 0xcc], "nop sp");
