@@ -507,14 +507,17 @@ impl SaeMode {
     /// ```
     /// use yaxpeax_x86::long_mode::SaeMode;
     ///
-    /// assert_eq!(SaeMode::RoundNearest.label(), "{rne-sae}");
+    /// assert_eq!(SaeMode::RoundNearest.label(), "{rn-sae}");
     /// assert_eq!(SaeMode::RoundDown.label(), "{rd-sae}");
     /// assert_eq!(SaeMode::RoundUp.label(), "{ru-sae}");
     /// assert_eq!(SaeMode::RoundZero.label(), "{rz-sae}");
     /// ```
     pub const fn label(&self) -> &'static str {
         match self {
-            SaeMode::RoundNearest => "{rne-sae}",
+            // in the KNL era some resources called this "rne-sae" (https://imsc.uni-graz.at/haasegu/Projects/FSP/HPC/ws_15/Intel_Open_Source_Software_Development.pdf)
+            // it seems xed retained this `rne-sae` form. zydis calls this "rn-sae".
+            // masm, nasm, gas, and everyone else wants "rn-sae". so, we'll call it "rn-sae" too.
+            SaeMode::RoundNearest => "{rn-sae}",
             SaeMode::RoundDown => "{rd-sae}",
             SaeMode::RoundUp => "{ru-sae}",
             SaeMode::RoundZero => "{rz-sae}",

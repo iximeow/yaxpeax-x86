@@ -149,7 +149,7 @@ pub(crate) fn read_evex<
         evex_start + 21,
         evex_start + 22,
         InnerDescription::Misc(match lpl {
-            0b00 => "evex.l'l is `0b00` (vector size 128 or rne-sae)",
+            0b00 => "evex.l'l is `0b00` (vector size 128 or rn-sae)",
             0b01 => "evex.l'l is `0b01` (vector size 256 or rd-sae)",
             0b10 => "evex.l'l is `0b10` (vector size 512 or ru-sae)",
             _ => "evex.l'l is `0b11` (vector size 512 + rz-sae)",

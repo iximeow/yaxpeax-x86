@@ -165,7 +165,7 @@ pub use real_mode::Arch as x86_16;
 // the pseudo-C syntax's max length would be something like:
 // ```
 // xacquire xrelease lock { repnz qword if /* signed */ greater_or_equal(rflags) then jmp gs:[xmm31 +
-// xmm31 * 8 + 0x12345678]{k7}{z}{rne-sae} }
+// xmm31 * 8 + 0x12345678]{k7}{z}{rn-sae} }
 // ```
 // (which is nonsensical) or for an unknown opcode,
 // ```
@@ -173,7 +173,7 @@ pub use real_mode::Arch as x86_16;
 // ```
 // where `opN` is an operand. the longest operand, same as above, would be something like
 // ```
-// gs:[xmm31 + xmm31 * 8 + 0x12345678]{k7}{z}{rne-sae}
+// gs:[xmm31 + xmm31 * 8 + 0x12345678]{k7}{z}{rn-sae}
 // ```
 // for a length like 262 bytes of operand, 55 bytes of prefixes and syntax, and another up-to-20
 // bytes of opcode.

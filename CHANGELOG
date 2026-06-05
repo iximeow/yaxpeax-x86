@@ -13,6 +13,11 @@
   through `Instruction::operand` is a guaranteed panic.
 * fix the mnemonics for some prefetch instructions: prefetcht{0,1,2} were missing the second "t".
   the Opcode variants are still spelled incorrectly and will continue to be until a future 3.0.
+* renamed the round-to-nearest AVX512 rounding mode from "rne-sae" to "rn-sae".
+  "rne-sae" is the XED spelling, taken from the original Knights Landing form of
+  AVX-512. everything else (including assemblers like nasm, masm, gas, ..) since
+  standardized on "rn-sae", the spelling for the rounding mode in subsequent
+  versions of the SDM and now APM.
 
 ## 2.1.0
 
