@@ -8745,7 +8745,7 @@ fn read_operands<
                             } else {
                                 RegisterBank::D
                             };
-                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().x(), opwidth);
+                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().b(), opwidth);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
@@ -8756,7 +8756,7 @@ fn read_operands<
                             } else {
                                 RegisterBank::D
                             };
-                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().x(), opwidth);
+                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().b(), opwidth);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
 
@@ -8768,7 +8768,7 @@ fn read_operands<
                             } else {
                                 RegisterBank::D
                             };
-                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().x(), opwidth);
+                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().b(), opwidth);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
@@ -8779,7 +8779,7 @@ fn read_operands<
                             } else {
                                 RegisterBank::D
                             };
-                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().x(), opwidth);
+                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().b(), opwidth);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }
@@ -8790,7 +8790,8 @@ fn read_operands<
                             } else {
                                 RegisterBank::D
                             };
-                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().x(), opwidth);
+                            // incssp register is extended by rex.b????
+                            instruction.regs[1] = RegSpec::from_parts(m, instruction.prefixes.rex_unchecked().b(), opwidth);
                             instruction.operands[0] = OperandSpec::RegMMM;
                             instruction.operand_count = 1;
                         }

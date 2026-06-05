@@ -23,6 +23,9 @@
   `pmovsxwq`, and `cvtss2sd`. additionally, `lfs`, `lgs`, and `lss` in 64-bit
   mode have 32-bit operand forms (yielding 32 + 16 == 48 bits of memory
   accessed).
+* fix many vex instructions having their modrm/mmm registers extended by an
+  incorrect VEX prefix bit. most errors were REX.X being used to extend the mmm-field
+  register, but hardware uses REX.B for this purpose.
 
 ## 2.1.0
 
