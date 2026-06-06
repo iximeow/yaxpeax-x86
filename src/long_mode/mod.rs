@@ -7242,24 +7242,11 @@ fn read_operands<
             instruction.operand_count = 2;
             instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[1] = mem_oper;
-            if instruction.prefixes.rex_unchecked().w() {
-                let op = instruction.operands[0];
-                instruction.operands[0] = instruction.operands[1];
-                instruction.operands[1] = op;
-                instruction.regs[0].bank = RegisterBank::MM;
-                instruction.regs[0].num &= 0b111;
-                instruction.opcode = Opcode::MOVD;
-                if instruction.operands[1] != OperandSpec::RegMMM {
-                    instruction.mem_size = 4;
-                } else {
-                    instruction.regs[1].bank = RegisterBank::Q;
-                }
+
+            if instruction.operands[1] != OperandSpec::RegMMM {
+                instruction.mem_size = 8;
             } else {
-                if instruction.operands[1] != OperandSpec::RegMMM {
-                    instruction.mem_size = 8;
-                } else {
-                    instruction.regs[1].bank = RegisterBank::X;
-                }
+                instruction.regs[1].bank = RegisterBank::X;
             }
         }
         OperandCase::ModRM_0x0f0d => {

@@ -7157,6 +7157,7 @@ fn read_operands<
             instruction.operand_count = 2;
             instruction.regs[0].bank = RegisterBank::X;
             instruction.operands[1] = mem_oper;
+
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = 8;
             } else {
