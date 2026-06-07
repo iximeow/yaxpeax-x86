@@ -1,3 +1,5 @@
+mod masm;
+
 use core::fmt;
 
 // allowing these deprecated items for the time being, not yet breaking yaxpeax-x86 apis
@@ -2142,6 +2144,8 @@ pub enum DisplayStyle {
     /// C-style syntax for instructions, like
     /// `eax += [edx + ecx * 2 + 0x1234]`
     C,
+    /// format instructions in the syntax used by the Microsoft Assembler (MASM)
+    Masm,
     // one might imagine an ATT style here, which is mostly interesting for reversing operand
     // order.
     // well.
@@ -2705,6 +2709,9 @@ impl <'instr, T: fmt::Write, Y: YaxColors> ShowContextual<u32, NoContext, T, Y> 
             DisplayStyle::C => {
                 contextualize_c(instr, &mut out)
             }
+            DisplayStyle::Masm => {
+                masm::contextualize(&instr, &mut out)
+            }
         }
     }
 }
@@ -2987,6 +2994,9 @@ mod buffer_sink {
                 }
                 DisplayStyle::C => {
                     contextualize_c(&display.instr, &mut handle)?;
+                }
+                DisplayStyle::Masm => {
+                    super::masm::contextualize(&display.instr, &mut handle)?;
                 }
             }
 
