@@ -18,7 +18,7 @@ use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
 use yaxpeax_x86::long_mode::InstDecoder;
 use yaxpeax_x86::long_mode::DisplayStyle;
 
-use crate::tools;
+use crate::tools::{self, CodeModel};
 
 /*
 #[cfg(feature="std")]
@@ -627,7 +627,7 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 // dumpbin calls this "fstp9", but it's just an undocumented fstp alias. this round-trips to a different instruction but it's at least.. kinda right.
                 &[0xdf, 0xdb] => "fstp st(3)".to_string(),
                 other => {
-                    tools::dumpbin(other).unwrap_or_else(|e| {
+                    tools::dumpbin(other, CodeModel::Bits64).unwrap_or_else(|e| {
                         panic!("{}: {e:?}", format!("could not get an instruction after dumpbining {other:x?}"));
                     })
                 }
@@ -666,7 +666,7 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 "feni" => vec![0xdb, 0xe0],
                 "fdisi" => vec![0xdb, 0xe1],
                 "fsetpm" => vec![0xdb, 0xe4],
-                _other => { tools::masm(&displayed_masm).expect("can assemble") }
+                _other => { tools::masm(&displayed_masm, CodeModel::Bits64).expect("can assemble") }
             };
             let masm_roundtrip = decoder.decode_slice(&masm_as_bytes).expect("can decode").display_with(DisplayStyle::Masm).to_string();
             // chasing down differences in how dumpbin/yax write "qword" is not useful to anyone..

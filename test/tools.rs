@@ -3,34 +3,51 @@
 // * `masm` is a "masm-like text to bytes" function.
 pub use imp::{dumpbin, masm};
 
+/// configure the various test tools for a desired bitness.
+// some tools (dumpbin) do not require any particular configuration as they take their cues from
+// object file headers. other tools (masm) not only need different source directives, but are
+// entirely different executables for different modes.
+#[derive(Copy, Clone, Debug)]
+pub enum CodeModel {
+    Bits16,
+    Bits32,
+    Bits64,
+}
+
 #[cfg(not(any(target_os="linux", target_os="windows")))]
 mod imp {
+    use super::CodeModel;
+
     // stub impls to at least run tests on other platforms, but some
     // test-specific features will of course fail at runtime..
-    pub fn dumpbin(bytes: &[u8]) -> Result<String, String> {
+    pub fn dumpbin(bytes: &[u8], codeness: CodeModel) -> Result<String, String> {
         panic!("no impl of dumpbin on this target");
     }
 
-    pub fn masm(text: &str) -> Result<Vec<u8>, String> {
+    pub fn masm(text: &str, codeness: CodeModel) -> Result<Vec<u8>, String> {
         panic!("no impl of masm on this target");
     }
 }
 
 #[cfg(target_os="linux")]
 mod imp {
-    pub fn dumpbin(bytes: &[u8]) -> Result<String, String> {
+    use super::CodeModel;
+
+    pub fn dumpbin(bytes: &[u8], codeness: CodeModel) -> Result<String, String> {
         // how very sad:
         // > wibo: call reached missing import GetModuleHandleExA from kernel32
         panic!("wibo can't run dumpbin right now");
     }
 
-    pub fn masm(text: &str) -> Result<Vec<u8>, String> {
+    pub fn masm(text: &str, codeness: CodeModel) -> Result<Vec<u8>, String> {
         panic!("have not implemented wibo/masm on linux yet");
     }
 }
 
 #[cfg(target_os="windows")]
 mod imp {
+    use super::CodeModel;
+
     use std::fmt::{Write as FmtWrite};
     use std::io::Write;
     use std::process::Command;
@@ -38,9 +55,20 @@ mod imp {
 
     use tempfile::NamedTempFile;
 
-    pub fn dumpbin(bytes: &[u8]) -> Result<String, String> {
+    pub fn dumpbin(bytes: &[u8], codeness: CodeModel) -> Result<String, String> {
         let mut source = String::new();
 
+        match codeness {
+            CodeModel::Bits16 => {
+                source.push_str(".286\n");
+            }
+            CodeModel::Bits32 => {
+                source.push_str(".386\n");
+            }
+            CodeModel::Bits64 => {
+                // no special incantations to get 64-bit code out of masm
+            }
+        }
         source.push_str(".code\n");
         source.push_str("\n");
         source.push_str("start::\n");
@@ -62,7 +90,12 @@ mod imp {
         let mut objpath = sourcepath.to_path_buf();
         objpath.add_extension(".o");
 
-        let out = Command::new("..\\..\\tools\\ml64.exe")
+        let exe = match codeness {
+            CodeModel::Bits64 => "ml64.exe",
+            _other => "ml.exe"
+        };
+
+        let out = Command::new(format!("..\\..\\tools\\{}", exe))
             .args(&["/c", "/Fo", &objpath.display().to_string(), &sourcepath.display().to_string()])
             .output()
             .expect("can run");
@@ -70,7 +103,7 @@ mod imp {
             eprintln!("failed to assemble {bytes:x?}:");
             eprintln!("stdout: {}", std::str::from_utf8(out.stdout.as_slice()).expect("valid utf8"));
             eprintln!("stderr: {}", std::str::from_utf8(out.stderr.as_slice()).expect("valid utf8"));
-            panic!("failed to ml64.exe");
+            panic!("failed to {}", exe);
         }
 
         let out = Command::new("..\\..\\tools\\dumpbin.exe")
@@ -119,9 +152,20 @@ mod imp {
         Ok(text)
     }
 
-    pub fn masm(text: &str) -> Result<Vec<u8>, String> {
+    pub fn masm(text: &str, codeness: CodeModel) -> Result<Vec<u8>, String> {
         let mut source = String::new();
 
+        match codeness {
+            CodeModel::Bits16 => {
+                source.push_str(".286\n");
+            }
+            CodeModel::Bits32 => {
+                source.push_str(".386\n");
+            }
+            CodeModel::Bits64 => {
+                // no special incantations to get 64-bit code out of masm
+            }
+        }
         source.push_str(".code\n");
         source.push_str("\n");
         source.push_str("start::\n");
@@ -139,7 +183,12 @@ mod imp {
         let mut objpath = sourcepath.to_path_buf();
         objpath.add_extension(".o");
 
-        let out = Command::new("..\\..\\tools\\ml64.exe")
+        let exe = match codeness {
+            CodeModel::Bits64 => "ml64.exe",
+            _other => "ml.exe"
+        };
+
+        let out = Command::new(format!("..\\..\\tools\\{}", exe))
             .args(&["/c", "/Fo", &objpath.display().to_string(), &sourcepath.display().to_string()])
             .output()
             .expect("can run");
@@ -147,7 +196,7 @@ mod imp {
             eprintln!("failed to assemble {text:x?}:");
             eprintln!("stdout: {}", std::str::from_utf8(out.stdout.as_slice()).expect("valid utf8"));
             eprintln!("stderr: {}", std::str::from_utf8(out.stderr.as_slice()).expect("valid utf8"));
-            panic!("failed to ml64.exe as part of masm()");
+            panic!("failed to {} as part of masm()", exe);
         }
 
         let out = Command::new("..\\..\\tools\\dumpbin.exe")
