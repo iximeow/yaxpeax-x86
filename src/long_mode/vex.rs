@@ -76,6 +76,7 @@ enum VEXOperandCode {
     G_E_xyLmm,
     E_G_xyLmm,
     G_E_xyLmm_imm8,
+    G_Lmm_E_xmm,
     G_V_E_xyLmm_imm8,
     G_V_E_xmm,
     G_V_E_xmm_imm8,
@@ -1200,6 +1201,35 @@ fn read_vex_operands<
             instruction.operand_count = 2;
             Ok(())
         }
+        VEXOperandCode::G_Lmm_E_xmm => {
+            if instruction.regs[3].num != 0 {
+                return Err(DecodeError::InvalidOperand);
+            }
+            // the name of this bit is `L` in the documentation, so use the same name here.
+            #[allow(non_snake_case)]
+            let L = instruction.prefixes.vex_unchecked().l();
+            let bank = if L { RegisterBank::Y } else { RegisterBank::X };
+
+            let modrm = read_modrm(words)?;
+            instruction.regs[0] =
+                RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), bank);
+            let mem_oper = read_E(words, instruction, modrm, RegisterBank::X, sink)?;
+            instruction.operands[0] = OperandSpec::RegRRR;
+            instruction.operands[1] = mem_oper;
+            if mem_oper != OperandSpec::RegMMM {
+                if instruction.opcode == Opcode::VPBROADCASTB {
+                    instruction.mem_size = 1;
+                } else if instruction.opcode == Opcode::VPBROADCASTW {
+                    instruction.mem_size = 2;
+                } else if instruction.opcode == Opcode::VPBROADCASTD {
+                    instruction.mem_size = 4;
+                } else if instruction.opcode == Opcode::VPBROADCASTQ {
+                    instruction.mem_size = 8;
+                };
+            }
+            instruction.operand_count = 2;
+            Ok(())
+        }
         VEXOperandCode::G_V_E_xyLmm => {
             let modrm = read_modrm(words)?;
             // the name of this bit is `L` in the documentation, so use the same name here.
@@ -2301,12 +2331,12 @@ fn read_vex_instruction<
                     0x58 => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
                     } else {
-                        (Opcode::VPBROADCASTD, VEXOperandCode::G_E_xyLmm)
+                        (Opcode::VPBROADCASTD, VEXOperandCode::G_Lmm_E_xmm)
                     },
                     0x59 => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
                     } else {
-                        (Opcode::VPBROADCASTQ, VEXOperandCode::G_E_xyLmm)
+                        (Opcode::VPBROADCASTQ, VEXOperandCode::G_Lmm_E_xmm)
                     },
                     0x5A => (Opcode::VBROADCASTI128, if L {
                         if instruction.prefixes.vex_unchecked().w() {
@@ -2319,12 +2349,12 @@ fn read_vex_instruction<
                     0x78 => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
                     } else {
-                        (Opcode::VPBROADCASTB, VEXOperandCode::G_E_xyLmm)
+                        (Opcode::VPBROADCASTB, VEXOperandCode::G_Lmm_E_xmm)
                     },
                     0x79 => if instruction.prefixes.vex_unchecked().w() {
                         return Err(DecodeError::InvalidOpcode);
                     } else {
-                        (Opcode::VPBROADCASTW, VEXOperandCode::G_E_xyLmm)
+                        (Opcode::VPBROADCASTW, VEXOperandCode::G_Lmm_E_xmm)
                     },
                     0x8C => {
                         if instruction.prefixes.vex_unchecked().w() {
