@@ -11,6 +11,12 @@
   nop dates back to initial versions of the library attempting to never return instructions
   that did not reflect a decoded x86 instruction.
   it has long passed its time. thank you for the patch, @Grond66!
+* fix vpbroadcast* with a SIMD register source being able to claim ymm as a source. the source
+  register according to manuals and every assembler is xmm-size, if a register. semantically this
+  has little effect: the broadcasted value is the low lane of the source register in these cases.
+* fix vpbroadcast* with a memory source reporting incorrect memory sizes. the memory address being
+  broadcast indicates the size, which is one byte/word/dword/qword. it is unrelated to the
+  broadcasted-to vector length.
 
 testing instruction round-tripping through `masm` found a few bugs, which are also fixed in this release:
 

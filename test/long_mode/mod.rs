@@ -2884,17 +2884,17 @@ mod vex {
         testcase!(features { AVX2: true } &[0xc4, 0b000_00010, 0b1_1111_101, 0x47, 0b11_001_010], "vpsllvq ymm9, ymm0, ymm10"),
 
         testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_001, 0x58, 0b11_000_001], "vpbroadcastd xmm0, xmm1"),
-        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x58, 0b11_000_001], "vpbroadcastd ymm0, ymm1"),
+        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x58, 0b11_000_001], "vpbroadcastd ymm0, xmm1"),
         testcase!(invalid: &[0xc4, 0b111_00010, 0b1_1111_001, 0x58, 0b11_000_001]),
         testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_001, 0x59, 0b11_000_001], "vpbroadcastq xmm0, xmm1"),
-        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x59, 0b11_000_001], "vpbroadcastq ymm0, ymm1"),
+        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x59, 0b11_000_001], "vpbroadcastq ymm0, xmm1"),
         testcase!(invalid: &[0xc4, 0b111_00010, 0b1_1111_001, 0x59, 0b11_000_001]),
 
         testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_001, 0x78, 0b11_000_001], "vpbroadcastb xmm0, xmm1"),
-        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x78, 0b11_000_001], "vpbroadcastb ymm0, ymm1"),
+        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x78, 0b11_000_001], "vpbroadcastb ymm0, xmm1"),
         testcase!(invalid: &[0xc4, 0b111_00010, 0b1_1111_001, 0x78, 0b11_000_001]),
         testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_001, 0x79, 0b11_000_001], "vpbroadcastw xmm0, xmm1"),
-        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x79, 0b11_000_001], "vpbroadcastw ymm0, ymm1"),
+        testcase!(features { AVX2: true } &[0xc4, 0b111_00010, 0b0_1111_101, 0x79, 0b11_000_001], "vpbroadcastw ymm0, xmm1"),
         testcase!(invalid: &[0xc4, 0b111_00010, 0b1_1111_001, 0x79, 0b11_000_001]),
 
         testcase!(features { AVX2: true } &[0xc4, 0b000_00010, 0b0_1111_001, 0x8c, 0b00_001_010], "vpmaskmovd xmm9, xmm0, xmmword [r10]"),
