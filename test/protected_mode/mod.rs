@@ -2639,7 +2639,7 @@ mod vex {
         testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b0_1111_001, 0x92, 0b00_000_100, 0xa1], "vgatherdps xmm0, dword [ecx + xmm12 * 4], xmm0"),
         testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b0_1111_101, 0x92, 0b00_000_100, 0xa1], "vgatherdps ymm0, qword [ecx + ymm12 * 4], ymm0"),
         testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b1_1111_001, 0x92, 0b00_000_100, 0xa1], "vgatherdpd xmm0, dword [ecx + xmm12 * 4], xmm0"),
-        testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b1_1111_101, 0x92, 0b00_000_100, 0xa1], "vgatherdpd ymm0, qword [ecx + ymm12 * 4], ymm0"),
+        testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b1_1111_101, 0x92, 0b00_000_100, 0xa1], "vgatherdpd ymm0, qword [ecx + xmm12 * 4], ymm0"),
 
         testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b0_1111_001, 0x93, 0b00_000_100, 0xa1], "vgatherqps xmm0, dword [ecx + xmm12 * 4], xmm0"),
         testcase!(features { AVX2: true } &[0xc4, 0b110_00010, 0b0_1111_101, 0x93, 0b00_000_100, 0xa1], "vgatherqps ymm0, qword [ecx + ymm12 * 4], ymm0"),

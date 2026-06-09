@@ -12,6 +12,8 @@
 * fix vpbroadcast* with a memory source reporting incorrect memory sizes. the memory address being
   broadcast indicates the size, which is one byte/word/dword/qword. it is unrelated to the
   broadcasted-to vector length.
+* fix incorrect index-vector-register size choice for vgatherdpd. the index register is xmm, not
+  depends-on-L xmm/ymm.
 
 ## 2.1.1
 

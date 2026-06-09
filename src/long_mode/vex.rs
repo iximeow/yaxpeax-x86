@@ -1408,7 +1408,7 @@ fn read_vex_operands<
             instruction.regs[0] =
                 RegSpec::from_parts((modrm >> 3) & 7, instruction.prefixes.vex_unchecked().r(), bank);
             let mem_oper = read_E(words, instruction, modrm, bank, sink)?;
-            if instruction.opcode == Opcode::VPGATHERDQ {
+            if instruction.opcode == Opcode::VPGATHERDQ || instruction.opcode == Opcode::VGATHERDPD {
                 instruction.regs[2].bank = RegisterBank::X;
             } else {
                 instruction.regs[2].bank = index_bank;
