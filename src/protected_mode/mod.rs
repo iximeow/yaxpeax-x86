@@ -7383,10 +7383,12 @@ fn read_operands<
                         instruction.opcode = Opcode::VMXON;
                         instruction.operands[0] = read_E(words, instruction, modrm, bank, sink)?;
                         if instruction.operands[0] == OperandSpec::RegMMM {
-                            // invalid as `vmxon`, reg-form is `senduipi`
-                            instruction.opcode = Opcode::SENDUIPI;
-                            // and the operand is always a dword register
-                            instruction.regs[1].bank = RegisterBank::D;
+                            // from the SDM:
+                            // > The SENDUIPI instruction is not recognized in protected mode.
+                            // instruction.opcode = Opcode::SENDUIPI;
+                            instruction.operands[0] = OperandSpec::Nothing;
+                            instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOpcode);
                         } else {
                             instruction.mem_size = 8;
                         }
@@ -8141,13 +8143,19 @@ fn read_operands<
                                 instruction.opcode = Opcode::TDCALL;
                             }
                             0b101 => {
-                                instruction.opcode = Opcode::SEAMRET;
+                                // from intel-tdx-cpu-architectural-specification.pdf, not supported outside long mode:
+                                // > IF inSEAM==0 or ((IA32_EFER.LMA & CS.L) == 0) or [..]
+                                return Err(DecodeError::InvalidOpcode);
                             }
                             0b110 => {
-                                instruction.opcode = Opcode::SEAMOPS;
+                                // from intel-tdx-cpu-architectural-specification.pdf, not supported outside long mode:
+                                // > IF inSEAM==0 or ((IA32_EFER.LMA & CS.L) == 0) or [..]
+                                return Err(DecodeError::InvalidOpcode);
                             }
                             0b111 => {
-                                instruction.opcode = Opcode::SEAMCALL;
+                                // from intel-tdx-cpu-architectural-specification.pdf, not supported outside long mode:
+                                // > IF inSEAM==0 or ((IA32_EFER.LMA & CS.L) == 0) or [..]
+                                return Err(DecodeError::InvalidOpcode);
                             }
                             _ => {
                                 return Err(DecodeError::InvalidOpcode);
@@ -8349,9 +8357,12 @@ fn read_operands<
                     }
                     0b100 => {
                         if instruction.prefixes.rep() {
-                            instruction.opcode = Opcode::UIRET;
+                            // from the SDM:
+                            // > The UIRET instruction is not recognized in protected mode.
+                            // instruction.opcode = Opcode::UIRET;
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOpcode);
                         } else {
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
@@ -8360,9 +8371,12 @@ fn read_operands<
                     }
                     0b101 => {
                         if instruction.prefixes.rep() {
-                            instruction.opcode = Opcode::TESTUI;
+                            // from the SDM:
+                            // > The TESTUI instruction is not recognized in protected mode.
+                            // instruction.opcode = Opcode::TESTUI;
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
+                            return Err(DecodeError::InvalidOpcode);
                         } else {
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
@@ -8371,10 +8385,12 @@ fn read_operands<
                     }
                     0b110 => {
                         if instruction.prefixes.rep() {
-                            instruction.opcode = Opcode::CLUI;
+                            // from the SDM:
+                            // > The CLUI instruction is not recognized in protected mode.
+                            // instruction.opcode = Opcode::CLUI;
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
-                            return Ok(());
+                            return Err(DecodeError::InvalidOpcode);
                         } else if instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
                             return Err(DecodeError::InvalidOpcode);
                         }
@@ -8384,10 +8400,12 @@ fn read_operands<
                     }
                     0b111 => {
                         if instruction.prefixes.rep() {
-                            instruction.opcode = Opcode::STUI;
+                            // from the SDM:
+                            // > The STUI instruction is not recognized in protected mode.
+                            // instruction.opcode = Opcode::STUI;
                             instruction.operands[0] = OperandSpec::Nothing;
                             instruction.operand_count = 0;
-                            return Ok(());
+                            return Err(DecodeError::InvalidOpcode);
                         } else if instruction.prefixes.operand_size() || instruction.prefixes.repnz() {
                             return Err(DecodeError::InvalidOpcode);
                         }
@@ -8571,29 +8589,24 @@ fn read_operands<
                 if (modrm & 0xc0) == 0xc0 {
                     match r {
                         0 => {
-                            instruction.opcode = Opcode::RDFSBASE;
-                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
-                            instruction.operands[0] = OperandSpec::RegMMM;
-                            instruction.operand_count = 1;
+                            // from the SDM:
+                            // > The RDFSBASE and RDGSBASE instructions are not recognized in protected mode.
+                            return Err(DecodeError::InvalidOpcode);
                         }
                         1 => {
-                            instruction.opcode = Opcode::RDGSBASE;
-                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
-                            instruction.operands[0] = OperandSpec::RegMMM;
-                            instruction.operand_count = 1;
-
+                            // from the SDM:
+                            // > The RDFSBASE and RDGSBASE instructions are not recognized in protected mode.
+                            return Err(DecodeError::InvalidOpcode);
                         }
                         2 => {
-                            instruction.opcode = Opcode::WRFSBASE;
-                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
-                            instruction.operands[0] = OperandSpec::RegMMM;
-                            instruction.operand_count = 1;
+                            // from the SDM:
+                            // > The RDFSBASE and RDGSBASE instructions are not recognized in protected mode.
+                            return Err(DecodeError::InvalidOpcode);
                         }
                         3 => {
-                            instruction.opcode = Opcode::WRGSBASE;
-                            instruction.regs[1] = RegSpec::from_parts(m, RegisterBank::D);
-                            instruction.operands[0] = OperandSpec::RegMMM;
-                            instruction.operand_count = 1;
+                            // from the SDM:
+                            // > The RDFSBASE and RDGSBASE instructions are not recognized in protected mode.
+                            return Err(DecodeError::InvalidOpcode);
                         }
                         5 => {
                             instruction.opcode = Opcode::INCSSP;

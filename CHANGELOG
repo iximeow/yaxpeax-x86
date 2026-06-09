@@ -19,6 +19,7 @@
   broadcasted-to vector length.
 * fix incorrect index-vector-register size choice for vgatherdpd. the index register is xmm, not
   depends-on-L xmm/ymm.
+* fix SEAM and {rd,wr}{fs,gs}base instructions being decoded in 32-bit and 16-bit modes.
 
 testing instruction round-tripping through `masm` found a few bugs, which are also fixed in this release:
 
