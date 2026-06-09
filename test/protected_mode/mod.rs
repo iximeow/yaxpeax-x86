@@ -2188,10 +2188,10 @@ mod misc {
         testcase!(&[0xf3, 0x0f, 0xae, 0x26], "ptwrite dword [esi]"),
         testcase!(&[0xf3, 0x0f, 0xae, 0xe6], "ptwrite esi"),
         testcase!(invalid: &[0x66, 0xf3, 0x0f, 0xae, 0xe6]),
-        testcase!(&[0xf3, 0x0f, 0xae, 0xc4], "rdfsbase esp"),
-        testcase!(&[0xf3, 0x0f, 0xae, 0xcc], "rdgsbase esp"),
-        testcase!(&[0xf3, 0x0f, 0xae, 0xd4], "wrfsbase esp"),
-        testcase!(&[0xf3, 0x0f, 0xae, 0xdc], "wrgsbase esp"),
+        testcase!(invalid: &[0xf3, 0x0f, 0xae, 0xc4]), // "rdfsbase esp", > The RDFSBASE and RDGSBASE instructions are not recognized in protected mode.
+        testcase!(invalid: &[0xf3, 0x0f, 0xae, 0xcc]), // "rdgsbase esp", > The RDFSBASE and RDGSBASE instructions are not recognized in protected mode.
+        testcase!(invalid: &[0xf3, 0x0f, 0xae, 0xd4]), // "wrfsbase esp", > The WRFSBASE and WRGSBASE instructions are not recognized in protected mode.
+        testcase!(invalid: &[0xf3, 0x0f, 0xae, 0xdc]), // "wrgsbase esp", > The WRFSBASE and WRGSBASE instructions are not recognized in protected mode.
         testcase!(&[0x66, 0x0f, 0xae, 0x3f], "clflushopt zmmword [edi]"), // or clflush without 66
         testcase!(invalid: &[0x66, 0x0f, 0xae, 0xff]),
         testcase!(&[0x66, 0x0f, 0xae, 0x37], "clwb zmmword [edi]"),
@@ -3194,10 +3194,10 @@ mod vex {
         testcase!(features { AVX: true } &[0xc5, 0xf8, 0x10, 0x01], "vmovups xmm0, xmmword [ecx]"),
     ];
 
-        #[test]
-        fn test() {
-            run_test(CASES);
-        }
+    #[test]
+    fn test() {
+        run_test(CASES);
+    }
 }
 
 mod strange_prefixing {
@@ -4208,16 +4208,18 @@ mod key_locker {
 
 // these uinter test cases come from llvm:
 // https://reviews.llvm.org/differential/changeset/?ref=2226860
+//
+// as it turns out, UINTR is not supported at all in protected or real mode.
 mod uintr {
     use crate::protected_mode::{TestCase, run_test};
 
     const CASES: &'static [TestCase] = &[
-        testcase!(&[0xf3, 0x0f, 0x01, 0xec], "uiret"),
-        testcase!(&[0xf3, 0x0f, 0x01, 0xed], "testui"),
-        testcase!(&[0xf3, 0x0f, 0x01, 0xee], "clui"),
-        testcase!(&[0xf3, 0x0f, 0x01, 0xef], "stui"),
-        testcase!(&[0xf3, 0x0f, 0xc7, 0xf0], "senduipi eax"),
-        testcase!(&[0xf3, 0x0f, 0xc7, 0xf2], "senduipi edx"),
+        testcase!(invalid: &[0xf3, 0x0f, 0x01, 0xec]), // "uiret"
+        testcase!(invalid: &[0xf3, 0x0f, 0x01, 0xed]), // "testui"
+        testcase!(invalid: &[0xf3, 0x0f, 0x01, 0xee]), // "clui"
+        testcase!(invalid: &[0xf3, 0x0f, 0x01, 0xef]), // "stui"
+        testcase!(invalid: &[0xf3, 0x0f, 0xc7, 0xf0]), // "senduipi eax"
+        testcase!(invalid: &[0xf3, 0x0f, 0xc7, 0xf2]), // "senduipi edx"
     ];
 
     #[test]
@@ -4261,9 +4263,9 @@ mod tdx {
 
     const CASES: &'static [TestCase] = &[
         testcase!(&[0x66, 0x0f, 0x01, 0xcc], "tdcall"),
-        testcase!(&[0x66, 0x0f, 0x01, 0xcd], "seamret"),
-        testcase!(&[0x66, 0x0f, 0x01, 0xce], "seamops"),
-        testcase!(&[0x66, 0x0f, 0x01, 0xcf], "seamcall"),
+        testcase!(invalid: &[0x66, 0x0f, 0x01, 0xcd]), // "seamret" is long-mode only
+        testcase!(invalid: &[0x66, 0x0f, 0x01, 0xce]), // "seamops" is long-mode only
+        testcase!(invalid: &[0x66, 0x0f, 0x01, 0xcf]), // "seamcall" is long-mode only
     ];
 
     #[test]
