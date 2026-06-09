@@ -63,9 +63,15 @@ mod imp {
         match codeness {
             CodeModel::Bits16 => {
                 source.push_str(".286\n");
+                source.push_str(".model small\n");
+                source.push_str("assume nothing\n");
             }
             CodeModel::Bits32 => {
-                source.push_str(".386\n");
+//                do not force masm to limit itself to a 686, though that's an interesting comparison in some cases..
+//                source.push_str(".686P\n");
+                source.push_str(".model flat\n");
+                source.push_str("assume fs:nothing\n");
+                source.push_str("assume gs:nothing\n");
             }
             CodeModel::Bits64 => {
                 // no special incantations to get 64-bit code out of masm
@@ -122,10 +128,17 @@ mod imp {
 
         let dumpbin_out = std::str::from_utf8(out.stdout.as_slice()).expect("valid utf8");
 
-        let dumpbin_interesting = carve_dumpbin_stdout(dumpbin_out).expect("works");
+        let dumpbin_interesting = carve_dumpbin_stdout(dumpbin_out)?;
         let dumpbin_interesting = dumpbin_interesting[0];
 
-        let end =   "  0000000000000000: 0F C7 0F                                     ".len();
+        let post_addr_len = "0F C7 0F                                     ".len();
+        let addr_len = "  ".len() + match codeness {
+            CodeModel::Bits64 => 16,
+            CodeModel::Bits32 => 8,
+            CodeModel::Bits16 => 4,
+        } + ":".len();
+        let start = addr_len;
+        let end = start + post_addr_len;
         if dumpbin_interesting.len() <= end {
             return Err("no instruction".to_string());
         }
@@ -142,7 +155,7 @@ mod imp {
             .replace("+", " + ")
             .replace("-", " - ")
             .replace("*", " * ")
-            .replace(" + FFFFFFFFCCBBAA34h", " - 334455CCh") // with apologies to future-me, replace common negative displacements into more normal values...
+            .replace(" + CCBBAA34h", " - 334455CCh") // with apologies to future-me, replace common negative displacements into more normal values...
             .replace("rn - sae", "rn-sae")
             .replace("rd - sae", "rd-sae")
             .replace("ru - sae", "ru-sae")
@@ -160,9 +173,15 @@ mod imp {
         match codeness {
             CodeModel::Bits16 => {
                 source.push_str(".286\n");
+                source.push_str(".model small\n");
+                source.push_str("assume nothing\n");
             }
             CodeModel::Bits32 => {
-                source.push_str(".386\n");
+//                do not force masm to limit itself to a 686, though that's an interesting comparison in some cases..
+//                source.push_str(".686P\n");
+                source.push_str(".model flat\n");
+                source.push_str("assume fs:nothing\n");
+                source.push_str("assume gs:nothing\n");
             }
             CodeModel::Bits64 => {
                 // no special incantations to get 64-bit code out of masm
@@ -214,10 +233,16 @@ mod imp {
 
         let dumpbin_out = std::str::from_utf8(out.stdout.as_slice()).expect("valid utf8");
 
-        let dumpbin_interesting = carve_dumpbin_stdout(dumpbin_out).expect("works");
+        let dumpbin_interesting = carve_dumpbin_stdout(dumpbin_out)?;
 
-        let end =   "  0000000000000000: 0F C7 0F                                     ".len();
-        let start = "  0000000000000000: ".len();
+        let post_addr_len = "0F C7 0F                                     ".len();
+        let addr_len = "  ".len() + match codeness {
+            CodeModel::Bits64 => 16,
+            CodeModel::Bits32 => 8,
+            CodeModel::Bits16 => 4,
+        } + ":".len();
+        let start = addr_len;
+        let end = start + post_addr_len;
         let hex_text = dumpbin_interesting[0][start..end].trim();
         let mut bytes = Vec::new();
         for f in hex_text.split(" ") {
@@ -278,7 +303,7 @@ fn carve_dumpbin_stdout(stdout: &str) -> Result<Vec<&str>, String> {
         return Err("got multiple lines of disassembly".to_string());
     }
 
-    // eprintln!("dumpbin returns: {:?}", disasm_lines);
+    eprintln!("dumpbin returns: {:?}", disasm_lines);
 
     Ok(disasm_lines.to_vec())
 }
