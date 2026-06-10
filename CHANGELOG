@@ -19,6 +19,8 @@
   these instructions consume 8 bit of immediate as several fields compressed into 8 bits, rather
   than as a numeric value, so sign extension is not useful.  further, extending the immediate makes
   it more difficult to round-trip disassembly through other assemblers.
+* fix lfs/lgs/lss loading into dword registers when operating with a short (16-bit segment/offset) pointer.
+  in these cases, the offset is loaded into a 16-bit register, not 32-bit. the upper 32 bits are unchanged.
 
 ## 2.1.1
 

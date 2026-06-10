@@ -6704,6 +6704,7 @@ fn read_operands<
             instruction.operands[1] = mem_oper;
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if !instruction.prefixes.operand_size() {
+                    instruction.regs[0].bank = RegisterBank::W;
                     instruction.mem_size = 4;
                 } else {
                     instruction.mem_size = 6;
@@ -7156,6 +7157,7 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::D;
             instruction.operand_count = 2;
             if instruction.operands[0] != OperandSpec::RegMMM {
+                // outside 64-bit mode the memory access is four bytes as well.
                 instruction.mem_size = 4;
             } else {
                 instruction.regs[1].bank = RegisterBank::D;
@@ -7171,6 +7173,7 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::D;
             instruction.operand_count = 2;
             if instruction.operands[1] != OperandSpec::RegMMM {
+                // outside 64-bit mode the memory access is four bytes as well.
                 instruction.mem_size = 4;
             } else {
                 instruction.regs[1].bank = RegisterBank::D;
