@@ -311,25 +311,38 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
             // OK: EXTERNAL_MASM is set, we'll expect that there's `../tools/` which has `wibo`,
             // `mlexe`, and `dumpbin.exe`.
 
+            // outside long mode, dumpbin behaves poorly in the face of vex/evex-encoded instructions. for instructions that include scalar registers,
+            // vex.w is often respected and extends dword instructions into qword instructions on rax and friends. wild! for SIMD registers, the
+            // register number extension bits are often respected, resulting in xmm8, ymm9, etc, appearing in protected mode. also wild!
+            // further, some instructions are overly-strict and will treat VEX.LIG as VEX.L0 in protected mode, so we a whole mess to deal with.
+            // lots of "successful" incorrect decodes, some "unsuccessful" decodes of valid-to-hardware instructions. what to do?
+            // if we fail to decode, and there's a c4/c5 up front, allow it in this specific branch because it might be a dumpbin bug.
+            // if we successfully decode and there's a rax/rcx/rdx/rbx/etc or "qword ptr" and it doesn't match the expectation, log it and move on because it might be a dumpbin bug.
+            // everything else is .. probably fine?
+            let vex_prefixed = bytes[0] == 0xc4 || bytes[0] == 0xc5;
+
             // match against some testcases that are known to be wrong by MASM/dumpbin.
             let external_masm_ish = match bytes {
                 &[0xf1] => "int 1".to_string(),  // dumpbin does not know how to decode f1...
                 &[0xe5, 0x99] => "in eax, 99h".to_string(), // this is a MASM/dumpbin bug. see notes on testcase.
                 &[0xe7, 0x99] => "out 99h, eax".to_string(), // this is a MASM/dumpbin bug. see notes on testcase.
                 // dumpbin prints the instruction as if it was encoded in 32-bit form regardless of object file, so overrule it.
-                &[0xf3, 0x0f, 0xc7, 0xfd] => "rdpid rbp".to_string(),
-                &[0x0f, 0x18, 0xc0] => "nop eax".to_string(), // dumpbin would love to call this "prefetchnta rax" ???
-                &[0x0f, 0x18, 0xcc] => "nop esp".to_string(), // dumpbin would love to call this "prefetchnta rsp" ???
-                &[0x0f, 0x18, 0x20] => "nop zmmword ptr [rax]".to_string(), // getting around dumpbin knowing about prefetchrst2..
-                &[0x0f, 0x19, 0x20] => "nop dword ptr [rax]".to_string(), // dumpbin doesn't know about 0f19..
-                &[0x0f, 0x1a, 0x20] => "nop dword ptr [rax]".to_string(), // dumpbin wants to call this bndldx, yax doesn't do MPX yet
-                &[0x0f, 0x1b, 0x20] => "nop dword ptr [rax]".to_string(), // dumpbin wants to call this bndstx, yax doesn't do MPX yet
-                &[0x0f, 0x1c, 0x20] => "nop dword ptr [rax]".to_string(), // dumpbin doesn't know about 0f1c..
-                &[0x0f, 0x1d, 0x20] => "nop dword ptr [rax]".to_string(), // dumpbin doesn't know about 0f1d..
-                &[0x0f, 0x1e, 0x20] => "nop dword ptr [rax]".to_string(), // dumpbin doesn't know about 0f1e..
+                &[0xf3, 0x0f, 0xc7, 0xfd] => "rdpid ebp".to_string(),
+                &[0x0f, 0x18, 0xc0] => "nop eax".to_string(), // dumpbin would love to call this "prefetchnta eax" ???
+                &[0x0f, 0x18, 0xcc] => "nop esp".to_string(), // dumpbin would love to call this "prefetchnta esp" ???
+                &[0x0f, 0x18, 0x20] => "nop zmmword ptr [eax]".to_string(), // getting around dumpbin knowing about prefetchrst2..
+                &[0x0f, 0x19, 0x20] => "nop dword ptr [eax]".to_string(), // dumpbin doesn't know about 0f19..
+                &[0x0f, 0x1a, 0x20] => "nop dword ptr [eax]".to_string(), // dumpbin wants to call this bndldx, yax doesn't do MPX yet
+                &[0x0f, 0x1b, 0x20] => "nop dword ptr [eax]".to_string(), // dumpbin wants to call this bndstx, yax doesn't do MPX yet
+                &[0x0f, 0x1c, 0x20] => "nop dword ptr [eax]".to_string(), // dumpbin doesn't know about 0f1c..
+                &[0x0f, 0x1d, 0x20] => "nop dword ptr [eax]".to_string(), // dumpbin doesn't know about 0f1d..
+                &[0x0f, 0x1e, 0x20] => "nop dword ptr [eax]".to_string(), // dumpbin doesn't know about 0f1e..
+                &[0xf2, 0x66, 0x66, 0x0f, 0x10, 0xc0] => "movsd xmm0, xmm0".to_string(), // dumpbin does not love the prefixes
                 &[0xf3, 0x0f, 0x1e, 0xfc] => "nop".to_string(), // dumpbin does not tolerate this at all, redirect into a boring nop.
+                &[0x0f, 0x43, 0xec] => "cmovnb ebp, esp".to_string(), // dumpbin writes it "cmovae" instead of yax's cmovnb.
+                &[0x2e, 0x36, 0x0f, 0x18, 0xe7] => "nop edi".to_string(), // dumpbin reports a mildly-confused prefetchrst2 rdi (even in 32-bit mode!)
                 &[0x0f, 0xbe, 0x83, 0xb4, 0x00, 0x00, 0x00] => {
-                    "movsx eax, byte ptr [rbx + 0B4h]".to_string() // dumpbin uses %016 formatting, masm happily accepts shorter.
+                    "movsx eax, byte ptr [ebx + 0B4h]".to_string() // dumpbin uses %016 formatting, masm happily accepts shorter.
                 },
                 &[0x62, 0xd2, 0x7e, 0x28, 0x3a, 0xca] => {
                     "vpbroadcastmw2d ymm1, k2".to_string() // dumpbin inexplicably uses "bnd2" as the source register??? MSVC 14.52.36328.
@@ -337,15 +350,9 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 &[0x62, 0xd2, 0x7e, 0x08, 0x28, 0xc2] => {
                     "vpmovm2b xmm0, k2".to_string() // dumpbin inexplicably uses "bnd2" as the source register??? MSVC 14.52.36328.
                 },
-                &[0x0f, 0x01, 0x51, 0xff] => {
-                    "lgdt fword ptr [rcx - 1]".to_string() // dumpbin prints this as "tbyte", which masm does not accept.
-                },
-                &[0x0f, 0x01, 0x59, 0xff] => {
-                    "lidt fword ptr [rcx - 1]".to_string() // dumpbin prints this as "tbyte", which masm does not accept.
-                },
                 &[0x0f, 0x0d, 0x00] => {
                     // dumpbin interprets this as the 3DNow!-style PREFETCH instruction, but we're definitely not 3dnow..
-                    "nop zmmword ptr [rax]".to_string()
+                    "nop zmmword ptr [eax]".to_string()
                 }
                 &[0xc4, 0x03, 0x3d, 0x0a, 0xca, 0x77] => {
                     // dumpbin can't deal with this instruction..
@@ -357,21 +364,24 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 }
                 &[0x66, 0x0f, 0xd6, 0x01] => {
                     // dumpbin really wants to use mmword here, but i really don't.
-                    "movq qword ptr [rcx], xmm0".to_string()
+                    "movq qword ptr [ecx], xmm0".to_string()
                 }
                 // dumpbin doesn't know how to decode, and masm doesn't know how to *en*code, ud0.
                 &[0x66, 0x0f, 0xff, 0xc1] => "ud0 eax, ecx".to_string(),
                 &[0xf2, 0x0f, 0xff, 0xc1] => "ud0 eax, ecx".to_string(),
                 &[0xf3, 0x0f, 0xff, 0xc1] => "ud0 eax, ecx".to_string(),
-                &[0x66, 0x0f, 0xff, 0x01] => "ud0 eax, dword ptr [rcx]".to_string(),
+                &[0x66, 0x0f, 0xff, 0x01] => "ud0 eax, dword ptr [ecx]".to_string(),
+                &[0x0f, 0xff, 0x6b, 0xac] => "ud0 ebp, dword ptr [ebx - 54h]".to_string(),
                 // dumpbin does not tolerate the pointless prefixes.
-                &[0x36, 0x36, 0x2e, 0x0f, 0x38, 0xf9, 0x55, 0x3e] => "movdiri dword ptr [rbp + 3Eh], edx".to_string(),
+                &[0x36, 0x36, 0x2e, 0x0f, 0x38, 0xf9, 0x55, 0x3e] => "movdiri dword ptr cs:[ebp + 3Eh], edx".to_string(),
                 // dumpbin does not tolerate the pointless prefixes.
-                &[0x36, 0x26, 0x66, 0x0f, 0x38, 0xf8, 0xad, 0x0b, 0x08, 0x29, 0x07] => "movdir64b rbp, zmmword ptr [rbp + 729080Bh]".to_string(),
+                &[0x36, 0x26, 0x66, 0x0f, 0x38, 0xf8, 0xad, 0x0b, 0x08, 0x29, 0x07] => "movdir64b ebp, zmmword ptr es:[ebp + 729080Bh]".to_string(),
                 // dumpbin does not tolerate the pointless prefixes.
-                &[0x36, 0x26, 0x66, 0x67, 0x0f, 0x38, 0xf8, 0xad, 0x0b, 0x08, 0x29, 0x07] => "movdir64b ebp, zmmword ptr [ebp + 729080Bh]".to_string(),
+                &[0x36, 0x26, 0x66, 0x67, 0x0f, 0x38, 0xf8, 0xad, 0x0b, 0x08] => "movdir64b bp, zmmword ptr es:[di + 80Bh]".to_string(),
+                // and again
+                 &[0xf2, 0xf2, 0x2e, 0x36, 0x0f, 0x38, 0xf8, 0x83, 0x09, 0x1c, 0x9d, 0x3f] => "enqcmd eax, zmmword ptr ss:[ebx + 3F9D1C09h]".to_string(),
                 // and again.
-                &[0x3e, 0x64, 0xf3, 0x64, 0x0f, 0x38, 0xf8, 0x72, 0x54] => "enqcmds rsi, zmmword ptr fs:[rdx + 54h]".to_string(),
+                &[0x3e, 0x64, 0xf3, 0x64, 0x0f, 0x38, 0xf8, 0x72, 0x54] => "enqcmds esi, zmmword ptr fs:[edx + 54h]".to_string(),
                 // prefixes confuse dumpbin again
                 &[0x66, 0xf3, 0x0f, 0x01, 0xe8] => "setssbsy".to_string(),
                 // prefixes confuse dumpbin again
@@ -381,7 +391,11 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 // prefixes confuse dumpbin again
                 &[0xf3, 0x66, 0x0f, 0x01, 0xea] => "saveprevssp".to_string(),
                 // prefixes confuse dumpbin again
-                &[0xf3, 0x66, 0x0f, 0x01, 0x29] => "rstorssp qword ptr [rcx]".to_string(),
+                &[0xf3, 0x66, 0x0f, 0x01, 0x29] => "rstorssp qword ptr [ecx]".to_string(),
+                // dumpbin writes the repne, but it doesn't do anything..
+                &[0xf2, 0x0f, 0x21, 0xc8] => "mov eax, dr1".to_string(),
+                // dumpbin writes the rep, but it doesn't do anything..
+                &[0xf3, 0x0f, 0x21, 0xc8] => "mov eax, dr1".to_string(),
                 // dumpbin prints out an xacquire when there is no lock prefix, which causes the instruction to grow a lock prefix in round-tripping. no!
                 &[0xf2, 0x0f, 0xc0, 0xcc] => "xadd ah, cl".to_string(),
                 // dumpbin prints out an rep when one is not allowed, which fails round-tripping. yax doesn't.
@@ -391,16 +405,17 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 // dumpbin prints out an rep when one is not allowed, which fails round-tripping. yax doesn't.
                 &[0xf3, 0x0f, 0xc1, 0xcc] => "xadd esp, ecx".to_string(),
                 // dumpbin prints out an xacquire when there is no lock prefix, which causes the instruction to grow a lock prefix in round-tripping. no!
-                &[0xf2, 0x0f, 0xc7, 0x0f] => "cmpxchg8b qword ptr [rdi]".to_string(),
+                &[0xf2, 0x0f, 0xc7, 0x0f] => "cmpxchg8b qword ptr [edi]".to_string(),
                 // dumpbin prints out an rep when one is not allowed, which fails round-tripping. yax doesn't.
-                &[0xf3, 0x0f, 0xc7, 0x0f] => "cmpxchg8b qword ptr [rdi]".to_string(),
+                &[0xf3, 0x0f, 0xc7, 0x0f] => "cmpxchg8b qword ptr [edi]".to_string(),
                 // prefixes again..
-                &[0x66, 0x36, 0x0f, 0x3a, 0xce, 0x8c, 0x56, 0x9e, 0x82, 0xd1, 0xbe, 0xad] => "gf2p8affineqb xmm1, xmmword ptr [rsi + rdx * 2 - 412E7D62h], 0ADh".to_string(),
+                &[0x66, 0x36, 0x0f, 0x3a, 0xce, 0x8c, 0x56, 0x9e, 0x82, 0xd1, 0xbe, 0xad] => "gf2p8affineqb xmm1, xmmword ptr ss:[esi + edx * 2 - 412E7D62h], 0ADh".to_string(),
+                &[0x3e, 0x64, 0x64, 0x66, 0x0f, 0x3a, 0xcf, 0xba, 0x13, 0x23, 0x04, 0xba, 0x6b] => "gf2p8affineinvqb xmm7, xmmword ptr fs:[edx - 45FBDCEDh], 6Bh".to_string(),
                 &[0xf3, 0x64, 0x2e, 0x65, 0x0f, 0x38, 0xdc, 0xe8] => "loadiwkey xmm5, xmm0".to_string(),
                 // dumpbin prints out the memory size as "oword", but yax uses "xmmword". masm accepts either.
-                &[0x66, 0x0f, 0x38, 0x80, 0x01] => "invept rax, xmmword ptr [rcx]".to_string(),
+                &[0x66, 0x0f, 0x38, 0x80, 0x01] => "invept eax, xmmword ptr [ecx]".to_string(),
                 // dumpbin prints out the memory size as "oword", but yax uses "xmmword". masm accepts either.
-                &[0x66, 0x0f, 0x38, 0x81, 0x01] => "invvpid rax, xmmword ptr [rcx]".to_string(),
+                &[0x66, 0x0f, 0x38, 0x81, 0x01] => "invvpid eax, xmmword ptr [ecx]".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
                 // (and we print jnb instead of jae)
                 &[0x73, 0x31] => "jnb $+33h".to_string(),
@@ -426,16 +441,12 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 &[0x0f, 0x85, 0x3b, 0x25, 0x00, 0x00] => "jnz $+2541h".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
                 &[0x74, 0x47] => "jz $+49h".to_string(),
-                // dumpbin invents a label for laughs.
-                &[0xff, 0x15, 0x7e, 0x72, 0x24, 0x00] => "call qword ptr [$ + 24727Eh]".to_string(),
+                // dumpbin prints a ds: since this is an absolute address..
+                &[0xff, 0x15, 0x7e, 0x72, 0x24, 0x00] => "call dword ptr [0024727Eh]".to_string(),
                 // dumpbin uses a really wide displacement .. for laughs..
-                &[0xff, 0x24, 0xcd, 0x70, 0xa0, 0xbc, 0x01] => "jmp qword ptr [rcx * 8 + 1BCA070h]".to_string(),
+                &[0xff, 0x24, 0xcd, 0x70, 0xa0, 0xbc, 0x01] => "jmp dword ptr [ecx * 8 + 1BCA070h]".to_string(),
                 // dumpbin uses a really wide displacement .. for laughs..
-                &[0xff, 0x14, 0xcd, 0x70, 0xa0, 0xbc, 0x01] => "call qword ptr [rcx * 8 + 1BCA070h]".to_string(),
-                // dumpbin bug: 66-prefixed jmp/call does not pick 16-bit registers
-                &[0x66, 0xff, 0xe0] => "jmp rax".to_string(),
-                // dumpbin bug: 66-prefixed jmp/call does not pick 16-bit registers
-                &[0x66, 0xff, 0xd0] => "call rax".to_string(),
+                &[0xff, 0x14, 0xcd, 0x70, 0xa0, 0xbc, 0x01] => "call dword ptr [ecx * 8 + 1BCA070h]".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
                 &[0xe0, 0x12] => "loopnz $+14h".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
@@ -443,21 +454,20 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 // dumpbin uses absolute branch destinations, but yax uses relative.
                 &[0xe2, 0x12] => "loop $+14h".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
-                &[0xe3, 0x12] => "jrcxz $+14h".to_string(),
+                &[0xe3, 0x12] => "jecxz $+14h".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
-                &[0xe3, 0xf0] => "jrcxz $-0Eh".to_string(),
+                &[0xe3, 0xf0] => "jecxz $-0Eh".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
-                &[0x67, 0xe3, 0x12] => "jecxz $+15h".to_string(),
+                &[0x67, 0xe3, 0x12] => "jcxz $+15h".to_string(),
                 // dumpbin uses absolute branch destinations, but yax uses relative.
-                &[0x67, 0xe3, 0xf0] => "jecxz $-0Dh".to_string(),
+                &[0x67, 0xe3, 0xf0] => "jcxz $-0Dh".to_string(),
                 // dumpbin dislikes prefixes.
                 &[0x66, 0xf2, 0x0f, 0x79, 0xcf] => "insertq xmm1, xmm7".to_string(),
-                // rip-rel: oh dear
-                &[0xf6, 0x05, 0x2c, 0x9b, 0xff, 0xff, 0x01] => "test byte ptr [$ - 64D4h], 1".to_string(),
+                &[0xf6, 0x05, 0x2c, 0x9b, 0xff, 0xff, 0x01] => "test byte ptr [0FFFF9B2Ch], 1".to_string(),
                 // yax uses wider immediates
-                &[0x3d, 0x01, 0xf0, 0xff, 0xff] => "cmp eax, 0FFFFFFFFFFFFF001h".to_string(),
+                &[0x3d, 0x01, 0xf0, 0xff, 0xff] => "cmp eax, 0FFFFF001h".to_string(),
                 // dumpbin gets the size wrong
-                &[0x62, 0xf2, 0xfd, 0x0f, 0x8a, 0x62, 0xf2] => "vcompresspd xmmword ptr [rdx - 70h]{k7}, xmm4".to_string(),
+                &[0x62, 0xf2, 0xfd, 0x0f, 0x8a, 0x62, 0xf2] => "vcompresspd xmmword ptr [edx - 70h]{k7}, xmm4".to_string(),
                 // TODO: yax doesn't know about rdssp{d,q}?
                 &[0xf3, 0x0f, 0x1e, 0x0f] => "nop".to_string(),
                 // yax won't mention the pointless repne prefix
@@ -465,33 +475,41 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 // yax won't mention the pointless repne prefix
                 &[0xf2, 0x0f, 0x07] => "sysret".to_string(),
                 // dumpbin spells this mmword
-                &[0x0f, 0x6f, 0x00] => "movq mm0, qword ptr [rax]".to_string(),
-                &[0x66, 0x2e, 0xf2, 0xf0, 0x0f, 0xbb, 0x13] => "xacquire lock btc word ptr [rbx], dx".to_string(),
+                &[0x0f, 0x6f, 0x00] => "movq mm0, qword ptr [eax]".to_string(),
+                &[0x66, 0x2e, 0xf2, 0xf0, 0x0f, 0xbb, 0x13] => "xacquire lock btc word ptr cs:[ebx], dx".to_string(),
                 // dumpbin prints with more.. flourish
-                &[0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00] => "nop word ptr [rax + rax]".to_string(),
+                &[0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00] => "nop word ptr cs:[eax + eax]".to_string(),
                 // disp is wider from dumpbin
-                &[0x0f, 0xfc, 0xaf, 0x40, 0x38, 0x25, 0xbf] => "paddb mm5, mmword ptr [rdi - 40DAC7C0h]".to_string(),
+                &[0x0f, 0xfc, 0xaf, 0x40, 0x38, 0x25, 0xbf] => "paddb mm5, mmword ptr [edi - 40DAC7C0h]".to_string(),
                 &[0xc7, 0xf8, 0x10, 0x12, 0x34, 0x56] => "xbegin $+56341216h".to_string(),
                 &[0x66, 0xc7, 0xf8, 0x10, 0x12] => "xbegin $+1215h".to_string(),
-                &[0x26, 0x36, 0x0f, 0x0f, 0x70, 0xfb, 0x0c] => "pi2fw mm6, qword ptr [rax - 5]".to_string(), // more prefix confusion..
+                &[0x26, 0x36, 0x0f, 0x0f, 0x70, 0xfb, 0x0c] => "pi2fw mm6, qword ptr ss:[eax - 5]".to_string(), // more prefix confusion..
                 // prefixes confuse dumpbin, and dumpbin says "qword" where we use mmword. masm accepts either
-                &[0x3e, 0xf3, 0x2e, 0xf2, 0x0f, 0x0f, 0x64, 0x93, 0x93, 0xa4] => "pfmax mm4, mmword ptr [rbx + rdx * 4 - 6Dh]".to_string(),
+                &[0x3e, 0xf3, 0x2e, 0xf2, 0x0f, 0x0f, 0x64, 0x93, 0x93, 0xa4] => "pfmax mm4, mmword ptr cs:[ebx + edx * 4 - 6Dh]".to_string(),
                 // dumpbin shows this as a non-rip-rel offset :(
-                &[0x0f, 0xe5, 0x3d, 0xaa, 0xbb, 0xcc, 0x77] => "pmulhw mm7, qword ptr [$ + 77CCBBAAh]".to_string(),
+                &[0x0f, 0xe5, 0x3d, 0xaa, 0xbb, 0xcc, 0x77] => "pmulhw mm7, qword ptr [77CCBBAAh]".to_string(),
                 // dumpbin confused about prefixes once again
-                &[0x66, 0x3e, 0x26, 0x2e, 0x2e, 0x0f, 0x38, 0x2a, 0x2b] => "movntdqa xmm5, xmmword ptr [rbx]".to_string(),
+                &[0x66, 0x3e, 0x26, 0x2e, 0x2e, 0x0f, 0x38, 0x2a, 0x2b] => "movntdqa xmm5, xmmword ptr cs:[ebx]".to_string(),
                 // prefixes.. cs: isn't real in 64-bit mode
-                &[0x66, 0x2e, 0x67, 0x0f, 0x3a, 0x0d, 0xb8, 0xf0, 0x2f, 0x7c, 0xf0, 0x63] => "blendpd xmm7, xmmword ptr [eax - 0F83D010h], 63h".to_string(),
+                &[0x66, 0x2e, 0x67, 0x0f, 0x3a, 0x0d, 0xb8, 0xf0, 0x2f, 0x7c] => "blendpd xmm7, xmmword ptr cs:[bx + si + 2FF0h], 7Ch".to_string(),
                 // prefixes confuse dumpbin
-                &[0x66, 0x66, 0x64, 0x3e, 0x0f, 0x38, 0x23, 0x9d, 0x69, 0x0f, 0xa8, 0x2d] => "pmovsxwd xmm3, qword ptr fs:[rbp + 2DA80F69h]".to_string(),
+                &[0x66, 0x66, 0x64, 0x3e, 0x0f, 0x38, 0x23, 0x9d, 0x69, 0x0f, 0xa8, 0x2d] => "pmovsxwd xmm3, qword ptr [ebp + 2DA80F69h]".to_string(),
                 // prefixes confuse dumpbin
-                &[0x67, 0x26, 0x66, 0x65, 0x0f, 0x38, 0x3f, 0x9d, 0xcc, 0x03, 0xb3, 0xfa] => "pmaxud xmm3, xmmword ptr gs:[ebp - 54CFC34h]".to_string(),
+                &[0x2e, 0x66, 0x26, 0x64, 0x0f, 0x3a, 0x21, 0x0b, 0xb1] => "insertps xmm1, dword ptr fs:[ebx], 0B1h".to_string(),
+                // prefixes confuse dumpbin
+                &[0x66, 0x26, 0x0f, 0x3a, 0x42, 0x96, 0x74, 0x29, 0x96, 0xf9, 0x6a] => "mpsadbw xmm2, xmmword ptr es:[esi - 669D68Ch], 6Ah".to_string(),
+                // prefixes confuse dumpbin
+                &[0x67, 0x26, 0x66, 0x65, 0x0f, 0x38, 0x3f, 0x9d, 0xcc, 0x03] => "pmaxud xmm3, xmmword ptr gs:[di + 3CCh]".to_string(),
                 // prefixes confuse dumpbin
                 &[0x67, 0x66, 0x65, 0x3e, 0x0f, 0x6d, 0xd1] => "punpckhqdq xmm2, xmm1".to_string(),
                 // prefixes confuse dumpbin
-                &[0xf2, 0x3e, 0x26, 0x67, 0x0f, 0xf0, 0xa0, 0x1b, 0x5f, 0xcd, 0xd7] => "lddqu xmm4, xmmword ptr [eax - 2832A0E5h]".to_string(),
+                &[0xf2, 0x3e, 0x26, 0x67, 0x0f, 0xf0, 0xa0, 0x1b, 0x5f] => "lddqu xmm4, xmmword ptr es:[bx + si + 5F1Bh]".to_string(),
+                // prefixes confuse dumpbin
+                &[0x2e, 0x3e, 0x66, 0x3e, 0x0f, 0x3a, 0x41, 0x30, 0x48] => "dppd xmm6, xmmword ptr [eax], 48h".to_string(),
+                // again prefixes confuse dumpbin
+                &[0x65, 0x66, 0x66, 0x64, 0x0f, 0x38, 0xdb, 0x0f] => "aesimc xmm1, xmmword ptr fs:[edi]".to_string(),
                 // dumpbin prints the order backwards =|
-                &[0x65, 0xf0, 0x87, 0x0f] => "lock xchg dword ptr gs:[rdi], ecx".to_string(),
+                &[0x65, 0xf0, 0x87, 0x0f] => "lock xchg dword ptr gs:[edi], ecx".to_string(),
                 // dumpbin knows about "fstpnce" as "fstp1", but masm does not.
                 // since this is an undocumented instruction anyway, decode it ourselves..
                 &[0xd9, 0xdb] => "fstpnce st(3), st(0)".to_string(),
@@ -509,26 +527,154 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 &[0xdf, 0xd3] => "fstp st(3)".to_string(),
                 // dumpbin calls this "fstp9", but it's just an undocumented fstp alias. this round-trips to a different instruction but it's at least.. kinda right.
                 &[0xdf, 0xdb] => "fstp st(3)".to_string(),
+                &[0xf2, 0x0f, 0xbc, 0xd3] => "bsf edx, ebx".to_string(),
+                // mov abs in 32-bit mode gets a ds: prefix even though that's the default. masm does not need this prefix, so we round-trip fine without it.
+                &[0xa0, 0x93, 0x62, 0xc4, 0x00] => "mov al, byte ptr [00C46293h]".to_string(),
+                &[0x67, 0xa0, 0x93, 0x62] => "mov al, byte ptr [00006293h]".to_string(),
+                &[0xa1, 0x93, 0x62, 0xc4, 0x00] => "mov eax, dword ptr [00C46293h]".to_string(),
+                &[0x67, 0xa1, 0x93, 0x62] => "mov eax, dword ptr [00006293h]".to_string(),
+                &[0xa2, 0x93, 0x62, 0xc4, 0x00] => "mov byte ptr [00C46293h], al".to_string(),
+                &[0x67, 0xa2, 0x93, 0x62] => "mov byte ptr [00006293h], al".to_string(),
+                &[0xa3, 0x93, 0x62, 0xc4, 0x00] => "mov dword ptr [00C46293h], eax".to_string(),
+                &[0x67, 0xa3, 0x93, 0x62] => "mov dword ptr [00006293h], eax".to_string(),
+                &[0x33, 0x05, 0x78, 0x56, 0x34, 0x12] => "xor eax, dword ptr [12345678h]".to_string(),
+                &[0x33, 0x04, 0x25, 0x11, 0x22, 0x33, 0x44] => "xor eax, dword ptr [44332211h]".to_string(),
+                &[0x33, 0x04, 0xe5, 0x11, 0x22, 0x33, 0x44] => "xor eax, dword ptr [44332211h]".to_string(),
+                &[0x33, 0x34, 0x25, 0x20, 0x30, 0x40, 0x50] => "xor esi, dword ptr [50403020h]".to_string(),
+                &[0xa0, 0xc0, 0xb0, 0xa0, 0x90] => "mov al, byte ptr [90A0B0C0h]".to_string(),
+                &[0x67, 0xa0, 0xc0, 0xb0] => "mov al, byte ptr [0B0C0h]".to_string(),
+                &[0x67, 0xa1, 0xc0, 0xb0] => "mov eax, dword ptr [0000B0C0h]".to_string(),
+                &[0x66, 0x67, 0xa1, 0xc0, 0xb0] => "mov ax, word ptr [0000B0C0h]".to_string(),
+                // same for wrssd
+                &[0x3e, 0x0f, 0x38, 0xf6, 0x23] => "wrssd dword ptr [ebx], esp".to_string(),
+                // dumpbin believes that rex.w works even in 32-bit code, thus prints `rorx rax, ..`. haha what a dingus
+                &[0xc4, 0xe3, 0xfb, 0xf0, 0x01, 0x05] => "rorx eax, dword ptr [ecx], 5".to_string(),
+                &[0xc4, 0xe2, 0xe3, 0xf5, 0x07] => "pdep eax, ebx, dword ptr [edi]".to_string(),
+                &[0xc4, 0xe2, 0xe3, 0xf6, 0x07] => "mulx eax, ebx, dword ptr [edi]".to_string(),
+                &[0xc4, 0xe2, 0xe3, 0xf7, 0x01] => "shrx eax, dword ptr [ecx], ebx".to_string(),
+                &[0xc4, 0xe2, 0xe2, 0xf5, 0x07] => "pext eax, ebx, dword ptr [edi]".to_string(),
+                &[0xc4, 0xe2, 0xe2, 0xf7, 0x01] => "sarx eax, dword ptr [ecx], ebx".to_string(),
+                &[0xc4, 0xe2, 0xe0, 0xf5, 0x07] => "bzhi eax, dword ptr [edi], ebx".to_string(),
+                &[0xc4, 0xe2, 0xe1, 0xf7, 0x01] => "shlx eax, dword ptr [ecx], ebx".to_string(),
+                &[0xc4, 0xe2, 0xe0, 0xf2, 0x01] => "andn eax, ebx, dword ptr [ecx]".to_string(),
+                &[0xc4, 0xe2, 0xf8, 0xf3, 0x09] => "blsr eax, dword ptr [ecx]".to_string(),
+                &[0xc4, 0xe2, 0xf8, 0xf3, 0x11] => "blsmsk eax, dword ptr [ecx]".to_string(),
+                &[0xc4, 0xe2, 0xf8, 0xf3, 0x19] => "blsi eax, dword ptr [ecx]".to_string(),
+                &[0xc4, 0xe2, 0xe0, 0xf7, 0x01] => "bextr eax, dword ptr [ecx], ebx".to_string(),
+                &[0xc4, 0xc3, 0x39, 0x0c, 0xca, 0x77] => "vblendps xmm1, xmm0, xmm2, 77h".to_string(),
+                // just have to decide we know better than dumpbin: masm does not accept an absolute far call/far jump destination,
+                // so we definitely can't round-trip by following dumpbin. dumpbin doesn't use hex suffixes here, instead printing
+                // "6655:44332211" as the destination. this is technically not ambiguous since `:` is a hint that this is a absolute
+                // far address and that both numbers are base 16, but that's ... subtle and easy to miss. so add some h's.
+                &[0x9a, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66] => "call 6655h:44332211h".to_string(),
+                &[0x66, 0x9a, 0x11, 0x22, 0x33, 0x44] => "call 4433h:2211h".to_string(),
+                // terribly unfortunate: masm reasonably encodes this instruction as a 32-bit offset, which causes yax to spell the offset
+                // as 0000AA55 instead of AA55. override dumpbin to use the (worse) encoding for the sake of matching with the test.
+                &[0x66, 0x67, 0x8b, 0x0e, 0x55, 0xaa] => "mov cx, word ptr [0AA55h]".to_string(),
+                // inexplicably, dumpbin spells this "aamb", for .. ascii adjust after multiplcation (byte) ???
+                // additionally, masm does not accept an integer operand: it only supports `aam 10` as in d4 0a. so.. bummer.
+                &[0xd4, 0x01] => "aam 1".to_string(),
+                // same as above
+                &[0xd5, 0x01] => "aad 1".to_string(),
+                // dunno why dumpbin doesn't like this one..
+                &[0xc5, 0b1_1111_100, 0x2e, 0b00_001_010] => "vucomiss xmm1, dword ptr [edx]".to_string(),
+                &[0xc5, 0b1_1111_100, 0x2f, 0b00_001_010] => "vcomiss xmm1, dword ptr [edx]".to_string(),
                 other => {
-                    tools::dumpbin(other, CodeModel::Bits32).unwrap_or_else(|e| {
-                        panic!("{}: {e:?}", format!("could not get an instruction after dumpbining {other:x?}"));
-                    })
+                    let dumpbin_res = tools::dumpbin(other, CodeModel::Bits32);
+                    match dumpbin_res {
+                        Ok(text) => text,
+                        Err(e) => {
+                            if vex_prefixed {
+                                // this might be an instance of dumpbin not being great: consider vucomiss, as in "c5f82eca".
+                                return;
+                            }
+
+                            // otherwise: unexpected, what da heck.
+                            panic!("{}: {e:?}", format!("could not get an instruction after dumpbining {other:x?}"));
+                        }
+                    }
                 }
             };
+
+            // anguish, misery, etc: dumpbin will process register extension bits in protected mode, even though they are ignored.
+            // if we see a register like this, just.. bail. otherwise this will have to have exceptions for hundreds of test cases.
+            // note this skips x/y/z in the register name since mm8..mm31 will do the job.
+            for reg in [
+                "mm8", "mm9", "mm10", "mm11", "mm12", "mm13", "mm14", "mm15",
+                "mm16", "mm17", "mm18", "mm19", "mm20", "mm21", "mm22", "mm23",
+                "mm24", "mm25", "mm26", "mm27", "mm28", "mm29", "mm30", "mm31",
+            ] {
+                if external_masm_ish.contains(reg) {
+                    // TODO: EXTRACT THIS TO SOME OTHER MASM-SPECIFIC FUNCTION: THIS BAILS OUT OF THE REST OF THE TEST ENTIRELY.
+                    return;
+                }
+            }
+
+            if vex_prefixed {
+                for reg in [
+                    "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
+                ] {
+                    if external_masm_ish.contains(reg) {
+                        // TODO: EXTRACT THIS TO SOME OTHER MASM-SPECIFIC FUNCTION: THIS BAILS OUT OF THE REST OF THE TEST ENTIRELY.
+                        return;
+                    }
+                }
+            }
+
             let displayed_masm = decoder.decode_slice(bytes).expect("can decode").display_with(DisplayStyle::Masm).to_string();
             let masm_as_bytes = match displayed_masm.as_str() {
-                "nop zmmword ptr [rax]" => vec![0x0f, 0x18, 0x20], // MASM doesn't accept `nop zmmword ..`, no way to round trip 0f1820
+                "nop zmmword ptr [eax]" => vec![0x0f, 0x18, 0x20], // MASM doesn't accept `nop zmmword ..`, no way to round trip 0f1820
                 "sysenter" => vec![0x0f, 0x34], // MASM doesn't accept sysenter, but dumpbin prints it.
                 "sysexit" => vec![0x0f, 0x35], // MASM doesn't accept sysexit, but dumpbin prints it.
                 // dumpbin doesn't know how to decode, and masm doesn't know how to *en*code, ud0.
                 "ud0 eax, ecx" => vec![0x66, 0x0f, 0xff, 0xc1],
-                "ud0 eax, dword ptr [rcx]" => vec![0x66, 0x0f, 0xff, 0x01],
+                "ud0 eax, dword ptr [ecx]" => vec![0x66, 0x0f, 0xff, 0x01],
+                "ud0 ebp, dword ptr [ebx - 54h]" => vec![0x0f, 0xff, 0x6b, 0xac],
                 // masm seems to not know about fstpnce/fstp1 at all. since this is an undocumented instruction anyway, assemble it ourselves..
                 "fstpnce st(3), st(0)" => vec![0xd9, 0xdb],
                 // masm inserts a wait prefix here..
                 "feni" => vec![0xdb, 0xe0],
                 "fdisi" => vec![0xdb, 0xe1],
                 "fsetpm" => vec![0xdb, 0xe4],
+                // masm doesn't know how to assemble address-size overrides..?
+                // > cannot use 16-bit register with a 32-bit address
+                "aesimc xmm1, xmmword ptr [bx]" => vec![0x67, 0x66, 0x0f, 0x38, 0xdb, 0x0f],
+                "aesenc xmm1, xmmword ptr [bx]" => vec![0x67, 0x66, 0x0f, 0x38, 0xdc, 0x0f],
+                "aesenclast xmm1, xmmword ptr [bx]" => vec![0x67, 0x66, 0x0f, 0x38, 0xdd, 0x0f],
+                "aesdec xmm1, xmmword ptr [bx]" => vec![0x67, 0x66, 0x0f, 0x38, 0xde, 0x0f],
+                "aesdeclast xmm1, xmmword ptr [bx]" => vec![0x67, 0x66, 0x0f, 0x38, 0xdf, 0x0f],
+                "blendpd xmm7, xmmword ptr cs:[bx + si + 2FF0h], 7Ch" => vec![0x66, 0x2e, 0x67, 0x0f, 0x3a, 0x0d, 0xb8, 0xf0, 0x2f, 0x7c],
+                // more
+                "movdir64b bp, zmmword ptr es:[di + 80Bh]" => vec![0x36, 0x26, 0x66, 0x67, 0x0f, 0x38, 0xf8, 0xad, 0x0b, 0x08],
+                "lss eax, fword ptr [bx + si]" => vec![0x67, 0x0f, 0xb2, 0x00],
+                "lddqu xmm4, xmmword ptr es:[bx + si + 5F1Bh]" => vec![0xf2, 0x3e, 0x26, 0x67, 0x0f, 0xf0, 0xa0, 0x1b, 0x5f],
+                "lods byte ptr [si]" => vec![0x67, 0xac],
+                "scas byte ptr es:[di]" => vec![0x67, 0xae],
+                "rep movs byte ptr es:[di], byte ptr [si]" => vec![0x67, 0xf3, 0xa4],
+                "rep movs dword ptr es:[di], dword ptr [si]" => vec![0x67, 0xf3, 0xa5],
+                "movapd xmm0, xmmword ptr [bx + si]" => vec![0x67, 0x66, 0x0f, 0x28, 0x00],
+                "cvtdq2ps xmm0, xmmword ptr [bx + di]" => vec![0x67, 0x0f, 0x5b, 0x01],
+                // i tried really hard to find a MASM syntax for absolute far call/jump destinations! i turned up a bunch of blanks.
+                // https://mirrors.nycbug.org/pub/The_Unix_Archive/Unix_Usenet/comp.unix.xenix/1989-February/001910.html is the funniest,
+                // given that it is OS hackers experiencing the same issue and concluding they should emit the bytes themselves.
+                // so yax will emit something like bindump would, and we'll just swallow the text as if masm worked like i'd hope..
+                "call 6655h:44332211h" => vec![0x9a, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66],
+                "call 4433h:2211h" => vec![0x66, 0x9a, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66],
+                // terribly unfortunate: masm reasonably encodes this instruction as a 32-bit offset, which causes yax to spell the offset
+                // as 0000AA55 instead of AA55. override dumpbin to use the (worse) encoding for the sake of matching with the test.
+                "mov cx, word ptr [0AA55h]" => vec![0x66, 0x67, 0x8b, 0x0e, 0x55, 0xaa],
+                // same deal, different instruction.
+                "mov al, byte ptr [0B0C0h]" => vec![0x67, 0xa0, 0xc0, 0xb0],
+                "mov eax, dword ptr [0000B0C0h]" => vec![0x67, 0xa1, 0xc0, 0xb0],
+                // if you operand-size override pushad/popad you get the 16-bit forms, pusha/popa. dumpbin reflects this, but in 32-bit mode
+                // accepts either as a way of spelling pushad/popad. override it here for tests to match up, but this is an unfortunately
+                // disastrous difference in round-tripping..
+                "pusha" => vec![0x66, 0x60],
+                "popa" => vec![0x66, 0x61],
+                // masm does not accept an integer operand: it only supports `aam 10` as in d4 0a. so.. bummer.
+                "aam 1" => vec![0xd4, 0x01],
+                // same as above
+                "aad 1" => vec![0xd5, 0x01],
                 _other => { tools::masm(&displayed_masm, CodeModel::Bits32).expect("can assemble") }
             };
             let masm_roundtrip = decoder.decode_slice(&masm_as_bytes).expect("can decode").display_with(DisplayStyle::Masm).to_string();
@@ -538,6 +684,8 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
             if external_masm_ish.starts_with("tzcnt") && masm_roundtrip.starts_with("bsf") {
                 // this is ok, we support "decode as if without bmi1" but dumpbin does not, so dumpbin always says tzcnt.
                 // masm accepts either and does the right thing.
+            } else if external_masm_ish.contains(" qword ") && masm_roundtrip.contains(" dword ") {
+                // this might be "dumpbin thinks the instruction works on qwords, but we know it's dwords. let it through? :/
             } else {
                 assert_eq!(external_masm_ish, masm_roundtrip);
             }
@@ -1388,7 +1536,7 @@ mod sse4_1 {
         testcase!(invalid: &[0x0f, 0x38, 0x32, 0x06]),
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x38, 0x33, 0x06], "pmovzxwd xmm0, qword [esi]"),
         testcase!(invalid: &[0x0f, 0x38, 0x33, 0x06]),
-        testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x38, 0x34, 0x06], "pmovzxwq xmm0, qword [esi]"),
+        testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x38, 0x34, 0x06], "pmovzxwq xmm0, dword [esi]"),
         testcase!(invalid: &[0x0f, 0x38, 0x34, 0x06]),
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x38, 0x35, 0x06], "pmovzxdq xmm0, qword [esi]"),
         testcase!(invalid: &[0x0f, 0x38, 0x35, 0x06]),
@@ -1554,10 +1702,10 @@ mod _0f01 {
         testcase!(&[0x0f, 0x01, 0xdd], "clgi"),
         testcase!(&[0x0f, 0x01, 0xde], "skinit eax"),
         testcase!(&[0x0f, 0x01, 0xdf], "invlpga eax, ecx"),
-    // TODO: not clear what SHOULD be reported for invlpgb. certainly not a `rax` operand. xed claims
+    // TODO: not clear what SHOULD be reported for invlpgb. certainly not a `eax` operand. xed claims
     // that this is UD in protected mode. the AMD manual explicitly says this does not #UD in protected
     // mode. same for tlbsync.
-    //    testcase!(&[0x0f, 0x01, 0xfe], "invlpgb rax, edx, ecx"),
+    //    testcase!(&[0x0f, 0x01, 0xfe], "invlpgb eax, edx, ecx"),
     //    testcase!(&[0x0f, 0x01, 0xff], "tlbsync"),
     //    testcase!(&[0x2e, 0x67, 0x65, 0x2e, 0x46, 0x0f, 0x01, 0xff], "tlbsync"),
         testcase!(&[0x0f, 0x01, 0xe0], "smsw eax"),
@@ -1672,10 +1820,10 @@ mod system {
     const CASES: &'static [TestCase] = &[
         testcase!(&[0x63, 0xc1], "arpl cx, ax"),
         testcase!(&[0x63, 0x04, 0xba], "arpl word [edx + edi * 4], ax"),
-        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, word [eax]"),
+        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, dword [eax]"),
         testcase!(&[0x67, 0x0f, 0xb2, 0x00], "lss eax, far [bx + si * 1]"),
         testcase!(&[0x0f, 0xb2, 0x00], "lss eax, far [eax]"),
-        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, word [eax]"),
+        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, dword [eax]"),
         testcase!(invalid: &[0x0f, 0x22, 0xc8]),
         testcase!(invalid: &[0x0f, 0x20, 0xc8]),
         testcase!(&[0x0f, 0x22, 0xd0], "mov cr2, eax"),
@@ -1950,7 +2098,7 @@ mod control_flow {
         testcase!(&[0x66, 0xff, 0xd0], "call ax"),
         testcase!(&[0x67, 0xff, 0xd0], "call eax"),
         testcase!(invalid: &[0xff, 0xd8]),
-        testcase!(&[0xff, 0x18], "callf far [eax]", masm: "call far ptr [eax]"),
+        testcase!(&[0xff, 0x18], "callf far [eax]", masm: "call fword ptr [eax]"),
         testcase!(&[0xe0, 0x12], "loopnz $+0x12"),
         testcase!(&[0xe1, 0x12], "loopz $+0x12"),
         testcase!(&[0xe2, 0x12], "loop $+0x12"),
@@ -2161,7 +2309,7 @@ mod misc {
         testcase!(&[0xef], "out dx, eax"),
         testcase!(&[0xcd, 0x00], "int 0x0"),
         testcase!(&[0xcd, 0xff], "int 0xff"),
-        testcase!(&[0x9c], "pushf"),
+        testcase!(&[0x9c], "pushf", masm: "pushfd"),
         testcase!(&[0x98], "cwde"),
         testcase!(&[0x66, 0x99], "cwd"),
         testcase!(&[0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00], "nop word cs:[eax + eax * 1]"),
@@ -3431,10 +3579,10 @@ mod only_32bit {
         testcase!(&[0x2f], "das"),
         testcase!(&[0x37], "aaa"),
         testcase!(&[0x3f], "aas"),
-        testcase!(&[0xd4, 0x01], "aam 0x1"),
-        testcase!(&[0xd4, 0x0a], "aam 0xa"),
-        testcase!(&[0xd5, 0x01], "aad 0x1"),
-        testcase!(&[0xd5, 0x0a], "aad 0xa"),
+        testcase!(&[0xd4, 0x01], "aam 0x1", masm: "aam 1"),
+        testcase!(&[0xd4, 0x0a], "aam 0xa", masm: "aam"),
+        testcase!(&[0xd5, 0x01], "aad 0x1", masm: "aad 1"),
+        testcase!(&[0xd5, 0x0a], "aad 0xa", masm: "aad"),
 
         testcase!(&[0xc5, 0x78, 0x10], "lds edi, far [eax + 0x10]"),
         testcase!(&[0x66, 0xc5, 0x78, 0x10], "lds di, dword [eax + 0x10]"),
@@ -3505,9 +3653,9 @@ mod svm {
         testcase!(&[0x0f, 0x01, 0xd8], "vmrun eax"),
         testcase!(&[0x0f, 0x78, 0xc4], "vmread esp, eax"),
         testcase!(&[0x0f, 0x79, 0xc5], "vmwrite eax, ebp"),
-        testcase!(&[0x0f, 0x78, 0x0b], "vmread qword [ebx], ecx"),
+        testcase!(&[0x0f, 0x78, 0x0b], "vmread dword [ebx], ecx"),
         testcase!(invalid: &[0x66, 0x0f, 0x78, 0x03]),
-        testcase!(&[0x0f, 0x79, 0x0b], "vmwrite ecx, qword [ebx]"),
+        testcase!(&[0x0f, 0x79, 0x0b], "vmwrite ecx, dword [ebx]"),
         testcase!(invalid: &[0x66, 0x0f, 0x79, 0x03]),
     ];
 
@@ -4060,7 +4208,7 @@ mod mishegos_finds {
         testcase!(&[0x66, 0x3e, 0x26, 0x2e, 0x2e, 0x0f, 0x38, 0x2a, 0x2b], "movntdqa xmm5, xmmword cs:[ebx]"),
         testcase!(&[0x66, 0x2e, 0x67, 0x0f, 0x3a, 0x0d, 0xb8, 0xf0, 0x2f, 0x7c], "blendpd xmm7, xmmword cs:[bx + si * 1 + 0x2ff0], 0x7c"),
         testcase!(&[0x66, 0x66, 0x64, 0x3e, 0x0f, 0x38, 0x23, 0x9d, 0x69, 0x0f, 0xa8, 0x2d], "pmovsxwd xmm3, qword [ebp + 0x2da80f69]"),
-        testcase!(&[0x2e, 0x66, 0x26, 0x64, 0x0f, 0x3a, 0x21, 0x0b, 0xb1], "insertps xmm1, dword fs:[ebx], -0x4f"),
+        testcase!(&[0x2e, 0x66, 0x26, 0x64, 0x0f, 0x3a, 0x21, 0x0b, 0xb1], "insertps xmm1, dword fs:[ebx], 0xb1"),
         testcase!(&[0x66, 0x26, 0x0f, 0x3a, 0x42, 0x96, 0x74, 0x29, 0x96, 0xf9, 0x6a], "mpsadbw xmm2, xmmword es:[esi - 0x669d68c], 0x6a"),
         testcase!(&[0x67, 0x26, 0x66, 0x65, 0x0f, 0x38, 0x3f, 0x9d, 0xcc, 0x03], "pmaxud xmm3, xmmword gs:[di + 0x3cc]"),
         testcase!(&[0x36, 0x36, 0x2e, 0x0f, 0x38, 0xf9, 0x55, 0x3e], "movdiri dword cs:[ebp + 0x3e], edx"),

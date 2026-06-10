@@ -257,12 +257,12 @@ impl <T: DisplaySink> crate::protected_mode::OperandVisitor for DisplayingOperan
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i8(&mut self, imm: i8) -> Result<Self::Ok, Self::Error> {
         self.f.span_start_immediate();
-        let imm = imm as i64 as u64;
-        if needs_leading_0(imm) {
+        let imm = imm as i32 as u32;
+        if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
         }
         write!(self.f, "{:X}", imm)?;
-        if hex_ambiguous(imm) {
+        if hex_ambiguous(imm as u64) {
             self.f.write_char('h')?;
         }
         self.f.span_end_immediate();
@@ -284,12 +284,12 @@ impl <T: DisplaySink> crate::protected_mode::OperandVisitor for DisplayingOperan
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i16(&mut self, imm: i16) -> Result<Self::Ok, Self::Error> {
         self.f.span_start_immediate();
-        let imm = imm as i64 as u64;
-        if needs_leading_0(imm) {
+        let imm = imm as i32 as u32;
+        if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
         }
         write!(self.f, "{:X}", imm)?;
-        if hex_ambiguous(imm) {
+        if hex_ambiguous(imm as u64) {
             self.f.write_char('h')?;
         }
         self.f.span_end_immediate();
@@ -310,12 +310,12 @@ impl <T: DisplaySink> crate::protected_mode::OperandVisitor for DisplayingOperan
     }
     fn visit_i32(&mut self, imm: i32) -> Result<Self::Ok, Self::Error> {
         self.f.span_start_immediate();
-        let imm = imm as i64 as u64;
-        if needs_leading_0(imm) {
+        let imm = imm as u32;
+        if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
         }
         write!(self.f, "{:X}", imm)?;
-        if hex_ambiguous(imm) {
+        if hex_ambiguous(imm as u64) {
             self.f.write_char('h')?;
         }
         self.f.span_end_immediate();
@@ -369,6 +369,9 @@ impl <T: DisplaySink> crate::protected_mode::OperandVisitor for DisplayingOperan
     fn visit_abs_u16(&mut self, imm: u16) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
         self.f.span_start_address();
+        if imm >= 0x1000 && needs_leading_0(imm as u64) {
+            self.f.write_char('0')?;
+        }
         write!(self.f, "{:04X}", imm)?;
         self.f.write_char('h')?;
         self.f.span_end_address();
@@ -378,6 +381,9 @@ impl <T: DisplaySink> crate::protected_mode::OperandVisitor for DisplayingOperan
     fn visit_abs_u32(&mut self, imm: u32) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
         self.f.span_start_address();
+        if imm >= 0x1000_0000 && needs_leading_0(imm as u64) {
+            self.f.write_char('0')?;
+        }
         write!(self.f, "{:08X}", imm)?;
         self.f.write_char('h')?;
         self.f.span_end_address();
@@ -385,9 +391,17 @@ impl <T: DisplaySink> crate::protected_mode::OperandVisitor for DisplayingOperan
         Ok(())
     }
     fn visit_absolute_far_address(&mut self, segment: u16, address: u32) -> Result<Self::Ok, Self::Error> {
-        self.f.write_prefixed_u16(segment)?;
+        if needs_leading_0(segment as u64) {
+            self.f.write_char('0')?;
+        }
+        write!(self.f, "{:4X}", segment)?;
+        self.f.write_char('h')?;
         self.f.write_fixed_size(":")?;
-        self.f.write_prefixed_u32(address)?;
+        if needs_leading_0(address as u64) {
+            self.f.write_char('0')?;
+        }
+        write!(self.f, "{:4X}", address)?;
+        self.f.write_char('h')?;
         Ok(())
     }
     #[cfg_attr(not(feature="profiling"), inline(always))]
@@ -700,7 +714,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         }
         Opcode::SGDT | Opcode::SIDT => {
             // masm uses "tbyte" as a memory size here.
-            out.write_fixed_size(" tbyte ptr ")?;
+            out.write_fixed_size(" fword ptr ")?;
             let mut visitor = DisplayingOperandVisitor::new(out);
             instr.visit_operand(0, &mut visitor)?;
 
@@ -711,7 +725,6 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
             visitor.f.write_char(' ')?;
             instr.visit_operand(0, &mut visitor)?;
 
-            // masm uses "tbyte" as a memory size here.
             match instr.mem_size {
                 4 => {
                     visitor.f.write_fixed_size(", dword ptr ")?;
@@ -719,10 +732,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
                 6 => {
                     visitor.f.write_fixed_size(", fword ptr ")?;
                 },
-                10 => {
-                    visitor.f.write_fixed_size(", tbyte ptr ")?;
-                },
-                _ => { panic!("impossible memory size"); }
+                o => { panic!("impossible memory size: {:?}", o); }
             }
 
             instr.visit_operand(1, &mut visitor)?;
@@ -848,6 +858,12 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
             out.write_fixed_size(" ")?;
             out.write_mem_size_label(instr.mem_size)?;
             out.write_fixed_size(" ptr ")?;
+            if let Some(prefix) = instr.segment_override_for_op(0) {
+                let name = prefix.name();
+                out.write_char(name[0] as char)?;
+                out.write_char(name[1] as char)?;
+                out.write_fixed_size(":")?;
+            }
             let mut visitor = DisplayingOperandVisitor::new(out);
             instr.visit_operand(0, &mut visitor)?;
             return Ok(());
@@ -866,6 +882,12 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
             out.write_fixed_size(" ")?;
             out.write_mem_size_label(instr.mem_size)?;
             out.write_fixed_size(" ptr ")?;
+            if let Some(prefix) = instr.segment_override_for_op(0) {
+                let name = prefix.name();
+                out.write_char(name[0] as char)?;
+                out.write_char(name[1] as char)?;
+                out.write_fixed_size(":")?;
+            }
             let mut visitor = DisplayingOperandVisitor::new(out);
             instr.visit_operand(0, &mut visitor)?;
             return Ok(());
@@ -945,9 +967,15 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         }
         Opcode::PUSHF => {
             if !instr.prefixes.operand_size() {
-                out.write_char('q')?;
+                out.write_char('d')?;
             }
             return Ok(());
+        }
+        Opcode::AAM | Opcode::AAD => {
+            if instr.imm == 10 {
+                // dumpbin doesn't bother with a base here, and this is the only form masm accepts.
+                return Ok(());
+            }
         }
         Opcode::FCOM | Opcode::FCOMP | Opcode::FICOM | Opcode::FICOMP => {
             // masm does not want the first operand *ever*?
@@ -1110,7 +1138,8 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
                 if size_is_mmword && instr.mem_size == 8 {
                     out.write_fixed_size("mmword")?;
                 } else if instr.mem_size == 6 && (instr.opcode == Opcode::JMPF || instr.opcode == Opcode::CALLF) {
-                    out.write_fixed_size("far")?;
+                    // "fword" in protected mode instead of "far"..
+                    out.write_fixed_size("fword")?;
                 } else {
                     out.write_mem_size_label(instr.mem_size)?;
                 }
@@ -1119,11 +1148,9 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
             }
             if let Some(prefix) = instr.segment_override_for_op(0) {
                 let name = prefix.name();
-                if instr.opcode != Opcode::MOVS || name != b"es" {
-                    out.write_char(name[0] as char)?;
-                    out.write_char(name[1] as char)?;
-                    out.write_fixed_size(":")?;
-                }
+                out.write_char(name[0] as char)?;
+                out.write_char(name[1] as char)?;
+                out.write_fixed_size(":")?;
             }
         }
 
@@ -1151,6 +1178,9 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
                 if instr.mem_size != 63 && instr.mem_size != 48 { // masm does not print "m384b" labels.. 
                     if size_is_mmword && instr.mem_size == 8 {
                         displayer.f.write_fixed_size("mmword")?;
+                    } else if instr.mem_size == 6 && (instr.opcode == Opcode::LDS || instr.opcode == Opcode::LES || instr.opcode == Opcode::LFS || instr.opcode == Opcode::LGS || instr.opcode == Opcode::LSS) {
+                        // "fword" in protected mode instead of "far"..
+                        displayer.f.write_fixed_size("fword")?;
                     } else {
                         displayer.f.write_mem_size_label(instr.mem_size)?;
                     }
