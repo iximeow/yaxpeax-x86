@@ -626,6 +626,9 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
                 &[0xdf, 0xd3] => "fstp st(3)".to_string(),
                 // dumpbin calls this "fstp9", but it's just an undocumented fstp alias. this round-trips to a different instruction but it's at least.. kinda right.
                 &[0xdf, 0xdb] => "fstp st(3)".to_string(),
+                // dunno why dumpbin doesn't like this one..
+                &[0xc5, 0b0_1111_100, 0x2e, 0b00_001_010] => "vucomiss xmm9, dword ptr [rdx]".to_string(),
+                &[0xc5, 0b0_1111_100, 0x2f, 0b00_001_010] => "vcomiss xmm9, dword ptr [rdx]".to_string(),
                 other => {
                     tools::dumpbin(other, CodeModel::Bits64).unwrap_or_else(|e| {
                         panic!("{}: {e:?}", format!("could not get an instruction after dumpbining {other:x?}"));
