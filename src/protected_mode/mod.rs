@@ -6600,7 +6600,7 @@ fn read_operands<
             } else {
                 instruction.regs[1].bank = RegisterBank::X;
             }
-            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
         }
         OperandCase::G_Ev_xmm_Ib => {
@@ -6619,7 +6619,7 @@ fn read_operands<
             } else {
                 instruction.regs[1].bank = RegisterBank::X;
             }
-            instruction.operands[2] = OperandSpec::ImmI8;
+            instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
         }
         OperandCase::PMOVX_E_G_xmm => {

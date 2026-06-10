@@ -20,6 +20,10 @@
 * fix incorrect index-vector-register size choice for vgatherdpd. the index register is xmm, not
   depends-on-L xmm/ymm.
 * fix SEAM and {rd,wr}{fs,gs}base instructions being decoded in 32-bit and 16-bit modes.
+* the pextr*/pinsr*/insertps/extrps immediate is now an unsigned 8-bit immediate, rather than signed.
+  these instructions consume 8 bit of immediate as several fields compressed into 8 bits, rather
+  than as a numeric value, so sign extension is not useful.  further, extending the immediate makes
+  it more difficult to round-trip disassembly through other assemblers.
 
 testing instruction round-tripping through `masm` found a few bugs, which are also fixed in this release:
 
