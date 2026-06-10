@@ -21,6 +21,9 @@
   it more difficult to round-trip disassembly through other assemblers.
 * fix lfs/lgs/lss loading into dword registers when operating with a short (16-bit segment/offset) pointer.
   in these cases, the offset is loaded into a 16-bit register, not 32-bit. the upper 32 bits are unchanged.
+* fix 32/16-bit unprefixed lss reporting too-small memory read.  in both modes
+  lss could be decoded as reading only an offset, rather than an offset (into the
+  destination register) and segment (into ss)
 
 ## 2.1.1
 
