@@ -3673,9 +3673,9 @@ mod svm {
         testcase!(&[0x0f, 0x01, 0xd8], "vmrun eax"),
         testcase!(&[0x0f, 0x78, 0xc4], "vmread esp, eax"),
         testcase!(&[0x0f, 0x79, 0xc5], "vmwrite eax, ebp"),
-        testcase!(&[0x0f, 0x78, 0x0b], "vmread qword [ebx], ecx"),
+        testcase!(&[0x0f, 0x78, 0x0b], "vmread dword [ebx], ecx"),
         testcase!(invalid: &[0x66, 0x0f, 0x78, 0x03]),
-        testcase!(&[0x0f, 0x79, 0x0b], "vmwrite ecx, qword [ebx]"),
+        testcase!(&[0x0f, 0x79, 0x0b], "vmwrite ecx, dword [ebx]"),
         testcase!(invalid: &[0x66, 0x0f, 0x79, 0x03]),
     ];
 

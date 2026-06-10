@@ -3942,8 +3942,8 @@ enum OperandCase {
     G_mm_U_mm,
     G_Mq_mm,
     G_mm_Ew_Ib,
-    G_E_q,
-    E_G_q,
+    G_E_d,
+    E_G_d,
     CVT_AA,
     CVT_DA,
     Rq_Cq_0,
@@ -4294,8 +4294,8 @@ enum OperandCode {
     G_mm_U_mm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_mm_U_mm).bits(),
     G_Mq_mm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_Mq_mm).bits(),
     G_mm_Ew_Ib = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_mm_Ew_Ib).bits(),
-    G_E_q = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_E_q).bits(),
-    E_G_q = OperandCodeBuilder::new().read_E().operand_case(OperandCase::E_G_q).bits(),
+    G_E_d = OperandCodeBuilder::new().read_E().operand_case(OperandCase::G_E_d).bits(),
+    E_G_d = OperandCodeBuilder::new().read_E().operand_case(OperandCase::E_G_d).bits(),
     CVT_AA = OperandCodeBuilder::new().operand_case(OperandCase::CVT_AA).bits(),
     CVT_DA = OperandCodeBuilder::new().operand_case(OperandCase::CVT_DA).bits(),
     Rq_Cq_0 = OperandCodeBuilder::new().operand_case(OperandCase::Rq_Cq_0).bits(),
@@ -6704,6 +6704,7 @@ fn read_operands<
             instruction.operands[1] = mem_oper;
             if [Opcode::LFS, Opcode::LGS, Opcode::LSS].contains(&instruction.opcode) {
                 if !instruction.prefixes.operand_size() {
+                    instruction.regs[0].bank = RegisterBank::W;
                     instruction.mem_size = 4;
                 } else {
                     instruction.mem_size = 6;
@@ -7146,7 +7147,7 @@ fn read_operands<
             instruction.mem_size = 8;
             instruction.operand_count = 2;
         },
-        OperandCase::E_G_q => {
+        OperandCase::E_G_d => {
             if instruction.prefixes.operand_size() {
                 return Err(DecodeError::InvalidOpcode);
             }
@@ -7156,12 +7157,13 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::D;
             instruction.operand_count = 2;
             if instruction.operands[0] != OperandSpec::RegMMM {
+                // outside 64-bit mode the memory access is four bytes as well.
                 instruction.mem_size = 4;
             } else {
                 instruction.regs[1].bank = RegisterBank::D;
             }
         }
-        OperandCase::G_E_q => {
+        OperandCase::G_E_d => {
             if instruction.prefixes.operand_size() {
                 return Err(DecodeError::InvalidOpcode);
             }
@@ -7171,6 +7173,7 @@ fn read_operands<
             instruction.regs[0].bank = RegisterBank::D;
             instruction.operand_count = 2;
             if instruction.operands[1] != OperandSpec::RegMMM {
+                // outside 64-bit mode the memory access is four bytes as well.
                 instruction.mem_size = 4;
             } else {
                 instruction.regs[1].bank = RegisterBank::D;
@@ -10870,8 +10873,8 @@ const NORMAL_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PCMPEQW), OperandCode::G_E_mm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PCMPEQD), OperandCode::G_E_mm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::EMMS), OperandCode::Nothing),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::VMREAD), OperandCode::E_G_q),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::VMWRITE), OperandCode::G_E_q),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::VMREAD), OperandCode::E_G_d),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::VMWRITE), OperandCode::G_E_d),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
