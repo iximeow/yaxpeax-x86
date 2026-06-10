@@ -28,6 +28,9 @@
   protected and real modes.
 * fix lfs/lgs/lss loading into dword registers when operating with a short (16-bit segment/offset) pointer.
   in these cases, the offset is loaded into a 16-bit register, not 32-bit. the upper 32 bits are unchanged.
+* fix 32/16-bit unprefixed lfs/lgs/lss reporting too-small memory read.  in both modes
+  these instructions could be decoded as reading only an offset, rather than an offset (into the
+  destination register) and segment (into ss)
 
 testing instruction round-tripping through `masm` found a few bugs, which are also fixed in this release:
 

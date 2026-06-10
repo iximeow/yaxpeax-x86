@@ -10599,10 +10599,10 @@ const OPERAND_SIZE_0F_CODES: [OpcodeRecord; 256] = [
 // 0xb0
     OpcodeRecord::new(Interpretation::Instruction(Opcode::CMPXCHG), OperandCode::Eb_Gb),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::CMPXCHG), OperandCode::Ev_Gv),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LSS), OperandCode::Gv_M),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LSS), OperandCode::INV_Gv_M),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::BTR), OperandCode::Ev_Gv),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LFS), OperandCode::Gv_M),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::LGS), OperandCode::Gv_M),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LFS), OperandCode::INV_Gv_M),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::LGS), OperandCode::INV_Gv_M),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::MOVZX), OperandCode::Gv_Eb),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::MOVZX), OperandCode::Gv_Ew),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),

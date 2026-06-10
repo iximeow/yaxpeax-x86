@@ -1829,12 +1829,17 @@ mod system {
     use crate::protected_mode::{TestCase, run_test};
 
     const CASES: &'static [TestCase] = &[
+        testcase!(&[0x0f, 0xb2, 0x00], "lss eax, far [eax]"),
+        testcase!(&[0x0f, 0xb4, 0x00], "lfs eax, far [eax]"),
+        testcase!(&[0x0f, 0xb5, 0x00], "lgs eax, far [eax]"),
         testcase!(&[0x63, 0xc1], "arpl cx, ax"),
         testcase!(&[0x63, 0x04, 0xba], "arpl word [edx + edi * 4], ax"),
-        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, word [eax]"),
+        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, dword [eax]"),
+        testcase!(&[0x66, 0x0f, 0xb4, 0x00], "lfs ax, dword [eax]"),
+        testcase!(&[0x66, 0x0f, 0xb5, 0x00], "lgs ax, dword [eax]"),
         testcase!(&[0x67, 0x0f, 0xb2, 0x00], "lss eax, far [bx + si * 1]"),
         testcase!(&[0x0f, 0xb2, 0x00], "lss eax, far [eax]"),
-        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, word [eax]"),
+        testcase!(&[0x66, 0x0f, 0xb2, 0x00], "lss ax, dword [eax]"),
         testcase!(invalid: &[0x0f, 0x22, 0xc8]),
         testcase!(invalid: &[0x0f, 0x20, 0xc8]),
         testcase!(&[0x0f, 0x22, 0xd0], "mov cr2, eax"),
