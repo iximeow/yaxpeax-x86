@@ -1,11 +1,19 @@
 ## 2.2.0
 
+* add DisplayStyle::Masm to long mode, protected mode, and real mode instruction formatting.
+  this "masm-style" formatting is derived from the output format of
+  dumpbin.exe, and (on Windows) is tested to round-trip through masm.exe or
+  ml64.exe as appropriate. caveats apply; see the documentation on DisplayStyle for details.
+
 * `Instruction::invalid()` returns instructions with opcode `Opcode::Invalid`, rather than nop.
   decoding an instruction with `opcode == Invalid` was already possible through attempting
   to decode invalid opcodes into a `&mut Instruction`; `invalid()` returning a no-operand
   nop dates back to initial versions of the library attempting to never return instructions
   that did not reflect a decoded x86 instruction.
   it has long passed its time. thank you for the patch, @Grond66!
+
+testing instruction round-tripping through `masm` found a few bugs, which are also fixed in this release:
+
 * fix vpbroadcast* with a SIMD register source being able to claim ymm as a source. the source
   register according to manuals and every assembler is xmm-size, if a register. semantically this
   has little effect: the broadcasted value is the low lane of the source register in these cases.
