@@ -1,17 +1,12 @@
 use core::fmt;
 
-// allowing these deprecated items for the time being, not yet breaking yaxpeax-x86 apis
-#[allow(deprecated)]
-use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
-
 use yaxpeax_arch::AddressBase;
 use yaxpeax_arch::LengthedInstruction;
 
-use crate::MEM_SIZE_STRINGS;
 use crate::real_mode::{
     RegSpec, Opcode, Operand, OperandSpec,
     MergeMode, SaeMode,
-    InstDecoder, Instruction, Segment, PrefixVex, RegisterBank,
+    Instruction, RegisterBank,
     display::DisplaySinkExt, OperandVisitor,
 };
 
@@ -86,7 +81,7 @@ impl<'a, F: DisplaySink> crate::real_mode::OperandVisitor for RelativeBranchPrin
     fn visit_deref(&mut self, _base: RegSpec) -> Result<Self::Ok, Self::Error> {
         Ok(false)
     }
-    fn visit_disp(&mut self, _base: RegSpec, rel: i32) -> Result<Self::Ok, Self::Error> {
+    fn visit_disp(&mut self, _base: RegSpec, _rel: i32) -> Result<Self::Ok, Self::Error> {
         Ok(false)
     }
     #[cfg_attr(feature="profiling", inline(never))]
@@ -164,7 +159,7 @@ impl<'a, F: DisplaySink> crate::real_mode::OperandVisitor for RelativeBranchPrin
     fn visit_abs_u32(&mut self, _imm: u32) -> Result<Self::Ok, Self::Error> {
         Ok(false)
     }
-    fn visit_absolute_far_address(&mut self, segment: u16, address: u32) -> Result<Self::Ok, Self::Error> {
+    fn visit_absolute_far_address(&mut self, _segment: u16, _address: u32) -> Result<Self::Ok, Self::Error> {
         Ok(false)
     }
     fn visit_index_scale(&mut self, _index: RegSpec, _scale: u8) -> Result<Self::Ok, Self::Error> {
@@ -800,7 +795,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         },
         Opcode::MONITOR => {
             // masm wants the implicit registers to all be ... explicit.
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor::new(out);
             visitor.f.write_char(' ')?;
             visitor.f.write_reg(RegSpec::eax())?;
             visitor.f.write_fixed_size(", ")?;
@@ -811,7 +806,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         }
         Opcode::MWAIT => {
             // masm wants the implicit registers to all be ... explicit.
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor::new(out);
             visitor.f.write_char(' ')?;
             visitor.f.write_reg(RegSpec::eax())?;
             visitor.f.write_fixed_size(", ")?;
@@ -829,7 +824,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         }
         Opcode::MONITORX => {
             // masm wants the implicit registers to all be ... explicit.
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor::new(out);
             visitor.f.write_char(' ')?;
             visitor.f.write_reg(RegSpec::eax())?;
             visitor.f.write_fixed_size(", ")?;
@@ -840,7 +835,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         }
         Opcode::MWAITX => {
             // masm wants the implicit registers to all be ... explicit.
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor::new(out);
             visitor.f.write_char(' ')?;
             visitor.f.write_reg(RegSpec::eax())?;
             visitor.f.write_fixed_size(", ")?;
@@ -900,7 +895,7 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         }
         Opcode::PVALIDATE | Opcode::RMPADJUST | Opcode::RMPUPDATE => {
             // masm wants the implicit registers to all be ... explicit.
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor::new(out);
             visitor.f.write_char(' ')?;
             visitor.f.write_reg(RegSpec::eax())?;
             visitor.f.write_fixed_size(", ")?;

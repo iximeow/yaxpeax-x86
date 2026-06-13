@@ -38,10 +38,6 @@ fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     }
 }
 
-fn test_display(data: &[u8], expected: &'static str) {
-    test_display_under(&InstDecoder::default(), data, expected);
-}
-
 fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str) {
     test_display_format(decoder, data, expected, DisplayStyle::Intel);
 }
@@ -1862,10 +1858,19 @@ mod arithmetic {
     }
 }
 
-#[test]
-fn test_E_decode() {
-    test_display(&[0xff, 0x75, 0xb8], "push dword [ebp - 0x48]");
-    test_display(&[0xff, 0x75, 0x08], "push dword [ebp + 0x8]");
+#[allow(non_snake_case)]
+mod E_decode {
+    use crate::protected_mode::{TestCase, run_test};
+
+    const CASES: &'static [TestCase] = &[
+        testcase!(&[0xff, 0x75, 0xb8], "push dword [ebp - 0x48]"),
+        testcase!(&[0xff, 0x75, 0x08], "push dword [ebp + 0x8]"),
+    ];
+
+    #[test]
+    fn test() {
+        run_test(CASES);
+    }
 }
 
 mod sse {

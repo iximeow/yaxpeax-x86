@@ -9,6 +9,8 @@ pub use imp::{dumpbin, masm};
 // entirely different executables for different modes.
 #[derive(Copy, Clone, Debug)]
 pub enum CodeModel {
+    // nothing even tries to run masm in 16-bit mode (yet..?)
+    #[allow(dead_code)]
     Bits16,
     Bits32,
     Bits64,
@@ -20,11 +22,11 @@ mod imp {
 
     // stub impls to at least run tests on other platforms, but some
     // test-specific features will of course fail at runtime..
-    pub fn dumpbin(bytes: &[u8], codeness: CodeModel) -> Result<String, String> {
+    pub fn dumpbin(_bytes: &[u8], _codeness: CodeModel) -> Result<String, String> {
         panic!("no impl of dumpbin on this target");
     }
 
-    pub fn masm(text: &str, codeness: CodeModel) -> Result<Vec<u8>, String> {
+    pub fn masm(_text: &str, _codeness: CodeModel) -> Result<Vec<u8>, String> {
         panic!("no impl of masm on this target");
     }
 }
@@ -33,13 +35,13 @@ mod imp {
 mod imp {
     use super::CodeModel;
 
-    pub fn dumpbin(bytes: &[u8], codeness: CodeModel) -> Result<String, String> {
+    pub fn dumpbin(_bytes: &[u8], _codeness: CodeModel) -> Result<String, String> {
         // how very sad:
         // > wibo: call reached missing import GetModuleHandleExA from kernel32
         panic!("wibo can't run dumpbin right now");
     }
 
-    pub fn masm(text: &str, codeness: CodeModel) -> Result<Vec<u8>, String> {
+    pub fn masm(_text: &str, _codeness: CodeModel) -> Result<Vec<u8>, String> {
         panic!("have not implemented wibo/masm on linux yet");
     }
 }
@@ -254,6 +256,7 @@ mod imp {
     }
 }
 
+#[allow(unused)]
 fn carve_dumpbin_stdout(stdout: &str) -> Result<Vec<&str>, String> {
     let lines = stdout.split("\n").collect::<Vec<_>>();
 

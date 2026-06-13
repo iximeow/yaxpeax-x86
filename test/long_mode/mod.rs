@@ -57,10 +57,6 @@ fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     }
 }
 
-fn test_display(data: &[u8], expected: &'static str) {
-    test_display_under(&InstDecoder::default(), data, expected);
-}
-
 fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str) {
     test_display_format(decoder, data, expected, DisplayStyle::Intel);
 }
