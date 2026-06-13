@@ -3283,7 +3283,7 @@ impl Instruction {
     pub fn invalid() -> Instruction {
         Instruction {
             prefixes: Prefixes::new(0),
-            opcode: Opcode::NOP,
+            opcode: Opcode::Invalid,
             mem_size: 0,
             regs: [RegSpec::rax(); 4],
             scale: 0,
