@@ -161,6 +161,9 @@ fn test_display_format(decoder: &InstDecoder, data: &[u8], expected: &'static st
                         DisplayStyle::C => {
                             panic!("no support for C-style display in testcases yet");
                         }
+                        other => {
+                            panic!("unsupported style: {:?}", other);
+                        }
                     }
                 } else {
                     eprintln!("non-fmt build cannot compare text equality")

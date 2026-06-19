@@ -7,7 +7,10 @@ use core::fmt;
 use yaxpeax_arch::{Colorize, ShowContextual, NoColors, YaxColors};
 
 use crate::MEM_SIZE_STRINGS;
-use crate::long_mode::{RegSpec, Opcode, Operand, MergeMode, InstDecoder, Instruction, Segment, PrefixRex};
+use crate::long_mode::{
+    RegSpec, Opcode, Operand, OperandSpec,
+    MergeMode, InstDecoder, Instruction, Segment, PrefixRex
+};
 
 use yaxpeax_arch::display::DisplaySink;
 use yaxpeax_arch::safer_unchecked::GetSaferUnchecked as _;
@@ -301,23 +304,40 @@ impl fmt::Display for Operand {
 impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Operand {
     fn colorize(&self, _colors: &Y, f: &mut T) -> fmt::Result {
         let mut f = yaxpeax_arch::display::FmtSink::new(f);
+        let rules = DefaultRules::for_style(DisplayStyle::Intel);
         let mut visitor = DisplayingOperandVisitor {
-            f: &mut f
+            f: &mut f,
+            rules: &rules,
         };
         self.visit(&mut visitor)
     }
 }
 
-struct DisplayingOperandVisitor<'a, T> {
+struct DisplayingOperandVisitor<'a, 'rules, T, R> {
     f: &'a mut T,
+    rules: &'rules R,
 }
 
-impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> {
+impl <T: DisplaySink, R: DisplayRules<T>> DisplayingOperandVisitor<'_, '_, T, R> {
+    fn write_register(&mut self, reg: RegSpec) -> Result<(), core::fmt::Error> {
+        if self.rules.emit_register(reg, &mut self.f)? {
+            return Ok(());
+        }
+
+        self.f.write_reg(reg)
+    }
+}
+
+impl <T: DisplaySink, R: DisplayRules<T>> super::OperandVisitor for DisplayingOperandVisitor<'_, '_, T, R> {
     type Ok = ();
     type Error = core::fmt::Error;
 
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u8(&mut self, imm: u8) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm as u64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         self.f.write_fixed_size("0x")?;
         self.f.write_u8(imm)?;
@@ -326,6 +346,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i8(&mut self, imm: i8) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm as i64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let mut v = imm as u8;
         if imm < 0 {
@@ -339,6 +363,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u16(&mut self, imm: u16) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm as u64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         self.f.write_fixed_size("0x")?;
         self.f.write_u16(imm)?;
@@ -347,6 +375,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i16(&mut self, imm: i16) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm as i64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let mut v = imm as u16;
         if imm < 0 {
@@ -360,6 +392,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u32(&mut self, imm: u32) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm as u64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         self.f.write_fixed_size("0x")?;
         self.f.write_u32(imm)?;
@@ -367,6 +403,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
         Ok(())
     }
     fn visit_i32(&mut self, imm: i32) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm as i64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let mut v = imm as u32;
         if imm < 0 {
@@ -380,6 +420,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u64(&mut self, imm: u64) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         self.f.write_fixed_size("0x")?;
         self.f.write_u64(imm)?;
@@ -388,6 +432,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i64(&mut self, imm: i64) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let mut v = imm as u64;
         if imm < 0 {
@@ -401,14 +449,14 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_reg(&mut self, reg: RegSpec) -> Result<Self::Ok, Self::Error> {
-        self.f.write_reg(reg)?;
+        self.write_register(reg)?;
         Ok(())
     }
     fn visit_reg_mask_merge(&mut self, spec: RegSpec, mask: RegSpec, merge_mode: MergeMode) -> Result<Self::Ok, Self::Error> {
-        self.f.write_reg(spec)?;
+        self.write_register(spec)?;
         if mask.num != 0 {
             self.f.write_fixed_size("{")?;
-            self.f.write_reg(mask)?;
+            self.write_register(mask)?;
             self.f.write_fixed_size("}")?;
         }
         if let MergeMode::Zero = merge_mode {
@@ -417,10 +465,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
         Ok(())
     }
     fn visit_reg_mask_merge_sae(&mut self, spec: RegSpec, mask: RegSpec, merge_mode: MergeMode, sae_mode: crate::long_mode::SaeMode) -> Result<Self::Ok, Self::Error> {
-        self.f.write_reg(spec)?;
+        self.write_register(spec)?;
         if mask.num != 0 {
             self.f.write_fixed_size("{")?;
-            self.f.write_reg(mask)?;
+            self.write_register(mask)?;
             self.f.write_fixed_size("}")?;
         }
         if let MergeMode::Zero = merge_mode {
@@ -430,10 +478,10 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
         Ok(())
     }
     fn visit_reg_mask_merge_sae_noround(&mut self, spec: RegSpec, mask: RegSpec, merge_mode: MergeMode) -> Result<Self::Ok, Self::Error> {
-        self.f.write_reg(spec)?;
+        self.write_register(spec)?;
         if mask.num != 0 {
             self.f.write_fixed_size("{")?;
-            self.f.write_reg(mask)?;
+            self.write_register(mask)?;
             self.f.write_fixed_size("}")?;
         }
         if let MergeMode::Zero = merge_mode {
@@ -444,17 +492,21 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     fn visit_abs_u32(&mut self, imm: u32) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.span_start_address();
-        self.f.write_prefixed_u32(imm)?;
-        self.f.span_end_address();
+        if !self.rules.emit_absolute_address(imm as u64, self.f)? {
+            self.f.span_start_address();
+            self.f.write_prefixed_u32(imm)?;
+            self.f.span_end_address();
+        }
         self.f.write_fixed_size("]")?;
         Ok(())
     }
     fn visit_abs_u64(&mut self, imm: u64) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.span_start_address();
-        self.f.write_prefixed_u64(imm)?;
-        self.f.span_end_address();
+        if !self.rules.emit_absolute_address(imm as u64, self.f)? {
+            self.f.span_start_address();
+            self.f.write_prefixed_u64(imm)?;
+            self.f.span_end_address();
+        }
         self.f.write_fixed_size("]")?;
         Ok(())
     }
@@ -462,19 +514,25 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_disp(&mut self, base: RegSpec, disp: i32) -> Result<Self::Ok, Self::Error> {
         self.f.write_char('[')?;
-        self.f.write_reg(base)?;
-        self.f.write_fixed_size(" ")?;
-        self.f.write_displacement(disp)?;
+        let mut printed = false;
+        if base == RegSpec::rip() {
+            printed = self.rules.emit_relative_address(disp, self.f)?;
+        }
+        if !printed {
+            self.write_register(base)?;
+            self.f.write_fixed_size(" ")?;
+            self.f.write_displacement(disp)?;
+        }
         self.f.write_fixed_size("]")
     }
     fn visit_deref(&mut self, base: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size("]")
     }
     fn visit_index_scale(&mut self, index: RegSpec, scale: u8) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size("]")?;
@@ -483,7 +541,7 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     fn visit_index_scale_disp(&mut self, index: RegSpec, scale: u8, disp: i32) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size(" ")?;
@@ -492,18 +550,18 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     fn visit_base_index_scale(&mut self, base: RegSpec, index: RegSpec, scale: u8) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size(" + ")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size("]")
     }
     fn visit_base_index_scale_disp(&mut self, base: RegSpec, index: RegSpec, scale: u8, disp: i32) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size(" + ")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size(" ")?;
@@ -512,97 +570,97 @@ impl <T: DisplaySink> super::OperandVisitor for DisplayingOperandVisitor<'_, T> 
     }
     fn visit_disp_masked(&mut self, base: RegSpec, disp: i32, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_char('[')?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_char(' ')?;
         self.f.write_displacement(disp)?;
         self.f.write_char(']')?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_deref_masked(&mut self, base: RegSpec, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size("]")?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_index_scale_masked(&mut self, index: RegSpec, scale: u8, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size("]")?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_index_scale_disp_masked(&mut self, index: RegSpec, scale: u8, disp: i32, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size(" ")?;
         self.f.write_displacement(disp)?;
         self.f.write_char(']')?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_base_index_masked(&mut self, base: RegSpec, index: RegSpec, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size(" + ")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size("]")?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_base_index_disp_masked(&mut self, base: RegSpec, index: RegSpec, disp: i32, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size(" + ")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" ")?;
         self.f.write_displacement(disp)?;
         self.f.write_char(']')?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_base_index_scale_masked(&mut self, base: RegSpec, index: RegSpec, scale: u8, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size(" + ")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_fixed_size("]")?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
     fn visit_base_index_scale_disp_masked(&mut self, base: RegSpec, index: RegSpec, scale: u8, disp: i32, mask_reg: RegSpec) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.write_reg(base)?;
+        self.write_register(base)?;
         self.f.write_fixed_size(" + ")?;
-        self.f.write_reg(index)?;
+        self.write_register(index)?;
         self.f.write_fixed_size(" * ")?;
         self.f.write_scale(scale)?;
         self.f.write_char(' ')?;
         self.f.write_displacement(disp)?;
         self.f.write_char(']')?;
         self.f.write_char('{')?;
-        self.f.write_reg(mask_reg)?;
+        self.write_register(mask_reg)?;
         self.f.write_char('}')?;
         Ok(())
     }
@@ -3558,9 +3616,9 @@ impl <T: fmt::Write, Y: YaxColors> Colorize<T, Y> for Opcode {
 
 impl fmt::Display for Instruction {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        // to reuse one implementation, call the deprecated function for now.
-        #[allow(deprecated)]
-        self.display_with(DisplayStyle::Intel).colorize(&NoColors, fmt)
+        let rules = DefaultRules::for_style(DisplayStyle::Intel);
+        let bundle = rules.display(self);
+        fmt::Display::fmt(&bundle, fmt)
     }
 }
 
@@ -3576,13 +3634,20 @@ impl<'instr> fmt::Display for InstructionDisplayer<'instr> {
 /// intel syntax, though memory operand sizes are elided if they can be inferred from other
 /// operands.
 ///
-/// note that `yaxpeax-x86` does not (and can not!) try to guarantee that formatting through any
-/// `DisplayStyle` round-trips through an assembler to produce the same bytes as were intially
-/// disassembled. opcode choice (for example, `0x31` vs `0x33` encodings of register-register
-/// `xor`) may not be controllable, immediates and displacements may have multiple valid encodings,
-/// and prefix handling in general is very lossy especially in the presence of repeat or
-/// ineffectual prefixes.
-#[derive(Copy, Clone)]
+/// ## lossiness
+///
+/// for some display styles, `yaxpeax-x86` tries to ensure instructions are formatted in a way that
+/// is accepted by some corresponding assemblers. even so, such round-tripping is inherently lossy;
+/// some instructions may have many equally-valid encodings, so re-assembling an instruction does
+/// not guarantee an assembler would produce the same bytes as were initially decoded.
+///
+/// a non-exhaustive list of ways that going through `bytes -> decode -> assemble -> bytes` can be lossy:
+/// * opcode choice (for example, `0x31` vs `0x33` encodings of register-register `xor`) may not be controllable,
+/// * immediates and displacements may have multiple valid encodings,
+/// * non-effectual prefixes are generally not printed by `yaxpeax-x86`,
+/// * repeated prefixes (imagine "`rep rep rep movsb`") are not printed and generally not accepted by assemblers,
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug)]
 pub enum DisplayStyle {
     /// intel-style syntax for instructions, like
     /// `add rax, [rdx + rcx * 2 + 0x1234]`
@@ -3590,7 +3655,7 @@ pub enum DisplayStyle {
     /// C-style syntax for instructions, like
     /// `rax += [rdx + rcx * 2 + 0x1234]`
     C,
-    /// format instructions in the syntax used by the Microsoft Assembler (MASM), like
+    /// format instructions in the syntax used by the Microsoft Macro Assembler (MASM), like
     /// `add rax, dword ptr [rdx + rcx * 2 + 1234h]`
     ///
     /// some instructions are decoded by `dumpbin.exe` and `yaxpeax-x86` but cannot be assembled by
@@ -3606,9 +3671,343 @@ pub enum DisplayStyle {
 
 /// implementation of [`Display`](fmt::Display) that renders instructions using a specified display
 /// style.
+///
+/// this is less flexible than the full gamut of `DisplayRules`, in favor of using `yaxpeax-x86`'s
+/// default address-insensitive instruction formatting.
 pub struct InstructionDisplayer<'instr> {
     pub(crate) instr: &'instr Instruction,
     pub(crate) style: DisplayStyle,
+}
+
+pub struct InstructionRuleBundle<'instr, 'rules, Rules> {
+    pub(crate) instr: &'instr Instruction,
+    pub(crate) rules: &'rules Rules,
+}
+
+impl<'instr, 'rules, Rules> InstructionRuleBundle<'instr, 'rules, Rules> {
+    fn new(instr: &'instr Instruction, rules: &'rules Rules) -> Self {
+        Self { instr, rules }
+    }
+}
+
+// impl<'instr, 'f: 'fmt, 'fmt, Rules: DisplayRules<yaxpeax_arch::display::FmtSink<'fmt, fmt::Formatter<'f>>>> fmt::Display for
+//    InstructionRuleBundle<'instr, 'fmt, Rules> {
+
+impl<'instr, 'fmt, Rules> fmt::Display for
+    InstructionRuleBundle<'instr, 'fmt, Rules> where
+      Rules: for<'f, 'g> DisplayRules<yaxpeax_arch::display::FmtSink<'f, fmt::Formatter<'g>>>
+{
+    fn fmt<'a, 'b, 'c>(&'a self, fmt: &'b mut fmt::Formatter<'c>) -> fmt::Result {
+        let mut sink = yaxpeax_arch::display::FmtSink::new(fmt);
+        let style = self.rules.display_style();
+        // format_instr_rules(self.rules, self.instr, sink)
+        match style {
+            DisplayStyle::Intel => format_intel(&self.instr, self.rules, &mut sink),
+            other => {
+                panic!("respect display style selection: {:?}", other);
+            }
+        }
+    }
+}
+
+struct DefaultRules {
+    style: DisplayStyle
+}
+
+impl DefaultRules {
+    fn for_style(style: DisplayStyle) -> Self {
+        Self { style }
+    }
+
+    fn display<'me, 'instr>(&'me self, instr: &'instr Instruction) -> InstructionRuleBundle<'instr, 'me, Self> {
+        InstructionRuleBundle {
+            instr,
+            rules: self,
+        }
+    }
+}
+
+impl<S: DisplaySink> DisplayRules<S> for DefaultRules {
+    fn display_style(&self) -> DisplayStyle {
+        self.style
+    }
+}
+
+/// ```rust
+/// // `AbsoluteAddressFormatter` prints instructions as a contiguous sequence starting from the
+/// // provided address.
+/// let mut addr_formatter = AbsoluteAddressFormatter::new(0x10);
+///
+/// let decoder = long_mdoe::InstDecoder::default();
+///
+/// let instr = decoder.decode_slice(&[0x33, 0x05, 0x08, 0x00, 0x00, 0x00])
+///     .expect("can decode 'xor eax, dword [rip + 0x10]'");
+///
+/// // instructions are printed with `rip` taken to be the address in the formatter, which
+/// // overrides rip-relative display.
+/// let formatted = format!("{}", addr_formatter.display(instr));
+/// assert_eq!(formatted, "xor eax, dword [0x18]");
+/// // the program address in `addr_formatter` must be advanced to the next instruction.
+/// addr_formatter.advance(instr);
+/// let formatted = format!("{}", addr_formatter.display(instr));
+/// assert_eq!(formatted, "xor eax, dword [0x1e]");
+///
+/// let branch = decoder.decode_slice(&[0xeb, 0x70])
+///     .expect("can decode 'jmp rip+0x70');
+///
+/// // rip-relative jump destinations are also made absolute.
+/// let formatted = format!("{}", addr_formatter.display(instr));
+/// assert_eq!(formatted, "jmp 0x7e");
+/// ```
+pub struct AbsoluteAddressFormatter {
+    rip: u64,
+    style: DisplayStyle,
+}
+
+impl AbsoluteAddressFormatter {
+    pub fn new(rip: u64) -> Self {
+        AbsoluteAddressFormatter {
+            rip,
+            style: DisplayStyle::Intel,
+        }
+    }
+
+    pub fn with_style(&mut self, style: DisplayStyle) -> &mut Self {
+        self.style = style;
+        self
+    }
+
+    pub fn display<'me, 'instr>(&'me self, instr: &'instr Instruction) -> InstructionRuleBundle<'instr, 'me, Self> {
+        InstructionRuleBundle {
+            instr,
+            rules: self,
+        }
+    }
+
+    pub fn advance(&mut self, instr: &Instruction) {
+        use yaxpeax_arch::{AddressBase, LengthedInstruction};
+        self.rip = self.rip.wrapping_offset(instr.len());
+    }
+}
+
+impl<S: DisplaySink> DisplayRules<S> for AbsoluteAddressFormatter {
+    fn display_style(&self) -> DisplayStyle {
+        self.style
+    }
+
+    unsafe fn max_size() -> Option<usize> {
+        // Safety: this is somewhat subtle.
+        //
+        // `MAX_INSTRUCTION_LEN` is sized for the longest possible instruction lengths. the longest
+        // strings that `emit_address` may write are u64-sized: "0xffffffffffffffff". the previous
+        // maximum length of replaced fields ranges from `$ + 0x12341234` to `rip + 0x12341234`.
+        // addresses are mildly longer now.
+        //
+        // instructions that include a rip-sensitive value have only one: a branch offset or a
+        // rip-relative memory reference. this means the actual addition to an instruction's
+        // maximum printed size is `8 (u32->u64 digits) - 4 ("$ + ")` four more bytes.
+        // `MAX_INSTRUCTION_LEN` has around 180 bytes of excess reservation, so this is within that
+        // margin of error.
+        Some(crate::MAX_INSTRUCTION_LEN)
+    }
+
+    fn instr_addr(&self) -> Option<u64> {
+        Some(self.rip)
+    }
+
+    fn emit_address(&self, addr: u64, s: &mut S) -> Result<bool, fmt::Error> {
+        s.span_start_immediate();
+        s.write_fixed_size("0x")?;
+        s.write_u64(addr)?;
+        s.span_end_immediate();
+        Ok(true)
+    }
+}
+
+/// a set of functions controlling how instructions are formatted in an [`InstructionDisplayer`].
+///
+/// generally, functions on this trait return either `Option`, where `None` indicates "data not
+/// available, caller should use some kind of default fallback behavior",
+/// or `Result<bool, fmt::Error>` where the bool indicates if the implementation has done the
+/// formatting work that would otherwise be left up to the caller.
+///
+/// functions on this trait default to returning `None` and `Ok(false)`, meaning a minimal
+/// `impl DisplayRules for ... { }` will not override any display logic.
+///
+/// ## interaction with `DisplayStyle`
+///
+/// `DisplayStyle` controls the overall style used for instruction printing, through to how
+/// registers and numbers are printed. as `DisplayRules` functions override default `yaxpeax-x86`
+/// printing behavior, implementations must consider if they want to support variants of
+/// `DisplayStyle as well, or only format with an assumed `DisplayStyle`.
+///
+/// the `DisplayStyle` used when formatting an instruction and invoking `DisplayRules` functions is
+/// controlled by `DisplayRules::display_style`. it is an implementation's decision to customize
+/// this (as an example: [`AbsoluteAddressFormatter::with_style()`]) or to simply return one style
+/// that is always used for instruction formatting.
+///
+/// `DisplayStyle` variants in some cases also control the display (or non-display) of implicit
+/// operands. for example, the `Intel` style writes x87 instructions with implicit operands, but
+/// `Masm` omits some (such as `fld` or `fst`, where `masm.exe` will treat `st(0)` as a syntax
+/// error). correspondingly, `DisplayRules::emit_operand` will be invoked only for the
+/// normally-printed non-`st(0)` operand of `fld` or `fst`. in a handful of cases the differences
+/// across display styles involve invoking more specific `DisplayRules` rules, particularly when
+/// there may not be an explicit operand to format and a register or immediate is shown in its
+/// stead; an example of this is formatting of the implicitly-read registers of `monitor` or
+/// `mwait` under `DisplayStyle::Masm`.
+///
+/// some other `DisplayStyle` variance includes size suffixes on opcodes, though there is no
+/// comprehensive list of per-style formatting variance.
+pub trait DisplayRules<S: DisplaySink> {
+    /// provide a `DisplayStyle` used when formatting instructions through this impl of
+    /// `DisplayRules`.
+    ///
+    /// if this impl of `DisplayRules` overrides some aspect of instruction formatting, it is that
+    /// override's responsibility to follow the `DisplayStyle` reported here. or ignore it, if you
+    /// so choose!
+    fn display_style(&self) -> DisplayStyle;
+
+    /// report the maximum size of an instruction formatted by this `DisplayRules` implementation,
+    /// across all x86_64 instructions.
+    ///
+    /// `max_size()` is used to control the use of bounds checks when formatting into an
+    /// [`InstructionTextBuffer`]. this is fundamentally a hint, and may be ignored by future
+    /// versions of `yaxpeax-x86`.
+    ///
+    /// # implementation guidance
+    ///
+    /// user code is extraordinarily unlikely to be able to safely return `Some` from this
+    /// function.
+    ///
+    /// implementations that return `Some` must never produce more than that many *bytes* of
+    /// output, including any output produced by `yaxpeax-x86`, in formatting an instruction. take
+    /// care to consider multi-byte UTF-8 codepoints, as `InstructionTextBuffer` writes into Rust
+    /// `alloc::string::String`, which uses that representation character data.
+    ///
+    /// implementations that use arbitrary strings for symbols, for example, are extremly unlikely
+    /// to be able to uphold a fixed-max-size hint.
+    ///
+    /// note that `yaxpeax-x86` may write additional data in future `DisplayStyle` variants. new
+    /// instructions may have longer mnemonics. new extensions may define longer register names, or
+    /// memory label sizes. new encodings may have additional (longer!) decorators or otherwise
+    /// raise the maximum size of a formatted instruction. any of these may occur across a patch or
+    /// minor version.
+    unsafe fn max_size() -> Option<usize> { None }
+
+    /// the address of the instruction to be printed.
+    ///
+    /// if this returns `None`, the default behavior is to show the relevant details of an
+    /// instruction in an address-insensitive way. see [`DisplayRules::emit_branch_addr`] and
+    /// [`DisplayRules::emit_relative_address`] for more.
+    fn instr_addr(&self) -> Option<u64> {
+        None
+    }
+
+    /// override all aspects of formatting the instruction.
+    fn emit_instruction(&self, instr: &Instruction, s: &mut S) -> Result<bool, fmt::Error> {
+        let _ = instr;
+        let _ = s;
+        Ok(false)
+    }
+
+    /// override the display of the `op_idx`'th explicit operand in `instr`.
+    ///
+    /// if a memory access, the overridden region includes the operand's memory size label and
+    /// segment override. if the operand has descriptors (like AVX512 rounding or broadcast modes),
+    /// they are overridden here as well.
+    fn emit_operand(&self, instr: &Instruction, op_idx: u8, s: &mut S) -> Result<bool, fmt::Error> {
+        let _ = instr;
+        let _ = op_idx;
+        let _ = s;
+        Ok(false)
+    }
+
+    fn emit_register(&self, reg: RegSpec, s: &mut S) -> Result<bool, fmt::Error> {
+        let _ = reg;
+        let _ = s;
+        Ok(false)
+    }
+
+    /// override the display of an immediate in an instruction.
+    ///
+    /// this is the `0x50` in `push 0x50`, as well as `0x60` in `ret 0x60`, and `0x500098` in
+    /// `mov rax, 0x500098`. this function is a unified formatter for all size of immediate; the
+    /// size of the encoded value is not reported.
+    fn emit_signed_immediate(&self, imm: i64, s: &mut S) -> Result<bool, fmt::Error> {
+        let _ = imm;
+        let _ = s;
+        Ok(false)
+    }
+
+    /// override the display of an unsigned immediate in an instruction.
+    ///
+    /// this is typically an integer involved in SIMD instruction configuration, or immediates in
+    /// instructions that operate on single-byte registers. that is, this is the `0xa4` in
+    /// `cmp al, 0xa4`. this also reports u16 immediates as in `return 0x1234` or `retf 0x1234`.
+    fn emit_unsigned_immediate(&self, imm: u64, s: &mut S) -> Result<bool, fmt::Error> {
+        let _ = imm;
+        let _ = s;
+        Ok(false)
+    }
+
+    /// override the display of a conditional or unconditional relative branch target.
+    ///
+    /// this is the `$+0x60` in `jmp $+0x60`. the default behavior is to check
+    /// [`DisplayRules::instr_addr()`] for the address of this instruction, convert the relative
+    /// branch to an absolute destination, and call [`DisplayRules::emit_address()`] with that
+    /// address.
+    ///
+    /// note that custom implementations of `emit_branch_addr` may want to retain the above
+    /// behavior.
+    fn emit_branch_addr(&self, instr: &Instruction, rel: i32, s: &mut S) -> Result<bool, fmt::Error> {
+        let Some(ip) = self.instr_addr() else {
+            return Ok(false);
+        };
+
+        use yaxpeax_arch::{AddressBase, LengthedInstruction};
+
+        let next = ip.wrapping_offset(instr.len());
+        let dest = next.wrapping_add(rel as i64 as u64);
+        self.emit_address(dest, s)
+    }
+
+    /// override the display of a rip-relative address.
+    ///
+    /// this is the `rip + 0x1234` in `xor rax, [rip + 0x1234]`.
+    fn emit_relative_address(&self, rel: i32, s: &mut S) -> Result<bool, fmt::Error> {
+        let Some(ip) = self.instr_addr() else {
+            return Ok(false);
+        };
+
+        let dest = ip.wrapping_add(rel as i64 as u64);
+        self.emit_address(dest, s)
+    }
+
+    /// override the display of a literal absolute address.
+    ///
+    /// this is the `0x10` in `mov rax, gs:[0x10]`, as well as
+    /// the `0x12345678` in `add rax, [0x12345678]`. the default behavior is to simply call
+    /// [`emit_address`] with the absolute value being dereferenced.
+    fn emit_absolute_address(&self, abs: u64, s: &mut S) -> Result<bool, fmt::Error> {
+        self.emit_address(abs, s)
+    }
+
+    /// write some address out to the provided `DisplaySink`.
+    ///
+    /// notably, this does *not* include values like relocated immeidates in expressions like
+    /// `mov rax, fn_ptr`; immediates are always printed through [`DisplayRules::exit_immediate`].
+    fn emit_address(&self, addr: u64, s: &mut S) -> Result<bool, fmt::Error> {
+        let _ = addr;
+        let _ = s;
+        Ok(false)
+    }
+
+    // 32-bit, 16-bit-only..
+    /*
+    fn emit_far_address(&mut self, seg: u16, offs: u32, s: &mut S) -> Result<bool, fmt::Error> {
+        Ok(false)
+    }
+    */
 }
 
 /*
@@ -3648,19 +4047,32 @@ impl Instruction {
     #[cfg_attr(feature="profiling", inline(never))]
     pub fn write_to<T: fmt::Write>(&self, out: &mut T) -> fmt::Result {
         let mut out = yaxpeax_arch::display::FmtSink::new(out);
-        contextualize_intel(self, &mut out)
+        let rules = DefaultRules::for_style(DisplayStyle::Intel);
+        format_intel(self, &rules, &mut out)
     }
 
     /// format this instruction into `out`, which may perform additional styling based on its
     /// `DisplaySink` implementation.
     #[cfg_attr(feature="profiling", inline(never))]
     pub fn display_into<T: DisplaySink>(&self, out: &mut T) -> fmt::Result {
-        contextualize_intel(self, out)
+        let rules = DefaultRules::for_style(DisplayStyle::Intel);
+        format_intel(self, &rules, out)
     }
+
+    /*
+    /// format this instruction into `out`, using the provided `rules` to potentially override the
+    /// default formatting for a given `DisplayStyle`.
+    #[cfg_attr(feature="profiling", inline(never))]
+    pub fn format_into<T: DisplaySink, Rules: DisplayRules<T>>(&self, 
+    */
 }
 
 #[cfg_attr(feature="profiling", inline(never))]
-pub(crate) fn contextualize_intel<T: DisplaySink>(instr: &Instruction, out: &mut T) -> fmt::Result {
+pub(crate) fn format_intel<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, rules: &R, out: &mut T) -> fmt::Result {
+    if rules.emit_instruction(instr, out)? {
+        return Ok(());
+    }
+
     if instr.xacquire() {
         out.write_fixed_size("xacquire ")?;
     }
@@ -3686,30 +4098,45 @@ pub(crate) fn contextualize_intel<T: DisplaySink>(instr: &Instruction, out: &mut
     if instr.operand_count > 0 {
         out.write_fixed_size(" ")?;
 
-        if instr.visit_operand(0, &mut RelativeBranchPrinter {
-            inst: instr,
-            out,
-        })? {
-            return Ok(());
-        }
-
-        if instr.operands[0 as usize].is_memory() {
-            out.write_mem_size_label(instr.mem_size)?;
-            if let Some(prefix) = instr.segment_override_for_op(0) {
-                let name = prefix.name();
-                out.write_char(' ')?;
-                out.write_char(name[0] as char)?;
-                out.write_char(name[1] as char)?;
-                out.write_fixed_size(":")?;
-            } else {
-                out.write_fixed_size(" ")?;
+        if instr.operands[0] == OperandSpec::ImmI8 || instr.operands[0] == OperandSpec::ImmI32 {
+            if RELATIVE_BRANCHES.contains(&instr.opcode) {
+                // relative branch instructions have only one operand, so print this one and we're
+                // done. relative branch instructions *also* have a ... relative branch ... as
+                // their only operand, so don't `emit_operand()` which would confuse these for a
+                // "normal" immediate.
+                if rules.emit_operand(instr, 0, out)? {
+                    return Ok(());
+                }
+            }
+            if instr.visit_operand(0, &mut RelativeBranchPrinter {
+                inst: instr,
+                rules,
+                out,
+            })? {
+                return Ok(());
             }
         }
 
-        let mut displayer = DisplayingOperandVisitor {
-            f: out,
-        };
-        instr.visit_operand(0 as u8, &mut displayer)?;
+        if !rules.emit_operand(instr, 0, out)? {
+            if instr.operands[0 as usize].is_memory() {
+                out.write_mem_size_label(instr.mem_size)?;
+                if let Some(prefix) = instr.segment_override_for_op(0) {
+                    let name = prefix.name();
+                    out.write_char(' ')?;
+                    out.write_char(name[0] as char)?;
+                    out.write_char(name[1] as char)?;
+                    out.write_fixed_size(":")?;
+                } else {
+                    out.write_fixed_size(" ")?;
+                }
+            }
+
+            let mut displayer = DisplayingOperandVisitor {
+                f: out,
+                rules,
+            };
+            instr.visit_operand(0 as u8, &mut displayer)?;
+        }
 
         for i in 1..instr.operand_count {
             // don't worry about checking for `instr.operands[i] != Nothing`, it would be a bug to
@@ -3721,6 +4148,11 @@ pub(crate) fn contextualize_intel<T: DisplaySink>(instr: &Instruction, out: &mut
                 // Safety: Instruction::operands is a four-element array; operand_count is always
                 // low enough that 0..operand_count is a valid index.
                 unsafe { unreachable_unchecked(); }
+            }
+
+            if rules.emit_operand(instr, i, out)? {
+                // if the rule printed an operand out, continue on to the next one!
+                continue;
             }
 
             if instr.operands[i as usize].is_memory() {
@@ -3738,6 +4170,7 @@ pub(crate) fn contextualize_intel<T: DisplaySink>(instr: &Instruction, out: &mut
 
             let mut displayer = DisplayingOperandVisitor {
                 f: out,
+                rules,
             };
 
             instr.visit_operand(i as u8, &mut displayer)?;
@@ -3802,7 +4235,7 @@ pub(crate) fn contextualize_intel<T: DisplaySink>(instr: &Instruction, out: &mut
     Ok(())
 }
 
-pub(crate) fn contextualize_c<T: DisplaySink>(instr: &Instruction, out: &mut T) -> fmt::Result {
+pub(crate) fn format_c<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, _rules: &R, out: &mut T) -> fmt::Result {
     let mut brace_count = 0;
 
     let mut prefixed = false;
@@ -4161,13 +4594,16 @@ impl <'instr, T: fmt::Write, Y: YaxColors> ShowContextual<u64, NoContext, T, Y> 
 
         match style {
             DisplayStyle::Intel => {
-                contextualize_intel(instr, &mut out)
+                let rules = DefaultRules::for_style(DisplayStyle::Intel);
+                format_intel(instr, &rules, &mut out)
             }
             DisplayStyle::C => {
-                contextualize_c(instr, &mut out)
+                let rules = DefaultRules::for_style(DisplayStyle::C);
+                format_c(instr, &rules, &mut out)
             }
             DisplayStyle::Masm => {
-                masm::contextualize(&instr, &mut out)
+                let rules = DefaultRules::for_style(DisplayStyle::Masm);
+                masm::contextualize(&instr, &rules, &mut out)
             }
         }
     }
@@ -4180,6 +4616,8 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
     fn contextualize(&self, colors: &Y, _address: u64, context: Option<&[Option<alloc::string::String>]>, out: &mut T) -> fmt::Result {
         let mut out = yaxpeax_arch::display::FmtSink::new(out);
         let out = &mut out;
+        let rules = DefaultRules::for_style(DisplayStyle::Intel);
+        let rules = &rules;
         use core::fmt::Write;
 
         if self.prefixes.lock() {
@@ -4216,6 +4654,7 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
 
                 let mut displayer = DisplayingOperandVisitor {
                     f: out,
+                    rules,
                 };
                 self.visit_operand(0, &mut displayer)?;
             }
@@ -4233,6 +4672,7 @@ impl <T: fmt::Write, Y: YaxColors> ShowContextual<u64, [Option<alloc::string::St
                             write!(out, ", ")?;
                             let mut displayer = DisplayingOperandVisitor {
                                 f: out,
+                                rules,
                             };
                             self.visit_operand(i as u8, &mut displayer)?;
                         }
@@ -4258,12 +4698,13 @@ static RELATIVE_BRANCHES: [Opcode; 23] = [
     Opcode::JLE, Opcode::JG,
 ];
 
-struct RelativeBranchPrinter<'a, F: DisplaySink> {
+struct RelativeBranchPrinter<'a, F: DisplaySink, Rules: DisplayRules<F>> {
     inst: &'a Instruction,
     out: &'a mut F,
+    rules: &'a Rules,
 }
 
-impl<'a, F: DisplaySink> super::OperandVisitor for RelativeBranchPrinter<'a, F> {
+impl<'a, F: DisplaySink, Rules: DisplayRules<F>> super::OperandVisitor for RelativeBranchPrinter<'a, F, Rules> {
     // return true if we printed a relative branch offset, false otherwise
     type Ok = bool;
     // but errors are errors
@@ -4281,6 +4722,12 @@ impl<'a, F: DisplaySink> super::OperandVisitor for RelativeBranchPrinter<'a, F> 
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i8(&mut self, rel: i8) -> Result<Self::Ok, Self::Error> {
         if RELATIVE_BRANCHES.contains(&self.inst.opcode) {
+            if self.rules.emit_branch_addr(&self.inst, rel as i32, &mut self.out)? {
+                // the display rule declared it has fully printed the relative address, so we have
+                // nothing to do.
+                return Ok(true);
+            }
+
             self.out.write_char('$')?;
             let mut v = rel as u8;
             if rel < 0 {
@@ -4299,6 +4746,12 @@ impl<'a, F: DisplaySink> super::OperandVisitor for RelativeBranchPrinter<'a, F> 
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i32(&mut self, rel: i32) -> Result<Self::Ok, Self::Error> {
         if RELATIVE_BRANCHES.contains(&self.inst.opcode) || self.inst.opcode == Opcode::XBEGIN {
+            if self.rules.emit_branch_addr(&self.inst, rel, &mut self.out)? {
+                // the display rule declared it has fully printed the relative address, so we have
+                // nothing to do.
+                return Ok(true);
+            }
+
             self.out.write_char('$')?;
             let mut v = rel as u32;
             if rel < 0 {
@@ -4392,7 +4845,8 @@ impl<'a, F: DisplaySink> super::OperandVisitor for RelativeBranchPrinter<'a, F> 
 mod buffer_sink {
     use core::fmt;
     use super::super::{DisplayStyle, InstructionDisplayer};
-    use super::{contextualize_c, contextualize_intel};
+    use super::{format_c, format_intel};
+    use super::DefaultRules;
 
     /// helper to format `amd64` instructions with highest throughput and least configuration. this is
     /// functionally a buffer for one x86 instruction's text.
@@ -4458,13 +4912,16 @@ mod buffer_sink {
 
             match display.style {
                 DisplayStyle::Intel => {
-                    contextualize_intel(&display.instr, &mut handle)?;
+                    let rules = DefaultRules::for_style(DisplayStyle::Intel);
+                    format_intel(&display.instr, &rules, &mut handle)?;
                 }
                 DisplayStyle::C => {
-                    contextualize_c(&display.instr, &mut handle)?;
+                    let rules = DefaultRules::for_style(DisplayStyle::C);
+                    format_c(&display.instr, &rules, &mut handle)?;
                 }
                 DisplayStyle::Masm => {
-                    super::masm::contextualize(&display.instr, &mut handle)?;
+                    let rules = DefaultRules::for_style(DisplayStyle::Masm);
+                    super::masm::contextualize(&display.instr, &rules, &mut handle)?;
                 }
             }
 
