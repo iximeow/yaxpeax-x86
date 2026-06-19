@@ -11,6 +11,8 @@ use crate::{Address, Word};
 
 #[cfg(feature = "fmt")]
 pub use self::display::{DisplayRules, DisplayStyle, InstructionDisplayer, InstructionRuleBundle};
+#[cfg(feature = "fmt")]
+pub use self::display::AbsoluteAddressFormatter;
 #[cfg(all(feature = "fmt", feature = "alloc"))]
 pub use self::display::InstructionTextBuffer;
 

@@ -2232,7 +2232,7 @@ pub struct InstructionRuleBundle<'instr, 'rules, Rules> {
 }
 
 impl<'instr, 'rules, Rules> InstructionRuleBundle<'instr, 'rules, Rules> {
-    fn new(instr: &'instr Instruction, rules: &'rules Rules) -> Self {
+    pub fn new(instr: &'instr Instruction, rules: &'rules Rules) -> Self {
         Self { instr, rules }
     }
 }
@@ -2241,7 +2241,7 @@ impl<'instr, 'fmt, Rules> fmt::Display for
     InstructionRuleBundle<'instr, 'fmt, Rules> where
       Rules: for<'f, 'g> DisplayRules<yaxpeax_arch::display::FmtSink<'f, fmt::Formatter<'g>>>
 {
-    fn fmt<'a, 'b, 'c>(&'a self, fmt: &'b mut fmt::Formatter<'c>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut sink = yaxpeax_arch::display::FmtSink::new(fmt);
         let style = self.rules.display_style();
         match style {
