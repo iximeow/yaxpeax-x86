@@ -3690,9 +3690,6 @@ impl<'instr, 'rules, Rules> InstructionRuleBundle<'instr, 'rules, Rules> {
     }
 }
 
-// impl<'instr, 'f: 'fmt, 'fmt, Rules: DisplayRules<yaxpeax_arch::display::FmtSink<'fmt, fmt::Formatter<'f>>>> fmt::Display for
-//    InstructionRuleBundle<'instr, 'fmt, Rules> {
-
 impl<'instr, 'fmt, Rules> fmt::Display for
     InstructionRuleBundle<'instr, 'fmt, Rules> where
       Rules: for<'f, 'g> DisplayRules<yaxpeax_arch::display::FmtSink<'f, fmt::Formatter<'g>>>
@@ -3700,11 +3697,13 @@ impl<'instr, 'fmt, Rules> fmt::Display for
     fn fmt<'a, 'b, 'c>(&'a self, fmt: &'b mut fmt::Formatter<'c>) -> fmt::Result {
         let mut sink = yaxpeax_arch::display::FmtSink::new(fmt);
         let style = self.rules.display_style();
-        // format_instr_rules(self.rules, self.instr, sink)
         match style {
             DisplayStyle::Intel => format_intel(&self.instr, self.rules, &mut sink),
-            other => {
-                panic!("respect display style selection: {:?}", other);
+            DisplayStyle::C => {
+                format_c(&self.instr, self.rules, &mut sink)
+            }
+            DisplayStyle::Masm => {
+                masm::contextualize(&self.instr, self.rules, &mut sink)
             }
         }
     }
@@ -3755,7 +3754,7 @@ impl<S: DisplaySink> DisplayRules<S> for DefaultRules {
 /// let branch = decoder.decode_slice(&[0xeb, 0x70])
 ///     .expect("can decode 'jmp rip+0x70');
 ///
-/// // rip-relative jump destinations are also made absolute.
+/// // jump destinations are also made absolute.
 /// let formatted = format!("{}", addr_formatter.display(instr));
 /// assert_eq!(formatted, "jmp 0x7e");
 /// ```
@@ -4592,17 +4591,15 @@ impl <'instr, T: fmt::Write, Y: YaxColors> ShowContextual<u64, NoContext, T, Y> 
 
         let mut out = yaxpeax_arch::display::FmtSink::new(out);
 
+        let rules = DefaultRules::for_style(*style);
         match style {
             DisplayStyle::Intel => {
-                let rules = DefaultRules::for_style(DisplayStyle::Intel);
                 format_intel(instr, &rules, &mut out)
             }
             DisplayStyle::C => {
-                let rules = DefaultRules::for_style(DisplayStyle::C);
                 format_c(instr, &rules, &mut out)
             }
             DisplayStyle::Masm => {
-                let rules = DefaultRules::for_style(DisplayStyle::Masm);
                 masm::contextualize(&instr, &rules, &mut out)
             }
         }
@@ -4910,17 +4907,15 @@ mod buffer_sink {
             // never escape `format_inst`.
             let mut handle = unsafe { self.write_handle() };
 
+            let rules = DefaultRules::for_style(display.style);
             match display.style {
                 DisplayStyle::Intel => {
-                    let rules = DefaultRules::for_style(DisplayStyle::Intel);
                     format_intel(&display.instr, &rules, &mut handle)?;
                 }
                 DisplayStyle::C => {
-                    let rules = DefaultRules::for_style(DisplayStyle::C);
                     format_c(&display.instr, &rules, &mut handle)?;
                 }
                 DisplayStyle::Masm => {
-                    let rules = DefaultRules::for_style(DisplayStyle::Masm);
                     super::masm::contextualize(&display.instr, &rules, &mut handle)?;
                 }
             }

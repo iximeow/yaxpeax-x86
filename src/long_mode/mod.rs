@@ -3359,6 +3359,7 @@ impl Instruction {
         }
     }
 
+    // TODO: more docs
     #[cfg(feature = "fmt")]
     pub fn display_rules<'a, 'rules, Rules>(
         &'a self,

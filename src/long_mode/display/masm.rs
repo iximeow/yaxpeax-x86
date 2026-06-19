@@ -717,9 +717,10 @@ pub(crate) fn contextualize<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruct
         }
         Opcode::LGDT | Opcode::LIDT => {
             // masm uses "fword" as a memory size here.
+            out.write_char(' ')?;
             let mut visitor = DisplayingOperandVisitor::new(out);
             if !rules.emit_operand(instr, 0, visitor.f)? {
-                visitor.f.write_fixed_size(" fword ptr ")?;
+                visitor.f.write_fixed_size("fword ptr ")?;
                 instr.visit_operand(0, &mut visitor)?;
             }
 
@@ -967,10 +968,11 @@ pub(crate) fn contextualize<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruct
         Opcode::FIADD | Opcode::FIMUL | Opcode::FISUB | Opcode::FISUBR | Opcode::FIDIV | Opcode::FIDIVR |
         Opcode::FCMOVB | Opcode::FCMOVE | Opcode::FCMOVBE | Opcode::FCMOVU | Opcode::FCMOVNB | Opcode::FCMOVNE | Opcode::FCMOVNBE | Opcode::FCMOVNU |
         Opcode::FUCOMI | Opcode::FCOMI | Opcode::FUCOMIP | Opcode::FCOMIP => {
+            out.write_fixed_size(" ")?;
+            let mut visitor = DisplayingOperandVisitor::new(out);
+
             if instr.operands[1].is_memory() {
                 // masm does not want to see the implicit st(0).
-                out.write_fixed_size(" ")?;
-                let mut visitor = DisplayingOperandVisitor::new(out);
 
                 if !rules.emit_operand(instr, 1, visitor.f)? {
                     visitor.f.write_mem_size_label(instr.mem_size)?;
@@ -986,9 +988,6 @@ pub(crate) fn contextualize<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruct
                 }
             } else {
                 // dumpbin writes `st` instead of `st(0)` as the first operand in reg-reg ops, replicate this. masm doesn't care.
-                out.write_fixed_size(" ")?;
-                let mut visitor = DisplayingOperandVisitor::new(out);
-
                 if instr.operands[0] == OperandSpec::RegRRR {
                     if !rules.emit_operand(instr, 0, visitor.f)? {
                         if instr.regs[0] == RegSpec::st0() {
