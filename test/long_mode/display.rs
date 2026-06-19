@@ -1,3 +1,5 @@
+mod display_rules;
+
 use std::fmt::Write;
 
 use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};

@@ -1,28 +1,33 @@
 use core::fmt;
 
-use yaxpeax_arch::AddressBase;
+use yaxpeax_arch::{AddressBase, AddressDiff};
 use yaxpeax_arch::LengthedInstruction;
 
 use crate::long_mode::{
+    DisplayRules,
     RegSpec, Opcode, Operand, OperandSpec,
     MergeMode, SaeMode,
     Instruction, RegisterBank,
-    display::DisplaySinkExt, OperandVisitor,
+    display::DisplaySinkExt,
 };
 
 use yaxpeax_arch::display::DisplaySink;
 use yaxpeax_arch::safer_unchecked::GetSaferUnchecked as _;
 use yaxpeax_arch::safer_unchecked::unreachable_kinda_unchecked as unreachable_unchecked;
 
-struct DisplayingOperandVisitor<'a, T> {
+struct DisplayingOperandVisitor<'a, 'rules, T, R> {
+    instr_len: AddressDiff<u64>,
     f: &'a mut T,
-    show_sae: bool,
-    sae_mode: Option<SaeMode>,
+    rules: &'rules R,
 }
 
-impl<'a, T> DisplayingOperandVisitor<'a, T> {
-    pub fn new(f: &'a mut T) -> Self {
-        Self { f, show_sae: false, sae_mode: None }
+impl<T: DisplaySink, R: DisplayRules<T>> DisplayingOperandVisitor<'_, '_, T, R> {
+    fn write_register(&mut self, reg: RegSpec) -> Result<(), core::fmt::Error> {
+        if self.rules.emit_register(reg, &mut self.f)? {
+            return Ok(());
+        }
+
+        self.f.write_reg(reg)
     }
 }
 
@@ -64,12 +69,13 @@ static RELATIVE_BRANCHES: [Opcode; 23] = [
     Opcode::JLE, Opcode::JG,
 ];
 
-struct RelativeBranchPrinter<'a, F: DisplaySink> {
+struct RelativeBranchPrinter<'a, F: DisplaySink, Rules: DisplayRules<F>> {
     inst: &'a Instruction,
     out: &'a mut F,
+    rules: &'a Rules,
 }
 
-impl<'a, F: DisplaySink> crate::long_mode::OperandVisitor for RelativeBranchPrinter<'a, F> {
+impl<'a, F: DisplaySink, Rules: DisplayRules<F>> crate::long_mode::OperandVisitor for RelativeBranchPrinter<'a, F, Rules> {
     // return true if we printed a relative branch offset, false otherwise
     type Ok = bool;
     // but errors are errors
@@ -96,12 +102,14 @@ impl<'a, F: DisplaySink> crate::long_mode::OperandVisitor for RelativeBranchPrin
             } else {
                 self.out.write_char('+')?;
             }
-            if needs_leading_0(v as u64) {
-                self.out.write_char('0')?;
-            }
-            write!(self.out, "{:X}", v)?;
-            if hex_ambiguous(v as u64) {
-                self.out.write_char('h')?;
+            if !self.rules.emit_signed_immediate(rel as i64, self.out)? {
+                if needs_leading_0(v as u64) {
+                    self.out.write_char('0')?;
+                }
+                write!(self.out, "{:X}", v)?;
+                if hex_ambiguous(v as u64) {
+                    self.out.write_char('h')?;
+                }
             }
             Ok(true)
         } else {
@@ -129,12 +137,14 @@ impl<'a, F: DisplaySink> crate::long_mode::OperandVisitor for RelativeBranchPrin
             } else {
                 self.out.write_char('+')?;
             }
-            if needs_leading_0(v as u64) {
-                self.out.write_char('0')?;
-            }
-            write!(self.out, "{:X}", v)?;
-            if hex_ambiguous(v as u64) {
-                self.out.write_char('h')?;
+            if !self.rules.emit_signed_immediate(rel as i64, self.out)? {
+                if needs_leading_0(v as u64) {
+                    self.out.write_char('0')?;
+                }
+                write!(self.out, "{:X}", v)?;
+                if hex_ambiguous(v as u64) {
+                    self.out.write_char('h')?;
+                }
             }
             Ok(true)
         } else {
@@ -235,12 +245,16 @@ fn masm_displacement<T: core::fmt::Write>(f: &mut T, disp: i32) -> Result<(), co
     Ok(())
 }
 
-impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisitor<'_, T> {
+impl <T: DisplaySink, R: DisplayRules<T>> crate::long_mode::OperandVisitor for DisplayingOperandVisitor<'_, '_, T, R> {
     type Ok = ();
     type Error = core::fmt::Error;
 
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u8(&mut self, imm: u8) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm as u64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
@@ -254,6 +268,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i8(&mut self, imm: i8) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm as i64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let imm = imm as i64 as u64;
         if needs_leading_0(imm) {
@@ -268,6 +286,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u16(&mut self, imm: u16) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm as u64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
@@ -281,6 +303,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i16(&mut self, imm: i16) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm as i64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let imm = imm as i64 as u64;
         if needs_leading_0(imm) {
@@ -295,6 +321,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u32(&mut self, imm: u32) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm as u64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
@@ -307,6 +337,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
         Ok(())
     }
     fn visit_i32(&mut self, imm: i32) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm as i64, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         let imm = imm as i64 as u64;
         if needs_leading_0(imm) {
@@ -321,6 +355,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_u64(&mut self, imm: u64) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_unsigned_immediate(imm, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         if needs_leading_0(imm) {
             self.f.write_char('0')?;
@@ -334,6 +372,10 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     }
     #[cfg_attr(feature="profiling", inline(never))]
     fn visit_i64(&mut self, imm: i64) -> Result<Self::Ok, Self::Error> {
+        if self.rules.emit_signed_immediate(imm, self.f)? {
+            return Ok(());
+        }
+
         self.f.span_start_immediate();
         if needs_leading_0(imm as u64) {
             self.f.write_char('0')?;
@@ -362,7 +404,7 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
         }
         Ok(())
     }
-    fn visit_reg_mask_merge_sae(&mut self, spec: RegSpec, mask: RegSpec, merge_mode: MergeMode, sae_mode: crate::long_mode::SaeMode) -> Result<Self::Ok, Self::Error> {
+    fn visit_reg_mask_merge_sae(&mut self, spec: RegSpec, mask: RegSpec, merge_mode: MergeMode, _sae_mode: crate::long_mode::SaeMode) -> Result<Self::Ok, Self::Error> {
         self.f.write_reg(spec)?;
         if mask.num != 0 {
             self.f.write_fixed_size("{")?;
@@ -372,8 +414,6 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
         if let MergeMode::Zero = merge_mode {
             self.f.write_fixed_size("{z}")?;
         }
-        self.show_sae = true;
-        self.sae_mode = Some(sae_mode);
         Ok(())
     }
     fn visit_reg_mask_merge_sae_noround(&mut self, spec: RegSpec, mask: RegSpec, merge_mode: MergeMode) -> Result<Self::Ok, Self::Error> {
@@ -386,25 +426,27 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
         if let MergeMode::Zero = merge_mode {
             self.f.write_fixed_size("{z}")?;
         }
-        self.show_sae = true;
-        self.sae_mode = None;
         Ok(())
     }
     fn visit_abs_u32(&mut self, imm: u32) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.span_start_address();
-        write!(self.f, "{:08X}", imm)?;
-        self.f.write_char('h')?;
-        self.f.span_end_address();
+        if !self.rules.emit_absolute_address(imm as u64, self.f)? {
+            self.f.span_start_address();
+            write!(self.f, "{:08X}", imm)?;
+            self.f.write_char('h')?;
+            self.f.span_end_address();
+        }
         self.f.write_fixed_size("]")?;
         Ok(())
     }
     fn visit_abs_u64(&mut self, imm: u64) -> Result<Self::Ok, Self::Error> {
         self.f.write_fixed_size("[")?;
-        self.f.span_start_address();
-        write!(self.f, "{:016X}", imm)?;
-        self.f.write_char('h')?;
-        self.f.span_end_address();
+        if !self.rules.emit_absolute_address(imm, self.f)? {
+            self.f.span_start_address();
+            write!(self.f, "{:016X}", imm)?;
+            self.f.write_char('h')?;
+            self.f.span_end_address();
+        }
         self.f.write_fixed_size("]")?;
         Ok(())
     }
@@ -413,12 +455,21 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
     fn visit_disp(&mut self, base: RegSpec, disp: i32) -> Result<Self::Ok, Self::Error> {
         self.f.write_char('[')?;
         if base == RegSpec::rip() {
-            self.f.write_char('$')?;
+            if !self.rules.emit_relative_address(self.instr_len, disp, self.f)? {
+                // masm needs rip-relative addresses printed a bit differently..
+                if base == RegSpec::rip() {
+                    self.f.write_char('$')?;
+                } else {
+                    self.f.write_reg(base)?;
+                }
+                self.f.write_fixed_size(" ")?;
+                masm_displacement(&mut self.f, disp)?;
+            }
         } else {
             self.f.write_reg(base)?;
+            self.f.write_fixed_size(" ")?;
+            masm_displacement(&mut self.f, disp)?;
         }
-        self.f.write_fixed_size(" ")?;
-        masm_displacement(&mut self.f, disp)?;
         self.f.write_fixed_size("]")
     }
     fn visit_deref(&mut self, base: RegSpec) -> Result<Self::Ok, Self::Error> {
@@ -583,7 +634,7 @@ impl <T: DisplaySink> crate::long_mode::OperandVisitor for DisplayingOperandVisi
 }
 
 #[cfg_attr(feature="profiling", inline(never))]
-pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) -> fmt::Result {
+pub(crate) fn contextualize<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, rules: &R, out: &mut T) -> fmt::Result {
     if instr.xacquire() {
         out.write_fixed_size("xacquire ")?;
     }
@@ -625,137 +676,130 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
     match instr.opcode {
         Opcode::HRESET => {
             // dumpbin shows, and MASM needs, the implicit "eax" operand as an explicit textual operand.
-            out.write_fixed_size(" ")?;
-            instr.visit_operand(0, &mut DisplayingOperandVisitor::new(out))?;
-            out.write_fixed_size(", eax")?;
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
+            visitor.f.write_fixed_size(" ")?;
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                instr.visit_operand(0, &mut visitor)?;
+            }
+            visitor.f.write_fixed_size(", ")?;
+            visitor.write_register(RegSpec::eax())?;
             return Ok(());
         }
         Opcode::LSL => {
             // dumpbin shows, and MASM needs, the first and second operands to match in size.
             // this means `lsl rax, edx` is actually shown as `lsl rax, rdx`. fix that up here.
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
 
             let Operand::Register { reg: dest } = instr.operand(0) else { panic!("impossible LSL dest"); };
 
             if let Operand::Register { reg: mut src } = instr.operand(1) {
                 visitor.f.write_fixed_size(" ")?;
-                instr.visit_operand(0, &mut visitor)?;
+                if !rules.emit_operand(instr, 0, visitor.f)? {
+                    instr.visit_operand(0, &mut visitor)?;
+                }
                 src.bank = dest.bank;
                 visitor.f.write_fixed_size(", ")?;
-                visitor.visit_reg(src)?;
+                visitor.write_register(src)?;
                 return Ok(());
             } else {
                 // don't need to do anything about memory sources
             };
         }
-        Opcode::PREFETCHNTA => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::PREFETCH0 => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::PREFETCH1 => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::PREFETCH2 => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::PREFETCHW => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::INVLPG => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::CLFLUSH => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
-        Opcode::CLFLUSHOPT => {
-            // dumpbin doesn't bother with the memory size here, same for masm.
-            out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-
-            return Ok(());
-        }
+        Opcode::PREFETCHNTA |
+        Opcode::PREFETCH0 |
+        Opcode::PREFETCH1 |
+        Opcode::PREFETCH2 |
+        Opcode::PREFETCHW |
+        Opcode::INVLPG |
+        Opcode::CLFLUSH |
+        Opcode::CLFLUSHOPT |
         Opcode::CLWB => {
             // dumpbin doesn't bother with the memory size here, same for masm.
             out.write_char(' ')?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                instr.visit_operand(0, &mut visitor)?;
+            }
 
             return Ok(());
         }
         Opcode::SGDT | Opcode::SIDT => {
             // masm uses "tbyte" as a memory size here.
-            out.write_fixed_size(" tbyte ptr ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
+            out.write_char(' ')?;
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                visitor.f.write_fixed_size("tbyte ptr ")?;
+                instr.visit_operand(0, &mut visitor)?;
+            }
+
 
             return Ok(());
         }
         Opcode::LSS => {
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
             visitor.f.write_char(' ')?;
-            instr.visit_operand(0, &mut visitor)?;
-
-            // masm uses "tbyte" as a memory size here.
-            match instr.mem_size {
-                4 => {
-                    visitor.f.write_fixed_size(", dword ptr ")?;
-                },
-                6 => {
-                    visitor.f.write_fixed_size(", fword ptr ")?;
-                },
-                10 => {
-                    visitor.f.write_fixed_size(", tbyte ptr ")?;
-                },
-                _ => { panic!("impossible memory size"); }
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                instr.visit_operand(0, &mut visitor)?;
             }
+            visitor.f.write_fixed_size(", ")?;
 
-            instr.visit_operand(1, &mut visitor)?;
+            if !rules.emit_operand(instr, 1, visitor.f)? {
+                // masm uses "tbyte" as a memory size here.
+                match instr.mem_size {
+                    4 => {
+                        visitor.f.write_fixed_size("dword ptr ")?;
+                    },
+                    6 => {
+                        visitor.f.write_fixed_size("fword ptr ")?;
+                    },
+                    10 => {
+                        visitor.f.write_fixed_size("tbyte ptr ")?;
+                    },
+                    o => { panic!("impossible memory size: {:?}", o); }
+                }
+
+                instr.visit_operand(1, &mut visitor)?;
+            }
 
             return Ok(());
         }
         Opcode::LGDT | Opcode::LIDT => {
             // masm uses "fword" as a memory size here.
-            out.write_fixed_size(" fword ptr ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
+            out.write_char(' ')?;
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                visitor.f.write_fixed_size("fword ptr ")?;
+                instr.visit_operand(0, &mut visitor)?;
+            }
 
             return Ok(());
         }
@@ -766,147 +810,173 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
                 return Ok(());
             }
         },
-        Opcode::VPSCATTERDD => {
+        Opcode::VPSCATTERDD | Opcode::VPSCATTERQD => {
             // intel/xed/etc syntax has the mask register as an operand rather than normal memory masking. is xed wrong?
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            visitor.f.write_str(" dword ptr ")?;
-            instr.visit_operand(0, &mut visitor)?;
-            visitor.f.write_char('{')?;
-            visitor.f.write_reg(instr.regs[3])?;
-            visitor.f.write_fixed_size("}, ")?;
-            instr.visit_operand(2, &mut visitor)?;
-            return Ok(());
-        },
-        Opcode::VPSCATTERQD => {
-            // intel/xed/etc syntax has the mask register as an operand rather than normal memory masking. is xed wrong?
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            visitor.f.write_str(" dword ptr ")?;
-            instr.visit_operand(0, &mut visitor)?;
-            visitor.f.write_char('{')?;
-            visitor.f.write_reg(instr.regs[3])?;
-            visitor.f.write_fixed_size("}, ")?;
-            instr.visit_operand(2, &mut visitor)?;
-            return Ok(());
-        },
-        Opcode::VPSCATTERDQ => {
-            // intel/xed/etc syntax has the mask register as an operand rather than normal memory masking. is xed wrong?
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            visitor.f.write_str(" qword ptr ")?;
-            instr.visit_operand(0, &mut visitor)?;
-            visitor.f.write_char('{')?;
-            visitor.f.write_reg(instr.regs[3])?;
-            visitor.f.write_fixed_size("}, ")?;
-            instr.visit_operand(2, &mut visitor)?;
-            return Ok(());
-        },
-        Opcode::VPSCATTERQQ => {
-            // intel/xed/etc syntax has the mask register as an operand rather than normal memory masking. is xed wrong?
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            visitor.f.write_str(" qword ptr ")?;
-            instr.visit_operand(0, &mut visitor)?;
-            visitor.f.write_char('{')?;
-            visitor.f.write_reg(instr.regs[3])?;
-            visitor.f.write_fixed_size("}, ")?;
-            instr.visit_operand(2, &mut visitor)?;
-            return Ok(());
-        },
-        Opcode::MONITOR => {
-            // masm wants the implicit registers to all be ... explicit.
-            let visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
             visitor.f.write_char(' ')?;
-            visitor.f.write_reg(RegSpec::rax())?;
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                visitor.f.write_str("dword ptr ")?;
+                instr.visit_operand(0, &mut visitor)?;
+                visitor.f.write_char('{')?;
+                if !rules.emit_operand(instr, 1, visitor.f)? {
+                    visitor.f.write_reg(instr.regs[3])?;
+                }
+                visitor.f.write_char('}')?;
+            }
             visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rcx())?;
+            if !rules.emit_operand(instr, 2, visitor.f)? {
+                instr.visit_operand(2, &mut visitor)?;
+            }
+            return Ok(());
+        },
+        Opcode::VPSCATTERDQ | Opcode::VPSCATTERQQ => {
+            // intel/xed/etc syntax has the mask register as an operand rather than normal memory masking. is xed wrong?
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
+            visitor.f.write_char(' ')?;
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                visitor.f.write_str("qword ptr ")?;
+                instr.visit_operand(0, &mut visitor)?;
+                visitor.f.write_char('{')?;
+                if !rules.emit_operand(instr, 1, visitor.f)? {
+                    visitor.f.write_reg(instr.regs[3])?;
+                }
+                visitor.f.write_char('}')?;
+            }
             visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rdx())?;            
+            if !rules.emit_operand(instr, 2, visitor.f)? {
+                instr.visit_operand(2, &mut visitor)?;
+            }
+            return Ok(());
+        },
+        Opcode::MONITOR | Opcode::MONITORX | Opcode::MWAITX => {
+            // masm wants the implicit registers to all be ... explicit.
+            let visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
+            visitor.f.write_char(' ')?;
+            if !rules.emit_register(RegSpec::rax(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rax())?;
+            }
+            visitor.f.write_fixed_size(", ")?;
+            if !rules.emit_register(RegSpec::rcx(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rcx())?;
+            }
+            visitor.f.write_fixed_size(", ")?;
+            if !rules.emit_register(RegSpec::rdx(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rdx())?;
+            }
             return Ok(());
         }
         Opcode::MWAIT => {
             // masm wants the implicit registers to all be ... explicit.
-            let visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
             visitor.f.write_char(' ')?;
-            visitor.f.write_reg(RegSpec::rax())?;
+            if !rules.emit_register(RegSpec::rax(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rax())?;
+            }
             visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rcx())?;           
+            if !rules.emit_register(RegSpec::rcx(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rcx())?;
+            }
             return Ok(());
         }
         Opcode::INVLPGB => {
             // masm bug: it doesn't tolerate the mention of the second operand?!
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
             visitor.f.write_char(' ')?;
-            instr.visit_operand(0, &mut visitor)?;
-            visitor.f.write_fixed_size(", ")?;  
-            instr.visit_operand(2, &mut visitor)?;       
-            return Ok(());
-        }
-        Opcode::MONITORX => {
-            // masm wants the implicit registers to all be ... explicit.
-            let visitor = DisplayingOperandVisitor::new(out);
-            visitor.f.write_char(' ')?;
-            visitor.f.write_reg(RegSpec::rax())?;
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                instr.visit_operand(0, &mut visitor)?;
+            }
             visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rcx())?;
-            visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rdx())?;
-            return Ok(());
-        }
-        Opcode::MWAITX => {
-            // masm wants the implicit registers to all be ... explicit.
-            let visitor = DisplayingOperandVisitor::new(out);
-            visitor.f.write_char(' ')?;
-            visitor.f.write_reg(RegSpec::rax())?;
-            visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rcx())?;
-            visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rbx())?;
+            if !rules.emit_operand(instr, 2, visitor.f)? {
+                instr.visit_operand(2, &mut visitor)?;
+            }
             return Ok(());
         }
         Opcode::RDPRU => {
             // masm wants no implicit registers this time.
             return Ok(());
         }
-        Opcode::SCAS => {
+        Opcode::SCAS | Opcode::STOS => {
             // masm does not want the implicit r/e/ax
             out.write_fixed_size(" ")?;
-            out.write_mem_size_label(instr.mem_size)?;
-            out.write_fixed_size(" ptr ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
+            if !rules.emit_operand(instr, 0, out)? {
+                out.write_mem_size_label(instr.mem_size)?;
+                out.write_fixed_size(" ptr ")?;
+                let mut visitor = DisplayingOperandVisitor {
+                    instr_len: instr.len(),
+                    f: out,
+                    rules,
+                };
+                instr.visit_operand(0, &mut visitor)?;
+            }
             return Ok(());
         }
         Opcode::LODS => {
             // masm does not want the implicit r/e/ax
             out.write_fixed_size(" ")?;
-            out.write_mem_size_label(instr.mem_size)?;
-            out.write_fixed_size(" ptr ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(1, &mut visitor)?;
-            return Ok(());
-        }
-        Opcode::STOS => {
-            // masm does not want the implicit r/e/ax
-            out.write_fixed_size(" ")?;
-            out.write_mem_size_label(instr.mem_size)?;
-            out.write_fixed_size(" ptr ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
+            if !rules.emit_operand(instr, 1, out)? {
+                out.write_mem_size_label(instr.mem_size)?;
+                out.write_fixed_size(" ptr ")?;
+                let mut visitor = DisplayingOperandVisitor {
+                    instr_len: instr.len(),
+                    f: out,
+                    rules,
+                };
+                instr.visit_operand(1, &mut visitor)?;
+            }
             return Ok(());
         }
         Opcode::PSMASH => {
             // masm wants the implicit rax operand
             out.write_fixed_size(" ")?;
-            out.write_reg(RegSpec::rax())?;
+            if !rules.emit_register(RegSpec::rax(), out)? {
+                out.write_reg(RegSpec::rax())?;
+            }
             return Ok(());
         }
         Opcode::PVALIDATE | Opcode::RMPADJUST | Opcode::RMPUPDATE => {
             // masm wants the implicit registers to all be ... explicit.
-            let visitor = DisplayingOperandVisitor::new(out);
+            let visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
             visitor.f.write_char(' ')?;
-            visitor.f.write_reg(RegSpec::rax())?;
+            if !rules.emit_register(RegSpec::rax(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rax())?;
+            }
             visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rcx())?;
+            if !rules.emit_register(RegSpec::rcx(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rcx())?;
+            }
             visitor.f.write_fixed_size(", ")?;
-            visitor.f.write_reg(RegSpec::rdx())?;
+            if !rules.emit_register(RegSpec::rdx(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::rdx())?;
+            }
             return Ok(());
         }
         Opcode::INCSSP => {
@@ -938,35 +1008,53 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         Opcode::PBLENDVB | Opcode::BLENDVPS | Opcode::BLENDVPD | Opcode::SHA256RNDS2 => {
             // masm wants the implicit xmm0 operand as ... explicit.
             out.write_fixed_size(" ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
-            visitor.f.write_str(", ")?;
-
-            if instr.operands[1].is_memory() {
-                visitor.f.write_mem_size_label(instr.mem_size)?;
-                visitor.f.write_fixed_size(" ptr")?;
-                visitor.f.write_char(' ')?;
-                if let Some(prefix) = instr.segment_override_for_op(1) {
-                    let name = prefix.name();
-                    visitor.f.write_char(name[0] as char)?;
-                    visitor.f.write_char(name[1] as char)?;
-                    visitor.f.write_fixed_size(":")?;
-                }
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                instr.visit_operand(0, &mut visitor)?;
             }
-
-            instr.visit_operand(1, &mut visitor)?;
             visitor.f.write_str(", ")?;
-            visitor.f.write_reg(RegSpec::xmm0())?;
+
+            if !rules.emit_operand(instr, 1, visitor.f)? {
+                if instr.operands[1].is_memory() {
+                    visitor.f.write_mem_size_label(instr.mem_size)?;
+                    visitor.f.write_fixed_size(" ptr")?;
+                    visitor.f.write_char(' ')?;
+                    if let Some(prefix) = instr.segment_override_for_op(1) {
+                        let name = prefix.name();
+                        visitor.f.write_char(name[0] as char)?;
+                        visitor.f.write_char(name[1] as char)?;
+                        visitor.f.write_fixed_size(":")?;
+                    }
+                }
+
+                instr.visit_operand(1, &mut visitor)?;
+            }
+            visitor.f.write_str(", ")?;
+            if !rules.emit_register(RegSpec::xmm0(), visitor.f)? {
+                visitor.f.write_reg(RegSpec::xmm0())?;
+            }
 
             return Ok(());
         }
         Opcode::LEA => {
             // dumpbin/masm don't want the `<word> ptr` prefix on the memory access here..
             out.write_fixed_size(" ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
-            instr.visit_operand(0, &mut visitor)?;
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                instr.visit_operand(0, &mut visitor)?;
+            }
             visitor.f.write_str(", ")?;
-            instr.visit_operand(1, &mut visitor)?;
+            if !rules.emit_operand(instr, 1, visitor.f)? {
+                instr.visit_operand(1, &mut visitor)?;
+            }
             return Ok(());
         }
         Opcode::PUSHF => {
@@ -978,21 +1066,27 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         Opcode::FCOM | Opcode::FCOMP | Opcode::FICOM | Opcode::FICOMP => {
             // masm does not want the first operand *ever*?
             out.write_fixed_size(" ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
 
-            if instr.operands[1].is_memory() {
-                visitor.f.write_mem_size_label(instr.mem_size)?;
-                visitor.f.write_fixed_size(" ptr")?;
-                visitor.f.write_char(' ')?;
-                if let Some(prefix) = instr.segment_override_for_op(1) {
-                    let name = prefix.name();
-                    visitor.f.write_char(name[0] as char)?;
-                    visitor.f.write_char(name[1] as char)?;
-                    visitor.f.write_fixed_size(":")?;
+            if !rules.emit_operand(instr, 1, visitor.f)? {
+                if instr.operands[1].is_memory() {
+                    visitor.f.write_mem_size_label(instr.mem_size)?;
+                    visitor.f.write_fixed_size(" ptr")?;
+                    visitor.f.write_char(' ')?;
+                    if let Some(prefix) = instr.segment_override_for_op(1) {
+                        let name = prefix.name();
+                        visitor.f.write_char(name[0] as char)?;
+                        visitor.f.write_char(name[1] as char)?;
+                        visitor.f.write_fixed_size(":")?;
+                    }
                 }
-            }
 
-            instr.visit_operand(1, &mut visitor)?;
+                instr.visit_operand(1, &mut visitor)?;
+            }
             return Ok(());
         }
         Opcode::FADD | Opcode::FMUL | Opcode::FSUB | Opcode::FSUBR | Opcode::FDIV | Opcode::FDIVR |
@@ -1000,105 +1094,125 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
         Opcode::FIADD | Opcode::FIMUL | Opcode::FISUB | Opcode::FISUBR | Opcode::FIDIV | Opcode::FIDIVR |
         Opcode::FCMOVB | Opcode::FCMOVE | Opcode::FCMOVBE | Opcode::FCMOVU | Opcode::FCMOVNB | Opcode::FCMOVNE | Opcode::FCMOVNBE | Opcode::FCMOVNU |
         Opcode::FUCOMI | Opcode::FCOMI | Opcode::FUCOMIP | Opcode::FCOMIP => {
+            out.write_fixed_size(" ")?;
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
+
             if instr.operands[1].is_memory() {
                 // masm does not want to see the implicit st(0).
-                out.write_fixed_size(" ")?;
-                let mut visitor = DisplayingOperandVisitor::new(out);
 
-                visitor.f.write_mem_size_label(instr.mem_size)?;
-                visitor.f.write_fixed_size(" ptr")?;
-                visitor.f.write_char(' ')?;
-                if let Some(prefix) = instr.segment_override_for_op(1) {
-                    let name = prefix.name();
-                    visitor.f.write_char(name[0] as char)?;
-                    visitor.f.write_char(name[1] as char)?;
-                    visitor.f.write_fixed_size(":")?;
+                if !rules.emit_operand(instr, 1, visitor.f)? {
+                    visitor.f.write_mem_size_label(instr.mem_size)?;
+                    visitor.f.write_fixed_size(" ptr")?;
+                    visitor.f.write_char(' ')?;
+                    if let Some(prefix) = instr.segment_override_for_op(1) {
+                        let name = prefix.name();
+                        visitor.f.write_char(name[0] as char)?;
+                        visitor.f.write_char(name[1] as char)?;
+                        visitor.f.write_fixed_size(":")?;
+                    }
+                    instr.visit_operand(1, &mut visitor)?;
                 }
-                instr.visit_operand(1, &mut visitor)?;
-                return Ok(());
             } else {
                 // dumpbin writes `st` instead of `st(0)` as the first operand in reg-reg ops, replicate this. masm doesn't care.
-                out.write_fixed_size(" ")?;
-                let mut visitor = DisplayingOperandVisitor::new(out);
-
                 if instr.operands[0] == OperandSpec::RegRRR {
-                    if instr.regs[0] == RegSpec::st0() {
-                        visitor.f.write_fixed_size("st")?;
-                    } else {
-                        instr.visit_operand(0, &mut visitor)?;
+                    if !rules.emit_operand(instr, 0, visitor.f)? {
+                        if instr.regs[0] == RegSpec::st0() {
+                            visitor.f.write_fixed_size("st")?;
+                        } else {
+                            instr.visit_operand(0, &mut visitor)?;
+                        }
                     }
                     visitor.f.write_fixed_size(", ")?;
-                    instr.visit_operand(1, &mut visitor)?;
+                    if !rules.emit_operand(instr, 1, visitor.f)? {
+                        instr.visit_operand(1, &mut visitor)?;
+                    }
                 } else {
                     debug_assert!(instr.operands[1] == OperandSpec::RegRRR);
 
-                    instr.visit_operand(0, &mut visitor)?;
+                    if !rules.emit_operand(instr, 0, visitor.f)? {
+                        instr.visit_operand(0, &mut visitor)?;
+                    }
                     visitor.f.write_fixed_size(", ")?;
-                    if instr.regs[0] == RegSpec::st0() {
-                        visitor.f.write_fixed_size("st")?;
-                    } else {
-                        instr.visit_operand(1, &mut visitor)?;
+                    if !rules.emit_operand(instr, 1, visitor.f)? {
+                        if instr.regs[0] == RegSpec::st0() {
+                            visitor.f.write_fixed_size("st")?;
+                        } else {
+                            instr.visit_operand(1, &mut visitor)?;
+                        }
                     }
                 };
-
-                return Ok(());
             }
+            return Ok(());
         }
         Opcode::FBLD | Opcode::FLD | Opcode::FILD | Opcode::FXCH | Opcode::FUCOM | Opcode::FUCOMP => {
             // masm does not want to see the implicit st(0).
             out.write_fixed_size(" ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
 
-            if instr.operands[1].is_memory() {
-                if instr.mem_size == 10 {
-                    visitor.f.write_fixed_size("tbyte")?;
-                } else {
-                    visitor.f.write_mem_size_label(instr.mem_size)?;
-                }
-                visitor.f.write_fixed_size(" ptr")?;
-                visitor.f.write_char(' ')?;
-                if let Some(prefix) = instr.segment_override_for_op(1) {
-                    let name = prefix.name();
-                    visitor.f.write_char(name[0] as char)?;
-                    visitor.f.write_char(name[1] as char)?;
-                    visitor.f.write_fixed_size(":")?;
-                }
-                instr.visit_operand(1, &mut visitor)?;
-                return Ok(());
-            } else {
-                if instr.regs[1] == RegSpec::st0() {
-                    visitor.f.write_fixed_size("st")?;
-                } else {
+            if !rules.emit_operand(instr, 1, visitor.f)? {
+                if instr.operands[1].is_memory() {
+                    if instr.mem_size == 10 {
+                        visitor.f.write_fixed_size("tbyte")?;
+                    } else {
+                        visitor.f.write_mem_size_label(instr.mem_size)?;
+                    }
+                    visitor.f.write_fixed_size(" ptr")?;
+                    visitor.f.write_char(' ')?;
+                    if let Some(prefix) = instr.segment_override_for_op(1) {
+                        let name = prefix.name();
+                        visitor.f.write_char(name[0] as char)?;
+                        visitor.f.write_char(name[1] as char)?;
+                        visitor.f.write_fixed_size(":")?;
+                    }
                     instr.visit_operand(1, &mut visitor)?;
+                } else {
+                    if instr.regs[1] == RegSpec::st0() {
+                        visitor.f.write_fixed_size("st")?;
+                    } else {
+                        instr.visit_operand(1, &mut visitor)?;
+                    }
                 }
-                return Ok(());
             }
+            return Ok(());
         }
         Opcode::FBSTP | Opcode::FST | Opcode::FSTP | Opcode::FIST | Opcode::FISTP | Opcode::FISTTP => {
             // masm does not want to see the implicit st(0).
             out.write_fixed_size(" ")?;
-            let mut visitor = DisplayingOperandVisitor::new(out);
+            let mut visitor = DisplayingOperandVisitor {
+                instr_len: instr.len(),
+                f: out,
+                rules,
+            };
 
-            if instr.operands[0].is_memory() {
-                if instr.mem_size == 10 {
-                    visitor.f.write_fixed_size("tbyte")?;
+            if !rules.emit_operand(instr, 0, visitor.f)? {
+                if instr.operands[0].is_memory() {
+                    if instr.mem_size == 10 {
+                        visitor.f.write_fixed_size("tbyte")?;
+                    } else {
+                        visitor.f.write_mem_size_label(instr.mem_size)?;
+                    }
+                    visitor.f.write_fixed_size(" ptr")?;
+                    visitor.f.write_char(' ')?;
+                    if let Some(prefix) = instr.segment_override_for_op(0) {
+                        let name = prefix.name();
+                        visitor.f.write_char(name[0] as char)?;
+                        visitor.f.write_char(name[1] as char)?;
+                        visitor.f.write_fixed_size(":")?;
+                    }
+                    instr.visit_operand(0, &mut visitor)?;
                 } else {
-                    visitor.f.write_mem_size_label(instr.mem_size)?;
+                    instr.visit_operand(0, &mut visitor)?;
                 }
-                visitor.f.write_fixed_size(" ptr")?;
-                visitor.f.write_char(' ')?;
-                if let Some(prefix) = instr.segment_override_for_op(0) {
-                    let name = prefix.name();
-                    visitor.f.write_char(name[0] as char)?;
-                    visitor.f.write_char(name[1] as char)?;
-                    visitor.f.write_fixed_size(":")?;
-                }
-                instr.visit_operand(0, &mut visitor)?;
-                return Ok(());
-            } else {
-                instr.visit_operand(0, &mut visitor)?;
-                return Ok(());
             }
+            return Ok(());
         }
         _ => {}
     }
@@ -1123,42 +1237,70 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
             size_is_mmword = true;
         }
 
-        if instr.visit_operand(0, &mut RelativeBranchPrinter {
-            inst: instr,
-            out,
-        })? {
-            return Ok(());
+        if instr.operands[0] == OperandSpec::ImmI8 || instr.operands[0] == OperandSpec::ImmI32 {
+            if RELATIVE_BRANCHES.contains(&instr.opcode) {
+                // relative branch instructions have only one operand, so print this one and we're
+                // done. relative branch instructions *also* have a ... relative branch ... as
+                // their only operand, so don't `emit_operand()` which would confuse these for a
+                // "normal" immediate.
+                if rules.emit_branch_addr(instr.len(), instr.imm as i32, out)? {
+                    return Ok(());
+                }
+            }
+            if instr.visit_operand(0, &mut RelativeBranchPrinter {
+                inst: instr,
+                rules,
+                out,
+            })? {
+                return Ok(());
+            }
         }
 
-        if instr.operands[0 as usize].is_memory() {
-            // fxsave and friends get no "XXXword ptr" memory prefix, masm doesn't accept it
-            if instr.mem_size != 63 && instr.mem_size != 48 { // masm does not print "m384b" labels.. 
-                if size_is_mmword && instr.mem_size == 8 {
-                    out.write_fixed_size("mmword")?;
-                } else if instr.mem_size == 10 && (instr.opcode == Opcode::JMPF || instr.opcode == Opcode::CALLF) {
-                    out.write_fixed_size("fword")?;
-                } else {
-                    out.write_mem_size_label(instr.mem_size)?;
-                }
-                out.write_fixed_size(" ptr")?;
-                out.write_char(' ')?;
-            }
-            if let Some(prefix) = instr.segment_override_for_op(0) {
-                let name = prefix.name();
-                if instr.opcode != Opcode::MOVS || name != b"es" {
-                    out.write_char(name[0] as char)?;
-                    out.write_char(name[1] as char)?;
-                    out.write_fixed_size(":")?;
-                }
-            }
-        }
+        let mut show_sae = false;
+        let mut sae_mode = None;
 
         let mut displayer = DisplayingOperandVisitor {
+            instr_len: instr.len(),
             f: out,
-            show_sae: false,
-            sae_mode: None,
+            rules,
         };
-        instr.visit_operand(0 as u8, &mut displayer)?;
+
+        if instr.operands[0] == OperandSpec::RegRRR_maskmerge_sae ||
+            instr.operands[0] == OperandSpec::RegRRR_maskmerge_sae_noround ||
+            instr.operands[0] == OperandSpec::RegMMM_maskmerge_sae_noround {
+            show_sae = true;
+            if instr.operands[0] == OperandSpec::RegRRR_maskmerge_sae {
+                let instr_evex = instr.prefixes.evex_unchecked();
+                sae_mode = Some(SaeMode::from(instr_evex.vex().l(), instr_evex.lp()));
+            }
+        }
+
+        if !rules.emit_operand(instr, 0, displayer.f)? {
+            if instr.operands[0 as usize].is_memory() {
+                // fxsave and friends get no "XXXword ptr" memory prefix, masm doesn't accept it
+                if instr.mem_size != 63 && instr.mem_size != 48 { // masm does not print "m384b" labels.. 
+                    if size_is_mmword && instr.mem_size == 8 {
+                        displayer.f.write_fixed_size("mmword")?;
+                    } else if instr.mem_size == 10 && (instr.opcode == Opcode::JMPF || instr.opcode == Opcode::CALLF) {
+                        displayer.f.write_fixed_size("fword")?;
+                    } else {
+                        displayer.f.write_mem_size_label(instr.mem_size)?;
+                    }
+                    displayer.f.write_fixed_size(" ptr")?;
+                    displayer.f.write_char(' ')?;
+                }
+                if let Some(prefix) = instr.segment_override_for_op(0) {
+                    let name = prefix.name();
+                    if instr.opcode != Opcode::MOVS || name != b"es" {
+                        displayer.f.write_char(name[0] as char)?;
+                        displayer.f.write_char(name[1] as char)?;
+                        displayer.f.write_fixed_size(":")?;
+                    }
+                }
+            }
+
+            instr.visit_operand(0 as u8, &mut displayer)?;
+        }
 
         for i in 1..instr.operand_count {
             // don't worry about checking for `instr.operands[i] != Nothing`, it would be a bug to
@@ -1170,6 +1312,11 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
                 // Safety: Instruction::operands is a four-element array; operand_count is always
                 // low enough that 0..operand_count is a valid index.
                 unsafe { unreachable_unchecked(); }
+            }
+
+            if rules.emit_operand(instr, i, displayer.f)? {
+                // if the rule printed an operand out, continue on to the next one!
+                continue;
             }
 
             if instr.operands[i as usize].is_memory() {
@@ -1252,9 +1399,9 @@ pub(crate) fn contextualize<T: DisplaySink>(instr: &Instruction, out: &mut T) ->
             }
         }
 
-        if displayer.show_sae {
+        if show_sae {
             displayer.f.write_char(' ')?;
-            if let Some(sae_mode) = displayer.sae_mode.as_ref() {
+            if let Some(sae_mode) = sae_mode.as_ref() {
                 displayer.f.write_sae_mode(*sae_mode)?;
             } else {
                 displayer.f.write_str("{sae}")?;

@@ -10,7 +10,13 @@ pub use crate::MemoryAccessSize;
 use crate::{Address, Word};
 
 #[cfg(feature = "fmt")]
-pub use self::display::{DisplayStyle, InstructionDisplayer};
+pub use self::display::{
+    DisplayStyle,
+    DisplayRules, DefaultRules,
+    InstructionDisplayer, InstructionRuleBundle
+};
+#[cfg(feature = "fmt")]
+pub use self::display::AbsoluteAddressFormatter;
 #[cfg(all(feature = "fmt", feature = "alloc"))]
 pub use self::display::InstructionTextBuffer;
 
@@ -3284,18 +3290,34 @@ impl Instruction {
     /// later. see the documentation on [`display::DisplayStyle`] for more.
     ///
     /// ```
-    /// use yaxpeax_x86::long_mode::{InstDecoder, DisplayStyle};
+    /// use yaxpeax_x86::long_mode::{InstDecoder, DisplayStyle, DefaultRules};
     ///
     /// let decoder = InstDecoder::default();
     /// let inst = decoder.decode_slice(&[0x33, 0xc1]).unwrap();
     ///
     /// assert_eq!("eax ^= ecx", inst.display_with(DisplayStyle::C).to_string());
     /// assert_eq!("xor eax, ecx", inst.display_with(DisplayStyle::Intel).to_string());
+    ///
+    /// // `display_with` is a short-hand for the default implementation of `DisplayRules`:
+    /// let formatted = format!("{}", DefaultRules::for_style(DisplayStyle::Intel).display(&inst));
+    /// assert_eq!("xor eax, ecx", formatted);
     /// ```
     pub fn display_with<'a>(&'a self, style: display::DisplayStyle) -> display::InstructionDisplayer<'a> {
         display::InstructionDisplayer {
             style,
             instr: self,
+        }
+    }
+
+    // TODO: more docs
+    #[cfg(feature = "fmt")]
+    pub fn display_rules<'a, 'rules, Rules>(
+        &'a self,
+        rules: &'rules Rules
+    ) -> display::InstructionRuleBundle<'a, 'rules, Rules> {
+        display::InstructionRuleBundle {
+            instr: self,
+            rules,
         }
     }
 

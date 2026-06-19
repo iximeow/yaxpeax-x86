@@ -5,6 +5,23 @@
   dumpbin.exe, and (on Windows) is tested to round-trip through masm.exe or
   ml64.exe as appropriate. caveats apply; see the documentation on DisplayStyle for details.
 
+* add a new `DisplayRules` trait to override elements of instruction formatting, as well as
+  `Instruction::display_rules` as an analogue to `Instruction::display_style` as a simple helper
+  to wrap an instruction and display rules together for formatting.
+
+  yaxpeax-x86 (finally) supports printing instructions at absolute addresses
+  through new `AbsoluteAddressFormatter`s in all modes. the interactions
+  between `DisplayStyle` and specific `DisplayRules` implementations are
+  somewhat subtle and better documented on those types. a test implementation
+  of `DisplayRules` is used to symbolicate addresses, for example, but such an
+  implementation is (probably!) not suitable for general-purpose use.
+
+  `DisplayRules` should not add any additional overhead to instruction
+  formatting beyond net-new logic in provided formatting. existing formatting
+  is a short-hand for `DefaultRules` (`Instruction::display_with` as well as
+  plain `impl Display for Instruction`). if formatting throughput regresses in
+  some use case, that is a bug! please report it!
+
 * `Instruction::invalid()` returns instructions with opcode `Opcode::Invalid`, rather than nop.
   decoding an instruction with `opcode == Invalid` was already possible through attempting
   to decode invalid opcodes into a `&mut Instruction`; `invalid()` returning a no-operand

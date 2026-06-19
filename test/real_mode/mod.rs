@@ -1,5 +1,7 @@
 mod operand;
 mod opcode;
+#[cfg(feature="fmt")]
+mod display;
 #[cfg(feature="behavior")]
 mod behavior;
 
@@ -170,7 +172,10 @@ fn test_display_format(decoder: &InstDecoder, data: &[u8], expected: &'static st
             // since write_to unconditionally uses DisplayStyle::Intel
         }
         DisplayStyle::C => {
-            // panic!("no support for C-style display in testcases yet");
+            panic!("no support for C-style display in testcases yet");
+        }
+        other => {
+            panic!("unsupported style: {:?}", other);
         }
     }
 }

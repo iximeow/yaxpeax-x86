@@ -10,7 +10,13 @@ pub use crate::MemoryAccessSize;
 use crate::{Address, Word};
 
 #[cfg(feature = "fmt")]
-pub use self::display::{DisplayStyle, InstructionDisplayer};
+pub use self::display::{
+    DisplayStyle,
+    DisplayRules, DefaultRules,
+    InstructionDisplayer, InstructionRuleBundle
+};
+#[cfg(feature = "fmt")]
+pub use self::display::AbsoluteAddressFormatter;
 #[cfg(all(feature = "fmt", feature = "alloc"))]
 pub use self::display::InstructionTextBuffer;
 
@@ -3323,6 +3329,18 @@ impl Instruction {
         display::InstructionDisplayer {
             style,
             instr: self,
+        }
+    }
+
+    // TODO: more docs
+    #[cfg(feature = "fmt")]
+    pub fn display_rules<'a, 'rules, Rules>(
+        &'a self,
+        rules: &'rules Rules
+    ) -> display::InstructionRuleBundle<'a, 'rules, Rules> {
+        display::InstructionRuleBundle {
+            instr: self,
+            rules,
         }
     }
 
