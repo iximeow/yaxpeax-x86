@@ -10,7 +10,11 @@ pub use crate::MemoryAccessSize;
 use crate::{Address, Word};
 
 #[cfg(feature = "fmt")]
-pub use self::display::{DisplayRules, DisplayStyle, InstructionDisplayer, InstructionRuleBundle};
+pub use self::display::{
+    DisplayStyle,
+    DisplayRules, DefaultRules,
+    InstructionDisplayer, InstructionRuleBundle
+};
 #[cfg(feature = "fmt")]
 pub use self::display::AbsoluteAddressFormatter;
 #[cfg(all(feature = "fmt", feature = "alloc"))]
@@ -3341,8 +3345,7 @@ impl Instruction {
     /// later. see the documentation on [`display::DisplayStyle`] for more.
     ///
     /// ```
-    /// use yaxpeax_x86::long_mode::{InstDecoder, DisplayStyle};
-    /// use yaxpeax_x86::long_mode::display::DefaultRules;
+    /// use yaxpeax_x86::long_mode::{InstDecoder, DisplayStyle, DefaultRules};
     ///
     /// let decoder = InstDecoder::default();
     /// let inst = decoder.decode_slice(&[0x33, 0xc1]).unwrap();
@@ -3351,7 +3354,7 @@ impl Instruction {
     /// assert_eq!("xor eax, ecx", inst.display_with(DisplayStyle::Intel).to_string());
     ///
     /// // `display_with` is a short-hand for the default implementation of `DisplayRules`:
-    /// let formatted = format!("{}", DefaultRules::new(DisplayStyle::Intel).display(inst));
+    /// let formatted = format!("{}", DefaultRules::for_style(DisplayStyle::Intel).display(&inst));
     /// assert_eq!("xor eax, ecx", formatted);
     /// ```
     pub fn display_with<'a>(&'a self, style: display::DisplayStyle) -> display::InstructionDisplayer<'a> {

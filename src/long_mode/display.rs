@@ -3709,16 +3709,16 @@ impl<'instr, 'fmt, Rules> fmt::Display for
     }
 }
 
-struct DefaultRules {
+pub struct DefaultRules {
     style: DisplayStyle
 }
 
 impl DefaultRules {
-    fn for_style(style: DisplayStyle) -> Self {
+    pub fn for_style(style: DisplayStyle) -> Self {
         Self { style }
     }
 
-    fn display<'me, 'instr>(&'me self, instr: &'instr Instruction) -> InstructionRuleBundle<'instr, 'me, Self> {
+    pub fn display<'me, 'instr>(&'me self, instr: &'instr Instruction) -> InstructionRuleBundle<'instr, 'me, Self> {
         InstructionRuleBundle {
             instr,
             rules: self,
@@ -3733,30 +3733,34 @@ impl<S: DisplaySink> DisplayRules<S> for DefaultRules {
 }
 
 /// ```rust
+/// use yaxpeax_x86::long_mode::{InstDecoder, AbsoluteAddressFormatter};
+///
 /// // `AbsoluteAddressFormatter` prints instructions as a contiguous sequence starting from the
 /// // provided address.
 /// let mut addr_formatter = AbsoluteAddressFormatter::new(0x10);
 ///
-/// let decoder = long_mdoe::InstDecoder::default();
+/// let decoder = InstDecoder::default();
 ///
 /// let instr = decoder.decode_slice(&[0x33, 0x05, 0x08, 0x00, 0x00, 0x00])
 ///     .expect("can decode 'xor eax, dword [rip + 0x10]'");
 ///
 /// // instructions are printed with `rip` taken to be the address in the formatter, which
 /// // overrides rip-relative display.
-/// let formatted = format!("{}", addr_formatter.display(instr));
+/// let formatted = format!("{}", addr_formatter.display(&instr));
 /// assert_eq!(formatted, "xor eax, dword [0x18]");
 /// // the program address in `addr_formatter` must be advanced to the next instruction.
-/// addr_formatter.advance(instr);
-/// let formatted = format!("{}", addr_formatter.display(instr));
+/// addr_formatter.advance(&instr);
+/// let formatted = format!("{}", addr_formatter.display(&instr));
 /// assert_eq!(formatted, "xor eax, dword [0x1e]");
+/// addr_formatter.advance(&instr);
 ///
 /// let branch = decoder.decode_slice(&[0xeb, 0x70])
-///     .expect("can decode 'jmp rip+0x70');
+///     .expect("can decode 'jmp $+0x70'");
 ///
 /// // jump destinations are also made absolute.
-/// let formatted = format!("{}", addr_formatter.display(instr));
-/// assert_eq!(formatted, "jmp 0x7e");
+/// let formatted = format!("{}", addr_formatter.display(&branch));
+/// // note this instruction is printed at 0x10 (formatter base) + 6 + 6.
+/// assert_eq!(formatted, "jmp 0x8e");
 /// ```
 #[derive(Copy, Clone)]
 pub struct AbsoluteAddressFormatter {

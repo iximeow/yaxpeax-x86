@@ -2256,16 +2256,16 @@ impl<'instr, 'fmt, Rules> fmt::Display for
     }
 }
 
-struct DefaultRules {
+pub struct DefaultRules {
     style: DisplayStyle
 }
 
 impl DefaultRules {
-    fn for_style(style: DisplayStyle) -> Self {
+    pub fn for_style(style: DisplayStyle) -> Self {
         Self { style }
     }
 
-    fn display<'me, 'instr>(&'me self, instr: &'instr Instruction) -> InstructionRuleBundle<'instr, 'me, Self> {
+    pub fn display<'me, 'instr>(&'me self, instr: &'instr Instruction) -> InstructionRuleBundle<'instr, 'me, Self> {
         InstructionRuleBundle {
             instr,
             rules: self,
@@ -2280,18 +2280,20 @@ impl<S: DisplaySink> DisplayRules<S> for DefaultRules {
 }
 
 /// ```rust
+/// use yaxpeax_x86::protected_mode::{InstDecoder, AbsoluteAddressFormatter};
+///
 /// // `AbsoluteAddressFormatter` prints instructions as a contiguous sequence starting from the
 /// // provided address.
 /// let mut addr_formatter = AbsoluteAddressFormatter::new(0x10);
 ///
-/// let decoder = long_mdoe::InstDecoder::default();
+/// let decoder = InstDecoder::default();
 ///
 /// let branch = decoder.decode_slice(&[0xeb, 0x70])
-///     .expect("can decode 'jmp $+0x70');
+///     .expect("can decode 'jmp $+0x70'");
 ///
 /// // jump destinations are also made absolute.
-/// let formatted = format!("{}", addr_formatter.display(instr));
-/// assert_eq!(formatted, "jmp 0x7e");
+/// let formatted = format!("{}", addr_formatter.display(&branch));
+/// assert_eq!(formatted, "jmp 0x82");
 ///
 /// // unlike in 64-bit mode, relative branches are really the only operands shown differently.
 /// ```
