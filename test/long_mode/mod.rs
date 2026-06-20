@@ -15,7 +15,8 @@ mod behavior;
 use std::fmt::Write;
 
 use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
-use yaxpeax_x86::long_mode::InstDecoder;
+use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
+#[cfg(feature="fmt")]
 use yaxpeax_x86::long_mode::DisplayStyle;
 
 use crate::tools::{self, CodeModel};
@@ -57,132 +58,141 @@ fn test_invalid_under(decoder: &InstDecoder, data: &[u8]) {
     }
 }
 
+fn test_decode_under(decoder: &InstDecoder, data: &[u8], expected: &'static str) -> Instruction {
+    let mut reader = yaxpeax_arch::U8Reader::new(data);
+    let instr = match decoder.decode(&mut reader) {
+        Ok(instr) => {
+            assert_eq!(instr.len().to_const(), data.len() as u64, "instruction length is incorrect");
+            instr
+        },
+        Err(e) => {
+            let mut hex = String::new();
+            for b in data {
+                write!(hex, "{:02x}", b).unwrap();
+            }
+            cfg_if::cfg_if! {
+                if #[cfg(feature="fmt")] {
+                    panic!("decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);
+                } else {
+                    // avoid the unused `e` warning
+                    let _ = e;
+                    panic!("decode error (<non-fmt build>) for {} under decoder <non-fmt build>:\n  expected: {}\n", hex, expected);
+                }
+            }
+        }
+    };
+    instr
+}
+
 fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str) {
+    // testing that the instruction displays doesn't work if formatting is disabled, but we can
+    // test that it at least decodes..
+    let instr = test_decode_under(decoder, data, expected);
+
+    #[cfg(feature="fmt")]
     test_display_format(decoder, data, expected, DisplayStyle::Intel);
 }
 
+#[cfg(feature="fmt")]
 fn test_display_format(decoder: &InstDecoder, data: &[u8], expected: &'static str, style: DisplayStyle) {
+    let instr = test_decode_under(decoder, data, expected);
+
     let mut hex = String::new();
     for b in data {
         write!(hex, "{:02x}", b).unwrap();
     }
-    let mut reader = yaxpeax_arch::U8Reader::new(data);
-    match decoder.decode(&mut reader) {
-        Ok(instr) => {
-            cfg_if::cfg_if! {
-                if #[cfg(feature="fmt")] {
-                    match style {
-                        DisplayStyle::Intel => {
-                            let text = format!("{}", instr.display_with(DisplayStyle::Intel));
-                            assert!(
-                                text == expected,
-                                "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                                hex,
-                                instr,
-                                decoder,
-                                text,
-                                expected
-                            );
+    match style {
+        DisplayStyle::Intel => {
+            let text = format!("{}", instr.display_with(DisplayStyle::Intel));
+            assert!(
+                text == expected,
+                "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                hex,
+                instr,
+                decoder,
+                text,
+                expected
+            );
 
-                            let mut text2 = String::new();
-                            let mut out = yaxpeax_arch::display::FmtSink::new(&mut text2);
-                            instr.write_to(&mut out).expect("printing succeeds");
+            let mut text2 = String::new();
+            let mut out = yaxpeax_arch::display::FmtSink::new(&mut text2);
+            instr.write_to(&mut out).expect("printing succeeds");
 
-                            assert!(
-                                text2 == text,
-                                "display error through FmtSink for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                                hex,
-                                instr,
-                                decoder,
-                                text2,
-                                text,
-                            );
+            assert!(
+                text2 == text,
+                "display error through FmtSink for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                hex,
+                instr,
+                decoder,
+                text2,
+                text,
+            );
 
-                            #[cfg(feature="alloc")]
-                            let mut formatter = yaxpeax_x86::long_mode::InstructionTextBuffer::new();
-                            #[cfg(feature="alloc")]
-                            let text3 = formatter.format_inst(&instr.display_with(DisplayStyle::Intel)).expect("printing succeeds");
+            #[cfg(feature="alloc")]
+            let mut formatter = yaxpeax_x86::long_mode::InstructionTextBuffer::new();
+            #[cfg(feature="alloc")]
+            let text3 = formatter.format_inst(&instr.display_with(DisplayStyle::Intel)).expect("printing succeeds");
 
-                            #[cfg(feature="alloc")]
-                            assert!(
-                                text3 == text,
-                                "display error through InstructionTextBuffer for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                                hex,
-                                instr,
-                                decoder,
-                                text3,
-                                text,
-                            );
+            #[cfg(feature="alloc")]
+            assert!(
+                text3 == text,
+                "display error through InstructionTextBuffer for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                hex,
+                instr,
+                decoder,
+                text3,
+                text,
+            );
 
-                            let mut text4 = String::new();
-                            instr.write_to(&mut text4).expect("printing succeeds");
+            let mut text4 = String::new();
+            instr.write_to(&mut text4).expect("printing succeeds");
 
-                            assert!(
-                                text4 == text,
-                                "display error through String for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                                hex,
-                                instr,
-                                decoder,
-                                text4,
-                                text,
-                            );
-                        }
-                        DisplayStyle::Masm => {
-                            let text = format!("{}", instr.display_with(DisplayStyle::Masm));
-                            assert!(
-                                text == expected,
-                                "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                                hex,
-                                instr,
-                                decoder,
-                                text,
-                                expected
-                            );
+            assert!(
+                text4 == text,
+                "display error through String for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                hex,
+                instr,
+                decoder,
+                text4,
+                text,
+            );
+        }
+        DisplayStyle::Masm => {
+            let text = format!("{}", instr.display_with(DisplayStyle::Masm));
+            assert!(
+                text == expected,
+                "display error for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                hex,
+                instr,
+                decoder,
+                text,
+                expected
+            );
 
-                            #[cfg(feature="alloc")]
-                            let mut formatter = yaxpeax_x86::long_mode::InstructionTextBuffer::new();
-                            #[cfg(feature="alloc")]
-                            let text3 = formatter.format_inst(&instr.display_with(DisplayStyle::Masm)).expect("printing succeeds");
+            #[cfg(feature="alloc")]
+            let mut formatter = yaxpeax_x86::long_mode::InstructionTextBuffer::new();
+            #[cfg(feature="alloc")]
+            let text3 = formatter.format_inst(&instr.display_with(DisplayStyle::Masm)).expect("printing succeeds");
 
-                            #[cfg(feature="alloc")]
-                            assert!(
-                                text3 == text,
-                                "display error through InstructionTextBuffer for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
-                                hex,
-                                instr,
-                                decoder,
-                                text3,
-                                text,
-                            );
+            #[cfg(feature="alloc")]
+            assert!(
+                text3 == text,
+                "display error through InstructionTextBuffer for {}:\n  decoded: {:?} under decoder {}\n displayed: {}\n expected: {}\n",
+                hex,
+                instr,
+                decoder,
+                text3,
+                text,
+            );
 
-                            // no `instr.display_with(DisplayStyle::Masm)` tests involving write_to
-                            // since write_to unconditionally uses DisplayStyle::Intel
-                        }
-                        DisplayStyle::C => {
-                            panic!("no support for C-style display in testcases yet");
-                        }
-                        other => {
-                            panic!("unsupported style: {:?}", other);
-                        }
-                    }
-                } else {
-                    eprintln!("non-fmt build cannot compare text equality")
-                }
-            }
-            // while we're at it, test that the instruction is as long, and no longer, than its
-            // input
-            assert_eq!((0u64.wrapping_offset(instr.len()).to_linear()) as usize, data.len(), "instruction length is incorrect, wanted instruction {}", expected);
-        },
-        Err(e) => {
-            cfg_if::cfg_if! {
-                if #[cfg(feature="fmt")] {
-                    assert!(false, "decode error ({}) for {} under decoder {}:\n  expected: {}\n", e, hex, decoder, expected);
-                } else {
-                    // avoid the unused `e` warning
-                    let _ = e;
-                    assert!(false, "decode error (<non-fmt build>) for {} under decoder <non-fmt build>:\n  expected: {}\n", hex, expected);
-                }
-            }
+            // no `instr.display_with(DisplayStyle::Masm)` tests involving write_to
+            // since write_to unconditionally uses DisplayStyle::Intel
+        }
+        DisplayStyle::C => {
+            panic!("no support for C-style display in testcases yet");
+        }
+        other => {
+            panic!("unsupported style: {:?}", other);
         }
     }
 }
@@ -309,13 +319,13 @@ struct Disasm {
 struct TestCase {
     bytes: &'static [u8],
     featuresets: Option<&'static [(FeatureSet, bool)]>,
-    #[cfg(feature="fmt")]
     decodes: Option<Disasm>,
 }
 
 fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &Disasm) {
     if decode_ok {
         test_display_under(&decoder, bytes, disasm.display);
+        #[cfg(feature = "fmt")]
         if let Some(c_style) = disasm.c.as_ref() {
             test_display_format(&decoder, bytes, c_style, DisplayStyle::C);
         }
@@ -324,6 +334,7 @@ fn check_decodes(decoder: &InstDecoder, decode_ok: bool, bytes: &[u8], disasm: &
         // is a bit convoluted. otherwise we're testing against in-tree "gold output". in the
         // EXTERNAL_MASM case we actually distrust this too, and validate the in-tree expected
         // output is what masm actually wants.
+        #[cfg(feature = "fmt")]
         if std::env::var_os("EXTERNAL_MASM").is_some() {
             eprintln!("==== running testcase: bytes={:x?}, expected_display={}", bytes, disasm.display);
             // OK: EXTERNAL_MASM is set, we'll expect that there's `../tools/` which has `wibo`,
