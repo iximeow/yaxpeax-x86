@@ -3368,7 +3368,7 @@ impl Instruction {
     #[cfg(feature = "fmt")]
     pub fn display_rules<'a, 'rules, Rules>(
         &'a self,
-        rules: &'rules mut Rules
+        rules: &'rules Rules
     ) -> display::InstructionRuleBundle<'a, 'rules, Rules> {
         display::InstructionRuleBundle {
             instr: self,

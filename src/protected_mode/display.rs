@@ -2194,7 +2194,7 @@ impl<'instr> fmt::Display for InstructionDisplayer<'instr> {
 /// * non-effectual prefixes are generally not printed by `yaxpeax-x86`,
 /// * repeated prefixes (imagine "`rep rep rep movsb`") are not printed and generally not accepted by assemblers,
 #[non_exhaustive]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum DisplayStyle {
     /// intel-style syntax for instructions, like
     /// `add eax, [edx + ecx * 2 + 0x1234]`
@@ -2297,6 +2297,7 @@ impl<S: DisplaySink> DisplayRules<S> for DefaultRules {
 ///
 /// // unlike in 64-bit mode, relative branches are really the only operands shown differently.
 /// ```
+#[derive(Copy, Clone)]
 pub struct AbsoluteAddressFormatter {
     eip: u32,
     style: DisplayStyle,
@@ -2310,7 +2311,7 @@ impl AbsoluteAddressFormatter {
         }
     }
 
-    pub fn with_style(&mut self, style: DisplayStyle) -> &mut Self {
+    pub fn with_style(mut self, style: DisplayStyle) -> Self {
         self.style = style;
         self
     }
@@ -2344,9 +2345,35 @@ impl<S: DisplaySink> DisplayRules<S> for AbsoluteAddressFormatter {
     }
 
     fn emit_address(&self, addr: u32, s: &mut S) -> Result<bool, fmt::Error> {
+        fn needs_leading_0(imm: u32) -> bool {
+            let mut rem = imm;
+            let mut digit = 0;
+            while rem > 0 {
+                digit = rem & 0xf;
+                rem = rem >> 4;
+            }
+
+            // digit is whatever the top non-zero hex digit was in the number
+            digit >= 10
+        }
+
+        fn hex_ambiguous(imm: u32) -> bool {
+            imm >= 10
+        }
+
         s.span_start_immediate();
-        s.write_fixed_size("0x")?;
-        s.write_u32(addr)?;
+        if self.style != DisplayStyle::Masm {
+            s.write_fixed_size("0x")?;
+            s.write_u32(addr)?;
+        } else {
+            if needs_leading_0(addr) {
+                s.write_char('0')?;
+            }
+            write!(s, "{:X}", addr)?;
+            if hex_ambiguous(addr) {
+                s.write_char('h')?;
+            }
+        }
         s.span_end_immediate();
         Ok(true)
     }
@@ -2519,7 +2546,7 @@ pub trait DisplayRules<S: DisplaySink> {
     }
 
     /// write the destination of an absolute far jump or call to the provided `DisplaySink`.
-    fn emit_far_address(&mut self, seg: u16, offs: u32, s: &mut S) -> Result<bool, fmt::Error> {
+    fn emit_far_address(&self, seg: u16, offs: u32, s: &mut S) -> Result<bool, fmt::Error> {
         let _ = seg;
         let _ = offs;
         let _ = s;
@@ -2740,7 +2767,7 @@ pub(crate) fn format_intel<T: DisplaySink, R: DisplayRules<T>>(instr: &Instructi
     Ok(())
 }
 
-pub(crate) fn format_c<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, _rules: &R, out: &mut T) -> fmt::Result {
+pub(crate) fn format_c<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, rules: &R, out: &mut T) -> fmt::Result {
     let mut brace_count = 0;
 
     let mut prefixed = false;
@@ -2786,35 +2813,36 @@ pub(crate) fn format_c<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, 
         }
     }
 
-    fn write_jmp_operand<T: fmt::Write>(op: Operand, out: &mut T) -> fmt::Result {
-        let mut out = yaxpeax_arch::display::FmtSink::new(out);
-        use core::fmt::Write;
-        match op {
-            Operand::ImmediateI8 { imm: rel } => {
-                let rel = if rel >= 0 {
-                    out.write_str("$+")?;
-                    rel as u8
-                } else {
-                    out.write_str("$-")?;
-                    rel.unsigned_abs()
+    fn write_jmp_operand<T: DisplaySink, Rules: DisplayRules<T>>(instr: &Instruction, idx: usize, rules: &Rules, out: &mut T) -> fmt::Result {
+        match instr.operands[idx] {
+            OperandSpec::ImmI8 => {
+                let mut rel_printer = RelativeBranchPrinter {
+                    inst: instr, out, rules
                 };
-                out.write_prefixed_u8(rel)
+                instr.visit_operand(idx as u8, &mut rel_printer)
+                    .map(|x| assert!(x))
             }
-            Operand::ImmediateI32 { imm: rel } => {
-                let rel = if rel >= 0 {
-                    out.write_str("$+")?;
-                    rel as u32
-                } else {
-                    out.write_str("$-")?;
-                    rel.unsigned_abs()
+            OperandSpec::ImmI32 => {
+                let mut rel_printer = RelativeBranchPrinter {
+                    inst: instr, out, rules
                 };
-                out.write_prefixed_u32(rel)
+                instr.visit_operand(idx as u8, &mut rel_printer)
+                    .map(|x| assert!(x))
             }
-            other => {
-                write!(out, "{}", other)
+            _other => {
+                let mut displayer = DisplayingOperandVisitor {
+                    f: out,
+                    rules,
+                };
+                instr.visit_operand(idx as u8, &mut displayer)
             }
         }
     }
+
+    let mut displayer = DisplayingOperandVisitor {
+        f: out,
+        rules,
+    };
 
     match instr.opcode {
         Opcode::Invalid => { out.write_str("invalid")?; },
@@ -2841,239 +2869,365 @@ pub(crate) fn format_c<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruction, 
             out.write_str("port(dx) = ds:[esi++]")?;
         }
         Opcode::ADD => {
-            write!(out, "{} += {}", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" += ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::OR => {
-            write!(out, "{} |= {}", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" |= ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::ADC => {
-            write!(out, "{} += {} + eflags.cf", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" += ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" + ")?;
+            displayer.f.write_str("rflags.cf")?;
         }
         Opcode::ADCX => {
-            write!(out, "{} += {} + eflags.cf", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" += ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" + ")?;
+            displayer.f.write_str("rflags.cf")?;
         }
         Opcode::ADOX => {
-            write!(out, "{} += {} + eflags.of", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" += ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" + ")?;
+            displayer.f.write_str("rflags.of")?;
         }
         Opcode::SBB => {
-            write!(out, "{} -= {} + eflags.cf", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" -= ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" + ")?;
+            displayer.f.write_str("rflags.cf")?;
         }
         Opcode::AND => {
-            write!(out, "{} &= {}", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" &= ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::XOR => {
-            write!(out, "{} ^= {}", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" ^= ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::SUB => {
-            write!(out, "{} -= {}", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" -= ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::CMP => {
-            write!(out, "eflags = flags({} - {})", instr.operand(0), instr.operand(1))?;
+            displayer.f.write_str("rflags")?;
+            displayer.f.write_str(" = flags(")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" - ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::TEST => {
-            write!(out, "eflags = flags({} & {})", instr.operand(0), instr.operand(1))?;
+            displayer.f.write_str("rflags")?;
+            displayer.f.write_str(" = flags(")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" & ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::XADD => {
-            write!(out, "({}, {}) = ({} + {}, {})", instr.operand(0), instr.operand(1), instr.operand(0), instr.operand(1), instr.operand(0))?;
+            // something like "({}, {}) = ({} + {}, {})";
+            displayer.f.write_char('(')?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(", ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(") = (")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" + ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(", ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_char(')')?;
         }
         Opcode::BT => {
-            write!(out, "bt")?;
+            displayer.f.write_str("bt")?;
         }
         Opcode::BTS => {
-            write!(out, "bts")?;
+            displayer.f.write_str("bts")?;
         }
         Opcode::BTC => {
-            write!(out, "btc")?;
+            displayer.f.write_str("btc")?;
         }
         Opcode::BSR => {
-            write!(out, "{} = msb({})", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = msb(")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::BSF => {
-            write!(out, "{} = lsb({}) (x86 bsf)", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = lsb(")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(") (x86 bsf)")?;
         }
         Opcode::TZCNT => {
-            write!(out, "{} = lsb({})", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = lsb(")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::MOV => {
-            write!(out, "{} = {}", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::SAR => {
-            write!(out, "{} = {} >>> {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" >>> ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::SAL => {
-            write!(out, "{} = {} <<< {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" <<< ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::SHR => {
-            write!(out, "{} = {} >> {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" >> ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::SHRX => {
-            write!(out, "{} = {} >> {} (x86 shrx)", instr.operand(0), instr.operand(1), instr.operand(2))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" >> ")?;
+            instr.visit_operand(2, &mut displayer)?;
+            displayer.f.write_str(" (x86 shrx)")?;
         }
         Opcode::SHL => {
-            write!(out, "{} = {} << {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" << ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::SHLX => {
-            write!(out, "{} = {} << {} (x86 shlx)", instr.operand(0), instr.operand(1), instr.operand(2))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" << ")?;
+            instr.visit_operand(2, &mut displayer)?;
+            displayer.f.write_str(" (x86 shlx)")?;
         }
         Opcode::ROR => {
-            write!(out, "{} = {} ror {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" ror ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::RORX => {
-            write!(out, "{} = {} ror {} (x86 rorx)", instr.operand(0), instr.operand(1), instr.operand(2))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(" ror ")?;
+            instr.visit_operand(2, &mut displayer)?;
+            displayer.f.write_str(" (x86 rorx)")?;
         }
         Opcode::ROL => {
-            write!(out, "{} = {} rol {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" rol ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::RCR => {
-            write!(out, "{} = {} rcr {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" rcr ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::RCL => {
-            write!(out, "{} = {} rcl {}", instr.operand(0), instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = ")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" rcl ")?;
+            instr.visit_operand(1, &mut displayer)?;
         }
         Opcode::PUSH => {
-            write!(out, "push({})", instr.operand(0))?;
+            displayer.f.write_str("push(")?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::POP => {
-            write!(out, "{} = pop()", instr.operand(0))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = pop()")?;
         }
         Opcode::MOVD => {
-            write!(out, "{} = movd({})", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = movd(")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::MOVQ => {
-            write!(out, "{} = movq({})", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = movq(")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::MOVNTQ => {
-            write!(out, "{} = movntq({})", instr.operand(0), instr.operand(1))?;
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str(" = movntq(")?;
+            instr.visit_operand(1, &mut displayer)?;
+            displayer.f.write_str(")")?;
         }
         Opcode::INC => {
             if instr.operand(0).is_memory() {
                 match instr.mem_size {
-                    1 => { write!(out, "byte {}++", instr.operand(0))?; },
-                    2 => { write!(out, "word {}++", instr.operand(0))?; },
-                    4 => { write!(out, "dword {}++", instr.operand(0))?; },
-                    _ => { write!(out, "qword {}++", instr.operand(0))?; }, // sizes that are not 1, 2, or 4, *better* be 8.
+                    1 => { displayer.f.write_str("byte ")?; },
+                    2 => { displayer.f.write_str("word ")?; },
+                    4 => { displayer.f.write_str("dword ")?; },
+                    _ => { displayer.f.write_str("qword ")?; }, // sizes that are not 1, 2, or 4, *better* be 8.
                 }
-            } else {
-                write!(out, "{}++", instr.operand(0))?;
             }
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str("++")?;
         }
         Opcode::DEC => {
             if instr.operand(0).is_memory() {
                 match instr.mem_size {
-                    1 => { write!(out, "byte {}--", instr.operand(0))?; },
-                    2 => { write!(out, "word {}--", instr.operand(0))?; },
-                    4 => { write!(out, "dword {}--", instr.operand(0))?; },
-                    _ => { write!(out, "qword {}--", instr.operand(0))?; }, // sizes that are not 1, 2, or 4, *better* be 8.
+                    1 => { displayer.f.write_str("byte ")?; },
+                    2 => { displayer.f.write_str("word ")?; },
+                    4 => { displayer.f.write_str("dword ")?; },
+                    _ => { displayer.f.write_str("qword ")?; }, // sizes that are not 1, 2, or 4, *better* be 8.
                 }
-            } else {
-                write!(out, "{}--", instr.operand(0))?;
             }
+            instr.visit_operand(0, &mut displayer)?;
+            displayer.f.write_str("--")?;
         }
         Opcode::JMP => {
-            out.write_str("jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
+        },
+        Opcode::CALL => {
+            displayer.f.write_str("call ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JECXZ => {
-            out.write_str("if ecx == 0 then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if ecx == 0 then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JCXZ => {
-            out.write_str("if cx == 0 then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if cx == 0 then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::LOOP => {
-            out.write_str("ecx--; if ecx != 0 then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("ecx--; if ecx != 0 then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::LOOPZ => {
-            out.write_str("ecx--; if ecx != 0 and zero(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("ecx--; if ecx != 0 and zero(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::LOOPNZ => {
-            out.write_str("ecx--; if ecx != 0 and !zero(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("ecx--; if ecx != 0 and !zero(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JO => {
-            out.write_str("if _(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if _(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JNO => {
-            out.write_str("if _(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if _(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JB => {
-            out.write_str("if /* unsigned */ below(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* unsigned */ below(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JNB => {
-            out.write_str("if /* unsigned */ above_or_equal(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* unsigned */ above_or_equal(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JZ => {
-            out.write_str("if zero(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if zero(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JNZ => {
-            out.write_str("if !zero(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if !zero(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JNA => {
-            out.write_str("if /* unsigned */ below_or_equal(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* unsigned */ below_or_equal(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JA => {
-            out.write_str("if /* unsigned */ above(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* unsigned */ above(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JS => {
-            out.write_str("if signed(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if signed(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JNS => {
-            out.write_str("if !signed(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if !signed(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JP => {
-            out.write_str("if parity(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if parity(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JNP => {
-            out.write_str("if !parity(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if !parity(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JL => {
-            out.write_str("if /* signed */ less(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* signed */ less(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JGE => {
-            out.write_str("if /* signed */ greater_or_equal(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* signed */ greater_or_equal(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JLE => {
-            out.write_str("if /* signed */ less_or_equal(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* signed */ less_or_equal(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::JG => {
-            out.write_str("if /* signed */ greater(rflags) then jmp ")?;
-            write_jmp_operand(instr.operand(0), out)?;
+            displayer.f.write_str("if /* signed */ greater(rflags) then jmp ")?;
+            write_jmp_operand(instr, 0, rules, displayer.f)?;
         },
         Opcode::NOP => {
-            write!(out, "nop")?;
+            displayer.f.write_str("nop")?;
         }
         _ => {
             if instr.operand_count() == 0 {
-                write!(out, "{}()", instr.opcode())?;
+                displayer.f.write_opcode(instr.opcode)?;
+                displayer.f.write_str("()")?;
             } else {
-                write!(out, "{} = {}({}", instr.operand(0), instr.opcode(), instr.operand(0))?;
+                instr.visit_operand(0, &mut displayer)?;
+                displayer.f.write_str(" = ")?;
+                displayer.f.write_opcode(instr.opcode)?;
+                displayer.f.write_str("(")?;
+                instr.visit_operand(0, &mut displayer)?;
                 let mut comma = true;
                 for i in 1..instr.operand_count() {
                     if comma {
-                        write!(out, ", ")?;
+                        displayer.f.write_str(", ")?;
                     }
-                    write!(out, "{}", instr.operand(i))?;
+                    instr.visit_operand(i, &mut displayer)?;
                     comma = true;
                 }
-                write!(out, ")")?;
+                displayer.f.write_str(")")?;
             }
         }
     }

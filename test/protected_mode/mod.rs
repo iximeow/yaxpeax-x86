@@ -9,7 +9,7 @@ mod behavior;
 
 use std::fmt::Write;
 
-use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
+use yaxpeax_arch::{Decoder, LengthedInstruction};
 use yaxpeax_x86::protected_mode::{Instruction, InstDecoder};
 #[cfg(feature="fmt")]
 use yaxpeax_x86::protected_mode::DisplayStyle;
@@ -68,7 +68,7 @@ fn test_decode_under(decoder: &InstDecoder, data: &[u8], expected: &'static str)
 fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str) {
     // testing that the instruction displays doesn't work if formatting is disabled, but we can
     // test that it at least decodes..
-    let instr = test_decode_under(decoder, data, expected);
+    let _instr = test_decode_under(decoder, data, expected);
 
     #[cfg(feature="fmt")]
     test_display_format(decoder, data, expected, DisplayStyle::Intel);

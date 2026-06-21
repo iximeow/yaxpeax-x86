@@ -14,26 +14,12 @@ mod behavior;
 
 use std::fmt::Write;
 
-use yaxpeax_arch::{AddressBase, Decoder, LengthedInstruction};
+use yaxpeax_arch::{Decoder, LengthedInstruction};
 use yaxpeax_x86::long_mode::{Instruction, InstDecoder};
 #[cfg(feature="fmt")]
 use yaxpeax_x86::long_mode::DisplayStyle;
 
 use crate::tools::{self, CodeModel};
-
-/*
-#[cfg(feature="std")]
-fn test_write_hex_specialization() {
-    use crate::yaxpeax_x86::long_mode::DisplaySink;
-    for i in 0..0xffu8 {
-        let mut out = yaxpeax_x86::long_mode::InstructionFormatter::new();
-        out.write_char('0').unwrap();
-        out.write_char('x').unwrap();
-        out.write_u8(i).unwrap();
-        assert_eq!(out.into_inner(), format!("0x{:x}", i));
-    }
-}
-*/
 
 fn test_invalid(data: &[u8]) {
     test_invalid_under(&InstDecoder::default(), data);
@@ -87,7 +73,7 @@ fn test_decode_under(decoder: &InstDecoder, data: &[u8], expected: &'static str)
 fn test_display_under(decoder: &InstDecoder, data: &[u8], expected: &'static str) {
     // testing that the instruction displays doesn't work if formatting is disabled, but we can
     // test that it at least decodes..
-    let instr = test_decode_under(decoder, data, expected);
+    let _instr = test_decode_under(decoder, data, expected);
 
     #[cfg(feature="fmt")]
     test_display_format(decoder, data, expected, DisplayStyle::Intel);
