@@ -21,6 +21,10 @@ fuzz_target!(|data: &[u8]| {
         write!(s, "{}", inst.display_with(DisplayStyle::C)).expect("can write");
         // MAX_INSTRUCTION_LEN is not a public crate item yet...
         assert!(s.len() < 512);
+        s.clear();
+        write!(s, "{}", inst.display_with(DisplayStyle::Masm)).expect("can write");
+        // MAX_INSTRUCTION_LEN is not a public crate item yet...
+        assert!(s.len() < 512);
     };
 
     if let Ok(inst) = x86_32_decoder.decode_slice(data) {
@@ -34,6 +38,10 @@ fuzz_target!(|data: &[u8]| {
         write!(s, "{}", inst.display_with(DisplayStyle::C)).expect("can write");
         // MAX_INSTRUCTION_LEN is not a public crate item yet...
         assert!(s.len() < 512);
+        s.clear();
+        write!(s, "{}", inst.display_with(DisplayStyle::Masm)).expect("can write");
+        // MAX_INSTRUCTION_LEN is not a public crate item yet...
+        assert!(s.len() < 512);
     };
 
     if let Ok(inst) = x86_16_decoder.decode_slice(data) {
@@ -45,6 +53,10 @@ fuzz_target!(|data: &[u8]| {
         assert!(s.len() < 512);
         s.clear();
         write!(s, "{}", inst.display_with(DisplayStyle::C)).expect("can write");
+        // MAX_INSTRUCTION_LEN is not a public crate item yet...
+        assert!(s.len() < 512);
+        s.clear();
+        write!(s, "{}", inst.display_with(DisplayStyle::Masm)).expect("can write");
         // MAX_INSTRUCTION_LEN is not a public crate item yet...
         assert!(s.len() < 512);
     };

@@ -48,6 +48,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "display_masm_does_not_panic"
+path = "fuzz_targets/display_masm_does_not_panic.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "does_not_decode_invalid_registers"
 path = "fuzz_targets/does_not_decode_invalid_registers.rs"
 test = false
