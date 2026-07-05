@@ -41,7 +41,7 @@ impl fmt::Display for DecodeError {
 /// an `x86` register, including its number and type. if `fmt` is enabled, name too.
 ///
 /// ```
-/// use yaxpeax_x86::long_mode::{RegSpec, register_class};
+/// use yaxpeax_x86::protected_mode::{RegSpec, register_class};
 ///
 /// assert_eq!(RegSpec::ecx().num(), 1);
 /// assert_eq!(RegSpec::ecx().class(), register_class::D);
@@ -68,7 +68,7 @@ impl Hash for RegSpec {
 ///
 /// these are only obtained through [`Opcode::condition()`]:
 /// ```
-/// use yaxpeax_x86::long_mode::{Opcode, ConditionCode};
+/// use yaxpeax_x86::protected_mode::{Opcode, ConditionCode};
 ///
 /// assert_eq!(Opcode::JB.condition(), Some(ConditionCode::B));
 /// ```
@@ -3290,7 +3290,7 @@ impl Instruction {
     /// later. see the documentation on [`display::DisplayStyle`] for more.
     ///
     /// ```
-    /// use yaxpeax_x86::long_mode::{InstDecoder, DisplayStyle, DefaultRules};
+    /// use yaxpeax_x86::protected_mode::{InstDecoder, DisplayStyle, DefaultRules};
     ///
     /// let decoder = InstDecoder::default();
     /// let inst = decoder.decode_slice(&[0x33, 0xc1]).unwrap();
@@ -5266,7 +5266,7 @@ pub enum InnerDescription {
     /// displaying for human consumption.
     OperandCode(OperandCodeWrapper),
     /// a decoded register: a name for the bits used to decode it, the register number those bits
-    /// specify, and the fully-constructed [`long_mode::RegSpec`] that was decoded.
+    /// specify, and the fully-constructed [`protected_mode::RegSpec`] that was decoded.
     RegisterNumber(&'static str, u8, RegSpec),
     /// a miscellaneous string describing some bits of the instruction. this may describe a prefix,
     /// internal details of a prefix, error or constraints on an opcode, operand encoding details,

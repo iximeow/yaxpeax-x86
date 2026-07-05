@@ -3531,22 +3531,22 @@ mod buffer_sink {
     /// ### example
     ///
     /// ```
-    /// use yaxpeax_x86::long_mode::InstDecoder;
-    /// use yaxpeax_x86::long_mode::InstructionTextBuffer;
-    /// use yaxpeax_x86::long_mode::DisplayStyle;
+    /// use yaxpeax_x86::real_mode::InstDecoder;
+    /// use yaxpeax_x86::real_mode::InstructionTextBuffer;
+    /// use yaxpeax_x86::real_mode::DisplayStyle;
     ///
     /// let bytes = &[0x33, 0xc0];
     /// let inst = InstDecoder::default().decode_slice(bytes).expect("can decode");
     /// let mut text_buf = InstructionTextBuffer::new();
     /// assert_eq!(
     ///     text_buf.format_inst(&inst.display_with(DisplayStyle::Intel)).expect("can format"),
-    ///     "xor eax, eax"
+    ///     "xor ax, ax"
     /// );
     ///
     /// // or, getting the formatted instruction with `text_str`:
     /// assert_eq!(
     ///     text_buf.text_str(),
-    ///     "xor eax, eax"
+    ///     "xor ax, ax"
     /// );
     /// ```
     pub struct InstructionTextBuffer {

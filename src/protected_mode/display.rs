@@ -3531,9 +3531,9 @@ mod buffer_sink {
     /// ### example
     ///
     /// ```
-    /// use yaxpeax_x86::long_mode::InstDecoder;
-    /// use yaxpeax_x86::long_mode::InstructionTextBuffer;
-    /// use yaxpeax_x86::long_mode::DisplayStyle;
+    /// use yaxpeax_x86::protected_mode::InstDecoder;
+    /// use yaxpeax_x86::protected_mode::InstructionTextBuffer;
+    /// use yaxpeax_x86::protected_mode::DisplayStyle;
     ///
     /// let bytes = &[0x33, 0xc0];
     /// let inst = InstDecoder::default().decode_slice(bytes).expect("can decode");
