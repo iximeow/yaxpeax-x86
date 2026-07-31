@@ -1,3 +1,8 @@
+## 2.2.1
+
+* fix instruction annotation for 0x9* xchg reporting an incorrect register in
+  the second operand. thanks @jld for the patch!
+
 ## 2.2.0
 
 * add DisplayStyle::Masm to long mode, protected mode, and real mode instruction formatting.

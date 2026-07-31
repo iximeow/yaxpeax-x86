@@ -279,6 +279,16 @@ fn test_annotations_under(decoder: &InstDecoder, data: &[u8], expected: &'static
 }
 
 #[test]
+fn test_non_modrm() {
+    test_annotations(&[0x97], "xchg eax, edi", &[
+        AnnotationCheck::exact(0, 7, InnerDescription::Opcode(Opcode::XCHG)),
+        AnnotationCheck::approximate(0, 7, |desc| { desc.to_string().contains("Zv_AX_R7") }),
+        AnnotationCheck::exact(0, 2, InnerDescription::RegisterNumber("zzz", 7, RegSpec::edi())),
+        AnnotationCheck::exact(3, 7, InnerDescription::Misc("opcode selects `eax` operand")),
+    ]);
+}
+
+#[test]
 fn test_modrm_decode() {
     test_annotations(&[0xff, 0xc0], "inc eax", &[
         AnnotationCheck::exact(11, 13, InnerDescription::Opcode(Opcode::INC)),
