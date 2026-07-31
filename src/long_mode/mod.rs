@@ -5894,7 +5894,7 @@ fn read_operands<
                 sink.record(
                     opcode_start,
                     opcode_start + 2,
-                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[1])
                         .with_id(opcode_start + 1)
                 );
                 if instruction.prefixes.rex_unchecked().b() {
