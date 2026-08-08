@@ -2,6 +2,8 @@
 
 * fix instruction annotation for 0x9* xchg reporting an incorrect register in
   the second operand. thanks @jld for the patch!
+* do not annotate "opcode ends/operands begin" for instructions with no following
+  operand bytes (push <reg>, xchg, or no-operand instructions)
 
 ## 2.2.0
 

@@ -5679,13 +5679,23 @@ fn read_operands<
     T: Reader<Address<Arch>, Word<Arch>>,
     S: DescriptionSink<FieldDescription>
 >(&mut self, decoder: &InstDecoder, words: &mut T, instruction: &mut Instruction, operand_code: OperandCode, sink: &mut S) -> Result<(), DecodeError> {
-    sink.record(
-        words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
-        InnerDescription::Boundary("opcode ends/operands begin (typically)")
-            .with_id(words.offset() as u32 * 8 - 1)
-    );
     disasm_stats::read_operands();
     let operand_code = OperandCodeBuilder::from_bits(operand_code as u16);
+
+    let operand_bytes_follow = if let Some(z_operand_code) = operand_code.get_embedded_instructions() {
+        // operand with a `zzz` field but also requiring an immediate (i8 or i32)
+        z_operand_code.category() >= 2
+    } else {
+        operand_code.operand_case_handler_index() != OperandCase::Nothing
+    };
+    if operand_bytes_follow {
+        sink.record(
+            words.offset() as u32 * 8 - 1, words.offset() as u32 * 8 - 1,
+            InnerDescription::Boundary("opcode ends/operands begin (typically)")
+                .with_id(words.offset() as u32 * 8 - 1)
+        );
+    }
+
     let modrm_start = words.offset() as u32 * 8;
     let opcode_start = modrm_start - 8;
 
@@ -5911,8 +5921,7 @@ fn read_operands<
                     InnerDescription::Misc("opcode selects `eax` operand")
                         .with_id(opcode_start + 2)
                 );
-                // TODO: hmm
-                let opwidth = 0;
+                let opwidth = bank as u8;
                 if opwidth == 2 {
                     sink.record(
                         opcode_start + 3,

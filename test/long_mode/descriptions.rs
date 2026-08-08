@@ -285,6 +285,33 @@ fn test_non_modrm() {
         AnnotationCheck::approximate(0, 7, |desc| { desc.to_string().contains("Zv_AX_R7") }),
         AnnotationCheck::exact(0, 2, InnerDescription::RegisterNumber("zzz", 7, RegSpec::edi())),
         AnnotationCheck::exact(3, 7, InnerDescription::Misc("opcode selects `eax` operand")),
+        AnnotationCheck::no_extra()
+    ]);
+    test_annotations(&[0x48, 0x97], "xchg rax, rdi", &[
+        AnnotationCheck::exact(0, 7, InnerDescription::RexPrefix(0x48)),
+        AnnotationCheck::exact(7, 7, InnerDescription::Boundary("prefixes end")),
+        AnnotationCheck::exact(8, 15, InnerDescription::Opcode(Opcode::XCHG)),
+        AnnotationCheck::approximate(8, 15, |desc| { desc.to_string().contains("Zv_AX_R7") }),
+        AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("zzz", 7, RegSpec::rdi())),
+        AnnotationCheck::exact(11, 15, InnerDescription::Misc("opcode selects `eax` operand")),
+        AnnotationCheck::exact(11, 15, InnerDescription::Misc("rex.w prefix selects `rax`")),
+        AnnotationCheck::no_extra()
+    ]);
+    test_annotations(&[0x66, 0x97], "xchg ax, di", &[
+        AnnotationCheck::exact(0, 7, InnerDescription::Misc("operand size override (to 16 bits)")),
+        AnnotationCheck::exact(7, 7, InnerDescription::Boundary("prefixes end")),
+        AnnotationCheck::exact(8, 15, InnerDescription::Opcode(Opcode::XCHG)),
+        AnnotationCheck::approximate(8, 15, |desc| { desc.to_string().contains("Zv_AX_R7") }),
+        AnnotationCheck::exact(8, 10, InnerDescription::RegisterNumber("zzz", 7, RegSpec::di())),
+        AnnotationCheck::exact(11, 15, InnerDescription::Misc("opcode selects `eax` operand")),
+        AnnotationCheck::exact(11, 15, InnerDescription::Misc("operand-size prefix override selects `ax`")),
+        AnnotationCheck::no_extra()
+    ]);
+    test_annotations(&[0x50], "push rax", &[
+        AnnotationCheck::exact(0, 7, InnerDescription::Opcode(Opcode::PUSH)),
+        AnnotationCheck::approximate(0, 7, |desc| { desc.to_string().contains("Zv_R0") }),
+        AnnotationCheck::exact(0, 2, InnerDescription::RegisterNumber("zzz", 0, RegSpec::rax())),
+        AnnotationCheck::no_extra()
     ]);
 }
 
