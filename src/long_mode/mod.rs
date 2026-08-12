@@ -5863,7 +5863,12 @@ fn read_operands<
         match z_operand_code.category() {
             0 => {
                 // these are Zv_R
-                let bank = bank_from_prefixes_64(SizeCode::vq, instruction.prefixes);
+                let size_code = if instruction.opcode == Opcode::BSWAP {
+                    SizeCode::vqp
+                } else {
+                    SizeCode::vq
+                };
+                let bank = bank_from_prefixes_64(size_code, instruction.prefixes);
                 instruction.regs[0] =
                     RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
                 instruction.mem_size = 8;
