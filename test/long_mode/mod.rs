@@ -955,7 +955,10 @@ mod sse2 {
             "movdqa xmm11, xmmword [r12 + r11 * 4 - 0x334455cc]"
         ),
 
+        testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x0f, 0x6e, 0xc1], "movd xmm0, ecx"),
+        testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x0f, 0x6e, 0x01], "movd xmm0, dword [rcx]"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x48, 0x0f, 0x6e, 0xc0], "movq xmm0, rax"),
+        testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x48, 0x0f, 0x6e, 0x01], "movq xmm0, qword [rcx]"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x0f, 0x70, 0xc0, 0x4e], "pshufd xmm0, xmm0, 0x4e"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0xf2, 0x0f, 0x70, 0xc0, 0x4e], "pshuflw xmm0, xmm0, 0x4e"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0xf3, 0x0f, 0x70, 0xc0, 0x4e], "pshufhw xmm0, xmm0, 0x4e"),

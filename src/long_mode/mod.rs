@@ -4002,7 +4002,6 @@ enum OperandCase {
     G_mm_U_xmm,
     Rv_Gmm_Ib,
     G_xmm_Edq,
-    G_xmm_Eq,
     G_mm_E_xmm,
     Gd_U_xmm,
     Gdq_Eq_xmm,
@@ -4358,7 +4357,6 @@ enum OperandCode {
     G_xmm_U_mm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_U_mm).bits(),
     G_mm_U_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_mm_U_xmm).bits(),
     G_xmm_Edq = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_Edq).bits(),
-    G_xmm_Eq = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_xmm_Eq).bits(),
     G_mm_E_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::G_mm_E_xmm).bits(),
     Gd_U_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gd_U_xmm).bits(),
     Gdq_Eq_xmm = OperandCodeBuilder::new().read_E().reg_mem().operand_case(OperandCase::Gdq_Eq_xmm).bits(),
@@ -7913,12 +7911,20 @@ fn read_operands<
         */
         OperandCase::G_xmm_Edq => {
             instruction.regs[0].bank = RegisterBank::X;
+            let rex_w = instruction.prefixes.rex_unchecked().w();
             if mem_oper == OperandSpec::RegMMM {
-                if instruction.prefixes.rex_unchecked().w() {
+                if rex_w {
                     instruction.regs[1].bank = RegisterBank::Q;
                 } else {
                     instruction.regs[1].bank = RegisterBank::D;
                 }
+            } else if rex_w {
+                instruction.mem_size = 8;
+            } else {
+                instruction.mem_size = 4;
+            }
+            if instruction.opcode == Opcode::MOVD && rex_w {
+                instruction.opcode = Opcode::MOVQ;
             }
         },
         OperandCase::G_xmm_Ew_Ib => {
@@ -7931,14 +7937,6 @@ fn read_operands<
                 instruction.regs[1].bank = RegisterBank::D;
             } else {
                 instruction.mem_size = 2;
-            }
-        },
-        OperandCase::G_xmm_Eq => {
-            instruction.regs[0].bank = RegisterBank::X;
-            if mem_oper == OperandSpec::RegMMM {
-                instruction.regs[1].bank = RegisterBank::Q;
-            } else {
-                instruction.mem_size = 8;
             }
         },
         OperandCase::G_mm_E_xmm => {
@@ -10646,7 +10644,7 @@ const OPERAND_SIZE_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PACKSSDW), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PUNPCKLQDQ), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PUNPCKHQDQ), OperandCode::G_E_xmm),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::MOVQ), OperandCode::G_xmm_Eq),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::MOVD), OperandCode::G_xmm_Edq),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::MOVDQA), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PSHUFD), OperandCode::G_E_xmm_Ib),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0f71),
