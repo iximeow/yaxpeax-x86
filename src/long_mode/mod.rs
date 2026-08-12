@@ -6787,7 +6787,11 @@ fn read_operands<
                     _ => 8,
                 };
             } else {
-                instruction.regs[1].bank = RegisterBank::X;
+                instruction.regs[1].bank = match instruction.opcode {
+                    Opcode::INSERTPS => RegisterBank::X,
+                    Opcode::PINSRQ => RegisterBank::Q,
+                    _ => RegisterBank::D,
+                };
             }
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
