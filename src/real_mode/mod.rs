@@ -349,6 +349,9 @@ pub enum Operand {
     /// a simple dereference of the address held in some register. for example: `[esi]`.
     MemDeref { base: RegSpec },
     /// a dereference of the address held in some register with offset. for example: `[esi + 0x14]`.
+    ///
+    /// TODO: this variant was not renamed along with the long-mode and protected-mode forms, and
+    /// will be renamed to `Disp` in the future.
     MemDisp { base: RegSpec, disp: i32 },
     /// a dereference of the address held in some register scaled by 1, 2, 4, or 8. this is almost always used with the `lea` instruction. for example: `[edx * 4]`.
     MemIndexScale { index: RegSpec, scale: u8 },
@@ -365,6 +368,9 @@ pub enum Operand {
     /// an `avx512` dereference of register with optional masking. for example: `[edx]{k3}`
     MemDerefMasked { base: RegSpec, mask: RegSpec },
     /// an `avx512` dereference of register plus offset, with optional masking. for example: `[esp + 0x40]{k3}`
+    ///
+    /// TODO: this variant was not renamed along with the long-mode and protected-mode forms, and
+    /// will be renamed to `DispMasked` in the future.
     MemDispMasked { base: RegSpec, disp: i32, mask: RegSpec },
     /// an `avx512` dereference of a register scaled by 1, 2, 4, or 8, with optional masking. this
     /// seems extraordinarily unlikely to occur in practice. for example: `[esi * 4]{k2}`

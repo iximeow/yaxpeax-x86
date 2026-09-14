@@ -18,7 +18,7 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(inst) = x86_64_decoder.decode_slice(data) {
         for i in 0..inst.operand_count() {
             match inst.operand(i) {
-                yaxpeax_x86::long_mode::Operand::Register(reg) => {
+                yaxpeax_x86::long_mode::Operand::Register { reg } => {
                     if reg.num() < 4 && reg.class() == yaxpeax_x86::long_mode::register_class::RB {
                         assert!(false, "instruction has rex.w register that aliases old byte registers");
                     } else {
