@@ -17,84 +17,59 @@ fuzz_target!(|data: &[u8]| {
         assert!(!res.contains("BUG"));
         for i in 0..inst.operand_count() {
             match inst.operand(i) {
-                Operand::Register(reg) => {
+                Operand::Register { reg } => {
                     assert!(!reg.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMerge(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMerge { reg, mask, merge: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMergeSae(r1, r2, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMergeSae { reg, mask, merge: _, sae: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMergeSaeNoround(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMergeSaeNoround { reg, mask, merge: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDeref(r1) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDeref { base } => {
+                    assert!(!base.class().name().contains("BUG"));
                 }
-                Operand::RegDisp(r1, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::Disp { base, disp: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
                 }
-                Operand::RegScale(r1, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemIndexScale { index, scale: _ } => {
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBase(r1, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScale { base, index, scale: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseDisp(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleDisp { base, index, scale: _, disp: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegScaleDisp(r1, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDerefMasked { base, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseScale(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::DispMasked { base, disp: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseScaleDisp(r1, r2, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleMasked { base, index, scale: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDerefMasked(r1, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemIndexScaleDispMasked { index, scale: _, disp: _, mask } => {
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDispMasked(r1, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegScaleMasked(r1, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseMasked(r1, r2, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseDispMasked(r1, r2, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegScaleDispMasked(r1, _, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseScaleMasked(r1, r2, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseScaleDispMasked(r1, r2, _, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleDispMasked { base, index, scale: _, disp: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
                 Operand::Nothing => {
                     panic!("`Nothing` should not be an operand listed in `inst.operand_count()`");
@@ -113,84 +88,59 @@ fuzz_target!(|data: &[u8]| {
         assert!(!res.contains("BUG"));
         for i in 0..inst.operand_count() {
             match inst.operand(i) {
-                Operand::Register(reg) => {
+                Operand::Register { reg } => {
                     assert!(!reg.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMerge(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMerge { reg, mask, merge: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMergeSae(r1, r2, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMergeSae { reg, mask, merge: _, sae: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMergeSaeNoround(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMergeSaeNoround { reg, mask, merge: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDeref(r1) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDeref { base } => {
+                    assert!(!base.class().name().contains("BUG"));
                 }
-                Operand::RegDisp(r1, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::Disp { base, disp: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
                 }
-                Operand::RegScale(r1, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemIndexScale { index, scale: _ } => {
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBase(r1, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScale { base, index, scale: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseDisp(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleDisp { base, index, scale: _, disp: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegScaleDisp(r1, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDerefMasked { base, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseScale(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::DispMasked { base, disp: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseScaleDisp(r1, r2, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleMasked { base, index, scale: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDerefMasked(r1, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemIndexScaleDispMasked { index, scale: _, disp: _, mask } => {
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDispMasked(r1, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegScaleMasked(r1, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseMasked(r1, r2, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseDispMasked(r1, r2, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegScaleDispMasked(r1, _, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseScaleMasked(r1, r2, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseScaleDispMasked(r1, r2, _, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleDispMasked { base, index, scale: _, disp: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
                 Operand::Nothing => {
                     panic!("`Nothing` should not be an operand listed in `inst.operand_count()`");
@@ -209,84 +159,58 @@ fuzz_target!(|data: &[u8]| {
         assert!(!res.contains("BUG"));
         for i in 0..inst.operand_count() {
             match inst.operand(i) {
-                Operand::Register(reg) => {
+                Operand::Register { reg } => {
                     assert!(!reg.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMerge(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMerge { reg, mask, merge: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMergeSae(r1, r2, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMergeSae { reg, mask, merge: _, sae: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegisterMaskMergeSaeNoround(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::RegisterMaskMergeSaeNoround { reg, mask, merge: _ } => {
+                    assert!(!reg.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDeref(r1) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDeref { base } => {
+                    assert!(!base.class().name().contains("BUG"));
                 }
-                Operand::RegDisp(r1, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDisp { base, disp: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
                 }
-                Operand::RegScale(r1, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemIndexScale { index, scale: _ } => {
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBase(r1, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemIndexScaleDisp { index, scale: _, disp: _ } => {
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseDisp(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleDisp { base, index, scale: _, disp: _ } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
                 }
-                Operand::RegScaleDisp(r1, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
+                Operand::MemDerefMasked { base, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseScale(r1, r2, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemDispMasked { base, disp: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegIndexBaseScaleDisp(r1, r2, _, _) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleMasked { base, index, scale: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDerefMasked(r1, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
+                Operand::MemIndexScaleDispMasked { index, scale: _, disp: _, mask } => {
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
-                Operand::RegDispMasked(r1, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegScaleMasked(r1, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseMasked(r1, r2, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseDispMasked(r1, r2, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegScaleDispMasked(r1, _, _, r2) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseScaleMasked(r1, r2, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
-                }
-                Operand::RegIndexBaseScaleDispMasked(r1, r2, _, _, r3) => {
-                    assert!(!r1.class().name().contains("BUG"));
-                    assert!(!r2.class().name().contains("BUG"));
-                    assert!(!r3.class().name().contains("BUG"));
+                Operand::MemBaseIndexScaleDispMasked { base, index, scale: _, disp: _, mask } => {
+                    assert!(!base.class().name().contains("BUG"));
+                    assert!(!index.class().name().contains("BUG"));
+                    assert!(!mask.class().name().contains("BUG"));
                 }
                 Operand::Nothing => {
                     panic!("`Nothing` should not be an operand listed in `inst.operand_count()`");
