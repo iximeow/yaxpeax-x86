@@ -1,5 +1,12 @@
 ## 2.2.1
 
+a few soundness fixes:
+* for an invalid instruction, .behavior().as_complex() was unsound, involving a
+  transmute to an enum with an invalid discriminant. this could be reached either like
+  `Instruction::invalid().behavior().as_complex()`, or by using `decode_into`, ignoring
+  a decode error, and then calling `.behavior().as_complex()` on the decoded-into instruction.
+  thanks to @hina-kura49 for reporting the issue.
+
 * fix instruction annotation for 0x9* xchg reporting an incorrect register in
   the second operand. thanks @jld for the patch!
 * do not annotate "opcode ends/operands begin" for instructions with no following
