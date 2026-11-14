@@ -1011,7 +1011,7 @@ const XSAVE: [Opcode; 10] = [
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(feature = "_debug_internal_asserts", derive(strum::EnumCount))]
+#[cfg_attr(feature = "_debug_internal_asserts", derive(strum::EnumCount, strum::VariantArray))]
 #[non_exhaustive]
 #[repr(u32)]
 pub enum Opcode {

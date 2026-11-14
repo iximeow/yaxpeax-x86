@@ -519,7 +519,7 @@ impl<'inst> InstBehavior<'inst> {
         } else {
             // Safety: every `Opcode` with a `BehaviorDigest` that is `set_complex(true)` has a
             // corresponding `ComplexOp` variant set to the same integer value, and the two types
-            // agree on repr.
+            // agree on repr. see the test `complex_behaviors_have_matching_variants()`.
             let comp: ComplexOp = unsafe { core::mem::transmute::<Opcode, ComplexOp>(self.inst.opcode) };
             Some(comp)
         }
@@ -1313,7 +1313,7 @@ impl BehaviorDigest {
 ///   transition, and has no way to validate if any implicit operand list describing the
 ///   reads/writes is correct.
 ///
-/// you know how to test SMM transitions and returns, please write me!
+/// if you know how to test SMM transitions and returns, please write me!
 ///
 /// ### WAITPKG
 ///
@@ -1341,12 +1341,20 @@ impl BehaviorDigest {
 ///
 /// TDX-related instructions are considered complex because they are not more precisely tested and
 /// are assumed as-complex-as-VMX in the first place.
+///
+/// ### `Invalid`
+///
+/// `Opcode::Invalid` is sometimes visible as a result of decoding an invalid instruction.  you
+/// must not rely on it as a sigil meaning "decoding failed", for the same reasons described in its
+/// `Opcode` variant. even so, it is possible to ask about the behavior of an invalid instruction,
+/// which is: only the caller can know what the program's behavior might be at that point!
 // TODO: this could be declared through a macro that does something like:
 // "declare_opcode_subset! { }" which gets a list of identifiers and generates the
 // `Opcode::<ident> as u32` rhs. but a vim macro will do for now.
 #[non_exhaustive]
 #[repr(u32)] // same repr as `Opcode`
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "_debug_internal_asserts", derive(strum::VariantArray))]
 #[allow(missing_docs)]
 pub enum ComplexOp {
     /// rdmsr/wrmsr are considered "complex" for reasons in the enum doc comment.
@@ -1617,6 +1625,11 @@ pub enum ComplexOp {
     VSCATTERPF1DPS = (Opcode::VSCATTERPF1DPS as u32),
     VSCATTERPF1QPD = (Opcode::VSCATTERPF1QPD as u32),
     VSCATTERPF1QPS = (Opcode::VSCATTERPF1QPS as u32),
+
+    /// invalid is considered "complex" because in a behavior context it is part of an instruction
+    /// stream the caller assumes is executable; the handling of the program at that state is well
+    /// beyond what yaxpeax-x86 can describe.
+    Invalid = (Opcode::Invalid as u32),
 }
 
 /// a visitor for collecting architectural accesses for an `Instruction`. used with
@@ -3886,6 +3899,52 @@ fn behavior_table_size_is_right() {
     assert_eq!(opcode2behavior(&Opcode::VMOVLHPS), GENERAL_W_R_R);
 }
 
+#[cfg(feature = "_debug_internal_asserts")]
+#[test]
+fn complex_behaviors_have_matching_variants() {
+    use strum::VariantArray;
+    let opcodes = super::Opcode::VARIANTS;
+    let complex_ops = ComplexOp::VARIANTS;
+    for (idx, digest) in TABLE.iter().enumerate() {
+        if digest.is_complex() {
+            let matching_complex_ops: alloc::vec::Vec<_> = complex_ops.iter().filter(|complex| {
+                **complex as usize & 0xfff == idx
+            }).collect();
+
+            let matching_opcodes: alloc::vec::Vec<_> = opcodes.iter().filter(|opcode| {
+                **opcode as usize & 0xfff == idx
+            }).collect();
+
+            match (matching_opcodes.as_slice(), matching_complex_ops.as_slice()) {
+                (_, &[]) => {
+                    panic!("no complex op for opcode index {}", idx);
+                }
+                (&[], _) => {
+                    panic!("no opcode for opcode index {}", idx);
+                }
+                (&[opcode], &[complex]) => {
+                    // this is the equivalence relationship that `as_complex_op()` relies on
+                    assert_eq!(*opcode as u32, *complex as u32);
+
+                    // kind of hokey, but does the job: Opcode and ComplexOp both impl display, and
+                    // ComplexOp variants are named to match Opcode, so double-check the number
+                    // means the same thing under both interpretations by checking the stringy
+                    // debug form matches.
+                    assert_eq!(
+                        alloc::format!("{:?}", opcode),
+                        alloc::format!("{:?}", complex)
+                    );
+                }
+                (opcodes, complex_ops) => {
+                    panic!("either multiple complex ops or multiple opcodes for opcode index {}.
+  opcodes: {:?}
+  complex_ops: {:?}", idx, opcodes, complex_ops);
+                }
+            }
+        }
+    }
+}
+
 /// this table MUST line up with Opcode declaration order in `mod.rs`.
 static TABLE: [BehaviorDigest; 1428] = [
     /* ADD => */ GENERAL_RW_R_FLAGWRITE,
@@ -3936,7 +3995,8 @@ static TABLE: [BehaviorDigest; 1428] = [
     /* INS => */ GENERAL_W_R,
     /* OUTS => */ GENERAL_R_R,
 
-        // "Invalid" should never be a publicly-visible Opcode variant..
+        // "Invalid" is a publicly-visible Opcode variant in some cases if decoding into an
+        // existing Instruction fails.
     /* Invalid => */ BehaviorDigest::empty()
             .set_complex(true),
     /* BT => */ GENERAL_R_R_FLAGWRITE
