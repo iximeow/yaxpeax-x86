@@ -1387,12 +1387,12 @@ pub(crate) fn contextualize<T: DisplaySink, R: DisplayRules<T>>(instr: &Instruct
                         }
                     };
                     displayer.f.write_fixed_size("{1to")?;
-                    static STRING_LUT: &'static [&'static str] = &[
-                        "0", "1", "2", "3", "4", "5", "6", "7", "8",
-                        "9", "10", "11", "12", "13", "14", "15", "16",
-                    ];
-                    unsafe {
-                        displayer.f.write_lt_16(STRING_LUT.get_kinda_unchecked(scale as usize))?;
+                    if scale >= 10 {
+                        displayer.f.write_char('1')?;
+                        // see comment on non-masm broadcast display.
+                        displayer.f.write_char((0x30 + (scale % 10)) as char)?;
+                    } else {
+                        displayer.f.write_char((0x30 + scale) as char)?;
                     }
                     displayer.f.write_char('}')?;
                 }
