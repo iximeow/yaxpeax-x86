@@ -3811,9 +3811,10 @@ struct OperandCodeBuilder {
 #[allow(non_camel_case_types)]
 enum ZOperandCategory {
     Zv_R = 0,
-    Zv_AX = 1,
-    Zb_Ib_R = 2,
-    Zv_Ivq_R = 3,
+    Zv_R_vqp = 1,
+    Zv_AX = 2,
+    Zb_Ib_R = 3,
+    Zv_Ivq_R = 4,
 }
 
 struct ZOperandInstructions {
@@ -3822,7 +3823,7 @@ struct ZOperandInstructions {
 
 impl ZOperandInstructions {
     fn category(&self) -> u8 {
-        (self.bits >> 4) as u8 & 0b11
+        (self.bits >> 4) as u8 & 0b111
     }
     fn reg(&self) -> u8 {
         (self.bits & 0b111) as u8
@@ -4384,6 +4385,14 @@ enum OperandCode {
     Zv_R5 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 5).bits(),
     Zv_R6 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 6).bits(),
     Zv_R7 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R, 7).bits(),
+    Zv_R0_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 0).bits(),
+    Zv_R1_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 1).bits(),
+    Zv_R2_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 2).bits(),
+    Zv_R3_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 3).bits(),
+    Zv_R4_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 4).bits(),
+    Zv_R5_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 5).bits(),
+    Zv_R6_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 6).bits(),
+    Zv_R7_vqp = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_R_vqp, 7).bits(),
     Zv_AX_R0 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 0).bits(),
     Zv_AX_R1 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 1).bits(),
     Zv_AX_R2 = OperandCodeBuilder::new().op0_is_rrr_and_Z_operand(ZOperandCategory::Zv_AX, 2).bits(),
@@ -5768,7 +5777,7 @@ fn read_operands<
 
     let operand_bytes_follow = if let Some(z_operand_code) = operand_code.get_embedded_instructions() {
         // operand with a `zzz` field but also requiring an immediate (i8 or i32)
-        z_operand_code.category() >= 2
+        z_operand_code.category() >= 3
     } else {
         operand_code.operand_case_handler_index() != OperandCase::Nothing
     };
@@ -5970,6 +5979,27 @@ fn read_operands<
                 instruction.operand_count = 1;
             }
             1 => {
+                // these are Zv_R_vqp, which is just "bswap" in practice
+                let bank = self.vqp_size();
+                instruction.regs[0] =
+                    RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), bank);
+                sink.record(
+                    opcode_start + 0,
+                    opcode_start + 2,
+                    InnerDescription::RegisterNumber("zzz", reg, instruction.regs[0])
+                        .with_id(opcode_start + 2)
+                );
+                if instruction.prefixes.rex_unchecked().b() {
+                    sink.record(
+                        opcode_start + 0,
+                        opcode_start + 2,
+                        InnerDescription::Misc("rex.b selects register `zzz` + 8")
+                            .with_id(opcode_start + 2)
+                    );
+                }
+                instruction.operand_count = 1;
+            }
+            2 => {
                 // Zv_AX
                 // in 64-bit mode, rex.b is able to make "nop" into an `xchg`, as in `4190`
                 // aka `xchg eax, r8d.
@@ -6023,7 +6053,7 @@ fn read_operands<
                 }
                 instruction.operand_count = 2;
             }
-            2 => {
+            3 => {
                 // these are Zb_Ib_R
                 let num = reg + if instruction.prefixes.rex_unchecked().b() { 0b1000 } else { 0 };
                 let bank = if num < 4 {
@@ -6056,8 +6086,8 @@ fn read_operands<
                 instruction.operands[1] = OperandSpec::ImmU8;
                 instruction.operand_count = 2;
             }
-            3 => {
-                // category == 3, Zv_Ivq_R
+            4 => {
+                // category == 4, Zv_Ivq_R
                 if instruction.prefixes.rex_unchecked().w() {
                     instruction.regs[0] =
                         RegSpec::from_parts(reg, instruction.prefixes.rex_unchecked().b(), RegisterBank::Q);
@@ -10279,14 +10309,14 @@ const REPNZ_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0fc7), // cmpxchg permits an f2 prefix, which is the only reason this entry is not `Nothing`
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7_vqp),
 
     OpcodeRecord::new(Interpretation::Instruction(Opcode::ADDSUBPS), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -10555,14 +10585,14 @@ const REP_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0fc7),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7_vqp),
 
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),
@@ -10828,14 +10858,14 @@ const OPERAND_SIZE_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PEXTRW), OperandCode::G_U_xmm_Ub),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::SHUFPD), OperandCode::G_E_xmm_Ib),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0fc7),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7_vqp),
 // 0xd0
     OpcodeRecord::new(Interpretation::Instruction(Opcode::ADDSUBPD), OperandCode::G_E_xmm),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PSRLW), OperandCode::G_E_xmm),
@@ -11110,14 +11140,14 @@ const NORMAL_0F_CODES: [OpcodeRecord; 256] = [
     OpcodeRecord::new(Interpretation::Instruction(Opcode::PEXTRW), OperandCode::Rv_Gmm_Ib),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::SHUFPS), OperandCode::G_E_xmm_Ib),
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::ModRM_0x0fc7),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6),
-    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R0_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R1_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R2_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R3_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R4_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R5_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R6_vqp),
+    OpcodeRecord::new(Interpretation::Instruction(Opcode::BSWAP), OperandCode::Zv_R7_vqp),
 
 // 0xd0
     OpcodeRecord::new(Interpretation::Instruction(Opcode::Invalid), OperandCode::Nothing),

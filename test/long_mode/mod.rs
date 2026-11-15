@@ -1962,6 +1962,22 @@ mod push_pop {
     }
 }
 
+mod bswap {
+    use crate::long_mode::{TestCase, run_test};
+
+    const CASES: &'static [TestCase] = &[
+        testcase!(&[0x0f, 0xc9], "bswap ecx"),
+        testcase!(&[0x48, 0x0f, 0xc9], "bswap rcx"),
+        testcase!(&[0x41, 0x0f, 0xc9], "bswap r9d"),
+        testcase!(&[0x66, 0x0f, 0xc9], "bswap cx"),
+    ];
+
+    #[test]
+    fn test() {
+        run_test(&CASES);
+    }
+}
+
 mod bmi1 {
     use crate::long_mode::{TestCase, run_test};
 

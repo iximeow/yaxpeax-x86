@@ -1882,6 +1882,20 @@ mod push_pop {
     }
 }
 
+mod bswap {
+    use crate::protected_mode::{TestCase, run_test};
+
+    const CASES: &'static [TestCase] = &[
+        testcase!(&[0x0f, 0xc9], "bswap ecx"),
+        testcase!(&[0x66, 0x0f, 0xc9], "bswap cx"),
+    ];
+
+    #[test]
+    fn test() {
+        run_test(&CASES);
+    }
+}
+
 mod bmi1 {
     use crate::protected_mode::{TestCase, run_test};
 

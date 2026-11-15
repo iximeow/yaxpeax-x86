@@ -35,6 +35,9 @@ come with a yaxpeax-arch API change.
   an existing instruction could produce bogus registers in the third operand.
   generally these differences are only InvalidOpcode and InvalidOperand errors
   trading places.
+* fix a few bugs reported by @hakan-demirli (thanks!)
+  * bswap incorrectly defaulted to a 64-bit operand in long mode, but should
+    have been 32-bit
 
 ## 2.2.0
 
