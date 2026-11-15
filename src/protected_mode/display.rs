@@ -2449,6 +2449,10 @@ pub trait DisplayRules<S: DisplaySink> {
     /// memory label sizes. new encodings may have additional (longer!) decorators or otherwise
     /// raise the maximum size of a formatted instruction. any of these may occur across a patch or
     /// minor version.
+    ///
+    /// finally, `DisplaySink::write_char` as implemented for InstructionDisplaySink - the internal
+    /// implementation detail used for formatting when `max_size` is defined - will truncate `char`
+    /// to a `u8` when writing. do not use `DisplaySink::write_char` with beyond-ASCII inputs.
     unsafe fn max_size() -> Option<usize> { None }
 
     /// the address of the instruction to be printed.
