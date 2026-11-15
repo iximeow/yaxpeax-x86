@@ -40,6 +40,9 @@ come with a yaxpeax-arch API change.
     have been 32-bit
   * pinsr* with a register source decode the source operand as xmm rather
     than gpr
+  * fix "movd xmm, gpr" being decoded as "movq xmm, gpr64"
+    .. and at the same time, fix cvtsi2s{s,d} being decoded with 16-bit memory
+    operand, as the 66 prefix is ineffectual there.
 
 ## 2.2.0
 
