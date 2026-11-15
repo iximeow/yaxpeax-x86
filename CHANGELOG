@@ -13,6 +13,10 @@ a few soundness fixes:
   to write to the prefixes of an instruction, and this field should have had a
   getter rather than be `pub`. a future API breaking change in yaxpeax-x86 will
   make prefixes() a getter, rather than pub field.
+* a library user with `use-serde` enabled could modify serialized RegSpec,
+  whereby deserialization yielded RegSpec with library invariants not upheld.
+  namely, a RegSpec could be deserialized with out-of-range register numbers,
+  and subsequently result in out-of-bounds access when formatted to a string.
 
 * fix instruction annotation for 0x9* xchg reporting an incorrect register in
   the second operand. thanks @jld for the patch!
