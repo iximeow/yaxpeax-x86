@@ -12,7 +12,6 @@ use crate::protected_mode::{
 };
 
 use yaxpeax_arch::display::DisplaySink;
-use yaxpeax_arch::safer_unchecked::GetSaferUnchecked as _;
 use yaxpeax_arch::safer_unchecked::unreachable_kinda_unchecked as unreachable_unchecked;
 
 struct DisplayingOperandVisitor<'a, 'rules, T, R> {
