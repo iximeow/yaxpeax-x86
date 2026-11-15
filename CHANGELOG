@@ -19,6 +19,12 @@ a few soundness fixes:
   namely, a RegSpec could be deserialized with out-of-range register numbers,
   and subsequently result in out-of-bounds access when formatted to a string.
 
+and an additional bit of documentation on the correctness of DisplayRules implementations:
+if a library user provides an impl of `max_size()`, that DisplayRules
+implementation must (for now) only use `DisplaySink::write_char` with
+characters below 0x80. this constraint may be relaxed in the future, but may
+come with a yaxpeax-arch API change.
+
 * fix instruction annotation for 0x9* xchg reporting an incorrect register in
   the second operand. thanks @jld for the patch!
 * do not annotate "opcode ends/operands begin" for instructions with no following
