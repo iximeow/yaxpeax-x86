@@ -4254,12 +4254,28 @@ pub(crate) fn format_intel<T: DisplaySink, R: DisplayRules<T>>(instr: &Instructi
                         }
                     };
                     out.write_fixed_size("{1to")?;
-                    static STRING_LUT: &'static [&'static str] = &[
-                        "0", "1", "2", "3", "4", "5", "6", "7", "8",
-                        "9", "10", "11", "12", "13", "14", "15", "16",
-                    ];
-                    unsafe {
-                        out.write_lt_16(STRING_LUT.get_kinda_unchecked(scale as usize))?;
+                    if scale > 10 {
+                        out.write_char('1')?;
+                        // realistically `scale` should be in the range of 0..16, so it would
+                        // almost seem acceptable to write `0x30 + scale - 10` here. unfortunately,
+                        // i made a mistake at one point in the past and made `prefixes` a public
+                        // member. that means that one can construct an `Instruction` with huge
+                        // `mem_size`, apply a prefix from an evex instruction with broadcast, and
+                        // get here with "scale" of more unpredictable values.
+                        //
+                        // previously this was a `get_unchecked` on a lookup table keyed by scale.
+                        // that was, because of the above, unsound. in our bold new LLM age, Claude
+                        // will breathlessly reports that there is a CRITICAL UNSOUNDNESS DEFECT in
+                        // the library because if you choose to go mess with disassembled
+                        // instructions then you could have the library do an OOB read. in Rust
+                        // terms, it is in fact unsound, and the application could write non-utf8
+                        // data into the output (or "just" segfault). so modulo it is.
+                        //
+                        // in the future, i will be breaking the API to make `prefixes()` a getter,
+                        // rather than a plain field access.
+                        out.write_char((0x30 + (scale % 10)) as char)?;
+                    } else {
+                        out.write_char((0x30 + scale) as char)?;
                     }
                     out.write_char('}')?;
                 }

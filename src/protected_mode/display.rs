@@ -2760,12 +2760,12 @@ pub(crate) fn format_intel<T: DisplaySink, R: DisplayRules<T>>(instr: &Instructi
                         }
                     };
                     out.write_fixed_size("{1to")?;
-                    static STRING_LUT: &'static [&'static str] = &[
-                        "0", "1", "2", "3", "4", "5", "6", "7", "8",
-                        "9", "10", "11", "12", "13", "14", "15", "16",
-                    ];
-                    unsafe {
-                        out.write_lt_16(STRING_LUT.get_kinda_unchecked(scale as usize))?;
+                    if scale > 10 {
+                        out.write_char('1')?;
+                        // see long monologue on the corresponding code in `long_mode`.
+                        out.write_char((0x30 + (scale % 10)) as char)?;
+                    } else {
+                        out.write_char((0x30 + scale) as char)?;
                     }
                     out.write_char('}')?;
                 }

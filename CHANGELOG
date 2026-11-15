@@ -6,6 +6,13 @@ a few soundness fixes:
   `Instruction::invalid().behavior().as_complex()`, or by using `decode_into`, ignoring
   a decode error, and then calling `.behavior().as_complex()` on the decoded-into instruction.
   thanks to @hina-kura49 for reporting the issue.
+* a library user could cause formatting an instruction to perform an
+  out-of-bounds read if they replace the "prefixes" field on a decoded
+  instruction with an alternate collection of prefixes from an EVEX-encoded
+  instruction with broadcast bit set. no library user i know of has ever wanted
+  to write to the prefixes of an instruction, and this field should have had a
+  getter rather than be `pub`. a future API breaking change in yaxpeax-x86 will
+  make prefixes() a getter, rather than pub field.
 
 * fix instruction annotation for 0x9* xchg reporting an incorrect register in
   the second operand. thanks @jld for the patch!
