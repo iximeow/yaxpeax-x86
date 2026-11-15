@@ -955,7 +955,10 @@ mod sse2 {
             "movdqa xmm11, xmmword [r12 + r11 * 4 - 0x334455cc]"
         ),
 
+        testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x0f, 0x6e, 0xc1], "movd xmm0, ecx"),
+        testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x0f, 0x6e, 0x01], "movd xmm0, dword [rcx]"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x48, 0x0f, 0x6e, 0xc0], "movq xmm0, rax"),
+        testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x48, 0x0f, 0x6e, 0x01], "movq xmm0, qword [rcx]"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0x66, 0x0f, 0x70, 0xc0, 0x4e], "pshufd xmm0, xmm0, 0x4e"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0xf2, 0x0f, 0x70, 0xc0, 0x4e], "pshuflw xmm0, xmm0, 0x4e"),
         testcase!(features nodefault { Minimal: true, SSE: true, SSE2: true } &[0xf3, 0x0f, 0x70, 0xc0, 0x4e], "pshufhw xmm0, xmm0, 0x4e"),
@@ -1317,12 +1320,16 @@ mod sse4_1 {
         testcase!(invalid: &[0x0f, 0x3a, 0x17, 0x06]),
 
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x20, 0x06, 0x31], "pinsrb xmm0, byte [rsi], 0x31"),
+        testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x20, 0xc1, 0x31], "pinsrb xmm0, ecx, 0x31"),
         testcase!(invalid: &[0x0f, 0x3a, 0x20, 0x06]),
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x21, 0x06, 0x31], "insertps xmm0, dword [rsi], 0x31"),
+        testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x21, 0xc1, 0x31], "insertps xmm0, xmm1, 0x31"),
         testcase!(invalid: &[0x0f, 0x3a, 0x21, 0x06]),
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x22, 0x06, 0x31], "pinsrd xmm0, dword [rsi], 0x31"),
+        testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x22, 0xc1, 0x31], "pinsrd xmm0, ecx, 0x31"),
         testcase!(invalid: &[0x0f, 0x3a, 0x22, 0x06]),
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x48, 0x0f, 0x3a, 0x22, 0x06, 0x31], "pinsrq xmm0, qword [rsi], 0x31"),
+        testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x48, 0x0f, 0x3a, 0x22, 0xc1, 0x31], "pinsrq xmm0, rcx, 0x31"),
 
         testcase!(features { SSE4_1: true, AVX: false } &[0x66, 0x0f, 0x3a, 0x40, 0x06, 0x31], "dpps xmm0, xmmword [rsi], 0x31"),
         testcase!(invalid: &[0x0f, 0x3a, 0x40, 0x06]),
@@ -3358,6 +3365,10 @@ mod prefixed_0f {
         testcase!(&[0x48, 0x0f, 0x03, 0xc1], "lsl rax, ecx", masm: "lsl rax, rcx"),
         testcase!(&[0x66, 0x0f, 0x03, 0x01], "lsl ax, word [rcx]"),
         testcase!(&[0x66, 0x0f, 0x03, 0xc1], "lsl ax, cx"),
+        testcase!(&[0x0f, 0xc8], "bswap eax"),
+        testcase!(&[0x48, 0x0f, 0xc8], "bswap rax"),
+        testcase!(&[0x41, 0x0f, 0xc8], "bswap r8d"),
+        testcase!(&[0x49, 0x0f, 0xc8], "bswap r8"),
         testcase!(&[0x0f, 0x05], "syscall"),
         testcase!(&[0x48, 0x0f, 0x05], "syscall"),
         testcase!(&[0x66, 0x0f, 0x05], "syscall"),
