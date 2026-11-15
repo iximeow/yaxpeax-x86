@@ -50,10 +50,94 @@ impl fmt::Display for DecodeError {
 /// some registers have classes of their own, and only one member: `rip`, `eip`, `rflags`, and
 /// `eflags`.
 #[cfg_attr(feature="use-serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature="use-serde", serde(try_from = "RawRegSpec"))]
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq)]
 pub struct RegSpec {
     num: u8,
     bank: RegisterBank
+}
+
+// a `RegSpec`, but with no constraints on `num` or `RegBank`. this is an intermediate, internal
+// detail of getting to a `RegSpec`. this is a non-doc comment because if this is ever
+// crate-public, something has gone wrong.
+#[cfg(feature="use-serde")]
+#[cfg_attr(feature="use-serde", derive(Deserialize))]
+struct RawRegSpec {
+    num: u8,
+    bank: RegisterBank
+}
+
+#[cfg(feature="use-serde")]
+impl core::convert::TryFrom<RawRegSpec> for RegSpec {
+    type Error = alloc::string::String;
+    fn try_from(other: RawRegSpec) -> Result<Self, Self::Error> {
+        use alloc::string::ToString;
+        match other.bank {
+            RegisterBank::X |
+            RegisterBank::Y |
+            RegisterBank::Z => {
+                if other.num >= 32 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::Q |
+            RegisterBank::D |
+            RegisterBank::W => {
+                if other.num >= 16 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::B => {
+                if other.num >= 8 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::rB => {
+                // rB is specifically "rex-prefixed byte registers". these are the low byte of
+                // GPRs, except that the low four GPRs are canonicalized to `RegisterBank::B`. so
+                // we check both directions, because if you've got a `RegisterBank::rB` with
+                // too-low register number then you've modified the json just the same.
+                if other.num >= 16  || other.num < 4 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::K => {
+                if other.num >= 8 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::ST |
+            RegisterBank::MM => {
+                if other.num >= 8 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::CR |
+            RegisterBank::DR => {
+                if other.num >= 16 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::S => {
+                if other.num >= 6 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+            RegisterBank::EIP |
+            RegisterBank::RIP |
+            RegisterBank::EFlags |
+            RegisterBank::RFlags => {
+                if other.num >= 1 {
+                    return Err("invalid register number".to_string())
+                }
+            }
+        }
+
+        Ok(RegSpec {
+            num: other.num,
+            bank: other.bank,
+        })
+    }
 }
 
 use core::hash::Hash;

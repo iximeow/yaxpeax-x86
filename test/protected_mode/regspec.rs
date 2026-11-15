@@ -51,3 +51,49 @@ fn match_bank_kind() {
         }
     }
 }
+
+#[cfg(feature="use-serde")]
+#[test]
+fn regspec_deserialize_is_invariant_preserving() {
+    // RegisterBank is not public, so we can't use it in the test. instead, use the serialized form
+    // of the enum and just splat it into the json by hand.
+    struct TestCase {
+        bank: &'static str,
+        // the lowest valid register number for this bank
+        low: u8,
+        // the highest valid register number for this bank (inclusive)
+        high: u8,
+    }
+
+    const DESERIALIZE_LIMITS: [TestCase; 12] = [
+        TestCase { bank: "D", low: 0, high: 7 },
+        TestCase { bank: "W", low: 0, high: 7 },
+        TestCase { bank: "B", low: 0, high: 7 },
+
+        TestCase { bank: "X", low: 0, high: 31 },
+        TestCase { bank: "Y", low: 0, high: 31 },
+        TestCase { bank: "Z", low: 0, high: 31 },
+
+        TestCase { bank: "K", low: 0, high: 7 },
+
+        TestCase { bank: "ST", low: 0, high: 7 },
+        TestCase { bank: "MM", low: 0, high: 7 },
+
+        TestCase { bank: "S", low: 0, high: 5 },
+
+        TestCase { bank: "EIP", low: 0, high: 0 },
+        TestCase { bank: "EFlags", low: 0, high: 0 },
+    ];
+
+    for TestCase { bank, low, high } in DESERIALIZE_LIMITS.iter() {
+        for i in 0..=255 {
+            let json = format!("{{ \"bank\": \"{}\", \"num\": {} }}", bank, i);
+            let res: Result<RegSpec, serde_json::Error> = serde_json::from_str(&json);
+            if i >= *low && i <= *high {
+                assert!(res.is_ok(), "deserializing bank {} register {} should succeed", bank, i);
+            } else {
+                assert!(res.is_err(), "deserializing bank {} register {} should fail", bank, i);
+            }
+        }
+    }
+}
