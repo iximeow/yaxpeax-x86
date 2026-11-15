@@ -32,10 +32,10 @@ fuzz_target!(|data: &[u8]| {
             let rest_res = decoder.decode_into(&mut inst, &mut rest_reader);
             match (first_next_inst, rest_res) {
                 (Ok(first_next_inst), Ok(())) => {
-                    assert_eq!(first_next_inst, inst);
+                    assert_eq!(first_next_inst, inst, "on second pass of {:x?}", remainder_slice);
                 }
                 (Err(left), Err(right)) => {
-                    assert_eq!(left, right);
+                    assert_eq!(left, right, "on second pass of {:x?}", remainder_slice);
                 }
                 other => {
                     panic!("mismatched results when reusing instruction: {:?}", other);
@@ -67,10 +67,10 @@ fuzz_target!(|data: &[u8]| {
             let rest_res = decoder.decode_into(&mut inst, &mut rest_reader);
             match (first_next_inst, rest_res) {
                 (Ok(first_next_inst), Ok(())) => {
-                    assert_eq!(first_next_inst, inst);
+                    assert_eq!(first_next_inst, inst, "on second pass of {:x?}", remainder_slice);
                 }
                 (Err(left), Err(right)) => {
-                    assert_eq!(left, right);
+                    assert_eq!(left, right, "on second pass of {:x?}", remainder_slice);
                 }
                 other => {
                     panic!("mismatched results when reusing instruction: {:?}", other);
@@ -102,10 +102,10 @@ fuzz_target!(|data: &[u8]| {
             let rest_res = decoder.decode_into(&mut inst, &mut rest_reader);
             match (first_next_inst, rest_res) {
                 (Ok(first_next_inst), Ok(())) => {
-                    assert_eq!(first_next_inst, inst);
+                    assert_eq!(first_next_inst, inst, "on second pass of {:x?}", remainder_slice);
                 }
                 (Err(left), Err(right)) => {
-                    assert_eq!(left, right);
+                    assert_eq!(left, right, "on second pass of {:x?}", remainder_slice);
                 }
                 other => {
                     panic!("mismatched results when reusing instruction: {:?}", other);

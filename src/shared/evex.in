@@ -194,6 +194,11 @@ pub(crate) fn read_evex<
               .with_id(evex_start + 24)
       );
       read_evex_operands(words, instruction, operand_code, sink)?;
+      // if the opcode is still invalid, no amount of post-operand handling
+      // here will make it valid. so bail out before we waste any more time.
+      if instruction.opcode == Opcode::Invalid {
+        return Err(DecodeError::InvalidOpcode);
+      }
       if instruction.prefixes.evex_unchecked().rp() {
         instruction.regs[0].num |= 0b10000;
         if ![RegisterBank::X, RegisterBank::Y, RegisterBank::Z].contains(&instruction.regs[0].bank) {
@@ -201,7 +206,9 @@ pub(crate) fn read_evex<
         }
       }
       if instruction.prefixes.evex_unchecked().vex().x() {
-        if instruction.operands.contains(&OperandSpec::RegMMM) {
+        // note: only check up to `operand_count` because it's possible there's
+        // litter in the upper OperandSpec fields from previous decodes.
+        if instruction.operands[..instruction.operand_count as usize].contains(&OperandSpec::RegMMM) {
           instruction.regs[1].num |= 0b10000;
           if ![RegisterBank::X, RegisterBank::Y, RegisterBank::Z].contains(&instruction.regs[1].bank) {
             return Err(DecodeError::InvalidOperand);
@@ -244,9 +251,6 @@ pub(crate) fn read_evex<
           instruction.disp = instruction.disp.wrapping_mul(instruction.mem_size.into());
         }
         instruction.prefixes.apply_compressed_disp(false);
-      }
-      if instruction.opcode == Opcode::Invalid {
-        return Err(DecodeError::InvalidOpcode);
       }
       // TODO: apply rp and bp?
     } else {
@@ -368,6 +372,20 @@ fn regs_size(inst: &Instruction) -> u8 {
     32
   } else {
     16
+  }
+}
+
+#[inline(always)]
+fn reg_size_from_ll(inst: &Instruction) -> Result<RegisterBank, DecodeError> {
+  if inst.prefixes.evex_unchecked().lp() {
+    if inst.prefixes.evex_unchecked().vex().l() {
+      return Err(DecodeError::InvalidOperand);
+    }
+    Ok(RegisterBank::Z)
+  } else if inst.prefixes.evex_unchecked().vex().l() {
+    Ok(RegisterBank::Y)
+  } else {
+    Ok(RegisterBank::X)
   }
 }
 
@@ -2531,7 +2549,11 @@ pub(crate) fn read_evex_operands<
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      set_reg_sizes_from_ll(instruction)?;
+      // unlike most other casess, the third operand (E, read just below) is
+      // either XMM or memory, and should not be sized by a `set_reg_sizes_from_ll`.
+      // so set the other two registers, which are sized by L'L, directly.
+      instruction.regs[0].bank = reg_size_from_ll(instruction)?;
+      instruction.regs[3].bank = reg_size_from_ll(instruction)?;
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -2548,7 +2570,11 @@ pub(crate) fn read_evex_operands<
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      set_reg_sizes_from_ll(instruction)?;
+      // unlike most other casess, the third operand (E, read just below) is
+      // either XMM or memory, and should not be sized by a `set_reg_sizes_from_ll`.
+      // so set the other two registers, which are sized by L'L, directly.
+      instruction.regs[0].bank = reg_size_from_ll(instruction)?;
+      instruction.regs[3].bank = reg_size_from_ll(instruction)?;
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -2563,7 +2589,11 @@ pub(crate) fn read_evex_operands<
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      set_reg_sizes_from_ll(instruction)?;
+      // unlike most other casess, the third operand (E, read just below) is
+      // either XMM or memory, and should not be sized by a `set_reg_sizes_from_ll`.
+      // so set the other two registers, which are sized by L'L, directly.
+      instruction.regs[0].bank = reg_size_from_ll(instruction)?;
+      instruction.regs[3].bank = reg_size_from_ll(instruction)?;
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
@@ -2585,7 +2615,11 @@ pub(crate) fn read_evex_operands<
 
       let modrm = read_modrm(words)?;
       set_rrr(instruction, modrm);
-      set_reg_sizes_from_ll(instruction)?;
+      // unlike most other casess, the third operand (E, read just below) is
+      // either XMM or memory, and should not be sized by a `set_reg_sizes_from_ll`.
+      // so set the other two registers, which are sized by L'L, directly.
+      instruction.regs[0].bank = reg_size_from_ll(instruction)?;
+      instruction.regs[3].bank = reg_size_from_ll(instruction)?;
       let mem_oper = read_E_vex(words, instruction, modrm, RegisterBank::X, sink)?;
       instruction.mem_size = 16;
       instruction.operands[0] = OperandSpec::RegRRR_maskmerge;
