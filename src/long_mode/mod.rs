@@ -6656,7 +6656,7 @@ fn read_operands<
                     .with_id(words.offset() as u32 * 8 - 8 + 1)
             );
             if instruction.operands[1] != OperandSpec::RegMMM {
-                if instruction.opcode == Opcode::CMPSS || instruction.opcode == Opcode::ROUNDSS {
+                if instruction.opcode == Opcode::CMPSS || instruction.opcode == Opcode::ROUNDSS || instruction.opcode == Opcode::INSERTPS {
                     instruction.mem_size = 4;
                 } else if instruction.opcode == Opcode::CMPSD || instruction.opcode == Opcode::ROUNDSD {
                     instruction.mem_size = 8;
@@ -6666,7 +6666,11 @@ fn read_operands<
             } else {
                 instruction.regs[1].bank = RegisterBank::X;
             }
-            instruction.operands[2] = OperandSpec::ImmI8;
+            if instruction.opcode == Opcode::INSERTPS {
+                instruction.operands[2] = OperandSpec::ImmU8;
+            } else {
+                instruction.operands[2] = OperandSpec::ImmI8;
+            }
             instruction.operand_count = 3;
         },
         OperandCase::AL_Ibs => {
@@ -6896,14 +6900,18 @@ fn read_operands<
                 read_num(words, 1)? as u8 as u64;
             if instruction.operands[1] != OperandSpec::RegMMM {
                 instruction.mem_size = match instruction.opcode {
-                    Opcode::INSERTPS => 4,
                     Opcode::PINSRB => 1,
                     Opcode::PINSRW => 2,
                     Opcode::PINSRD => 4,
                     _ => 8,
                 };
             } else {
-                instruction.regs[1].bank = RegisterBank::X;
+                if instruction.opcode == Opcode::PINSRQ {
+                    instruction.regs[1].bank = RegisterBank::Q;
+                } else {
+                    // pinsr{b,w,d} are all 32-bit gpr sources, if gpr
+                    instruction.regs[1].bank = RegisterBank::D;
+                }
             }
             instruction.operands[2] = OperandSpec::ImmU8;
             instruction.operand_count = 3;
@@ -9466,7 +9474,7 @@ fn read_0f3a_opcode(&mut self, opcode: u8, prefixes: &mut Prefixes) -> Result<Op
             0x16 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::PEXTRD), OperandCode::Ev_G_xmm_Ib)),
             0x17 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::EXTRACTPS), OperandCode::Ev_G_xmm_Ib)),
             0x20 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::PINSRB), OperandCode::G_Ev_xmm_Ib)),
-            0x21 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::INSERTPS), OperandCode::G_Ev_xmm_Ib)),
+            0x21 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::INSERTPS), OperandCode::G_E_xmm_Ib)),
             0x22 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::PINSRD), OperandCode::G_Ev_xmm_Ib)),
             0x40 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::DPPS), OperandCode::G_E_xmm_Ib)),
             0x41 => Ok(OpcodeRecord::new(Interpretation::Instruction(Opcode::DPPD), OperandCode::G_E_xmm_Ib)),
