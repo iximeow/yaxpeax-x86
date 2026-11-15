@@ -28,6 +28,12 @@ come with a yaxpeax-arch API change.
   the second operand. thanks @jld for the patch!
 * do not annotate "opcode ends/operands begin" for instructions with no following
   operand bytes (push <reg>, xchg, or no-operand instructions)
+* fix a smattering of cases where decoding through a fresh instruction or a
+  reused instruction could produce different results. for some EVEX
+  instructions (vpsrl*, vpsra*, vpsll*, and vinsertf{32x4,64x2}), decoding into
+  an existing instruction could produce bogus registers in the third operand.
+  generally these differences are only InvalidOpcode and InvalidOperand errors
+  trading places.
 
 ## 2.2.0
 
